@@ -1,0 +1,45 @@
+# Environment & secrets
+.env
+*.env
+.env.*
+
+# Claude Code local settings (contains credentials)
+.claude/
+
+# Slack bot has its own repo
+slack_ai_bot/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Logs
+*.log
+orchestrator.log
+
+# Database
+*.db
+*.sqlite3
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Misc
+*.docx
+*.png
+report.md
