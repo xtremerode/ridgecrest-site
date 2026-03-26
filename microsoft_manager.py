@@ -68,12 +68,21 @@ LOOKBACK_DAYS     = 7
 # (same approach as meta_manager.py).
 ACTIVE_DAYS = {"friday", "saturday", "sunday", "monday"}
 
-# Campaigns that should be ENABLED (Priority 1–3 per CLAUDE.md §6)
+# Campaigns that should be ENABLED on active days (Fri-Mon).
+# Updated 2026-03-26: matches the 5 consolidated campaign names after rebuild.
+# Theme is extracted from campaign name: "[RMA] {theme} | Ridgecrest Marketing"
 PRIORITY_ENABLED_THEMES = {
+    # New consolidated campaigns (rebuild_microsoft_campaigns.py)
+    "Custom Home & Design Build",
+    "Whole House Remodel",
+    "Kitchen & Bathroom",
+    "Interior & Home Design",
+    "Contractors & Builders",
+    # Legacy single-theme names kept as fallback in case old campaigns
+    # were not fully archived — they will be activated if present and ENABLED.
     "Design Build",
     "Custom Home",
     "Custom Home Builder",
-    "Whole House Remodel",
     "Kitchen Remodel",
     "Bathroom Remodel",
     "Master Bathroom Remodel",
@@ -634,6 +643,99 @@ def resume_campaign(name_fragment: str):
         _set_campaign_status_by_id(auth, c["id"], "Active", c["name"])
 
 
+def set_keyword_floor_bid(floor_usd: float):
+    """
+    Raise any Microsoft keyword bid below floor_usd up to floor_usd.
+    Updates both the Microsoft Ads API and the local DB.
+    Use this to fix under-bid keywords that are not winning auctions.
+    """
+    access_token, expires_in = _refresh_token()
+    auth = _build_auth(access_token, expires_in)
+    from bingads import ServiceClient
+    svc = ServiceClient("CampaignManagementService", 13, auth, "production")
+
+    floor_micros = int(floor_usd * 1_000_000)
+
+    with db.get_db() as (conn, cur):
+        cur.execute(
+            """
+            SELECT k.id as db_id, k.google_keyword_id, k.cpc_bid_micros,
+                   k.keyword_text, k.match_type, ag.google_ad_group_id
+            FROM keywords k
+            JOIN ad_groups ag ON ag.id = k.ad_group_id
+            JOIN campaigns c ON c.id = ag.campaign_id
+            WHERE c.platform = 'microsoft_ads'
+              AND (k.cpc_bid_micros IS NULL OR k.cpc_bid_micros < %s)
+            """,
+            (floor_micros,),
+        )
+        rows = [dict(r) for r in cur.fetchall()]
+
+    if not rows:
+        logger.info("All keyword bids are already at or above $%.2f — nothing to do", floor_usd)
+        return
+
+    logger.info("Raising %d keyword(s) to minimum bid $%.2f", len(rows), floor_usd)
+
+    # Group keywords by ad group for batched UpdateKeywords calls
+    from collections import defaultdict
+    by_ag: dict[int, list[dict]] = defaultdict(list)
+    for row in rows:
+        msft_ag_id = int(row["google_ad_group_id"].replace("msft_ag_", ""))
+        by_ag[msft_ag_id].append(row)
+
+    updated = 0
+    errors  = 0
+    for msft_ag_id, kw_rows in by_ag.items():
+        try:
+            from suds import null as snull
+            kw_objects = []
+            for row in kw_rows:
+                msft_kw_id = int(row["google_keyword_id"].replace("msft_kw_", ""))
+                kw = svc.factory.create("Keyword")
+                kw.Id         = msft_kw_id
+                kw.Bid        = svc.factory.create("Bid")
+                kw.Bid.Amount = floor_usd
+                # Null out all enum/optional fields to prevent suds serializing
+                # them as empty strings which Microsoft rejects as invalid enum values
+                kw.MatchType               = snull()
+                kw.Status                  = snull()
+                kw.EditorialStatus         = snull()
+                kw.Text                    = snull()
+                kw.BiddingScheme           = snull()
+                kw.DestinationUrl          = snull()
+                kw.FinalAppUrls            = snull()
+                kw.FinalMobileUrls         = snull()
+                kw.FinalUrlSuffix          = snull()
+                kw.FinalUrls               = snull()
+                kw.ForwardCompatibilityMap = snull()
+                kw.Param1                  = snull()
+                kw.Param2                  = snull()
+                kw.Param3                  = snull()
+                kw.TrackingUrlTemplate     = snull()
+                kw.UrlCustomParameters     = snull()
+                kw_objects.append(kw)
+
+            svc.UpdateKeywords(AdGroupId=msft_ag_id, Keywords={"Keyword": kw_objects})
+
+            # Update DB for all keywords in this batch
+            for row in kw_rows:
+                with db.get_db() as (conn, cur):
+                    cur.execute(
+                        "UPDATE keywords SET cpc_bid_micros=%s, updated_at=NOW() WHERE id=%s",
+                        (floor_micros, row["db_id"]),
+                    )
+                updated += 1
+                logger.info("  %s [%s]: $%.2f → $%.2f",
+                            row["keyword_text"], row["match_type"],
+                            (row["cpc_bid_micros"] or 0) / 1_000_000, floor_usd)
+        except Exception as e:
+            errors += len(kw_rows)
+            logger.error("  Ad group %d batch update failed: %s", msft_ag_id, e)
+
+    logger.info("Keyword floor bid done — updated=%d errors=%d", updated, errors)
+
+
 def set_budget(name_fragment: str, daily_budget_usd: float):
     """Set daily budget for campaign(s) matching name fragment."""
     access_token, expires_in = _refresh_token()
@@ -751,7 +853,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Microsoft Ads Manager")
     parser.add_argument("command", nargs="?", default="run",
-                        choices=["run", "list", "pause", "resume", "budget"])
+                        choices=["run", "list", "pause", "resume", "budget", "floor_bid"])
     parser.add_argument("name",   nargs="?", help="Campaign name fragment")
     parser.add_argument("value",  nargs="?", help="Budget value in USD (for budget command)")
     args = parser.parse_args()
@@ -773,6 +875,11 @@ if __name__ == "__main__":
             print("Usage: python microsoft_manager.py budget 'campaign name fragment' 45.00")
         else:
             set_budget(args.name, float(args.value))
+    elif args.command == "floor_bid":
+        if not args.value:
+            print("Usage: python microsoft_manager.py floor_bid '' 8.00")
+        else:
+            set_keyword_floor_bid(float(args.value))
     else:
         result = run()
         print(json.dumps(result, indent=2, default=str))

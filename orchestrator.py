@@ -51,6 +51,7 @@ import command_executor
 import recommendation_agent
 import health_agent
 import chat_agent
+import compliance_agent
 
 logging.basicConfig(
     level=logging.INFO,
@@ -337,6 +338,22 @@ def run_pipeline(force: bool = False) -> dict:
 
     results["phases"]["platform_managers"] = platform_manager_results
 
+    # ---- Phase 1c: Compliance Check (verify all CLAUDE.md parameters are met) ----
+    logger.info("--- Phase 1c: Compliance Check ---")
+    db.heartbeat(AGENT_NAME, "alive", metadata={"phase": "compliance_check",
+                                                 "run_id": pipeline_run_id})
+    try:
+        comp_result = compliance_agent.run()
+        results["phases"]["compliance_check"] = {
+            "status":       comp_result.get("status"),
+            "checks_total": comp_result.get("checks_total", 0),
+            "checks_fail":  comp_result.get("checks_fail", 0),
+            "auto_fixed":   comp_result.get("auto_fixed", 0),
+        }
+    except Exception as e:
+        logger.error("Compliance check failed: %s", e, exc_info=True)
+        results["phases"]["compliance_check"] = {"status": "error", "error": str(e)}
+
     # ---- Phase 2: Bid & Budget Optimization ----
     if optimization_halted:
         logger.warning(
@@ -567,10 +584,53 @@ def _sync_supabase():
 # Daemon scheduler
 # ---------------------------------------------------------------------------
 
+def _run_platform_sync():
+    """
+    Lightweight sync-only run: pulls fresh data from Meta and Microsoft into the DB
+    without running optimization, creative, or reporting phases.
+    Runs every 6 hours so the DB never goes more than 6 hours stale between
+    the daily 08:00 full pipeline runs.
+    """
+    logger.info("=== Platform sync (lightweight) starting ===")
+    try:
+        meta_result = meta_sync.run()
+        logger.info("Meta sync: %s", meta_result.get("status"))
+    except Exception as e:
+        logger.warning("Meta sync error in lightweight run: %s", e)
+    try:
+        msft_result = microsoft_sync.run()
+        logger.info("Microsoft sync: %s — keywords=%s",
+                    msft_result.get("status"), msft_result.get("keywords_synced", 0))
+    except Exception as e:
+        logger.warning("Microsoft sync error in lightweight run: %s", e)
+    logger.info("=== Platform sync (lightweight) done ===")
+
+
+def _run_compliance_check():
+    """
+    Lightweight compliance check (spend + Meta targeting).
+    Runs every 6 hours. Full Microsoft criteria check runs in the daily pipeline.
+    """
+    try:
+        result = compliance_agent.run(lightweight=True)
+        if result.get("checks_fail", 0) or result.get("auto_fixed", 0):
+            logger.warning(
+                "Compliance: %d/%d checks failing, %d auto-fixed",
+                result["checks_fail"], result["checks_total"], result["auto_fixed"],
+            )
+        else:
+            logger.info("Compliance: all %d checks passing", result.get("checks_total", 0))
+    except Exception as e:
+        logger.error("Compliance check error: %s", e, exc_info=True)
+
+
 def setup_schedule():
     """Configure the daily run schedule."""
     # Run pipeline at 08:00 every day
     schedule.every().day.at("08:00").do(run_pipeline)
+
+    # Lightweight platform data sync every 6 hours (keeps DB fresh between pipeline runs)
+    schedule.every(6).hours.do(_run_platform_sync)
 
     # Lightweight status check every hour
     schedule.every().hour.do(print_system_status)
@@ -590,7 +650,10 @@ def setup_schedule():
     # End-to-end health checks every 30 minutes
     schedule.every(30).minutes.do(_run_health_agent)
 
-    logger.info("Scheduler configured: pipeline at 08:00 daily, status every hour, supabase sync every 5 min, command executor every 30s, chat agent every 5s, health checks every 30 min")
+    # Compliance checks every 6 hours (runs after platform sync)
+    schedule.every(6).hours.do(_run_compliance_check)
+
+    logger.info("Scheduler configured: pipeline at 08:00 daily, status every hour, supabase sync every 5 min, command executor every 30s, chat agent every 5s, health checks every 30 min, compliance checks every 6 hours")
 
 
 def run_daemon():

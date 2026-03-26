@@ -193,10 +193,12 @@ def _sync_adset_metrics(adset_map: dict, start_date: date, end_date: date) -> in
 
     rows = resp.get("data", [])
     paging = resp.get("paging", {})
-    while paging.get("next"):
+    page_count = 0
+    while paging.get("next") and page_count < 20:
         page = requests.get(paging["next"], timeout=30).json()
         rows.extend(page.get("data", []))
         paging = page.get("paging", {})
+        page_count += 1
 
     written = 0
     for row in rows:
@@ -299,12 +301,14 @@ def run() -> dict:
         return {"platform": PLATFORM, "status": "error", "error": err}
 
     rows = ins_resp.get("data", [])
-    # Handle pagination
+    # Handle pagination (max 20 pages as safety limit)
     paging = ins_resp.get("paging", {})
-    while paging.get("next"):
+    page_count = 0
+    while paging.get("next") and page_count < 20:
         page = requests.get(paging["next"], timeout=30).json()
         rows.extend(page.get("data", []))
         paging = page.get("paging", {})
+        page_count += 1
 
     logger.info("Fetched %d daily insight row(s) from Meta", len(rows))
 

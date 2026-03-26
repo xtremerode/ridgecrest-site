@@ -268,6 +268,154 @@ def _submit_and_download_report(auth_data, start_date: date, end_date: date) -> 
     return rows
 
 
+def _fetch_keywords(auth_data, ag_id: int) -> list[dict]:
+    """Fetch all keywords for a single Microsoft Ads ad group."""
+    from bingads import ServiceClient
+    try:
+        svc = ServiceClient("CampaignManagementService", 13, auth_data, "production")
+        resp = svc.GetKeywordsByAdGroupId(AdGroupId=ag_id)
+        raw = (resp.Keyword.Keyword
+               if resp.Keyword and hasattr(resp.Keyword, "Keyword")
+               else list(resp.Keyword or []))
+        results = []
+        for kw in raw:
+            if not hasattr(kw, "Id") or kw.Id is None:
+                continue
+            bid_usd = None
+            try:
+                if hasattr(kw, "Bid") and kw.Bid is not None and hasattr(kw.Bid, "Amount"):
+                    bid_usd = float(kw.Bid.Amount) if kw.Bid.Amount is not None else None
+            except Exception:
+                pass
+            results.append({
+                "id":         int(kw.Id),
+                "text":       str(kw.Text) if hasattr(kw, "Text") and kw.Text else "",
+                "match_type": str(kw.MatchType) if hasattr(kw, "MatchType") else "Broad",
+                "bid_usd":    bid_usd,
+                "status":     str(kw.Status) if hasattr(kw, "Status") else "Active",
+            })
+        return results
+    except Exception as e:
+        logger.warning("GetKeywordsByAdGroupId failed for ag %d: %s", ag_id, e)
+        return []
+
+
+def _upsert_keyword(ag_db_id: int, msft_kw_id: int, text: str,
+                    match_type: str, bid_usd: float | None, status: str) -> None:
+    external_id   = f"msft_kw_{msft_kw_id}"
+    bid_micros    = int(bid_usd * 1_000_000) if bid_usd is not None else None
+    norm_status   = "ENABLED" if status.lower() in ("active", "enabled") else "PAUSED"
+    with db.get_db() as (conn, cur):
+        cur.execute(
+            """INSERT INTO keywords
+               (google_keyword_id, ad_group_id, keyword_text, match_type,
+                status, cpc_bid_micros, updated_at)
+               VALUES (%s, %s, %s, %s, %s, %s, NOW())
+               ON CONFLICT (google_keyword_id) DO UPDATE SET
+                   keyword_text   = EXCLUDED.keyword_text,
+                   match_type     = EXCLUDED.match_type,
+                   status         = EXCLUDED.status,
+                   cpc_bid_micros = COALESCE(EXCLUDED.cpc_bid_micros, keywords.cpc_bid_micros),
+                   updated_at     = NOW()""",
+            (external_id, ag_db_id, text, match_type.upper(), norm_status, bid_micros),
+        )
+
+
+def _scan_all_ad_groups(auth_data, campaign_db_map: dict[int, int]) -> dict[int, int]:
+    """
+    Walk ALL campaigns via GetCampaignsByAccountId and upsert every ad group.
+    Returns {msft_ag_id: db_ad_group_id} covering all 18 campaigns, including
+    those with zero impressions that never appear in performance reports.
+
+    Builds its own full campaign list instead of relying on the report-based
+    campaign_db_map (which only covers campaigns with recent activity).
+    """
+    from bingads import ServiceClient
+    svc = ServiceClient("CampaignManagementService", 13, auth_data, "production")
+    ag_db_map: dict[int, int] = {}
+
+    # Get ALL campaigns from the account — not just those in the performance report
+    try:
+        camp_resp = svc.GetCampaignsByAccountId(AccountId=ACCOUNT_ID, CampaignType="Search")
+        all_camps = (list(camp_resp.Campaign.Campaign)
+                     if camp_resp.Campaign and hasattr(camp_resp.Campaign, "Campaign")
+                     else list(camp_resp.Campaign or []))
+    except Exception as e:
+        logger.warning("GetCampaignsByAccountId in _scan_all_ad_groups failed: %s", e)
+        # Fall back to whatever was passed in
+        all_camps = []
+
+    # Build a full campaign map, merging API results with the report-based map
+    full_campaign_db_map: dict[int, int] = dict(campaign_db_map)  # copy
+    for c in all_camps:
+        if not hasattr(c, "Id") or c.Id is None:
+            continue
+        msft_cid = int(c.Id)
+        if msft_cid not in full_campaign_db_map:
+            # Campaign not yet in DB — upsert it
+            c_name  = str(c.Name) if hasattr(c, "Name") and c.Name else str(msft_cid)
+            c_status = str(c.Status) if hasattr(c, "Status") else "ENABLED"
+            budget_usd = None
+            try:
+                if hasattr(c, "DailyBudget") and c.DailyBudget is not None:
+                    budget_usd = float(c.DailyBudget)
+                elif hasattr(c, "Budget") and c.Budget is not None and hasattr(c.Budget, "Amount"):
+                    budget_usd = float(c.Budget.Amount) if c.Budget.Amount is not None else None
+            except Exception:
+                pass
+            full_campaign_db_map[msft_cid] = _upsert_campaign(msft_cid, c_name, budget_usd, c_status)
+
+    logger.info("Full ad group scan: walking %d campaign(s)", len(full_campaign_db_map))
+
+    for msft_cid, camp_db_id in full_campaign_db_map.items():
+        try:
+            resp = svc.GetAdGroupsByCampaignId(CampaignId=msft_cid)
+            raw  = (list(resp.AdGroup.AdGroup)
+                    if resp.AdGroup and hasattr(resp.AdGroup, "AdGroup")
+                    else list(resp.AdGroup or []))
+            for ag in raw:
+                if not hasattr(ag, "Id") or ag.Id is None:
+                    continue
+                msft_ag_id = int(ag.Id)
+                ag_name    = str(ag.Name) if hasattr(ag, "Name") and ag.Name else str(msft_ag_id)
+                ag_db_id   = _upsert_ad_group(camp_db_id, msft_ag_id, ag_name)
+                ag_db_map[msft_ag_id] = ag_db_id
+        except Exception as e:
+            logger.warning("GetAdGroupsByCampaignId failed for campaign %d: %s", msft_cid, e)
+
+    logger.info("Full ad group scan: found %d ad group(s) across %d campaign(s)",
+                len(ag_db_map), len(full_campaign_db_map))
+    return ag_db_map
+
+
+def _sync_keywords(auth_data, ag_db_map: dict[int, int]) -> int:
+    """
+    Fetch keywords for every known Microsoft ad group and upsert into DB.
+    ag_db_map: {msft_ag_id -> db ad_group id}
+    Returns total keywords upserted.
+    """
+    total = 0
+    for msft_ag_id, ag_db_id in ag_db_map.items():
+        keywords = _fetch_keywords(auth_data, msft_ag_id)
+        for kw in keywords:
+            try:
+                _upsert_keyword(
+                    ag_db_id   = ag_db_id,
+                    msft_kw_id = kw["id"],
+                    text       = kw["text"],
+                    match_type = kw["match_type"],
+                    bid_usd    = kw["bid_usd"],
+                    status     = kw["status"],
+                )
+                total += 1
+            except Exception as e:
+                logger.warning("Keyword upsert failed (ag=%d kw=%d): %s", msft_ag_id, kw["id"], e)
+        if keywords:
+            logger.info("  Ad group %d: synced %d keyword(s)", msft_ag_id, len(keywords))
+    logger.info("Keyword sync complete — %d keywords upserted across %d ad groups", total, len(ag_db_map))
+    return total
+
+
 def _upsert_ad_group(campaign_db_id: int, msft_ag_id: int, name: str) -> int:
     external_id = f"msft_ag_{msft_ag_id}"
     with db.get_db() as (conn, cur):
@@ -581,23 +729,48 @@ def run() -> dict:
     logger.info("Ad group sync: %d ad groups, %d rows written",
                 len(ag_db_map), ag_rows_written)
 
+    # ── Full ad group scan (catches campaigns with 0 impressions) ─────────
+    # The performance report only returns ad groups that have activity.
+    # This API walk ensures every ad group and keyword is in the DB
+    # regardless of spend/impression history.
+    try:
+        full_ag_map = _scan_all_ad_groups(auth_data, campaign_db_map)
+        # Merge: report-based entries take precedence (they have perf data);
+        # API-scan entries fill in the gaps.
+        for msft_ag_id, ag_db_id in full_ag_map.items():
+            if msft_ag_id not in ag_db_map:
+                ag_db_map[msft_ag_id] = ag_db_id
+        logger.info("ag_db_map after full scan: %d ad groups total", len(ag_db_map))
+    except Exception as e:
+        logger.warning("Full ad group scan failed (non-fatal): %s", e)
+
+    # ── Keyword sync ──────────────────────────────────────────────────────
+    keywords_synced = 0
+    if ag_db_map:
+        try:
+            keywords_synced = _sync_keywords(auth_data, ag_db_map)
+        except Exception as e:
+            logger.warning("Keyword sync failed (non-fatal): %s", e)
+
     status = "error" if errors and rows_written == 0 else "success"
     db.heartbeat(AGENT_NAME, status, metadata={
         "rows_written":     rows_written,
         "ag_rows_written":  ag_rows_written,
+        "keywords_synced":  keywords_synced,
         "campaigns_synced": len(campaign_db_map),
         "ad_groups_synced": len(ag_db_map),
         "date_range":       f"{start_date} to {end_date}",
     })
     logger.info(
-        "=== Microsoft Sync done — campaigns=%d ad_groups=%d camp_rows=%d ag_rows=%d errors=%d ===",
-        len(campaign_db_map), len(ag_db_map), rows_written, ag_rows_written, len(errors),
+        "=== Microsoft Sync done — campaigns=%d ad_groups=%d keywords=%d camp_rows=%d ag_rows=%d errors=%d ===",
+        len(campaign_db_map), len(ag_db_map), keywords_synced, rows_written, ag_rows_written, len(errors),
     )
     return {
         "platform":         PLATFORM,
         "status":           status,
         "campaigns_synced": len(campaign_db_map),
         "ad_groups_synced": len(ag_db_map),
+        "keywords_synced":  keywords_synced,
         "rows_written":     rows_written,
         "ag_rows_written":  ag_rows_written,
         "date_range":       f"{start_date} to {end_date}",
