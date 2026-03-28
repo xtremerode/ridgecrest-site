@@ -806,6 +806,8 @@ def run_once() -> int:
         return 0
 
     pending = fetch_pending_messages()
+    if not pending:
+        db.heartbeat(AGENT_NAME, "alive")
     for msg in pending:
         try:
             process_message(msg)

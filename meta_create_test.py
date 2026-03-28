@@ -68,10 +68,12 @@ def create_campaign() -> str:
 def create_adset(campaign_id: str) -> str:
     print("\n[2] Creating test ad set …")
 
-    # Targeting: 18 zip codes from CLAUDE.md §12
+    # Targeting: 17 zip codes from CLAUDE.md §12
     zip_codes = [
-        "94596", "94595", "94588", "94586", "94583",
-        "94582", "94568", "94566", "94563", "94556",
+        "94506", "94507", "94526", "94528", "94549",
+        "94556", "94563", "94566", "94568", "94582",
+        "94583", "94586", "94588", "94595", "94596",
+        "94597", "94598",
     ]
     # Advantage+ audience (default for OUTCOME_LEADS) caps age_min at 25.
     # Target by zip code only; age skew comes from creative messaging.

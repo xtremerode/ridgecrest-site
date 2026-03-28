@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Screenshot Upload</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .container {
+      background: white;
+      border-radius: 12px;
+      padding: 40px;
+      width: 540px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    h1 { font-size: 22px; color: #1a1a1a; margin-bottom: 8px; }
+    p { color: #666; font-size: 14px; margin-bottom: 24px; }
+    .paste-zone {
+      border: 2px dashed #d0d0d0;
+      border-radius: 8px;
+      padding: 48px 24px;
+      color: #999;
+      font-size: 16px;
+      transition: all 0.2s;
+      cursor: default;
+    }
+    .paste-zone.active {
+      border-color: #4f46e5;
+      background: #f5f3ff;
+      color: #4f46e5;
+    }
+    .status {
+      margin-top: 16px;
+      font-size: 14px;
+      min-height: 20px;
+    }
+    .status.success { color: #16a34a; font-weight: 600; }
+    .status.error { color: #dc2626; }
+
+    /* File list */
+    .list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 28px;
+      margin-bottom: 8px;
+    }
+    .list-header span { font-size: 13px; font-weight: 600; color: #444; }
+    .show-all-btn {
+      font-size: 12px;
+      color: #4f46e5;
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+      display: none;
+    }
+    .file-list {
+      text-align: left;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .file-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-family: monospace;
+      color: #333;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .file-item:last-child { border-bottom: none; }
+    .file-item:nth-child(even) { background: #fafafa; }
+    .file-item .new-badge {
+      font-size: 11px;
+      background: #dcfce7;
+      color: #16a34a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: sans-serif;
+      font-weight: 600;
+    }
+    .file-item .age {
+      font-size: 11px;
+      color: #999;
+      font-family: sans-serif;
+    }
+    .empty { color: #aaa; font-size: 13px; padding: 16px; text-align: center; }
+
+    /* Downloads */
+    .downloads-section { margin-top: 36px; text-align: left; }
+    .downloads-section h2 { font-size: 15px; font-weight: 600; color: #444; margin-bottom: 10px; }
+    .download-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      background: #fafafa;
+    }
+    .download-item:hover { background: #f0f4ff; }
+    .download-info { display: flex; flex-direction: column; gap: 2px; }
+    .download-name { font-size: 13px; font-weight: 500; color: #1a1a1a; }
+    .download-meta { font-size: 11px; color: #999; }
+    .download-btn {
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 12px;
+      cursor: pointer;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .download-btn:hover { background: #4338ca; }
+    .no-downloads { color: #aaa; font-size: 13px; padding: 12px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Screenshot Paste</h1>
+    <p>Take a screenshot, then press <strong>Ctrl+V</strong> anywhere on this page</p>
+    <div class="paste-zone" id="pasteZone">
+      Press Ctrl+V to paste a screenshot
+    </div>
+    <div class="status" id="status"></div>
+
+    <div class="list-header">
+      <span id="listLabel">Recent screenshots</span>
+      <button class="show-all-btn" id="showAllBtn" onclick="toggleAll()">Show all</button>
+    </div>
+    <div class="file-list" id="fileList"><div class="empty">No screenshots yet</div></div>
+
+    <div class="downloads-section">
+      <h2>Files from Claude</h2>
+      <div id="downloadList"><div class="no-downloads">No files available yet</div></div>
+    </div>
+  </div>
+
+  <script>
+    const status = document.getElementById("status");
+    const pasteZone = document.getElementById("pasteZone");
+    const fileList = document.getElementById("fileList");
+    const showAllBtn = document.getElementById("showAllBtn");
+    const listLabel = document.getElementById("listLabel");
+
+    let allFiles = [];
+    let showingAll = false;
+    let newestFile = null;
+
+    function formatAge(filename) {
+      // filename: YYYYMMDD_HHMMSS.ext
+      const m = filename.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
+      if (!m) return "";
+      const d = new Date(m[1], m[2]-1, m[3], m[4], m[5], m[6]);
+      const diff = Math.floor((Date.now() - d) / 1000);
+      if (diff < 60) return "just now";
+      if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+      if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+      return `${Math.floor(diff/86400)}d ago`;
+    }
+
+    function renderList(files) {
+      if (!files.length) {
+        fileList.innerHTML = '<div class="empty">No screenshots yet</div>';
+        showAllBtn.style.display = "none";
+        return;
+      }
+      const display = showingAll ? files : files.slice(0, 100);
+      fileList.innerHTML = display.map(f => `
+        <div class="file-item">
+          <span>${f}</span>
+          <span style="display:flex;gap:8px;align-items:center;">
+            ${f === newestFile ? '<span class="new-badge">NEW</span>' : ''}
+            <span class="age">${formatAge(f)}</span>
+          </span>
+        </div>
+      `).join("");
+      if (files.length > 100) {
+        showAllBtn.style.display = "inline";
+        showAllBtn.textContent = showingAll ? "Show first 100" : `Show all ${files.length}`;
+      } else {
+        showAllBtn.style.display = "none";
+      }
+      listLabel.textContent = `Recent screenshots (${files.length})`;
+    }
+
+    function toggleAll() {
+      showingAll = !showingAll;
+      renderList(allFiles);
+    }
+
+    async function loadList() {
+      try {
+        const res = await fetch("/list");
+        allFiles = await res.json();
+        renderList(allFiles);
+      } catch(e) {}
+    }
+
+    document.addEventListener("paste", async (e) => {
+      const items = e.clipboardData.items;
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          const blob = item.getAsFile();
+          const reader = new FileReader();
+          reader.onload = async () => {
+            const dataUrl = reader.result;
+            pasteZone.classList.add("active");
+            pasteZone.textContent = "Saving...";
+            status.className = "status";
+            status.textContent = "";
+
+            try {
+              const res = await fetch("/upload", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image: dataUrl })
+              });
+              const data = await res.json();
+              newestFile = data.filename;
+              status.className = "status success";
+              status.textContent = `Saved: ${data.filename}`;
+              pasteZone.classList.remove("active");
+              pasteZone.textContent = "Press Ctrl+V to paste another screenshot";
+              await loadList();
+            } catch (err) {
+              status.className = "status error";
+              status.textContent = "Upload failed. Try again.";
+              pasteZone.classList.remove("active");
+              pasteZone.textContent = "Press Ctrl+V to paste a screenshot";
+            }
+          };
+          reader.readAsDataURL(blob);
+          break;
+        }
+      }
+    });
+
+    async function loadDownloads() {
+      try {
+        const res = await fetch("/files");
+        const files = await res.json();
+        const el = document.getElementById("downloadList");
+        if (!files.length) {
+          el.innerHTML = '<div class="no-downloads">No files available yet</div>';
+          return;
+        }
+        el.innerHTML = files.map(f => `
+          <div class="download-item">
+            <div class="download-info">
+              <span class="download-name">${f.name}</span>
+              <span class="download-meta">${f.modified} &middot; ${(f.size/1024).toFixed(1)} KB</span>
+            </div>
+            <a class="download-btn" href="/download/${encodeURIComponent(f.name)}" download="${f.name}">Download</a>
+          </div>
+        `).join("");
+      } catch(e) {}
+    }
+
+    // Load list on page load and refresh every 30s
+    loadList();
+    loadDownloads();
+    setInterval(loadList, 30000);
+    setInterval(loadDownloads, 30000);
+  </script>
+</body>
+</html>

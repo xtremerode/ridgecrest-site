@@ -1,0 +1,547 @@
+RIDGECREST DESIGNS — MASTER KEYWORD LIST (UPDATED)
+====================================================
+Updated: 2026-03-27
+Cities: Walnut Creek, Pleasanton, Danville, San Ramon,
+        Dublin, Orinda, Moraga, Lafayette, Alamo,
+        Sunol, Rossmoor, Diablo
+Format: [exact match] and "phrase match"
+
+ORIGINAL THEMES (168 keywords)
+NEW THEMES ADDED (274 keywords)
+TOTAL: 442 keywords
+
+New themes added:
+  - Luxury Home Builder
+  - Luxury Home Renovation
+  - Luxury Kitchen Remodel
+  - Luxury Bathroom Remodel
+  - Luxury Design Build
+  - Whole Home Renovation (variant of Whole House Remodel)
+  - Full House Remodel (variant of Whole House Remodel)
+  - Master Bath Remodel (short form)
+  - Primary Bathroom Remodel (emerging term)
+  - Design Build Remodeling
+  - Custom Home Design Build
+  - Near Me (10 phrase match terms, no city — caught by geo targeting)
+====================================================
+
+
+======================================================
+ORIGINAL THEMES
+======================================================
+
+--- CUSTOM HOME BUILDER ---
+[custom home builder walnut creek]
+"custom home builder walnut creek"
+[custom home builder pleasanton]
+"custom home builder pleasanton"
+[custom home builder danville]
+"custom home builder danville"
+[custom home builder san ramon]
+"custom home builder san ramon"
+[custom home builder dublin]
+"custom home builder dublin"
+[custom home builder orinda]
+"custom home builder orinda"
+[custom home builder moraga]
+"custom home builder moraga"
+[custom home builder lafayette]
+"custom home builder lafayette"
+[custom home builder alamo]
+"custom home builder alamo"
+[custom home builder sunol]
+"custom home builder sunol"
+[custom home builder rossmoor]
+"custom home builder rossmoor"
+[custom home builder diablo]
+"custom home builder diablo"
+
+--- CUSTOM HOME ---
+[custom home walnut creek]
+"custom home walnut creek"
+[custom home pleasanton]
+"custom home pleasanton"
+[custom home danville]
+"custom home danville"
+[custom home san ramon]
+"custom home san ramon"
+[custom home dublin]
+"custom home dublin"
+[custom home orinda]
+"custom home orinda"
+[custom home moraga]
+"custom home moraga"
+[custom home lafayette]
+"custom home lafayette"
+[custom home alamo]
+"custom home alamo"
+[custom home sunol]
+"custom home sunol"
+[custom home rossmoor]
+"custom home rossmoor"
+[custom home diablo]
+"custom home diablo"
+
+--- DESIGN BUILD ---
+[design build walnut creek]
+"design build walnut creek"
+[design build pleasanton]
+"design build pleasanton"
+[design build danville]
+"design build danville"
+[design build san ramon]
+"design build san ramon"
+[design build dublin]
+"design build dublin"
+[design build orinda]
+"design build orinda"
+[design build moraga]
+"design build moraga"
+[design build lafayette]
+"design build lafayette"
+[design build alamo]
+"design build alamo"
+[design build sunol]
+"design build sunol"
+[design build rossmoor]
+"design build rossmoor"
+[design build diablo]
+"design build diablo"
+
+--- DESIGN BUILD CONTRACTOR ---
+[design build contractor walnut creek]
+"design build contractor walnut creek"
+[design build contractor pleasanton]
+"design build contractor pleasanton"
+[design build contractor danville]
+"design build contractor danville"
+[design build contractor san ramon]
+"design build contractor san ramon"
+[design build contractor dublin]
+"design build contractor dublin"
+[design build contractor orinda]
+"design build contractor orinda"
+[design build contractor moraga]
+"design build contractor moraga"
+[design build contractor lafayette]
+"design build contractor lafayette"
+[design build contractor alamo]
+"design build contractor alamo"
+[design build contractor sunol]
+"design build contractor sunol"
+[design build contractor rossmoor]
+"design build contractor rossmoor"
+[design build contractor diablo]
+"design build contractor diablo"
+
+--- HOME BUILDER ---
+[home builder walnut creek]
+"home builder walnut creek"
+[home builder pleasanton]
+"home builder pleasanton"
+[home builder danville]
+"home builder danville"
+[home builder san ramon]
+"home builder san ramon"
+[home builder dublin]
+"home builder dublin"
+[home builder orinda]
+"home builder orinda"
+[home builder moraga]
+"home builder moraga"
+[home builder lafayette]
+"home builder lafayette"
+[home builder alamo]
+"home builder alamo"
+[home builder sunol]
+"home builder sunol"
+[home builder rossmoor]
+"home builder rossmoor"
+[home builder diablo]
+"home builder diablo"
+
+--- WHOLE HOUSE REMODEL ---
+[whole house remodel walnut creek]
+"whole house remodel walnut creek"
+[whole house remodel pleasanton]
+"whole house remodel pleasanton"
+[whole house remodel danville]
+"whole house remodel danville"
+[whole house remodel san ramon]
+"whole house remodel san ramon"
+[whole house remodel dublin]
+"whole house remodel dublin"
+[whole house remodel orinda]
+"whole house remodel orinda"
+[whole house remodel moraga]
+"whole house remodel moraga"
+[whole house remodel lafayette]
+"whole house remodel lafayette"
+[whole house remodel alamo]
+"whole house remodel alamo"
+[whole house remodel sunol]
+"whole house remodel sunol"
+[whole house remodel rossmoor]
+"whole house remodel rossmoor"
+[whole house remodel diablo]
+"whole house remodel diablo"
+
+--- HOME RENOVATION ---
+[home renovation walnut creek]
+"home renovation walnut creek"
+[home renovation pleasanton]
+"home renovation pleasanton"
+[home renovation danville]
+"home renovation danville"
+[home renovation san ramon]
+"home renovation san ramon"
+[home renovation dublin]
+"home renovation dublin"
+[home renovation orinda]
+"home renovation orinda"
+[home renovation moraga]
+"home renovation moraga"
+[home renovation lafayette]
+"home renovation lafayette"
+[home renovation alamo]
+"home renovation alamo"
+[home renovation sunol]
+"home renovation sunol"
+[home renovation rossmoor]
+"home renovation rossmoor"
+[home renovation diablo]
+"home renovation diablo"
+
+
+======================================================
+NEW THEMES
+======================================================
+
+--- LUXURY HOME BUILDER ---
+[luxury home builder walnut creek]
+"luxury home builder walnut creek"
+[luxury home builder pleasanton]
+"luxury home builder pleasanton"
+[luxury home builder danville]
+"luxury home builder danville"
+[luxury home builder san ramon]
+"luxury home builder san ramon"
+[luxury home builder dublin]
+"luxury home builder dublin"
+[luxury home builder orinda]
+"luxury home builder orinda"
+[luxury home builder moraga]
+"luxury home builder moraga"
+[luxury home builder lafayette]
+"luxury home builder lafayette"
+[luxury home builder alamo]
+"luxury home builder alamo"
+[luxury home builder sunol]
+"luxury home builder sunol"
+[luxury home builder rossmoor]
+"luxury home builder rossmoor"
+[luxury home builder diablo]
+"luxury home builder diablo"
+
+--- LUXURY HOME RENOVATION ---
+[luxury home renovation walnut creek]
+"luxury home renovation walnut creek"
+[luxury home renovation pleasanton]
+"luxury home renovation pleasanton"
+[luxury home renovation danville]
+"luxury home renovation danville"
+[luxury home renovation san ramon]
+"luxury home renovation san ramon"
+[luxury home renovation dublin]
+"luxury home renovation dublin"
+[luxury home renovation orinda]
+"luxury home renovation orinda"
+[luxury home renovation moraga]
+"luxury home renovation moraga"
+[luxury home renovation lafayette]
+"luxury home renovation lafayette"
+[luxury home renovation alamo]
+"luxury home renovation alamo"
+[luxury home renovation sunol]
+"luxury home renovation sunol"
+[luxury home renovation rossmoor]
+"luxury home renovation rossmoor"
+[luxury home renovation diablo]
+"luxury home renovation diablo"
+
+--- LUXURY KITCHEN REMODEL ---
+[luxury kitchen remodel walnut creek]
+"luxury kitchen remodel walnut creek"
+[luxury kitchen remodel pleasanton]
+"luxury kitchen remodel pleasanton"
+[luxury kitchen remodel danville]
+"luxury kitchen remodel danville"
+[luxury kitchen remodel san ramon]
+"luxury kitchen remodel san ramon"
+[luxury kitchen remodel dublin]
+"luxury kitchen remodel dublin"
+[luxury kitchen remodel orinda]
+"luxury kitchen remodel orinda"
+[luxury kitchen remodel moraga]
+"luxury kitchen remodel moraga"
+[luxury kitchen remodel lafayette]
+"luxury kitchen remodel lafayette"
+[luxury kitchen remodel alamo]
+"luxury kitchen remodel alamo"
+[luxury kitchen remodel sunol]
+"luxury kitchen remodel sunol"
+[luxury kitchen remodel rossmoor]
+"luxury kitchen remodel rossmoor"
+[luxury kitchen remodel diablo]
+"luxury kitchen remodel diablo"
+
+--- LUXURY BATHROOM REMODEL ---
+[luxury bathroom remodel walnut creek]
+"luxury bathroom remodel walnut creek"
+[luxury bathroom remodel pleasanton]
+"luxury bathroom remodel pleasanton"
+[luxury bathroom remodel danville]
+"luxury bathroom remodel danville"
+[luxury bathroom remodel san ramon]
+"luxury bathroom remodel san ramon"
+[luxury bathroom remodel dublin]
+"luxury bathroom remodel dublin"
+[luxury bathroom remodel orinda]
+"luxury bathroom remodel orinda"
+[luxury bathroom remodel moraga]
+"luxury bathroom remodel moraga"
+[luxury bathroom remodel lafayette]
+"luxury bathroom remodel lafayette"
+[luxury bathroom remodel alamo]
+"luxury bathroom remodel alamo"
+[luxury bathroom remodel sunol]
+"luxury bathroom remodel sunol"
+[luxury bathroom remodel rossmoor]
+"luxury bathroom remodel rossmoor"
+[luxury bathroom remodel diablo]
+"luxury bathroom remodel diablo"
+
+--- LUXURY DESIGN BUILD ---
+[luxury design build walnut creek]
+"luxury design build walnut creek"
+[luxury design build pleasanton]
+"luxury design build pleasanton"
+[luxury design build danville]
+"luxury design build danville"
+[luxury design build san ramon]
+"luxury design build san ramon"
+[luxury design build dublin]
+"luxury design build dublin"
+[luxury design build orinda]
+"luxury design build orinda"
+[luxury design build moraga]
+"luxury design build moraga"
+[luxury design build lafayette]
+"luxury design build lafayette"
+[luxury design build alamo]
+"luxury design build alamo"
+[luxury design build sunol]
+"luxury design build sunol"
+[luxury design build rossmoor]
+"luxury design build rossmoor"
+[luxury design build diablo]
+"luxury design build diablo"
+
+--- WHOLE HOME RENOVATION ---
+[whole home renovation walnut creek]
+"whole home renovation walnut creek"
+[whole home renovation pleasanton]
+"whole home renovation pleasanton"
+[whole home renovation danville]
+"whole home renovation danville"
+[whole home renovation san ramon]
+"whole home renovation san ramon"
+[whole home renovation dublin]
+"whole home renovation dublin"
+[whole home renovation orinda]
+"whole home renovation orinda"
+[whole home renovation moraga]
+"whole home renovation moraga"
+[whole home renovation lafayette]
+"whole home renovation lafayette"
+[whole home renovation alamo]
+"whole home renovation alamo"
+[whole home renovation sunol]
+"whole home renovation sunol"
+[whole home renovation rossmoor]
+"whole home renovation rossmoor"
+[whole home renovation diablo]
+"whole home renovation diablo"
+
+--- FULL HOUSE REMODEL ---
+[full house remodel walnut creek]
+"full house remodel walnut creek"
+[full house remodel pleasanton]
+"full house remodel pleasanton"
+[full house remodel danville]
+"full house remodel danville"
+[full house remodel san ramon]
+"full house remodel san ramon"
+[full house remodel dublin]
+"full house remodel dublin"
+[full house remodel orinda]
+"full house remodel orinda"
+[full house remodel moraga]
+"full house remodel moraga"
+[full house remodel lafayette]
+"full house remodel lafayette"
+[full house remodel alamo]
+"full house remodel alamo"
+[full house remodel sunol]
+"full house remodel sunol"
+[full house remodel rossmoor]
+"full house remodel rossmoor"
+[full house remodel diablo]
+"full house remodel diablo"
+
+--- MASTER BATH REMODEL ---
+[master bath remodel walnut creek]
+"master bath remodel walnut creek"
+[master bath remodel pleasanton]
+"master bath remodel pleasanton"
+[master bath remodel danville]
+"master bath remodel danville"
+[master bath remodel san ramon]
+"master bath remodel san ramon"
+[master bath remodel dublin]
+"master bath remodel dublin"
+[master bath remodel orinda]
+"master bath remodel orinda"
+[master bath remodel moraga]
+"master bath remodel moraga"
+[master bath remodel lafayette]
+"master bath remodel lafayette"
+[master bath remodel alamo]
+"master bath remodel alamo"
+[master bath remodel sunol]
+"master bath remodel sunol"
+[master bath remodel rossmoor]
+"master bath remodel rossmoor"
+[master bath remodel diablo]
+"master bath remodel diablo"
+
+--- PRIMARY BATHROOM REMODEL ---
+[primary bathroom remodel walnut creek]
+"primary bathroom remodel walnut creek"
+[primary bathroom remodel pleasanton]
+"primary bathroom remodel pleasanton"
+[primary bathroom remodel danville]
+"primary bathroom remodel danville"
+[primary bathroom remodel san ramon]
+"primary bathroom remodel san ramon"
+[primary bathroom remodel dublin]
+"primary bathroom remodel dublin"
+[primary bathroom remodel orinda]
+"primary bathroom remodel orinda"
+[primary bathroom remodel moraga]
+"primary bathroom remodel moraga"
+[primary bathroom remodel lafayette]
+"primary bathroom remodel lafayette"
+[primary bathroom remodel alamo]
+"primary bathroom remodel alamo"
+[primary bathroom remodel sunol]
+"primary bathroom remodel sunol"
+[primary bathroom remodel rossmoor]
+"primary bathroom remodel rossmoor"
+[primary bathroom remodel diablo]
+"primary bathroom remodel diablo"
+
+--- DESIGN BUILD REMODELING ---
+[design build remodeling walnut creek]
+"design build remodeling walnut creek"
+[design build remodeling pleasanton]
+"design build remodeling pleasanton"
+[design build remodeling danville]
+"design build remodeling danville"
+[design build remodeling san ramon]
+"design build remodeling san ramon"
+[design build remodeling dublin]
+"design build remodeling dublin"
+[design build remodeling orinda]
+"design build remodeling orinda"
+[design build remodeling moraga]
+"design build remodeling moraga"
+[design build remodeling lafayette]
+"design build remodeling lafayette"
+[design build remodeling alamo]
+"design build remodeling alamo"
+[design build remodeling sunol]
+"design build remodeling sunol"
+[design build remodeling rossmoor]
+"design build remodeling rossmoor"
+[design build remodeling diablo]
+"design build remodeling diablo"
+
+--- CUSTOM HOME DESIGN BUILD ---
+[custom home design build walnut creek]
+"custom home design build walnut creek"
+[custom home design build pleasanton]
+"custom home design build pleasanton"
+[custom home design build danville]
+"custom home design build danville"
+[custom home design build san ramon]
+"custom home design build san ramon"
+[custom home design build dublin]
+"custom home design build dublin"
+[custom home design build orinda]
+"custom home design build orinda"
+[custom home design build moraga]
+"custom home design build moraga"
+[custom home design build lafayette]
+"custom home design build lafayette"
+[custom home design build alamo]
+"custom home design build alamo"
+[custom home design build sunol]
+"custom home design build sunol"
+[custom home design build rossmoor]
+"custom home design build rossmoor"
+[custom home design build diablo]
+"custom home design build diablo"
+
+
+======================================================
+NEAR ME — PHRASE MATCH ONLY
+(No city needed — geo targeting handles location)
+High-volume searches caught by geo targeting to 17 zip codes
+======================================================
+
+"custom home builder near me"
+"luxury home builder near me"
+"design build contractor near me"
+"design build firm near me"
+"whole house remodel near me"
+"whole home renovation near me"
+"home renovation contractor near me"
+"luxury home renovation near me"
+"master bath remodel near me"
+"luxury design build near me"
+
+
+======================================================
+USAGE NOTES
+======================================================
+
+HOW TO USE THIS FILE
+- Use the full master list for new campaigns
+- Segment by theme when building individual ad groups
+- Each theme maps to a tightly focused ad group
+- Match ad copy and landing page to the theme
+
+CAMPAIGN MAPPING (suggested)
+- Custom Home Builder campaign  → Custom Home Builder, Custom Home, Custom Home Design Build
+- Design Build campaign         → Design Build, Design Build Contractor, Design Build Remodeling, Luxury Design Build, Custom Home Design Build
+- Luxury campaign (new)         → Luxury Home Builder, Luxury Home Renovation, Luxury Kitchen Remodel, Luxury Bathroom Remodel, Luxury Design Build
+- Whole House Remodel campaign  → Whole House Remodel, Whole Home Renovation, Full House Remodel
+- Kitchen Remodel campaign      → (from CLAUDE.md Section 17) + Luxury Kitchen Remodel
+- Bathroom Remodel campaign     → (from CLAUDE.md Section 17) + Master Bath Remodel, Primary Bathroom Remodel, Luxury Bathroom Remodel
+- Near Me (add to all campaigns)→ Near Me section above
+
+SEARCH TERMS REVIEW
+After 7–14 days live, pull the Search Terms report in Google Ads.
+Add any irrelevant terms as negatives. Add any strong performers
+that aren't in this list as new keywords.

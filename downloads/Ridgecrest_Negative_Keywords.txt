@@ -1,0 +1,282 @@
+RIDGECREST DESIGNS — GOOGLE ADS NEGATIVE KEYWORD LIST
+======================================================
+Generated: 2026-03-27
+Purpose: Filter low-quality, off-target, and low-budget traffic
+Format: [exact match] | "phrase match" | broad match
+
+HOW TO USE IN GOOGLE ADS
+--------------------------
+- Add account-level negatives for terms that should NEVER match
+- Add campaign-level negatives for terms specific to a service type
+- Recommended: add all BROAD MATCH negatives at account level first,
+  then tighten to phrase/exact as you review search term reports
+
+======================================================
+SECTION 1 — PRICE & BUDGET (Account Level)
+======================================================
+cheap
+affordable
+inexpensive
+low cost
+low price
+budget
+discount
+free estimate
+free quote
+cheapest
+lowest price
+best price
+best deal
+cost effective
+economical
+
+======================================================
+SECTION 2 — DIY / RESEARCH INTENT (Account Level)
+======================================================
+diy
+do it yourself
+how to
+how to remodel
+how to build
+tutorial
+step by step
+plans
+floor plans free
+blueprints
+blueprint
+design ideas
+remodel ideas
+kitchen ideas
+bathroom ideas
+home design ideas
+inspiration
+trends
+cost calculator
+average cost
+how much does it cost
+price guide
+price list
+cost estimate
+cost breakdown
+
+======================================================
+SECTION 3 — JOBS & EMPLOYMENT (Account Level)
+======================================================
+jobs
+job
+careers
+career
+hiring
+employment
+salary
+wages
+pay
+hourly rate
+apprentice
+apprenticeship
+subcontractor jobs
+construction jobs
+trade jobs
+work for
+join our team
+
+======================================================
+SECTION 4 — REPAIR & MAINTENANCE (Account Level)
+======================================================
+repair
+fix
+fixing
+handyman
+patch
+maintenance
+service call
+emergency
+leaking
+broken
+damaged
+crack
+cracked
+restore
+restoration
+
+======================================================
+SECTION 5 — WRONG PROPERTY / PROJECT TYPE (Account Level)
+======================================================
+commercial
+office
+retail
+warehouse
+industrial
+apartment
+apartments
+condo
+condos
+rental property
+investment property
+flip
+house flip
+mobile home
+manufactured home
+tiny home
+tiny house
+shed
+garage door
+fence
+fencing
+deck
+patio
+driveway
+painting
+carpet
+carpet installation
+flooring only
+tile only
+roof
+roofing
+gutters
+siding
+windows only
+doors only
+pool
+pool repair
+hvac
+plumbing repair
+electrical repair
+cleaning
+maid
+pressure washing
+landscaping
+lawn
+
+======================================================
+SECTION 6 — WRONG AUDIENCE / LOW BUDGET SIGNALS (Account Level)
+======================================================
+small bathroom
+half bath
+powder room
+small kitchen
+galley kitchen
+studio apartment
+one bedroom
+starter home
+mobile home
+prefab
+modular
+kit home
+manufactured
+
+======================================================
+SECTION 7 — COMPETITOR / RETAIL BRANDS (Account Level)
+======================================================
+ikea
+home depot
+lowes
+lowe's
+menards
+wayfair
+build.com
+houzz (as standalone — keep in research context)
+angi
+angie's list
+homeadvisor
+thumbtack
+yelp contractor
+craigslist
+
+======================================================
+SECTION 8 — NEGATIVE GEOGRAPHY (Account Level)
+Use only if geo targeting gaps appear in search terms)
+======================================================
+san francisco
+san jose
+oakland
+berkeley
+fremont
+hayward
+antioch
+pittsburg
+brentwood
+richmond
+el cerrito
+martinez
+concord
+sacramento
+stockton
+modesto
+fresno
+los angeles
+san diego
+
+======================================================
+SECTION 9 — MISCELLANEOUS (Account Level)
+======================================================
+complaints
+reviews
+lawsuit
+permit cost
+permit fees
+permits only
+drafting only
+cad
+autocad
+3d rendering only
+software
+app
+template
+sample
+example
+school
+class
+course
+training
+certification
+license lookup
+contractor license
+bond
+insurance only
+real estate agent
+realtor
+zillow
+redfin
+for sale
+buy a house
+sell my home
+
+======================================================
+SECTION 10 — CAMPAIGN-SPECIFIC NEGATIVES
+======================================================
+
+FOR KITCHEN REMODEL CAMPAIGNS — add these negatives:
+  custom home
+  new construction
+  home builder
+  whole house
+
+FOR BATHROOM REMODEL CAMPAIGNS — add these negatives:
+  custom home
+  new construction
+  home builder
+  whole house
+  kitchen
+
+FOR CUSTOM HOME / DESIGN BUILD CAMPAIGNS — add these negatives:
+  remodel
+  renovation
+  bathroom
+  kitchen
+
+======================================================
+PRIORITY IMPORT ORDER
+======================================================
+1. Import Section 1 (Price/Budget) first — highest waste prevention
+2. Import Section 3 (Jobs) — common source of wasted spend
+3. Import Section 4 (Repair) — wrong service type
+4. Import Section 2 (DIY/Research) — low-intent traffic
+5. Import remaining sections after first week of search term review
+
+======================================================
+NEXT STEP
+======================================================
+After running campaigns for 7–14 days, pull the Search Terms
+report and add any irrelevant terms you see as new negatives.
+This list is a starting point — it will grow over time.

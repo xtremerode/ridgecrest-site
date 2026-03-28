@@ -146,6 +146,63 @@ def _meta_get(path: str, params: dict = None) -> dict:
     return r.json()
 
 
+def _apply_meta_adset_targeting(adset_id: str, adset_name: str) -> bool:
+    """
+    Apply the full CLAUDE.md §18 targeting spec to an ad set.
+    Sets advantage_audience=0, correct geo/age/gender/family-status targeting,
+    and includes the required saved audience in custom_audiences.
+    Returns True on success.
+    """
+    targeting_spec = {
+        "age_min": 35,
+        "age_max": 55,
+        "genders": [2],
+        "flexible_spec": [
+            {
+                "family_statuses": [
+                    {"id": "6023005529383"},
+                    {"id": "6023005570783"},
+                    {"id": "6023005681983"},
+                    {"id": "6023005718983"},
+                    {"id": "6023080302983"},
+                ]
+            }
+        ],
+        "geo_locations": {
+            "zips": [
+                {"key": "US:94506"}, {"key": "US:94507"}, {"key": "US:94526"},
+                {"key": "US:94528"}, {"key": "US:94549"}, {"key": "US:94556"},
+                {"key": "US:94563"}, {"key": "US:94566"}, {"key": "US:94568"},
+                {"key": "US:94582"}, {"key": "US:94583"}, {"key": "US:94586"},
+                {"key": "US:94588"}, {"key": "US:94595"}, {"key": "US:94596"},
+                {"key": "US:94597"}, {"key": "US:94598"},
+            ],
+            "location_types": ["home", "recent"],
+        },
+        "custom_audiences": [{"id": META_REQUIRED_AUDIENCE_ID}],
+        "targeting_automation": {"advantage_audience": META_REQUIRED_ADVANTAGE_AUD},
+    }
+    try:
+        resp = requests.post(
+            f"{META_BASE_URL}/{adset_id}",
+            data={
+                "targeting": json.dumps(targeting_spec),
+                "access_token": META_ACCESS_TOKEN,
+            },
+            timeout=30,
+        )
+        result = resp.json()
+        if result.get("success") or result.get("id"):
+            logger.info("  Auto-fixed targeting for ad set %s (%s)", adset_name, adset_id)
+            return True
+        else:
+            logger.warning("  Targeting fix failed for %s: %s", adset_name, result)
+            return False
+    except Exception as e:
+        logger.warning("  Targeting fix exception for %s: %s", adset_name, e)
+        return False
+
+
 def check_meta_compliance() -> list[dict]:
     findings = []
 
@@ -211,35 +268,70 @@ def check_meta_compliance() -> list[dict]:
             asname = adset.get("name", asid)
             targeting = adset.get("targeting", {})
 
+            # ── Collect targeting violations for this ad set ──────────────────
+            adset_violations = []
+
             # Check advantage_audience = 0
             targeting_auto = targeting.get("targeting_automation", {})
             advantage_aud = targeting_auto.get("advantage_audience", None)
             if advantage_aud is None or int(advantage_aud) != META_REQUIRED_ADVANTAGE_AUD:
-                advantage_violations += 1
-                findings.append(_fail(
-                    "meta_advantage_audience", "meta",
-                    f"{asname}: advantage_audience={advantage_aud} (required: 0). "
-                    "Meta may be expanding beyond the saved audience.",
-                    auto_fixable=False,
-                    entity=asname,
-                ))
-                _log_violation("advantage_audience", "meta", asname,
-                               f"advantage_audience={advantage_aud} — must be 0")
+                adset_violations.append("advantage_audience")
 
-            # Check saved audience ID is in custom_audiences
+            # Check saved audience ID in custom_audiences or saved_audience_id
             custom_auds = targeting.get("custom_audiences", [])
             aud_ids = [str(a.get("id", "")) for a in custom_auds]
-            if META_REQUIRED_AUDIENCE_ID not in aud_ids:
-                audience_violations += 1
-                findings.append(_fail(
-                    "meta_saved_audience", "meta",
-                    f"{asname}: saved audience {META_REQUIRED_AUDIENCE_ID} not found "
-                    f"in targeting (found: {aud_ids or 'none'})",
-                    auto_fixable=False,
-                    entity=asname,
-                ))
-                _log_violation("saved_audience", "meta", asname,
-                               f"Required audience {META_REQUIRED_AUDIENCE_ID} not in targeting")
+            saved_aud_id = str(targeting.get("saved_audience_id", ""))
+            if (META_REQUIRED_AUDIENCE_ID not in aud_ids
+                    and META_REQUIRED_AUDIENCE_ID != saved_aud_id):
+                adset_violations.append("saved_audience")
+
+            # ── Auto-fix both violations in one API call ──────────────────────
+            if adset_violations:
+                logger.info("  Ad set %s has violation(s): %s — attempting auto-fix",
+                            asname, adset_violations)
+                fixed = _apply_meta_adset_targeting(asid, asname)
+                if fixed:
+                    if "advantage_audience" in adset_violations:
+                        advantage_violations += 1
+                        findings.append(_pass(
+                            "meta_advantage_audience", "meta",
+                            f"{asname}: advantage_audience corrected to 0 (auto-fixed)",
+                        ))
+                    if "saved_audience" in adset_violations:
+                        audience_violations += 1
+                        findings.append(_pass(
+                            "meta_saved_audience", "meta",
+                            f"{asname}: saved audience {META_REQUIRED_AUDIENCE_ID} "
+                            f"applied to custom_audiences (auto-fixed)",
+                        ))
+                    _log_violation(
+                        "targeting_auto_fixed", "meta", asname,
+                        f"Violations {adset_violations} auto-fixed — CLAUDE.md §18 spec applied",
+                    )
+                else:
+                    if "advantage_audience" in adset_violations:
+                        advantage_violations += 1
+                        findings.append(_fail(
+                            "meta_advantage_audience", "meta",
+                            f"{asname}: advantage_audience={advantage_aud} (required: 0). "
+                            "Auto-fix attempted but failed — check manually.",
+                            auto_fixable=False,
+                            entity=asname,
+                        ))
+                        _log_violation("advantage_audience", "meta", asname,
+                                       f"advantage_audience={advantage_aud} — auto-fix failed")
+                    if "saved_audience" in adset_violations:
+                        audience_violations += 1
+                        findings.append(_fail(
+                            "meta_saved_audience", "meta",
+                            f"{asname}: saved audience {META_REQUIRED_AUDIENCE_ID} not found "
+                            f"in targeting (found: {aud_ids or 'none'}). "
+                            "Auto-fix attempted but failed — check manually.",
+                            auto_fixable=False,
+                            entity=asname,
+                        ))
+                        _log_violation("saved_audience", "meta", asname,
+                                       f"Required audience {META_REQUIRED_AUDIENCE_ID} — auto-fix failed")
 
             # Check daily budget ≤ $125
             daily_budget_cents = int(adset.get("daily_budget", 0))

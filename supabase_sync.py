@@ -223,6 +223,11 @@ def sync(pipeline_run_id: str | None = None) -> dict:
 
     success = post_to_edge_function(payload)
 
+    if success:
+        db.heartbeat("supabase_sync", "success", metadata={"row_counts": row_counts})
+    else:
+        db.heartbeat("supabase_sync", "error", error="POST to edge function failed")
+
     result = {
         "success": success,
         "tables_synced": TABLES,

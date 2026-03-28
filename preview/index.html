@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Preview Ready</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f8f9fa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      color: #1a1a1a;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 48px;
+      text-align: center;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.08);
+      max-width: 480px;
+    }
+    .dot { width: 12px; height: 12px; background: #22c55e; border-radius: 50%; display: inline-block; margin-right: 8px; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    h1 { font-size: 24px; font-weight: 700; margin: 16px 0 8px; }
+    p { color: #666; font-size: 15px; line-height: 1.6; }
+    code { background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-size: 13px; color: #4f46e5; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div><span class="dot"></span><strong>Preview Server Running</strong></div>
+    <h1>Ready to Build</h1>
+    <p>Claude Code is watching this directory.<br/>Edit any file and this window will reload automatically.</p>
+    <br/>
+    <p>Current file: <code>preview/index.html</code></p>
+  </div>
+</body>
+</html>

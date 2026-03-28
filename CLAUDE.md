@@ -322,22 +322,60 @@ Target only these service areas:
 
 
 ### Zip Code Targeting (MANDATORY)
-- 94596
-- 94595
-- 94588
-- 94586
-- 94583
-- 94582
-- 94568
-- 94566
-- 94563
-- 94556
+- 94506 — Blackhawk / Danville
+- 94507 — Alamo
+- 94526 — Danville
+- 94528 — Diablo
+- 94549 — Lafayette
+- 94556 — Moraga
+- 94563 — Orinda
+- 94566 — Pleasanton
+- 94568 — Dublin
+- 94582 — San Ramon
+- 94583 — San Ramon
+- 94586 — Sunol
+- 94588 — Pleasanton
+- 94595 — Walnut Creek
+- 94596 — Walnut Creek
+- 94597 — Walnut Creek
+- 94598 — Walnut Creek
 
 Rules:
-- These zip codes must be actively targeted from the start
+- These zip codes apply to ALL platforms: Google Ads, Microsoft Ads, and Meta
+- These zip codes must be actively targeted from the start on every platform
 - Do not delay or phase in zip targeting
 - Campaigns should be restricted to these zip codes in addition to city targeting
 - Use zip codes to refine audience quality and eliminate lower-income areas
+
+### Location Exclusions (MANDATORY — All Platforms)
+Exclude all countries outside the United States, and exclude Alaska and Hawaii. Apply these exclusions on Google Ads, Microsoft Ads, and Meta:
+
+Canada, Mexico, Greenland, Bermuda, Saint Pierre and Miquelon,
+Belize, Costa Rica, El Salvador, Guatemala, Honduras, Nicaragua, Panama,
+Antigua and Barbuda, Bahamas, Barbados, Cuba, Dominica, Dominican Republic,
+Grenada, Haiti, Jamaica, Saint Kitts and Nevis, Saint Lucia,
+Saint Vincent and the Grenadines, Trinidad and Tobago,
+Argentina, Bolivia, Brazil, Chile, Colombia, Ecuador, Guyana, Paraguay,
+Peru, Suriname, Uruguay, Venezuela,
+United Kingdom, Ireland, France, Germany, Spain, Italy, Portugal,
+Netherlands, Belgium, Switzerland, Austria, Sweden, Norway, Denmark,
+Finland, Poland, Czech Republic, Hungary, Romania, Greece, Turkey,
+Russia, Ukraine, Belarus, Iceland,
+China, Japan, South Korea, India, Pakistan, Bangladesh, Indonesia,
+Philippines, Vietnam, Thailand, Malaysia, Singapore, Mongolia,
+Australia, New Zealand,
+South Africa, Nigeria, Kenya, Ghana, Egypt, Morocco, Algeria, Angola,
+Cameroon, Ethiopia, Tanzania, Uganda, Mozambique, Zambia, Zimbabwe,
+Libya, Sudan, Iran, Iraq, Afghanistan, Syria, Yemen,
+Saudi Arabia, United Arab Emirates, Israel,
+Niger, Chad, Namibia, Mali, Burkina Faso, Senegal, Guinea, Guinea-Bissau,
+Sierra Leone, Liberia, Ivory Coast, Togo, Benin, Gabon,
+Republic of the Congo, Democratic Republic of the Congo,
+Central African Republic, South Sudan, Eritrea, Djibouti, Somalia,
+Rwanda, Burundi, Malawi, Lesotho, Eswatini, Botswana, Madagascar,
+Mauritius, Seychelles, Comoros, Cape Verde, Sao Tome and Principe,
+Equatorial Guinea, Gambia, Mauritania, Tunisia, Western Sahara,
+Turkmenistan, Kazakhstan
 
 ---
 
@@ -992,9 +1030,11 @@ Later, connect app-based confirmed booking data back into campaign optimization 
   "geo_locations": {
     "zips": [
       {"key": "US:94506"}, {"key": "US:94507"}, {"key": "US:94526"},
-      {"key": "US:94549"}, {"key": "US:94551"}, {"key": "US:94556"},
+      {"key": "US:94528"}, {"key": "US:94549"}, {"key": "US:94556"},
       {"key": "US:94563"}, {"key": "US:94566"}, {"key": "US:94568"},
-      {"key": "US:94582"}, {"key": "US:94583"}, {"key": "US:94588"}
+      {"key": "US:94582"}, {"key": "US:94583"}, {"key": "US:94586"},
+      {"key": "US:94588"}, {"key": "US:94595"}, {"key": "US:94596"},
+      {"key": "US:94597"}, {"key": "US:94598"}
     ],
     "location_types": ["home", "recent"]
   },
@@ -1006,7 +1046,73 @@ Later, connect app-based confirmed booking data back into campaign optimization 
 
 ---
 
-## 19. Operating Summary
+## 19. Live Google Ads Campaign — Custom Home Builder | Google Search
+
+### Campaign Settings (configured 2026-03-27)
+- **Campaign name:** Custom Home Builder | Google Search
+- **Type:** Search only
+- **Bidding:** Maximize Conversions (no Target CPA — insufficient data)
+- **Budget:** $125/day
+- **Networks:** Google Search Network only — Search Partners and Display Network OFF
+- **Ad schedule:** Friday, Saturday, Sunday, Monday only
+- **Location targeting:** 17 zip codes (see Section 12)
+- **Location exclusions:** All countries except USA, plus Alaska and Hawaii
+- **Languages:** English
+- **AI Max:** Off
+- **Gender targeting:** All (men and women)
+- **Age targeting:** 35-44 and 45-54 active; 18-24 and 25-34 excluded; 55+ reduced
+- **Household income:** Top 10-30% active; bottom 50% excluded
+- **Audience segments:** Observation mode — Home Improvement & Remodeling, Residential Properties, Luxury Goods & Services, Home Renovation
+
+### Ad Group: Custom Home Builder
+- **Final URL:** https://go.ridgecrestdesigns.com
+- **Display path:** /custom-builder
+
+### RSA Headlines (15)
+1. Custom Home Builder
+2. Design Build Experts
+3. High-End Custom Home Designs
+4. Premium Build Process
+5. Pleasanton's Design Build Firm
+6. Luxury Homes, Flawless Results
+7. We Handle Design & Permits
+8. East Bay's Premier Builder
+9. Ridgecrest Designs
+10. Onsite Services Available
+11. Luxury Design Build Firm
+12. From Vision to Completion
+13. Design Build Contractor
+14. Design Build Firm
+15. Request a Free Consultation
+
+### RSA Descriptions (4)
+1. See photo-realistic renders of your custom home before we break ground.
+2. Design-build experts serving Pleasanton, Walnut Creek, Danville & the East Bay.
+3. We manage design, engineering, permits & construction under one roof. No surprises.
+4. Premium custom homes for discerning homeowners. Request a consultation today.
+
+### Sitelinks (7)
+1. Start Your Project — ridgecrestdesigns.com/contact
+2. Our Design-Build Process — ridgecrestdesigns.com/california-process
+3. View Our Portfolio — ridgecrestdesigns.com/portfolio
+4. About Ridgecrest Designs — ridgecrestdesigns.com/about
+5. Meet Our Team — ridgecrestdesigns.com/bios
+6. The RD Edit — ridgecrestdesigns.com/therdedit
+7. Client Testimonials — ridgecrestdesigns.com/testimonials
+
+### Callouts
+Photo-Realistic Renders, Licensed & Insured, Integrated Design-Build, Serving the East Bay, Luxury Custom Homes, Free Consultation
+
+### Keywords
+168 keywords across 7 themes × 12 cities × exact + phrase match:
+Custom Home Builder, Custom Home, Design Build, Design Build Contractor, Home Builder, Whole House Remodel, Home Renovation
+
+### Negative Keywords
+Full list applied from downloads/Ridgecrest_Negative_Keywords.txt (10 sections)
+
+---
+
+## 20. Operating Summary
 This file is intended to guide Claude Code or any campaign-building workflow for Ridgecrest Designs using the full chat history and all revisions.
 
 ### New Campaign Grace Period
@@ -1038,3 +1144,38 @@ The following active campaigns were running before the RMA strategy was implemen
 - Expand to Meta and Microsoft only after Google Ads is working properly
 - All Meta ad sets MUST use saved audience ID 6934900931693 with advantage_audience=0
 
+
+---
+
+## 21. Web Development Infrastructure (added 2026-03-27)
+
+### Decision
+All web pages (landing pages, inquiry forms, Command Center) are built using Claude Code + Flask on the existing server. Lovable and Base44 are being replaced. We own everything — no SaaS fees.
+
+### Server
+- IP: 147.182.242.54
+- Preview server: http://147.182.242.54:8081/ — live auto-reload on file save
+- Downloads/files server: http://147.182.242.54:8080/
+- All new pages go in: /root/agent/preview/
+- Preview server file: /root/agent/preview_server.py
+
+### Preview Workflow
+1. Open http://147.182.242.54:8081/ in browser
+2. Claude edits files in /root/agent/preview/
+3. Browser auto-refreshes on every save — no manual steps
+
+### Claude Code Permissions
+- Global settings: ~/.claude/settings.json — defaultMode: bypassPermissions
+- Project settings: /root/agent/.claude/settings.local.json — defaultMode: bypassPermissions
+- skipDangerousModePermissionPrompt: true on both
+- Launch with: claude --dangerously-skip-permissions for immediate effect
+
+### Google Ads Workflow File
+- /root/agent/google_ads_campaign_setup_workflow.md — 15-step manual setup guide
+- Also in downloads at http://147.182.242.54:8080/
+- Upload to a Claude.ai Project with the keyword files for step-by-step campaign setup
+
+### Master Keyword File
+- /root/agent/downloads/Ridgecrest_Keywords_Master.txt
+- 442 keywords across 18 themes × 12 cities
+- Includes 11 new themes added 2026-03-27: luxury variants, whole home renovation, full house remodel, master bath, primary bathroom, design build remodeling, custom home design build

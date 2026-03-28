@@ -8,7 +8,8 @@ to all 18 [RMA] campaigns so ads only serve in the target service area.
 Target locations per CLAUDE.md §12:
   Cities: Walnut Creek, Pleasanton, San Ramon, Dublin, Danville,
           Orinda, Lafayette, Moraga, Alamo, Diablo, Sunol
-  Zip codes: 94596, 94595, 94588, 94586, 94583, 94582, 94568, 94566, 94563, 94556
+  Zip codes: 94506, 94507, 94526, 94528, 94549, 94556, 94563, 94566, 94568,
+             94582, 94583, 94586, 94588, 94595, 94596, 94597, 94598
 
 Location IDs sourced from GetGeoLocationsFileUrl (CampaignManagementService).
 
@@ -48,16 +49,23 @@ CITY_LOCATION_IDS = {
 }
 
 ZIP_LOCATION_IDS = {
-    "94596": 87855,
-    "94595": 87823,
-    "94588": 87376,
-    "94586": 86988,
-    "94583": 87500,
-    "94582": 87493,
-    "94568": 87357,
-    "94566": 87192,
-    "94563": 87825,
-    "94556": 87713,
+    "94506": 87651,   # Blackhawk / Danville
+    "94507": 87774,   # Alamo
+    "94526": 87669,   # Danville
+    "94528": 87739,   # Diablo
+    "94549": 87883,   # Lafayette
+    "94556": 87713,   # Moraga
+    "94563": 87825,   # Orinda
+    "94566": 87192,   # Pleasanton
+    "94568": 87357,   # Dublin
+    "94582": 87493,   # San Ramon
+    "94583": 87500,   # San Ramon
+    "94586": 86988,   # Sunol
+    "94588": 87376,   # Pleasanton
+    "94595": 87823,   # Walnut Creek
+    "94596": 87855,   # Walnut Creek
+    "94597": 87929,   # Walnut Creek
+    "94598": 87888,   # Walnut Creek
 }
 
 # All location IDs to apply (cities + zip codes)

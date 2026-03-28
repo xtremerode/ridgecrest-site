@@ -58,7 +58,10 @@ logging.basicConfig(
     format="%(asctime)s [orchestrator] %(levelname)s — %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler("/root/agent/orchestrator.log", mode="a"),
+        logging.FileHandler(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "orchestrator.log"),
+            mode="a",
+        ),
     ]
 )
 logger = logging.getLogger(__name__)
