@@ -70,6 +70,15 @@ from config import ACTIVE_DAYS
 
 AGENT_NAME = "orchestrator"
 
+# ---------------------------------------------------------------------------
+# Manual-mode flag
+# Set CAMPAIGN_AUTOMATION_ENABLED=false in .env to disable all campaign writes
+# while keeping data sync, reporting, and chat fully operational.
+# ---------------------------------------------------------------------------
+CAMPAIGN_AUTOMATION_ENABLED = os.getenv(
+    "CAMPAIGN_AUTOMATION_ENABLED", "true"
+).strip().lower() not in ("false", "0", "off", "no")
+
 
 # ---------------------------------------------------------------------------
 # Critical alert handler
@@ -309,56 +318,73 @@ def run_pipeline(force: bool = False) -> dict:
         db.heartbeat(AGENT_NAME, "error", error=str(e))
 
     # ---- Phase 1b: Platform Managers (Meta + Microsoft write-back) ----
-    logger.info("--- Phase 1b: Platform Managers ---")
-    db.heartbeat(AGENT_NAME, "alive", metadata={"phase": "platform_managers",
-                                                 "run_id": pipeline_run_id})
-    platform_manager_results = {}
-    for manager_module, label in [
-        (meta_manager,      "meta"),
-        (microsoft_manager, "microsoft_ads"),
-    ]:
-        try:
-            result = manager_module.run()
-            platform_manager_results[label] = {
-                "status":          result.get("status"),
-                "actions_total":   result.get("actions_total", 0),
-                "actions_applied": result.get("actions_applied", 0),
-                "actions_pending": result.get("actions_pending", 0),
-            }
-        except Exception as e:
-            logger.error("Platform manager failed for %s: %s", label, e, exc_info=True)
-            platform_manager_results[label] = {"status": "error", "error": str(e)}
-
-    # Google Ads day scheduler — staged until developer token approved
-    try:
-        sched_result = google_ads_scheduler.apply_schedule(auto_apply=False)
-        platform_manager_results["google_ads_scheduler"] = sched_result
-    except Exception as e:
-        logger.warning("Google Ads scheduler skipped (token pending): %s", e)
-        platform_manager_results["google_ads_scheduler"] = {
-            "status": "skipped", "reason": str(e)
+    if not CAMPAIGN_AUTOMATION_ENABLED:
+        logger.info("--- Phase 1b: Platform Managers SKIPPED (manual mode) ---")
+        results["phases"]["platform_managers"] = {
+            "status": "skipped", "reason": "CAMPAIGN_AUTOMATION_ENABLED=false"
         }
+    else:
+        logger.info("--- Phase 1b: Platform Managers ---")
+        db.heartbeat(AGENT_NAME, "alive", metadata={"phase": "platform_managers",
+                                                     "run_id": pipeline_run_id})
+        platform_manager_results = {}
+        for manager_module, label in [
+            (meta_manager,      "meta"),
+            (microsoft_manager, "microsoft_ads"),
+        ]:
+            try:
+                result = manager_module.run()
+                platform_manager_results[label] = {
+                    "status":          result.get("status"),
+                    "actions_total":   result.get("actions_total", 0),
+                    "actions_applied": result.get("actions_applied", 0),
+                    "actions_pending": result.get("actions_pending", 0),
+                }
+            except Exception as e:
+                logger.error("Platform manager failed for %s: %s", label, e, exc_info=True)
+                platform_manager_results[label] = {"status": "error", "error": str(e)}
 
-    results["phases"]["platform_managers"] = platform_manager_results
+        # Google Ads day scheduler — staged until developer token approved
+        try:
+            sched_result = google_ads_scheduler.apply_schedule(auto_apply=False)
+            platform_manager_results["google_ads_scheduler"] = sched_result
+        except Exception as e:
+            logger.warning("Google Ads scheduler skipped (token pending): %s", e)
+            platform_manager_results["google_ads_scheduler"] = {
+                "status": "skipped", "reason": str(e)
+            }
+
+        results["phases"]["platform_managers"] = platform_manager_results
 
     # ---- Phase 1c: Compliance Check (verify all CLAUDE.md parameters are met) ----
-    logger.info("--- Phase 1c: Compliance Check ---")
-    db.heartbeat(AGENT_NAME, "alive", metadata={"phase": "compliance_check",
-                                                 "run_id": pipeline_run_id})
-    try:
-        comp_result = compliance_agent.run()
+    if not CAMPAIGN_AUTOMATION_ENABLED:
+        logger.info("--- Phase 1c: Compliance Check SKIPPED (manual mode) ---")
         results["phases"]["compliance_check"] = {
-            "status":       comp_result.get("status"),
-            "checks_total": comp_result.get("checks_total", 0),
-            "checks_fail":  comp_result.get("checks_fail", 0),
-            "auto_fixed":   comp_result.get("auto_fixed", 0),
+            "status": "skipped", "reason": "CAMPAIGN_AUTOMATION_ENABLED=false"
         }
-    except Exception as e:
-        logger.error("Compliance check failed: %s", e, exc_info=True)
-        results["phases"]["compliance_check"] = {"status": "error", "error": str(e)}
+    else:
+        logger.info("--- Phase 1c: Compliance Check ---")
+        db.heartbeat(AGENT_NAME, "alive", metadata={"phase": "compliance_check",
+                                                     "run_id": pipeline_run_id})
+        try:
+            comp_result = compliance_agent.run()
+            results["phases"]["compliance_check"] = {
+                "status":       comp_result.get("status"),
+                "checks_total": comp_result.get("checks_total", 0),
+                "checks_fail":  comp_result.get("checks_fail", 0),
+                "auto_fixed":   comp_result.get("auto_fixed", 0),
+            }
+        except Exception as e:
+            logger.error("Compliance check failed: %s", e, exc_info=True)
+            results["phases"]["compliance_check"] = {"status": "error", "error": str(e)}
 
     # ---- Phase 2: Bid & Budget Optimization ----
-    if optimization_halted:
+    if not CAMPAIGN_AUTOMATION_ENABLED:
+        logger.info("--- Phase 2: Bid & Budget Optimization SKIPPED (manual mode) ---")
+        results["phases"]["bid_budget_optimization"] = {
+            "status": "skipped", "reason": "CAMPAIGN_AUTOMATION_ENABLED=false"
+        }
+    elif optimization_halted:
         logger.warning(
             "--- Phase 2: SKIPPED — escalation violations active. "
             "Human review required before optimization resumes. ---"
@@ -416,7 +442,12 @@ def run_pipeline(force: bool = False) -> dict:
             results["phases"]["bid_budget_optimization"] = {"status": "error", "error": str(e)}
 
     # ---- Phase 3: Creative Agent (refresh on active days only) ----
-    if optimization_halted:
+    if not CAMPAIGN_AUTOMATION_ENABLED:
+        logger.info("--- Phase 3: Creative Refresh SKIPPED (manual mode) ---")
+        results["phases"]["creative_refresh"] = {
+            "status": "skipped", "reason": "CAMPAIGN_AUTOMATION_ENABLED=false"
+        }
+    elif optimization_halted:
         logger.warning(
             "--- Phase 3: SKIPPED — escalation violations active. "
             "Creative changes blocked until human review. ---"
