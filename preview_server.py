@@ -3,7 +3,7 @@
 Ridgecrest Preview Server — port 8081
 Serves /home/claudeuser/agent/preview/ as a static preview site.
 """
-from flask import Flask, Response, jsonify, render_template_string, request, session
+from flask import Flask, Response, jsonify, render_template_string, request, send_file, session
 import threading
 import mimetypes
 import os
@@ -12,6 +12,7 @@ import secrets
 import hashlib
 import json
 import sys
+import subprocess
 from datetime import datetime, timezone
 
 # Try importing db/bcrypt for admin features — non-fatal if missing
@@ -4311,6 +4312,721 @@ def admin_label_all_images():
 
     return Response(generate(), mimetype='text/event-stream',
                     headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+
+# ── Server Management App ─────────────────────────────────────────────────────
+import csv as _csv
+import io as _io
+
+# App log file — Flask writes here, log viewer tails it
+_APP_LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'preview_server.log')
+_FS_ROOT      = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))  # /home/claudeuser/agent
+_ENV_FILE     = os.path.join(_FS_ROOT, '.env')
+
+_FS_PROTECTED_NAMES = {'.env', 'preview_server.py', 'CLAUDE.md', 'GUARDRAILS.md', '__pycache__'}
+_FS_PROTECTED_EXTS  = {'.pyc'}
+
+_ENV_SENSITIVE = {
+    'ANTHROPIC_API_KEY','META_APP_SECRET','META_ACCESS_TOKEN',
+    'GOOGLE_CLIENT_SECRET','GOOGLE_REFRESH_TOKEN','GOOGLE_DEVELOPER_TOKEN',
+    'MICROSOFT_CLIENT_SECRET','MICROSOFT_REFRESH_TOKEN','MICROSOFT_ADS_DEVELOPER_TOKEN',
+    'RESEND_API_KEY','GEMINI_API_KEY','DATABASE_URL','INGEST_API_KEY',
+    'ADMIN_PASSWORD','ADMIN_PASSWORD_HASH','META_APP_ID','SUPABASE_INGEST_ENDPOINT',
+}
+_ENV_EDITABLE = {
+    'GEMINI_API_KEY','ANTHROPIC_API_KEY','RESEND_API_KEY',
+    'CAMPAIGN_AUTOMATION_ENABLED','META_MANAGER_AUTO_APPLY','MSFT_MANAGER_AUTO_APPLY',
+    'ALERT_EMAIL','ALERT_FROM','LANDING_PAGE_URL','META_API_VERSION',
+    'META_ACCESS_TOKEN','GOOGLE_REFRESH_TOKEN','MICROSOFT_REFRESH_TOKEN',
+}
+
+
+def _fs_safe(rel_path):
+    """Resolve path inside FS_ROOT; return abs path or None if outside."""
+    try:
+        resolved = os.path.realpath(os.path.join(_FS_ROOT, rel_path.lstrip('/')))
+        if resolved.startswith(_FS_ROOT + os.sep) or resolved == _FS_ROOT:
+            return resolved
+    except Exception:
+        pass
+    return None
+
+
+def _read_env_file():
+    env = {}
+    if not os.path.isfile(_ENV_FILE):
+        return env
+    with open(_ENV_FILE) as f:
+        for line in f:
+            line = line.rstrip('\n')
+            if line.startswith('#') or '=' not in line:
+                continue
+            k, _, v = line.partition('=')
+            env[k.strip()] = v.strip()
+    return env
+
+
+def _write_env_file(updates):
+    """Update specific keys in .env in-place."""
+    lines = []
+    updated = set()
+    if os.path.isfile(_ENV_FILE):
+        with open(_ENV_FILE) as f:
+            for line in f:
+                stripped = line.rstrip('\n')
+                if not stripped.startswith('#') and '=' in stripped:
+                    k = stripped.split('=', 1)[0].strip()
+                    if k in updates:
+                        lines.append(f'{k}={updates[k]}\n')
+                        updated.add(k)
+                        continue
+                lines.append(line if line.endswith('\n') else line + '\n')
+    for k, v in updates.items():
+        if k not in updated:
+            lines.append(f'{k}={v}\n')
+    with open(_ENV_FILE, 'w') as f:
+        f.writelines(lines)
+
+
+def _mask_val(v):
+    if not v:
+        return ''
+    if len(v) <= 8:
+        return '••••••••'
+    return v[:4] + '••••••••' + v[-4:]
+
+
+# ── Health ────────────────────────────────────────────────────────────────────
+
+@app.route('/admin/api/server/health')
+def admin_server_health():
+    auth = _require_admin()
+    if auth: return auth
+    try:
+        import psutil, shutil as _shutil
+        cpu  = psutil.cpu_percent(interval=0.5)
+        mem  = psutil.virtual_memory()
+        disk = _shutil.disk_usage('/')
+        boot = psutil.boot_time()
+        uptime_secs = int(datetime.now(timezone.utc).timestamp() - boot)
+
+        img_dir   = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+        img_size  = 0
+        img_count = 0
+        if os.path.isdir(img_dir):
+            for fn in os.listdir(img_dir):
+                fp = os.path.join(img_dir, fn)
+                if os.path.isfile(fp):
+                    img_size  += os.path.getsize(fp)
+                    img_count += 1
+
+        db_size_mb = 0
+        conn = _db_conn()
+        if conn:
+            try:
+                cur = conn.cursor()
+                cur.execute("SELECT pg_database_size('marketing_agent') AS sz")
+                row = cur.fetchone()
+                if row: db_size_mb = round(row['sz'] / 1024 / 1024, 1)
+            except Exception:
+                pass
+            finally:
+                conn.close()
+
+        procs = []
+        for p in sorted(
+            psutil.process_iter(['pid','name','cpu_percent','memory_percent','status']),
+            key=lambda p: p.info.get('memory_percent') or 0, reverse=True
+        )[:15]:
+            try:
+                procs.append({
+                    'pid':    p.info['pid'],
+                    'name':   p.info['name'],
+                    'cpu':    round(p.info.get('cpu_percent') or 0, 1),
+                    'mem':    round(p.info.get('memory_percent') or 0, 1),
+                    'status': p.info.get('status',''),
+                })
+            except Exception:
+                pass
+
+        return jsonify({
+            'ok': True,
+            'cpu':     {'percent': cpu, 'cores': psutil.cpu_count()},
+            'memory':  {'used_gb': round(mem.used/1024**3, 2),
+                        'total_gb': round(mem.total/1024**3, 2),
+                        'percent': mem.percent},
+            'disk':    {'used_gb': round(disk.used/1024**3, 1),
+                        'total_gb': round(disk.total/1024**3, 1),
+                        'free_gb': round(disk.free/1024**3, 1),
+                        'percent': round(disk.used/disk.total*100, 1)},
+            'images':  {'count': img_count, 'size_mb': round(img_size/1024**2, 1)},
+            'db_size_mb': db_size_mb,
+            'uptime_seconds': uptime_secs,
+            'processes': procs,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/server/services')
+def admin_server_services():
+    auth = _require_admin()
+    if auth: return auth
+    service_defs = [
+        ('preview_server',          'Preview Server',    '◈'),
+        ('postgresql',              'PostgreSQL',        '◉'),
+        ('ridgecrest-agent',        'Marketing Agent',   '▲'),
+        ('ridgecrest-orchestrator', 'Orchestrator',      '⊙'),
+    ]
+    try:
+        import psutil
+    except ImportError:
+        psutil = None
+
+    result = []
+    for key, name, icon in service_defs:
+        try:
+            r = subprocess.run(['systemctl','is-active', key],
+                               capture_output=True, text=True, timeout=5)
+            active = r.stdout.strip() == 'active'
+            pid = mem_mb = uptime_str = None
+            if active and psutil:
+                try:
+                    r2 = subprocess.run(
+                        ['systemctl','show', key,'--property=MainPID'],
+                        capture_output=True, text=True, timeout=5)
+                    pid_str = r2.stdout.strip().replace('MainPID=','')
+                    if pid_str and pid_str != '0':
+                        pid = int(pid_str)
+                        p = psutil.Process(pid)
+                        mem_mb = round(p.memory_info().rss/1024**2, 1)
+                        ct = p.create_time()
+                        secs = int(datetime.now(timezone.utc).timestamp() - ct)
+                        d, rem = divmod(secs, 86400)
+                        h, rem = divmod(rem, 3600)
+                        m, s   = divmod(rem, 60)
+                        uptime_str = (f'{d}d ' if d else '') + f'{h:02d}:{m:02d}:{s:02d}'
+                except Exception:
+                    pass
+            result.append({'key':key,'name':name,'icon':icon,
+                           'active':active,'pid':pid,'mem_mb':mem_mb,'uptime':uptime_str})
+        except Exception as e:
+            result.append({'key':key,'name':name,'icon':icon,
+                           'active':False,'pid':None,'mem_mb':None,'uptime':None,'error':str(e)})
+    return jsonify({'ok': True, 'services': result})
+
+
+@app.route('/admin/api/server/service/restart', methods=['POST'])
+def admin_service_restart():
+    auth = _require_admin()
+    if auth: return auth
+    data = request.get_json(silent=True) or {}
+    key  = data.get('service','').strip()
+    allowed = {'ridgecrest-agent','ridgecrest-orchestrator','preview_server'}
+    # postgresql not restartable via UI
+    if key not in allowed:
+        return jsonify({'error': 'service not restartable via UI'}), 403
+    try:
+        r = subprocess.run(['sudo','systemctl','restart', key],
+                           capture_output=True, text=True, timeout=15)
+        if r.returncode != 0:
+            return jsonify({'error': r.stderr.strip() or 'restart failed'}), 500
+        return jsonify({'ok': True, 'service': key})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+
+@app.route('/admin/api/server/logs')
+def admin_server_logs():
+    auth = _require_admin()
+    if auth: return auth
+    level_filter = request.args.get('level','ALL').upper()
+    limit = min(int(request.args.get('limit', 300)), 500)
+    search = request.args.get('q','').lower()
+
+    lines = []
+
+    def _classify(text):
+        t = text.upper()
+        if 'ERROR' in t or 'EXCEPTION' in t or 'TRACEBACK' in t: return 'ERROR'
+        if 'WARNING' in t or 'WARN' in t:                         return 'WARNING'
+        if 'DEBUG' in t:                                           return 'DEBUG'
+        return 'INFO'
+
+    # Try app log file
+    if os.path.isfile(_APP_LOG_FILE):
+        try:
+            with open(_APP_LOG_FILE) as f:
+                raw = f.readlines()[-limit:]
+            for line in raw:
+                line = line.rstrip()
+                if not line: continue
+                lv = _classify(line)
+                if level_filter != 'ALL' and lv != level_filter: continue
+                if search and search not in line.lower(): continue
+                lines.append({'text': line, 'level': lv})
+        except Exception:
+            pass
+
+    # Fallback: journalctl
+    if not lines:
+        try:
+            r = subprocess.run(
+                ['journalctl','--no-pager','-n',str(limit),'--output=short'],
+                capture_output=True, text=True, timeout=10)
+            for line in r.stdout.splitlines():
+                if not line or line.startswith('--'): continue
+                lv = _classify(line)
+                if level_filter != 'ALL' and lv != level_filter: continue
+                if search and search not in line.lower(): continue
+                lines.append({'text': line, 'level': lv})
+        except Exception:
+            pass
+
+    return jsonify({'ok': True, 'lines': lines[-limit:]})
+
+
+@app.route('/admin/api/server/logs/stream')
+def admin_server_logs_stream():
+    token = request.headers.get('X-Admin-Token','') or request.args.get('token','')
+    with _TOKENS_LOCK:
+        if token not in _ADMIN_TOKENS:
+            return Response('data: {"error":"unauthorized"}\n\n', status=401)
+
+    def generate():
+        def emit(text, level='INFO'):
+            return f"event: log\ndata: {json.dumps({'text': text, 'level': level})}\n\n"
+
+        # Send last 80 lines immediately
+        if os.path.isfile(_APP_LOG_FILE):
+            try:
+                with open(_APP_LOG_FILE) as f:
+                    lines = f.readlines()[-80:]
+                for line in lines:
+                    line = line.rstrip()
+                    if line:
+                        lv = 'ERROR' if 'ERROR' in line.upper() else ('WARNING' if 'WARNING' in line.upper() else 'INFO')
+                        yield emit(line, lv)
+            except Exception:
+                pass
+        else:
+            yield emit('No log file yet — logs appear here after first request')
+
+        # Tail in real-time
+        import time as _time_mod
+        target = _APP_LOG_FILE
+        for _ in range(10):
+            if os.path.isfile(target): break
+            _time_mod.sleep(0.5)
+
+        try:
+            args = ['tail','-f','-n','0', target] if os.path.isfile(target) \
+                   else ['journalctl','-f','--no-pager','-n','0']
+            proc = subprocess.Popen(args, stdout=subprocess.PIPE,
+                                    stderr=subprocess.DEVNULL, text=True)
+            try:
+                for line in proc.stdout:
+                    line = line.rstrip()
+                    if not line: continue
+                    lv = 'ERROR' if 'ERROR' in line.upper() else ('WARNING' if 'WARNING' in line.upper() else 'INFO')
+                    yield emit(line, lv)
+            finally:
+                proc.kill()
+        except Exception as e:
+            yield emit(f'Stream error: {e}', 'ERROR')
+
+    return Response(generate(), content_type='text/event-stream',
+                    headers={'Cache-Control':'no-cache','X-Accel-Buffering':'no'})
+
+
+@app.route('/admin/api/server/logs/download')
+def admin_server_logs_download():
+    auth = _require_admin()
+    if auth: return auth
+    if not os.path.isfile(_APP_LOG_FILE):
+        return jsonify({'error':'no log file yet'}), 404
+    from flask import send_file
+    return send_file(_APP_LOG_FILE, as_attachment=True,
+                     download_name='preview_server.log')
+
+
+@app.route('/admin/api/server/logs/clear', methods=['POST'])
+def admin_server_logs_clear():
+    auth = _require_admin()
+    if auth: return auth
+    try:
+        open(_APP_LOG_FILE, 'w').close()
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ── File Manager ──────────────────────────────────────────────────────────────
+
+@app.route('/admin/api/fs/list')
+def admin_fs_list():
+    auth = _require_admin()
+    if auth: return auth
+    rel = request.args.get('path','').strip('/')
+    abs_path = _fs_safe(rel) if rel else _FS_ROOT
+    if not abs_path or not os.path.isdir(abs_path):
+        return jsonify({'error':'directory not found'}), 404
+    try:
+        items = []
+        for name in sorted(os.listdir(abs_path),
+                           key=lambda n: (not os.path.isdir(os.path.join(abs_path,n)), n.lower())):
+            fp   = os.path.join(abs_path, name)
+            try:
+                stat  = os.stat(fp)
+            except Exception:
+                continue
+            is_dir = os.path.isdir(fp)
+            ext    = os.path.splitext(name)[1].lower()
+            items.append({
+                'name':      name,
+                'path':      os.path.relpath(fp, _FS_ROOT),
+                'is_dir':    is_dir,
+                'size':      stat.st_size if not is_dir else None,
+                'modified':  datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+                'protected': name in _FS_PROTECTED_NAMES or ext in _FS_PROTECTED_EXTS,
+                'is_image':  ext in {'.webp','.jpg','.jpeg','.png','.gif'},
+            })
+        crumbs = []
+        if rel:
+            acc = ''
+            for part in rel.split('/'):
+                if not part: continue
+                acc = (acc + '/' + part).lstrip('/')
+                crumbs.append({'name': part, 'path': acc})
+        return jsonify({'ok':True,'path':rel,'items':items,'breadcrumb':crumbs})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/fs/download')
+def admin_fs_download():
+    auth = _require_admin()
+    if auth: return auth
+    rel = request.args.get('path','').strip('/')
+    abs_path = _fs_safe(rel)
+    if not abs_path or not os.path.isfile(abs_path):
+        return jsonify({'error':'file not found'}), 404
+    from flask import send_file
+    return send_file(abs_path, as_attachment=True,
+                     download_name=os.path.basename(abs_path))
+
+
+@app.route('/admin/api/fs/delete', methods=['POST'])
+def admin_fs_delete():
+    auth = _require_admin()
+    if auth: return auth
+    data = request.get_json(silent=True) or {}
+    rel  = (data.get('path') or '').strip('/')
+    abs_path = _fs_safe(rel)
+    if not abs_path or not os.path.exists(abs_path):
+        return jsonify({'error':'not found'}), 404
+    name = os.path.basename(abs_path)
+    ext  = os.path.splitext(name)[1].lower()
+    if name in _FS_PROTECTED_NAMES or ext in _FS_PROTECTED_EXTS:
+        return jsonify({'error':'protected file cannot be deleted'}), 403
+    try:
+        if os.path.isdir(abs_path):
+            import shutil as _sh; _sh.rmtree(abs_path)
+        else:
+            os.remove(abs_path)
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/fs/rename', methods=['POST'])
+def admin_fs_rename():
+    auth = _require_admin()
+    if auth: return auth
+    data     = request.get_json(silent=True) or {}
+    rel      = (data.get('path') or '').strip('/')
+    new_name = os.path.basename((data.get('new_name') or '').strip())
+    abs_path = _fs_safe(rel)
+    if not abs_path or not os.path.exists(abs_path):
+        return jsonify({'error':'not found'}), 404
+    if not new_name or '/' in new_name or '..' in new_name:
+        return jsonify({'error':'invalid name'}), 400
+    new_abs = os.path.join(os.path.dirname(abs_path), new_name)
+    if os.path.exists(new_abs):
+        return jsonify({'error':'name already exists'}), 409
+    try:
+        os.rename(abs_path, new_abs)
+        return jsonify({'ok':True,'new_path': os.path.relpath(new_abs, _FS_ROOT)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/fs/upload', methods=['POST'])
+def admin_fs_upload():
+    auth = _require_admin()
+    if auth: return auth
+    rel     = request.form.get('path','').strip('/')
+    abs_dir = _fs_safe(rel) if rel else _FS_ROOT
+    if not abs_dir or not os.path.isdir(abs_dir):
+        return jsonify({'error':'directory not found'}), 404
+    uploaded, errors = [], []
+    for f in request.files.getlist('files'):
+        fname = os.path.basename(f.filename or '')
+        if not fname: continue
+        ext = os.path.splitext(fname)[1].lower()
+        if ext in _FS_PROTECTED_EXTS:
+            errors.append(f'{fname}: file type not allowed'); continue
+        try:
+            f.save(os.path.join(abs_dir, fname)); uploaded.append(fname)
+        except Exception as e:
+            errors.append(f'{fname}: {e}')
+    return jsonify({'ok':True,'uploaded':uploaded,'errors':errors})
+
+
+@app.route('/admin/api/fs/mkdir', methods=['POST'])
+def admin_fs_mkdir():
+    auth = _require_admin()
+    if auth: return auth
+    data     = request.get_json(silent=True) or {}
+    rel      = (data.get('path') or '').strip('/')
+    dir_name = os.path.basename((data.get('name') or '').strip())
+    if not dir_name or '/' in dir_name or '..' in dir_name:
+        return jsonify({'error':'invalid name'}), 400
+    parent = _fs_safe(rel) if rel else _FS_ROOT
+    if not parent or not os.path.isdir(parent):
+        return jsonify({'error':'parent not found'}), 404
+    new_dir = os.path.join(parent, dir_name)
+    if os.path.exists(new_dir):
+        return jsonify({'error':'already exists'}), 409
+    try:
+        os.makedirs(new_dir)
+        return jsonify({'ok':True,'path': os.path.relpath(new_dir, _FS_ROOT)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ── Database Browser ──────────────────────────────────────────────────────────
+
+@app.route('/admin/api/db/tables')
+def admin_db_tables():
+    auth = _require_admin()
+    if auth: return auth
+    conn = _db_conn()
+    if not conn: return jsonify({'error':'no db'}), 503
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT tablename,
+                   pg_size_pretty(pg_total_relation_size(quote_ident(tablename))) AS size,
+                   pg_total_relation_size(quote_ident(tablename)) AS size_bytes
+            FROM pg_tables WHERE schemaname='public' ORDER BY tablename
+        """)
+        tables = cur.fetchall()
+        result = []
+        for row in tables:
+            try:
+                cur.execute(f'SELECT count(*) FROM "{row["tablename"]}"')
+                cnt = cur.fetchone()['count']
+            except Exception:
+                cnt = None
+            result.append({'name':row['tablename'],'size':row['size'],
+                           'size_bytes':row['size_bytes'],'rows':cnt})
+        cur.execute("SELECT pg_size_pretty(pg_database_size('marketing_agent')) AS total, pg_database_size('marketing_agent') AS bytes")
+        db = cur.fetchone()
+        return jsonify({'ok':True,'tables':result,'db_size':db['total'],'db_bytes':db['bytes']})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/admin/api/db/table/<table_name>')
+def admin_db_table_rows(table_name):
+    auth = _require_admin()
+    if auth: return auth
+    conn = _db_conn()
+    if not conn: return jsonify({'error':'no db'}), 503
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename=%s", (table_name,))
+        if not cur.fetchone(): return jsonify({'error':'table not found'}), 404
+        offset = max(0, int(request.args.get('offset',0)))
+        limit  = min(100, max(1, int(request.args.get('limit',50))))
+        sort_col = request.args.get('sort','')
+        # Validate sort column
+        cur.execute("""SELECT column_name FROM information_schema.columns
+                       WHERE table_schema='public' AND table_name=%s
+                       ORDER BY ordinal_position""", (table_name,))
+        cols = [r['column_name'] for r in cur.fetchall()]
+        if sort_col not in cols and cols:
+            sort_col = cols[0]
+        order = f'ORDER BY "{sort_col}"' if sort_col else ''
+        cur.execute(f'SELECT count(*) FROM "{table_name}"')
+        total = cur.fetchone()['count']
+        cur.execute(f'SELECT * FROM "{table_name}" {order} LIMIT %s OFFSET %s', (limit, offset))
+        rows = cur.fetchall()
+        col_info = []
+        cur.execute("""SELECT column_name, data_type FROM information_schema.columns
+                       WHERE table_schema='public' AND table_name=%s
+                       ORDER BY ordinal_position""", (table_name,))
+        for r in cur.fetchall():
+            col_info.append({'name':r['column_name'],'type':r['data_type']})
+        serialized = []
+        for row in rows:
+            r = {}
+            for k, v in row.items():
+                if v is None: r[k] = None
+                elif isinstance(v, datetime): r[k] = v.isoformat()
+                elif isinstance(v, (int,float,bool,str)): r[k] = v
+                else: r[k] = str(v)
+            serialized.append(r)
+        return jsonify({'ok':True,'table':table_name,'columns':col_info,
+                        'rows':serialized,'total':total,'offset':offset,'limit':limit})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/admin/api/db/export/<table_name>')
+def admin_db_export(table_name):
+    auth = _require_admin()
+    if auth: return auth
+    conn = _db_conn()
+    if not conn: return jsonify({'error':'no db'}), 503
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename=%s", (table_name,))
+        if not cur.fetchone(): return jsonify({'error':'table not found'}), 404
+        cur.execute(f'SELECT * FROM "{table_name}" ORDER BY 1')
+        rows = cur.fetchall()
+        buf = _io.StringIO()
+        if rows:
+            writer = _csv.DictWriter(buf, fieldnames=list(rows[0].keys()))
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({k: (v.isoformat() if isinstance(v, datetime) else (str(v) if v is not None else ''))
+                                  for k, v in row.items()})
+        ts = datetime.now().strftime('%Y%m%d')
+        return Response(buf.getvalue(), content_type='text/csv',
+                        headers={'Content-Disposition': f'attachment; filename={table_name}_{ts}.csv'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ── Environment Manager ───────────────────────────────────────────────────────
+
+@app.route('/admin/api/server/env')
+def admin_env_list():
+    auth = _require_admin()
+    if auth: return auth
+    env = _read_env_file()
+    # Group keys
+    groups = {
+        'General':   ['CAMPAIGN_AUTOMATION_ENABLED','META_MANAGER_AUTO_APPLY','MSFT_MANAGER_AUTO_APPLY','ALERT_EMAIL','ALERT_FROM','LANDING_PAGE_URL'],
+        'AI':        ['ANTHROPIC_API_KEY','GEMINI_API_KEY'],
+        'Meta':      ['META_APP_ID','META_APP_SECRET','META_ACCESS_TOKEN','META_AD_ACCOUNT_ID','META_PIXEL_ID','META_API_VERSION','META_AUDIENCE_ID','META_CONVERSION_INQUIRY_ID','META_CONVERSION_BOOKING_ID'],
+        'Google':    ['GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET','GOOGLE_REFRESH_TOKEN','GOOGLE_DEVELOPER_TOKEN','GOOGLE_ADS_CUSTOMER_ID','GOOGLE_ADS_MANAGER_ID'],
+        'Microsoft': ['MICROSOFT_CLIENT_ID','MICROSOFT_TENANT_ID','MICROSOFT_CLIENT_SECRET','MICROSOFT_REFRESH_TOKEN','MICROSOFT_ADS_DEVELOPER_TOKEN','MICROSOFT_ADS_ACCOUNT_ID'],
+        'Database':  ['DATABASE_URL'],
+        'Email':     ['RESEND_API_KEY'],
+        'URLs':      ['INQUIRY_FORM_URL','INQUIRY_SUBMITTED_URL','BOOKING_CONFIRMED_URL','COMMAND_CENTER_URL','SUPABASE_URL'],
+    }
+    placed = set()
+    result_groups = []
+    for grp_name, keys in groups.items():
+        items = []
+        for k in keys:
+            if k in env:
+                placed.add(k)
+                sensitive = k in _ENV_SENSITIVE
+                items.append({'key':k,'value':_mask_val(env[k]) if sensitive else env[k],
+                               'sensitive':sensitive,'editable':k in _ENV_EDITABLE,'set':bool(env.get(k))})
+        if items:
+            result_groups.append({'group':grp_name,'vars':items})
+    # Other keys not in groups
+    other = []
+    for k, v in env.items():
+        if k not in placed:
+            sensitive = k in _ENV_SENSITIVE
+            other.append({'key':k,'value':_mask_val(v) if sensitive else v,
+                          'sensitive':sensitive,'editable':k in _ENV_EDITABLE,'set':bool(v)})
+    if other:
+        result_groups.append({'group':'Other','vars':other})
+    return jsonify({'ok':True,'groups':result_groups})
+
+
+@app.route('/admin/api/server/env/set', methods=['POST'])
+def admin_env_set_server():
+    auth = _require_admin()
+    if auth: return auth
+    data  = request.get_json(silent=True) or {}
+    key   = data.get('key','').strip()
+    value = data.get('value','').strip()
+    if not key or key not in _ENV_EDITABLE:
+        return jsonify({'error':'key not editable via UI'}), 403
+    if not re.match(r'^[A-Z][A-Z0-9_]*$', key):
+        return jsonify({'error':'invalid key name'}), 400
+    try:
+        _write_env_file({key: value})
+        os.environ[key] = value
+        return jsonify({'ok':True,'key':key})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ── Backup ────────────────────────────────────────────────────────────────────
+
+@app.route('/admin/api/server/backup/db', methods=['POST'])
+def admin_backup_db():
+    auth = _require_admin()
+    if auth: return auth
+    try:
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix='.sql', delete=False) as tf:
+            tmp_path = tf.name
+        env2 = os.environ.copy()
+        env2['PGPASSWORD'] = 'StrongPass123!'
+        r = subprocess.run(
+            ['pg_dump','-U','agent_user','-h','localhost','marketing_agent','-f',tmp_path],
+            capture_output=True, text=True, timeout=120, env=env2)
+        if r.returncode != 0:
+            return jsonify({'error': r.stderr.strip() or 'pg_dump failed'}), 500
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        from flask import send_file
+        return send_file(tmp_path, as_attachment=True,
+                         download_name=f'marketing_agent_{ts}.sql',
+                         mimetype='application/sql')
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/server/backup/files', methods=['POST'])
+def admin_backup_files():
+    """Create a tar.gz of the preview/ directory and download it."""
+    auth = _require_admin()
+    if auth: return auth
+    try:
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix='.tar.gz', delete=False) as tf:
+            tmp_path = tf.name
+        src = os.path.join(_FS_ROOT, 'preview')
+        r = subprocess.run(
+            ['tar','-czf', tmp_path,'-C', _FS_ROOT, 'preview'],
+            capture_output=True, timeout=120)
+        if r.returncode != 0:
+            return jsonify({'error':'tar failed'}), 500
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        from flask import send_file
+        return send_file(tmp_path, as_attachment=True,
+                         download_name=f'preview_{ts}.tar.gz',
+                         mimetype='application/gzip')
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 # ── Startup: seed pages + team tables + load persisted sessions ──────────────

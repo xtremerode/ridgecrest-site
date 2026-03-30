@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Server — Ridgecrest Admin</title>
+  <link rel="stylesheet" href="css/admin.css" />
+  <style>
+    /* ── Server app tabs ── */
+    .srv-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      flex-shrink: 0;
+      overflow-x: auto;
+    }
+    .srv-tab {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 13px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-2);
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      white-space: nowrap;
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+      transition: color var(--transition);
+    }
+    .srv-tab:hover { color: var(--text); }
+    .srv-tab.active { color: var(--accent-lt); border-bottom-color: var(--accent); }
+    .srv-tab-icon { font-size: 15px; }
+
+    /* ── Tab panels ── */
+    .srv-panel { display: none; flex-direction: column; gap: 20px; }
+    .srv-panel.active { display: flex; }
+
+    /* ── Metric bar ── */
+    .metric-bar-wrap { margin-top: 8px; }
+    .metric-bar {
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .metric-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+    .metric-bar-fill.green  { background: var(--green); }
+    .metric-bar-fill.yellow { background: var(--yellow); }
+    .metric-bar-fill.red    { background: var(--red); }
+    .metric-bar-fill.blue   { background: var(--accent-lt); }
+
+    /* ── Process table compact ── */
+    .proc-table tbody td { padding: 8px 12px; font-size: 12px; }
+    .proc-table thead th { padding: 7px 12px; }
+
+    /* ── Uptime chip ── */
+    .uptime-chip {
+      font-size: 13px;
+      font-family: monospace;
+      color: var(--gold);
+    }
+
+    /* ── File manager ── */
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-3);
+      flex-wrap: wrap;
+    }
+    .breadcrumb-item { color: var(--text-2); cursor: pointer; }
+    .breadcrumb-item:hover { color: var(--accent-lt); }
+    .breadcrumb-sep { color: var(--text-3); }
+    .breadcrumb-item.current { color: var(--text); cursor: default; }
+
+    .fs-row-name { display: flex; align-items: center; gap: 8px; }
+    .fs-icon { font-size: 16px; width: 20px; text-align: center; }
+    .fs-actions { display: flex; gap: 6px; opacity: 0; transition: opacity var(--transition); }
+    .fm-table tbody tr:hover .fs-actions { opacity: 1; }
+    .fs-action-btn {
+      background: none;
+      border: 1px solid var(--border-2);
+      color: var(--text-2);
+      padding: 3px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      transition: all var(--transition);
+    }
+    .fs-action-btn:hover { background: var(--surface-2); color: var(--text); }
+    .fs-action-btn.danger:hover { background: rgba(239,68,68,.15); color: var(--red); border-color: rgba(239,68,68,.3); }
+
+    /* ── Upload drop zone ── */
+    .drop-zone {
+      border: 2px dashed var(--border-2);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      text-align: center;
+      color: var(--text-3);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+      color: var(--accent-lt);
+    }
+    .drop-zone-icon { font-size: 28px; margin-bottom: 8px; }
+
+    /* ── Log viewer ── */
+    .log-viewer {
+      background: #050810;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+      font-size: 12px;
+      line-height: 1.7;
+      color: #94a3b8;
+      height: 480px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .log-line-error  { color: #f87171; }
+    .log-line-warn   { color: #fbbf24; }
+    .log-line-info   { color: #94a3b8; }
+    .log-line-debug  { color: #475569; }
+    .log-line-ok     { color: #4ade80; }
+    .log-streaming-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--green);
+    }
+    .log-streaming-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 1.2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ── Service cards ── */
+    .svc-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .svc-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .svc-dot.active   { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .svc-dot.inactive { background: var(--red); }
+    .svc-dot.unknown  { background: var(--text-3); }
+    .svc-info { flex: 1; min-width: 0; }
+    .svc-name { font-size: 14px; font-weight: 600; color: var(--text); }
+    .svc-desc { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+    .svc-status { font-size: 11px; font-weight: 600; margin-top: 4px; }
+    .svc-status.active   { color: var(--green); }
+    .svc-status.inactive { color: var(--red); }
+
+    /* ── DB browser ── */
+    .db-sidebar {
+      width: 200px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .db-sidebar-header {
+      padding: 12px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      border-bottom: 1px solid var(--border);
+    }
+    .db-table-list {
+      overflow-y: auto;
+      flex: 1;
+    }
+    .db-table-item {
+      padding: 9px 16px;
+      font-size: 12px;
+      color: var(--text-2);
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      transition: all var(--transition);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .db-table-item:hover { background: var(--surface-2); color: var(--text); }
+    .db-table-item.active { background: var(--accent-glow); color: var(--accent-lt); }
+    .db-table-rows { font-size: 10px; color: var(--text-3); }
+    .db-main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .db-layout {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .db-pagination {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-2);
+    }
+    .db-page-info { color: var(--text-3); font-size: 12px; }
+
+    /* ── Env editor ── */
+    .env-group {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .env-group-header {
+      padding: 12px 20px;
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .env-row {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      transition: background var(--transition);
+    }
+    .env-row:last-child { border-bottom: none; }
+    .env-row:hover { background: var(--surface-2); }
+    .env-key {
+      width: 260px;
+      flex-shrink: 0;
+      padding: 10px 20px;
+      font-family: monospace;
+      font-size: 12px;
+      color: var(--gold);
+      border-right: 1px solid var(--border);
+    }
+    .env-val {
+      flex: 1;
+      padding: 10px 16px;
+      font-family: monospace;
+      font-size: 12px;
+      color: var(--text-2);
+      word-break: break-all;
+    }
+    .env-val.masked { color: var(--text-3); font-style: italic; }
+    .env-edit-btn {
+      background: none;
+      border: none;
+      color: var(--text-3);
+      padding: 8px 16px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: color var(--transition);
+    }
+    .env-edit-btn:hover { color: var(--accent-lt); }
+
+    /* ── Backup cards ── */
+    .backup-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .backup-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .backup-icon { font-size: 28px; }
+    .backup-title { font-size: 15px; font-weight: 600; color: var(--text); }
+    .backup-desc { font-size: 13px; color: var(--text-3); }
+    .backup-result {
+      font-size: 12px;
+      font-family: monospace;
+      color: var(--green);
+      padding: 8px 12px;
+      background: rgba(34,197,94,.05);
+      border: 1px solid rgba(34,197,94,.15);
+      border-radius: var(--radius);
+      display: none;
+    }
+
+    /* ── Rename/mkdir modal fields ── */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 200; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: var(--surface);
+      border: 1px solid var(--border-2);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: var(--shadow);
+    }
+    .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 18px; color: var(--text); }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid var(--border-2);
+      border-top-color: var(--accent-lt);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Refresh timer ── */
+    .refresh-badge {
+      font-size: 11px;
+      color: var(--text-3);
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-wordmark">Ridgecrest Designs</div>
+      <div class="sidebar-sub">Admin Panel</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <a href="dashboard.html" class="nav-item" data-page="dashboard">
+        <span class="nav-icon">◈</span> Dashboard
+      </a>
+      <div class="nav-section-label">Leads</div>
+      <a href="leads.html" class="nav-item" data-page="leads">
+        <span class="nav-icon">◉</span> Lead Inbox
+        <span class="nav-badge" id="navLeadBadge" style="display:none"></span>
+      </a>
+      <div class="nav-section-label">Content</div>
+      <a href="blog.html" class="nav-item" data-page="blog">
+        <span class="nav-icon">✎</span> Blog (RD Edit)
+      </a>
+      <a href="portfolio.html" class="nav-item" data-page="portfolio">
+        <span class="nav-icon">▣</span> Portfolio
+      </a>
+      <a href="team.html" class="nav-item" data-page="team">
+        <span class="nav-icon">◎</span> Team
+      </a>
+      <a href="pages.html" class="nav-item" data-page="pages">
+        <span class="nav-icon">◧</span> Pages
+      </a>
+      <a href="media.html" class="nav-item" data-page="media">
+        <span class="nav-icon">◆</span> Media Library
+      </a>
+      <div class="nav-section-label">Growth</div>
+      <a href="analytics.html" class="nav-item" data-page="analytics">
+        <span class="nav-icon">▲</span> Analytics
+      </a>
+      <a href="seo.html" class="nav-item" data-page="seo">
+        <span class="nav-icon">◻</span> SEO
+      </a>
+      <div class="nav-section-label">System</div>
+      <a href="settings.html" class="nav-item" data-page="settings">
+        <span class="nav-icon">⊙</span> Settings
+      </a>
+      <div class="nav-section-label">Apps</div>
+      <a href="server.html" class="nav-item active" data-page="server">
+        <span class="nav-icon">⬡</span> Server
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar">H</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name">Henry</div>
+          <div class="sidebar-user-role">Administrator</div>
+        </div>
+        <button class="sidebar-logout" data-action="logout" title="Sign out">⏻</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="header">
+      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+      <div>
+        <div class="header-title">Server Management</div>
+        <div class="header-subtitle" id="headerDate"></div>
+      </div>
+      <div class="header-actions">
+        <span class="refresh-badge" id="refreshBadge"></span>
+        <div class="header-chip">
+          <span class="header-chip-dot"></span>
+          Site Live
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB BAR -->
+    <div class="srv-tabs" id="srvTabs">
+      <button class="srv-tab active" data-tab="health">
+        <span class="srv-tab-icon">◈</span> Health
+      </button>
+      <button class="srv-tab" data-tab="files">
+        <span class="srv-tab-icon">◧</span> Files
+      </button>
+      <button class="srv-tab" data-tab="logs">
+        <span class="srv-tab-icon">≡</span> Logs
+      </button>
+      <button class="srv-tab" data-tab="services">
+        <span class="srv-tab-icon">⬡</span> Services
+      </button>
+      <button class="srv-tab" data-tab="database">
+        <span class="srv-tab-icon">▣</span> Database
+      </button>
+      <button class="srv-tab" data-tab="config">
+        <span class="srv-tab-icon">⊙</span> Config &amp; Backups
+      </button>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content" id="srvContent">
+
+      <!-- ══ HEALTH ══ -->
+      <div class="srv-panel active" id="panel-health">
+        <div class="kpi-grid" id="healthKpis">
+          <div class="kpi-card green">
+            <div class="kpi-label">CPU Usage</div>
+            <div class="kpi-value" id="h-cpu">—</div>
+            <div class="metric-bar-wrap"><div class="metric-bar"><div class="metric-bar-fill green" id="h-cpu-bar" style="width:0%"></div></div></div>
+          </div>
+          <div class="kpi-card yellow">
+            <div class="kpi-label">Memory</div>
+            <div class="kpi-value" id="h-mem">—</div>
+            <div class="metric-bar-wrap"><div class="metric-bar"><div class="metric-bar-fill yellow" id="h-mem-bar" style="width:0%"></div></div></div>
+            <div class="kpi-delta" id="h-mem-detail"></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Disk</div>
+            <div class="kpi-value" id="h-disk">—</div>
+            <div class="metric-bar-wrap"><div class="metric-bar"><div class="metric-bar-fill blue" id="h-disk-bar" style="width:0%"></div></div></div>
+            <div class="kpi-delta" id="h-disk-detail"></div>
+          </div>
+          <div class="kpi-card gold">
+            <div class="kpi-label">Uptime</div>
+            <div class="kpi-value" id="h-uptime" style="font-size:20px">—</div>
+            <div class="kpi-delta" id="h-load">Load avg —</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Top Processes</div>
+              <div class="card-sub" id="h-proc-count"></div>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="healthRefreshBtn">↺ Refresh</button>
+          </div>
+          <div class="table-wrap">
+            <table class="proc-table">
+              <thead>
+                <tr>
+                  <th>PID</th>
+                  <th>Name</th>
+                  <th>CPU %</th>
+                  <th>MEM %</th>
+                </tr>
+              </thead>
+              <tbody id="procBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ FILES ══ -->
+      <div class="srv-panel" id="panel-files">
+        <div class="card">
+          <div class="card-header">
+            <div class="breadcrumb" id="fsBreadcrumb"></div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-ghost btn-sm" id="fsMkdirBtn">+ Folder</button>
+              <label class="btn btn-ghost btn-sm" style="cursor:pointer">
+                ↑ Upload
+                <input type="file" id="fsUploadInput" style="display:none" multiple />
+              </label>
+            </div>
+          </div>
+          <div id="fsUploadDropZone" class="drop-zone" style="margin:16px;display:none">
+            <div class="drop-zone-icon">↑</div>
+            <div>Drop files here or click Upload</div>
+            <div style="font-size:11px;margin-top:4px" id="fsUploadStatus"></div>
+          </div>
+          <div class="table-wrap">
+            <table class="fm-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Size</th>
+                  <th>Modified</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="fsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ LOGS ══ -->
+      <div class="srv-panel" id="panel-logs">
+        <div class="card">
+          <div class="card-header">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div class="card-title">Application Logs</div>
+              <span id="logStreamBadge" class="log-streaming-badge" style="display:none">
+                <span class="log-streaming-dot"></span> Streaming
+              </span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div class="search-box" style="min-width:180px">
+                <span class="search-icon">⌕</span>
+                <input type="text" id="logFilter" placeholder="Filter logs…" />
+              </div>
+              <select class="form-input" id="logLines" style="width:auto;padding:7px 10px;font-size:12px">
+                <option value="100">100 lines</option>
+                <option value="200" selected>200 lines</option>
+                <option value="500">500 lines</option>
+                <option value="1000">1000 lines</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" id="logStreamToggle">⏵ Stream</button>
+              <a class="btn btn-ghost btn-sm" id="logDownloadBtn" href="/admin/api/server/logs/download" target="_blank">↓ Download</a>
+              <button class="btn btn-danger btn-sm" id="logClearBtn">✕ Clear</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:16px">
+            <div class="log-viewer" id="logViewer"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ SERVICES ══ -->
+      <div class="srv-panel" id="panel-services">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" id="svcGrid">
+          <!-- Cards populated dynamically by loadServices() -->
+        </div>
+        <div style="display:flex;justify-content:flex-end">
+          <button class="btn btn-ghost btn-sm" id="svcRefreshBtn">↺ Refresh status</button>
+        </div>
+      </div>
+
+      <!-- ══ DATABASE ══ -->
+      <div class="srv-panel" id="panel-database">
+        <div class="db-layout">
+          <div class="db-sidebar">
+            <div class="db-sidebar-header">Tables</div>
+            <div class="db-table-list" id="dbTableList"></div>
+          </div>
+          <div class="db-main">
+            <div class="card" id="dbBrowseCard" style="display:none">
+              <div class="card-header">
+                <div>
+                  <div class="card-title" id="dbTableTitle">—</div>
+                  <div class="card-sub" id="dbTableSub"></div>
+                </div>
+                <div style="display:flex;gap:8px">
+                  <button class="btn btn-ghost btn-sm" id="dbExportBtn">↓ CSV</button>
+                  <button class="btn btn-ghost btn-sm" id="dbPrevBtn">‹ Prev</button>
+                  <button class="btn btn-ghost btn-sm" id="dbNextBtn">Next ›</button>
+                </div>
+              </div>
+              <div class="db-pagination card-body" style="padding:12px 20px">
+                <span class="db-page-info" id="dbPageInfo">Page 1 of 1 — 0 rows</span>
+              </div>
+              <div class="table-wrap" id="dbTableWrap" style="max-height:480px;overflow:auto">
+                <table id="dbDataTable">
+                  <thead id="dbDataHead"></thead>
+                  <tbody id="dbDataBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="dbPlaceholder" style="color:var(--text-3);font-size:13px;padding:40px;text-align:center">
+              Select a table from the sidebar to browse data.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ CONFIG & BACKUPS ══ -->
+      <div class="srv-panel" id="panel-config">
+        <div class="backup-grid">
+          <div class="backup-card">
+            <div class="backup-icon">🗄</div>
+            <div class="backup-title">Database Backup</div>
+            <div class="backup-desc">Export full PostgreSQL dump (pg_dump) to the server's downloads folder.</div>
+            <button class="btn btn-ghost" id="backupDbBtn">Run DB Backup</button>
+            <div class="backup-result" id="backupDbResult"></div>
+          </div>
+          <div class="backup-card">
+            <div class="backup-icon">📁</div>
+            <div class="backup-title">Files Backup</div>
+            <div class="backup-desc">Create a tar.gz archive of the preview/ website directory.</div>
+            <button class="btn btn-ghost" id="backupFilesBtn">Run Files Backup</button>
+            <div class="backup-result" id="backupFilesResult"></div>
+          </div>
+        </div>
+
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <div style="font-size:15px;font-weight:600;color:var(--text)">Environment Variables</div>
+            <div style="font-size:12px;color:var(--text-3)">Sensitive values are masked. Click ✎ to edit.</div>
+          </div>
+          <div id="envGroups"></div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- MODALS -->
+<div class="modal-overlay" id="renameModal">
+  <div class="modal-box">
+    <div class="modal-title">Rename</div>
+    <div class="form-group">
+      <label class="form-label">New name</label>
+      <input class="form-input" id="renameInput" type="text" />
+      <input type="hidden" id="renameOrigPath" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-modal-close>Cancel</button>
+      <button class="btn btn-primary" id="renameConfirm" style="width:auto">Rename</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="mkdirModal">
+  <div class="modal-box">
+    <div class="modal-title">New Folder</div>
+    <div class="form-group">
+      <label class="form-label">Folder name</label>
+      <input class="form-input" id="mkdirInput" type="text" placeholder="folder-name" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-modal-close>Cancel</button>
+      <button class="btn btn-primary" id="mkdirConfirm" style="width:auto">Create</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="envEditModal">
+  <div class="modal-box">
+    <div class="modal-title">Edit Environment Variable</div>
+    <div class="form-group">
+      <label class="form-label" id="envEditKeyLabel">KEY</label>
+      <input class="form-input" id="envEditInput" type="text" />
+      <input type="hidden" id="envEditKey" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-modal-close>Cancel</button>
+      <button class="btn btn-primary" id="envEditConfirm" style="width:auto">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal-box">
+    <div class="modal-title">Confirm Delete</div>
+    <div style="font-size:14px;color:var(--text-2);margin-bottom:8px" id="deleteModalMsg"></div>
+    <div style="font-size:12px;color:var(--red)">This action cannot be undone.</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-modal-close>Cancel</button>
+      <button class="btn btn-danger" id="deleteConfirm">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/admin.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  if (!Admin.requireAuth()) return;
+  Admin.init('server');
+
+  // ── Header date ──────────────────────────────────────────────
+  document.getElementById('headerDate').textContent =
+    new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+  // ── Tab switching ────────────────────────────────────────────
+  const tabs = document.querySelectorAll('.srv-tab');
+  const panels = document.querySelectorAll('.srv-panel');
+  let activeTab = 'health';
+
+  function switchTab(tab) {
+    activeTab = tab;
+    tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    panels.forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
+    if (tab === 'health')    loadHealth();
+    if (tab === 'files')     loadFiles();
+    if (tab === 'logs')      loadLogs();
+    if (tab === 'services')  loadServices();
+    if (tab === 'database')  loadDbTables();
+    if (tab === 'config')    { loadEnv(); }
+  }
+
+  document.getElementById('srvTabs').addEventListener('click', e => {
+    const btn = e.target.closest('.srv-tab');
+    if (btn) switchTab(btn.dataset.tab);
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // HEALTH TAB
+  // ═══════════════════════════════════════════════════════════
+  let healthTimer = null;
+  let healthCountdown = 0;
+
+  function fmtUptime(secs) {
+    const d = Math.floor(secs / 86400);
+    const h = Math.floor((secs % 86400) / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    if (d > 0) return `${d}d ${h}h ${m}m`;
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  }
+
+  function barColor(pct) {
+    if (pct >= 90) return 'red';
+    if (pct >= 70) return 'yellow';
+    return 'green';
+  }
+
+  function setBar(id, pct) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.width = pct + '%';
+    el.className = 'metric-bar-fill ' + barColor(pct);
+  }
+
+  async function loadHealth() {
+    const data = await Admin.get('/server/health');
+    if (!data) return;
+
+    const cpu = (data.cpu && data.cpu.percent) || data.cpu_percent || 0;
+    document.getElementById('h-cpu').textContent = cpu.toFixed(1) + '%';
+    setBar('h-cpu-bar', cpu);
+
+    const mem = (data.memory && data.memory.percent) || data.mem_percent || 0;
+    document.getElementById('h-mem').textContent = mem.toFixed(1) + '%';
+    setBar('h-mem-bar', mem);
+    const memUsed = (data.memory && data.memory.used_gb) || data.mem_used_gb || 0;
+    const memTotal = (data.memory && data.memory.total_gb) || data.mem_total_gb || 0;
+    document.getElementById('h-mem-detail').textContent =
+      `${memUsed.toFixed(1)} GB / ${memTotal.toFixed(1)} GB`;
+
+    const disk = (data.disk && data.disk.percent) || data.disk_percent || 0;
+    document.getElementById('h-disk').textContent = disk.toFixed(1) + '%';
+    setBar('h-disk-bar', disk);
+    const diskUsed = (data.disk && data.disk.used_gb) || data.disk_used_gb || 0;
+    const diskTotal = (data.disk && data.disk.total_gb) || data.disk_total_gb || 0;
+    document.getElementById('h-disk-detail').textContent =
+      `${diskUsed.toFixed(1)} GB / ${diskTotal.toFixed(1)} GB`;
+
+    const uptime = data.uptime_seconds || data.uptime_secs || 0;
+    document.getElementById('h-uptime').textContent = fmtUptime(uptime);
+    const load = data.load_avg || [0,0,0];
+    document.getElementById('h-load').textContent =
+      `Load ${load[0].toFixed(2)} ${load[1].toFixed(2)} ${load[2].toFixed(2)}`;
+
+    const procs = (data.processes || []).slice(0, 20);
+    document.getElementById('h-proc-count').textContent = `${procs.length} running processes`;
+    document.getElementById('procBody').innerHTML = procs.map(p => `
+      <tr>
+        <td class="td-mono td-light">${p.pid}</td>
+        <td>${p.name}</td>
+        <td>${(p.cpu||0).toFixed(1)}%</td>
+        <td>${(p.mem||0).toFixed(1)}%</td>
+      </tr>
+    `).join('');
+  }
+
+  function startHealthAutoRefresh() {
+    clearHealthTimer();
+    healthCountdown = 15;
+    healthTimer = setInterval(() => {
+      healthCountdown--;
+      document.getElementById('refreshBadge').textContent = `Auto-refresh in ${healthCountdown}s`;
+      if (healthCountdown <= 0) {
+        healthCountdown = 15;
+        if (activeTab === 'health') loadHealth();
+      }
+    }, 1000);
+  }
+
+  function clearHealthTimer() {
+    if (healthTimer) { clearInterval(healthTimer); healthTimer = null; }
+    document.getElementById('refreshBadge').textContent = '';
+  }
+
+  document.getElementById('healthRefreshBtn').addEventListener('click', loadHealth);
+
+  // Start auto-refresh and load health on page load
+  loadHealth();
+  startHealthAutoRefresh();
+
+  // Pause auto-refresh when switching away from health tab
+  tabs.forEach(t => {
+    t.addEventListener('click', () => {
+      if (t.dataset.tab !== 'health') {
+        clearHealthTimer();
+        document.getElementById('refreshBadge').textContent = '';
+      } else {
+        startHealthAutoRefresh();
+      }
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // FILE MANAGER TAB
+  // ═══════════════════════════════════════════════════════════
+  let fsPath = '';
+
+  function fmtSize(bytes) {
+    if (bytes === 0 || bytes === null) return '—';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+    if (bytes < 1024*1024*1024) return (bytes/1024/1024).toFixed(1) + ' MB';
+    return (bytes/1024/1024/1024).toFixed(2) + ' GB';
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  }
+
+  function buildBreadcrumb(path) {
+    const bc = document.getElementById('fsBreadcrumb');
+    const parts = path ? path.split('/').filter(Boolean) : [];
+    let html = `<span class="breadcrumb-item${parts.length===0?' current':''}" data-bc-path="">/ root</span>`;
+    let built = '';
+    parts.forEach((p, i) => {
+      built += (built ? '/' : '') + p;
+      const current = i === parts.length - 1;
+      html += `<span class="breadcrumb-sep">/</span>`;
+      html += `<span class="breadcrumb-item${current?' current':''}" data-bc-path="${built}">${p}</span>`;
+    });
+    bc.innerHTML = html;
+    bc.querySelectorAll('.breadcrumb-item:not(.current)').forEach(el => {
+      el.addEventListener('click', () => loadFiles(el.dataset.bcPath));
+    });
+  }
+
+  async function loadFiles(path) {
+    if (path !== undefined) fsPath = path;
+    const data = await Admin.get('/fs/list?path=' + encodeURIComponent(fsPath));
+    if (!data) return;
+
+    buildBreadcrumb(data.path || fsPath);
+
+    const body = document.getElementById('fsBody');
+    const items = data.items || [];
+
+    if (items.length === 0) {
+      body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:32px">Empty folder</td></tr>';
+      return;
+    }
+
+    body.innerHTML = items.map(item => {
+      const icon = item.is_dir ? '📁' : fileIcon(item.name);
+      const encodedPath = encodeURIComponent(item.path);
+      const protectedBadge = item.protected ? '<span class="badge badge-gray" style="font-size:10px;padding:1px 6px;margin-left:6px">protected</span>' : '';
+      const actions = item.protected ? '' : `
+        <div class="fs-actions">
+          ${!item.is_dir ? `<a href="/admin/api/fs/download?path=${encodedPath}" class="fs-action-btn" title="Download" target="_blank">↓</a>` : ''}
+          <button class="fs-action-btn" data-rename="${item.path}" data-rename-name="${item.name}">✎</button>
+          <button class="fs-action-btn danger" data-delete="${item.path}" data-delete-name="${item.name}">✕</button>
+        </div>
+      `;
+      const nameCell = item.is_dir
+        ? `<span class="fs-icon">${icon}</span><span class="fs-dir-link" data-path="${item.path}" style="cursor:pointer;color:var(--accent-lt)">${item.name}</span>${protectedBadge}`
+        : `<span class="fs-icon">${icon}</span>${item.name}${protectedBadge}`;
+      return `<tr>
+        <td><div class="fs-row-name">${nameCell}</div></td>
+        <td class="td-light">${item.is_dir ? '—' : fmtSize(item.size)}</td>
+        <td class="td-light" style="font-size:12px">${fmtDate(item.modified)}</td>
+        <td style="text-align:right">${actions}</td>
+      </tr>`;
+    }).join('');
+
+    // Dir navigation
+    body.querySelectorAll('.fs-dir-link').forEach(el => {
+      el.addEventListener('click', () => loadFiles(el.dataset.path));
+    });
+    // Rename
+    body.querySelectorAll('[data-rename]').forEach(btn => {
+      btn.addEventListener('click', () => openRename(btn.dataset.rename, btn.dataset.renameName));
+    });
+    // Delete
+    body.querySelectorAll('[data-delete]').forEach(btn => {
+      btn.addEventListener('click', () => openDelete(btn.dataset.delete, btn.dataset.deleteName));
+    });
+  }
+
+  function fileIcon(name) {
+    const ext = name.split('.').pop().toLowerCase();
+    const map = { html:'📄', css:'🎨', js:'⚙', py:'🐍', json:'{ }', sql:'🗄', md:'✎',
+                  png:'🖼', jpg:'🖼', jpeg:'🖼', webp:'🖼', gif:'🖼', svg:'🖼',
+                  pdf:'📕', txt:'📝', sh:'⬡', log:'≡', gz:'📦', zip:'📦', tar:'📦' };
+    return map[ext] || '📄';
+  }
+
+  // Rename modal
+  function openRename(path, name) {
+    document.getElementById('renameOrigPath').value = path;
+    document.getElementById('renameInput').value = name;
+    Admin.openModal('renameModal');
+    setTimeout(() => document.getElementById('renameInput').focus(), 50);
+  }
+
+  document.getElementById('renameConfirm').addEventListener('click', async () => {
+    const path = document.getElementById('renameOrigPath').value;
+    const newName = document.getElementById('renameInput').value.trim();
+    if (!newName) return;
+    const r = await Admin.post('/fs/rename', { path, new_name: newName });
+    if (r && r.ok) {
+      Admin.toast('Renamed successfully', 'success');
+      Admin.closeModal('renameModal');
+      loadFiles();
+    } else {
+      Admin.toast(r?.error || 'Rename failed', 'error');
+    }
+  });
+
+  // Delete modal
+  let _deletePath = null;
+  function openDelete(path, name) {
+    _deletePath = path;
+    document.getElementById('deleteModalMsg').textContent = `Delete "${name}"?`;
+    Admin.openModal('deleteModal');
+  }
+
+  document.getElementById('deleteConfirm').addEventListener('click', async () => {
+    if (!_deletePath) return;
+    const r = await Admin.post('/fs/delete', { path: _deletePath });
+    if (r && r.ok) {
+      Admin.toast('Deleted', 'success');
+      Admin.closeModal('deleteModal');
+      _deletePath = null;
+      loadFiles();
+    } else {
+      Admin.toast(r?.error || 'Delete failed', 'error');
+    }
+  });
+
+  // Mkdir modal
+  document.getElementById('fsMkdirBtn').addEventListener('click', () => {
+    document.getElementById('mkdirInput').value = '';
+    Admin.openModal('mkdirModal');
+    setTimeout(() => document.getElementById('mkdirInput').focus(), 50);
+  });
+
+  document.getElementById('mkdirConfirm').addEventListener('click', async () => {
+    const name = document.getElementById('mkdirInput').value.trim();
+    if (!name) return;
+    const r = await Admin.post('/fs/mkdir', { path: fsPath || '', name });
+    if (r && r.ok) {
+      Admin.toast('Folder created', 'success');
+      Admin.closeModal('mkdirModal');
+      loadFiles();
+    } else {
+      Admin.toast(r?.error || 'Create failed', 'error');
+    }
+  });
+
+  // Upload
+  const fsUploadInput = document.getElementById('fsUploadInput');
+  const fsUploadStatus = document.getElementById('fsUploadStatus');
+
+  fsUploadInput.addEventListener('change', () => {
+    if (fsUploadInput.files.length > 0) uploadFiles(fsUploadInput.files);
+  });
+
+  async function uploadFiles(files) {
+    const status = document.getElementById('fsUploadStatus');
+    document.getElementById('fsUploadDropZone').style.display = 'block';
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      status.textContent = `Uploading ${i+1}/${files.length}: ${f.name}…`;
+      const fd = new FormData();
+      fd.append('file', f);
+      fd.append('path', fsPath || '');
+      const token = sessionStorage.getItem('rd_admin_token');
+      const res = await fetch('/admin/api/fs/upload', {
+        method: 'POST',
+        headers: { 'X-Admin-Token': token || '' },
+        body: fd
+      });
+      const r = await res.json();
+      if (!r.ok) { Admin.toast('Upload failed: ' + (r.error || f.name), 'error'); }
+    }
+    status.textContent = `Done — ${files.length} file(s) uploaded`;
+    Admin.toast('Upload complete', 'success');
+    fsUploadInput.value = '';
+    setTimeout(() => { document.getElementById('fsUploadDropZone').style.display = 'none'; }, 2000);
+    loadFiles();
+  }
+
+  // Drag-and-drop
+  const dropZone = document.getElementById('fsUploadDropZone');
+  dropZone.style.display = 'block'; // always show
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files);
+  });
+  dropZone.addEventListener('click', () => fsUploadInput.click());
+
+  // ═══════════════════════════════════════════════════════════
+  // LOGS TAB
+  // ═══════════════════════════════════════════════════════════
+  let logEventSource = null;
+  let logStreaming = false;
+
+  function classifyLine(line) {
+    const l = line.toLowerCase();
+    if (l.includes('error') || l.includes('exception') || l.includes('traceback')) return 'log-line-error';
+    if (l.includes('warn') || l.includes('warning')) return 'log-line-warn';
+    if (l.includes(' 200 ') || l.includes('ok') || l.includes('success')) return 'log-line-ok';
+    if (l.includes('debug')) return 'log-line-debug';
+    return 'log-line-info';
+  }
+
+  function appendLogLine(viewer, line, filter) {
+    if (filter && !line.toLowerCase().includes(filter.toLowerCase())) return;
+    const div = document.createElement('div');
+    div.className = classifyLine(line);
+    div.textContent = line;
+    viewer.appendChild(div);
+  }
+
+  async function loadLogs() {
+    const n = document.getElementById('logLines').value;
+    const filter = document.getElementById('logFilter').value;
+    const data = await Admin.get(`/server/logs?lines=${n}&filter=${encodeURIComponent(filter)}`);
+    if (!data) return;
+    const viewer = document.getElementById('logViewer');
+    viewer.innerHTML = '';
+    if (!data.lines || data.lines.length === 0) {
+      viewer.innerHTML = '<span style="color:var(--text-3)">No log entries yet.</span>';
+      return;
+    }
+    data.lines.forEach(line => appendLogLine(viewer, line, ''));
+    viewer.scrollTop = viewer.scrollHeight;
+  }
+
+  function startLogStream() {
+    if (logEventSource) { logEventSource.close(); logEventSource = null; }
+    const token = sessionStorage.getItem('rd_admin_token');
+    logEventSource = new EventSource(`/admin/api/server/logs/stream?token=${encodeURIComponent(token||'')}`);
+    logStreaming = true;
+    document.getElementById('logStreamBadge').style.display = 'inline-flex';
+    document.getElementById('logStreamToggle').textContent = '⏸ Stop';
+
+    const viewer = document.getElementById('logViewer');
+    viewer.innerHTML = '<span style="color:var(--text-3)">Streaming…</span>\n';
+
+    logEventSource.addEventListener('log', e => {
+      const filter = document.getElementById('logFilter').value;
+      let line;
+      try { line = JSON.parse(e.data).text; } catch(_) { line = e.data; }
+      if (!line) return;
+      if (!filter || line.toLowerCase().includes(filter.toLowerCase())) {
+        // Remove placeholder
+        if (viewer.firstChild && viewer.firstChild.textContent === 'Streaming…') {
+          viewer.innerHTML = '';
+        }
+        appendLogLine(viewer, line, '');
+        // Auto-scroll
+        viewer.scrollTop = viewer.scrollHeight;
+        // Keep last 1000 lines
+        while (viewer.childElementCount > 1000) viewer.removeChild(viewer.firstChild);
+      }
+    });
+
+    logEventSource.onerror = () => {
+      if (logStreaming) {
+        const div = document.createElement('div');
+        div.className = 'log-line-warn';
+        div.textContent = '— stream disconnected —';
+        viewer.appendChild(div);
+        stopLogStream();
+      }
+    };
+  }
+
+  function stopLogStream() {
+    if (logEventSource) { logEventSource.close(); logEventSource = null; }
+    logStreaming = false;
+    document.getElementById('logStreamBadge').style.display = 'none';
+    document.getElementById('logStreamToggle').textContent = '⏵ Stream';
+  }
+
+  document.getElementById('logStreamToggle').addEventListener('click', () => {
+    if (logStreaming) stopLogStream(); else startLogStream();
+  });
+
+  document.getElementById('logLines').addEventListener('change', () => { if (!logStreaming) loadLogs(); });
+  document.getElementById('logFilter').addEventListener('input', () => { if (!logStreaming) loadLogs(); });
+
+  document.getElementById('logClearBtn').addEventListener('click', async () => {
+    if (!confirm('Clear all log entries?')) return;
+    stopLogStream();
+    const r = await Admin.post('/server/logs/clear', {});
+    if (r && r.ok) {
+      Admin.toast('Logs cleared', 'success');
+      document.getElementById('logViewer').innerHTML = '<span style="color:var(--text-3)">Log cleared.</span>';
+    } else {
+      Admin.toast('Clear failed', 'error');
+    }
+  });
+
+  // Update download link with token header workaround (direct download)
+  document.getElementById('logDownloadBtn').addEventListener('click', e => {
+    e.preventDefault();
+    const token = sessionStorage.getItem('rd_admin_token');
+    fetch('/admin/api/server/logs/download', { headers: { 'X-Admin-Token': token || '' } })
+      .then(r => r.blob())
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'preview_server.log';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+  });
+
+  // Stop stream when leaving logs tab
+  tabs.forEach(t => {
+    t.addEventListener('click', () => {
+      if (t.dataset.tab !== 'logs' && logStreaming) stopLogStream();
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // SERVICES TAB
+  // ═══════════════════════════════════════════════════════════
+  const RESTARTABLE = new Set(['ridgecrest-agent', 'ridgecrest-orchestrator', 'preview_server']);
+
+  async function loadServices() {
+    const data = await Admin.get('/server/services');
+    if (!data || !Array.isArray(data.services)) return;
+
+    const grid = document.getElementById('svcGrid');
+    grid.innerHTML = data.services.map(svc => {
+      const dotClass = svc.active ? 'active' : 'inactive';
+      const statusText = svc.active
+        ? (svc.uptime ? `Active — up ${svc.uptime}` : 'Active')
+        : (svc.error && svc.error.includes('inactive') ? 'Inactive' : 'Inactive');
+      const memStr = svc.mem_mb ? ` · ${svc.mem_mb} MB` : '';
+      const canRestart = RESTARTABLE.has(svc.key);
+      const restartBtn = canRestart
+        ? `<button class="btn btn-ghost btn-sm" data-svc="${svc.key}">↺ Restart</button>`
+        : `<span class="badge badge-gray">Managed</span>`;
+      return `
+        <div class="svc-card">
+          <div class="svc-dot ${dotClass}"></div>
+          <div class="svc-info">
+            <div class="svc-name">${svc.name}</div>
+            <div class="svc-desc">${svc.key}${memStr}</div>
+            <div class="svc-status ${dotClass}">${statusText}</div>
+          </div>
+          ${restartBtn}
+        </div>`;
+    }).join('');
+  }
+
+  document.getElementById('svcGrid').addEventListener('click', async e => {
+    const btn = e.target.closest('button[data-svc]');
+    if (!btn) return;
+    const svc = btn.dataset.svc;
+    if (svc === 'preview_server') {
+      if (!confirm('Restarting the preview server will disconnect this session briefly. Continue?')) return;
+    }
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+    const r = await Admin.post('/server/service/restart', { service: svc });
+    btn.disabled = false;
+    btn.textContent = '↺ Restart';
+    if (r && r.ok) {
+      Admin.toast(`${svc} restarted`, 'success');
+      setTimeout(loadServices, 2000);
+    } else {
+      Admin.toast(r?.error || 'Restart failed', 'error');
+    }
+  });
+
+  document.getElementById('svcRefreshBtn').addEventListener('click', loadServices);
+
+  // ═══════════════════════════════════════════════════════════
+  // DATABASE TAB
+  // ═══════════════════════════════════════════════════════════
+  let dbActiveTable = null;
+  let dbPage = 1;
+  let dbPages = 1;
+
+  async function loadDbTables() {
+    const data = await Admin.get('/db/tables');
+    if (!data || !Array.isArray(data.tables)) return;
+
+    document.getElementById('dbTableList').innerHTML = data.tables.map(t => `
+      <div class="db-table-item" data-table="${t.name}">
+        <span>${t.name}</span>
+        <span class="db-table-rows">${(t.row_count||0).toLocaleString()}</span>
+      </div>
+    `).join('');
+
+    document.getElementById('dbTableList').addEventListener('click', e => {
+      const item = e.target.closest('.db-table-item');
+      if (!item) return;
+      document.querySelectorAll('.db-table-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+      dbActiveTable = item.dataset.table;
+      dbPage = 1;
+      loadDbRows();
+    });
+  }
+
+  async function loadDbRows() {
+    if (!dbActiveTable) return;
+    document.getElementById('dbBrowseCard').style.display = '';
+    document.getElementById('dbPlaceholder').style.display = 'none';
+    document.getElementById('dbTableTitle').textContent = dbActiveTable;
+
+    const perPage = 50;
+    const offset = (dbPage - 1) * perPage;
+    const data = await Admin.get(`/db/table/${dbActiveTable}?offset=${offset}&limit=${perPage}`);
+    if (!data) return;
+
+    const total = data.total || 0;
+    dbPages = Math.max(1, Math.ceil(total / perPage));
+    document.getElementById('dbTableSub').textContent = `${total.toLocaleString()} rows`;
+    document.getElementById('dbPageInfo').textContent =
+      `Page ${dbPage} of ${dbPages} — ${total.toLocaleString()} total rows`;
+
+    // columns can be [{name, type}] or just strings
+    const rawCols = data.columns || [];
+    const colNames = rawCols.map(c => (typeof c === 'object' ? c.name : c));
+
+    const head = document.getElementById('dbDataHead');
+    const body = document.getElementById('dbDataBody');
+
+    head.innerHTML = '<tr>' + colNames.map(c => `<th>${c}</th>`).join('') + '</tr>';
+    body.innerHTML = (data.rows||[]).map(row =>
+      '<tr>' + colNames.map(col => {
+        const val = row[col];
+        const display = val === null ? '<span style="color:var(--text-3)">null</span>' :
+          String(val).length > 120 ? String(val).slice(0, 120) + '…' : String(val);
+        return `<td class="td-mono">${display}</td>`;
+      }).join('') + '</tr>'
+    ).join('');
+  }
+
+  document.getElementById('dbPrevBtn').addEventListener('click', () => {
+    if (dbPage > 1) { dbPage--; loadDbRows(); }
+  });
+  document.getElementById('dbNextBtn').addEventListener('click', () => {
+    if (dbPage < dbPages) { dbPage++; loadDbRows(); }
+  });
+
+  document.getElementById('dbExportBtn').addEventListener('click', () => {
+    if (!dbActiveTable) return;
+    const token = sessionStorage.getItem('rd_admin_token');
+    fetch(`/admin/api/db/export/${dbActiveTable}`, { headers: { 'X-Admin-Token': token || '' } })
+      .then(r => r.blob())
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = dbActiveTable + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // CONFIG & BACKUPS TAB
+  // ═══════════════════════════════════════════════════════════
+  async function loadEnv() {
+    const data = await Admin.get('/server/env');
+    if (!data || !Array.isArray(data.groups)) return;
+
+    const container = document.getElementById('envGroups');
+    container.innerHTML = data.groups.map(group => `
+      <div class="env-group">
+        <div class="env-group-header">${group.group}</div>
+        ${(group.vars || []).map(v => `
+          <div class="env-row">
+            <div class="env-key">${v.key}</div>
+            <div class="env-val${v.masked ? ' masked' : ''}">${v.masked ? '••••••••' : (v.value || '')}</div>
+            ${!v.masked ? `<button class="env-edit-btn" data-env-key="${v.key}" data-env-val="${(v.value||'').replace(/"/g, '&quot;')}">✎</button>` : '<span style="width:40px"></span>'}
+          </div>
+        `).join('')}
+      </div>
+    `).join('');
+
+    container.querySelectorAll('[data-env-key]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('envEditKey').value = btn.dataset.envKey;
+        document.getElementById('envEditKeyLabel').textContent = btn.dataset.envKey;
+        document.getElementById('envEditInput').value = btn.dataset.envVal;
+        Admin.openModal('envEditModal');
+        setTimeout(() => document.getElementById('envEditInput').focus(), 50);
+      });
+    });
+  }
+
+  document.getElementById('envEditConfirm').addEventListener('click', async () => {
+    const key = document.getElementById('envEditKey').value;
+    const value = document.getElementById('envEditInput').value;
+    const r = await Admin.post('/server/env/set', { key, value });
+    if (r && r.ok) {
+      Admin.toast('Variable updated', 'success');
+      Admin.closeModal('envEditModal');
+      loadEnv();
+    } else {
+      Admin.toast(r?.error || 'Update failed', 'error');
+    }
+  });
+
+  // Backups — endpoints return file downloads
+  async function runBackup(btnId, resultId, path, btnLabel, ext) {
+    const btn = document.getElementById(btnId);
+    const result = document.getElementById(resultId);
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Running…';
+    try {
+      const token = sessionStorage.getItem('rd_admin_token');
+      const res = await fetch('/admin/api' + path, {
+        method: 'POST',
+        headers: { 'X-Admin-Token': token || '', 'Content-Type': 'application/json' },
+        body: '{}'
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        Admin.toast(err.error || 'Backup failed', 'error');
+        return;
+      }
+      const blob = await res.blob();
+      const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+      const filename = `backup_${ts}.${ext}`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+      result.style.display = 'block';
+      result.textContent = '✓ Downloaded: ' + filename;
+      Admin.toast('Backup downloaded', 'success');
+    } catch(e) {
+      Admin.toast('Backup error: ' + e.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = btnLabel;
+    }
+  }
+
+  document.getElementById('backupDbBtn').addEventListener('click', () =>
+    runBackup('backupDbBtn', 'backupDbResult', '/server/backup/db', 'Run DB Backup', 'sql'));
+  document.getElementById('backupFilesBtn').addEventListener('click', () =>
+    runBackup('backupFilesBtn', 'backupFilesResult', '/server/backup/files', 'Run Files Backup', 'tar.gz'));
+
+  // Keyboard shortcuts
+  document.getElementById('renameInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('renameConfirm').click();
+    if (e.key === 'Escape') Admin.closeModal('renameModal');
+  });
+  document.getElementById('mkdirInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('mkdirConfirm').click();
+    if (e.key === 'Escape') Admin.closeModal('mkdirModal');
+  });
+  document.getElementById('envEditInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('envEditConfirm').click();
+    if (e.key === 'Escape') Admin.closeModal('envEditModal');
+  });
+
+})();
+</script>
+</body>
+</html>
