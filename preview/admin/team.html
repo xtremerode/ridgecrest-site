@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Team — Ridgecrest Admin</title>
+  <link rel="stylesheet" href="css/admin.css" />
+  <style>
+    .team-list { display: flex; flex-direction: column; gap: 0; }
+    .team-row {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border, #2a3748);
+      cursor: default;
+      transition: background .12s;
+    }
+    .team-row:hover { background: var(--surface2, #111b27); }
+    .team-row.inactive { opacity: 0.45; }
+    .drag-handle {
+      color: var(--text-muted, #64748b);
+      font-size: 18px;
+      cursor: grab;
+      user-select: none;
+      flex-shrink: 0;
+    }
+    .drag-handle:active { cursor: grabbing; }
+    .member-photo {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: var(--surface2, #1a2e44) center/cover no-repeat;
+      flex-shrink: 0;
+      border: 2px solid var(--border, #2a3748);
+    }
+    .member-info { flex: 1; min-width: 0; }
+    .member-name { font-weight: 600; color: var(--text, #e2e8f0); font-size: 14px; }
+    .member-role { font-size: 12px; color: var(--text-muted, #94a3b8); margin-top: 2px; }
+    .member-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .toggle-active {
+      position: relative; width: 36px; height: 20px;
+      background: var(--border, #2a3748); border-radius: 10px;
+      cursor: pointer; border: none; transition: background .2s; flex-shrink: 0;
+    }
+    .toggle-active.on { background: #22c55e; }
+    .toggle-active::after {
+      content: ''; position: absolute; top: 3px; left: 3px;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #fff; transition: transform .2s;
+    }
+    .toggle-active.on::after { transform: translateX(16px); }
+    .btn-edit-member {
+      padding: 5px 14px; border-radius: 5px; font-size: 12px; font-weight: 600;
+      background: var(--surface2, #111b27); color: var(--text-muted, #94a3b8);
+      border: 1px solid var(--border, #2a3748); cursor: pointer; transition: all .12s;
+    }
+    .btn-edit-member:hover { border-color: #3b82f6; color: #3b82f6; }
+    .btn-delete-member {
+      padding: 5px 10px; border-radius: 5px; font-size: 12px;
+      background: transparent; color: #64748b;
+      border: 1px solid transparent; cursor: pointer; transition: all .12s;
+    }
+    .btn-delete-member:hover { color: #ef4444; border-color: #ef4444; }
+
+    /* Modal */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.65); z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--surface, #1a2332); border: 1px solid var(--border, #2a3748);
+      border-radius: 10px; width: 100%; max-width: 560px;
+      max-height: 90vh; overflow-y: auto;
+      padding: 28px; box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    }
+    .modal-title { font-size: 18px; font-weight: 700; color: var(--text, #e2e8f0); margin-bottom: 20px; }
+    .form-row { margin-bottom: 16px; }
+    .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted, #94a3b8); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+    .form-input, .form-textarea {
+      width: 100%; box-sizing: border-box;
+      background: var(--surface2, #111b27); color: var(--text, #e2e8f0);
+      border: 1px solid var(--border, #2a3748); border-radius: 6px;
+      padding: 9px 12px; font-size: 14px; font-family: inherit;
+    }
+    .form-input:focus, .form-textarea:focus { outline: none; border-color: #3b82f6; }
+    .form-textarea { min-height: 100px; resize: vertical; }
+    .photo-preview-wrap { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+    .photo-preview {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: var(--surface2, #1a2e44) center/cover no-repeat;
+      border: 2px solid var(--border, #2a3748); flex-shrink: 0;
+    }
+    .btn-pick-photo {
+      padding: 7px 16px; border-radius: 6px; font-size: 13px; font-weight: 600;
+      background: var(--surface2, #111b27); color: var(--text-muted, #94a3b8);
+      border: 1px solid var(--border, #2a3748); cursor: pointer; transition: all .12s;
+    }
+    .btn-pick-photo:hover { border-color: #3b82f6; color: #3b82f6; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+    .btn-cancel {
+      padding: 9px 20px; border-radius: 6px; font-size: 13px; font-weight: 600;
+      background: transparent; color: var(--text-muted, #94a3b8);
+      border: 1px solid var(--border, #2a3748); cursor: pointer;
+    }
+    .btn-save {
+      padding: 9px 24px; border-radius: 6px; font-size: 13px; font-weight: 700;
+      background: #3b82f6; color: #fff; border: none; cursor: pointer; transition: background .12s;
+    }
+    .btn-save:hover { background: #2563eb; }
+    .btn-save:disabled { background: #475569; cursor: not-allowed; }
+
+    /* Photo picker overlay */
+    .photo-picker-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.8); z-index: 1100;
+      align-items: flex-start; justify-content: center; padding-top: 60px;
+    }
+    .photo-picker-backdrop.open { display: flex; }
+    .photo-picker {
+      background: var(--surface, #1a2332); border: 1px solid var(--border, #2a3748);
+      border-radius: 10px; width: 100%; max-width: 760px;
+      max-height: 80vh; display: flex; flex-direction: column;
+    }
+    .photo-picker-head {
+      display: flex; align-items: center; gap: 12px;
+      padding: 16px 20px; border-bottom: 1px solid var(--border, #2a3748);
+      flex-shrink: 0;
+    }
+    .photo-picker-title { font-size: 15px; font-weight: 700; color: var(--text, #e2e8f0); flex: 1; }
+    .photo-picker-search {
+      padding: 7px 12px; border-radius: 6px; font-size: 13px;
+      background: var(--surface2, #111b27); color: var(--text, #e2e8f0);
+      border: 1px solid var(--border, #2a3748); width: 200px;
+    }
+    .photo-picker-search:focus { outline: none; border-color: #3b82f6; }
+    .photo-picker-close {
+      background: none; border: none; color: var(--text-muted, #94a3b8);
+      font-size: 20px; cursor: pointer; line-height: 1;
+    }
+    .photo-picker-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 8px; padding: 16px; overflow-y: auto;
+    }
+    .photo-picker-item {
+      position: relative;
+      aspect-ratio: 1; border-radius: 6px;
+      background: var(--surface2, #111b27) center/cover no-repeat;
+      cursor: pointer; border: 2px solid transparent;
+      transition: border-color .12s, transform .12s;
+      overflow: hidden;
+    }
+    .photo-picker-item:hover { border-color: #3b82f6; transform: scale(1.03); }
+    .photo-picker-item.selected { border-color: #22c55e; }
+    .photo-picker-caption {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: rgba(0,0,0,.65);
+      color: #fff;
+      font-size: 9px;
+      font-weight: 500;
+      padding: 3px 5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+    }
+
+    .drag-over { background: rgba(59,130,246,.1) !important; border-top: 2px solid #3b82f6; }
+    .empty-state { padding: 60px 20px; text-align: center; color: var(--text-muted, #64748b); font-size: 14px; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-wordmark">Ridgecrest Designs</div>
+      <div class="sidebar-sub">Admin Panel</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <a href="dashboard.html" class="nav-item" data-page="dashboard">
+        <span class="nav-icon">◈</span> Dashboard
+      </a>
+      <div class="nav-section-label">Leads</div>
+      <a href="leads.html" class="nav-item" data-page="leads">
+        <span class="nav-icon">◉</span> Lead Inbox
+        <span class="nav-badge" id="navLeadBadge" style="display:none"></span>
+      </a>
+      <div class="nav-section-label">Content</div>
+      <a href="blog.html" class="nav-item" data-page="blog">
+        <span class="nav-icon">✎</span> Blog (RD Edit)
+      </a>
+      <a href="portfolio.html" class="nav-item" data-page="portfolio">
+        <span class="nav-icon">▣</span> Portfolio
+      </a>
+      <a href="team.html" class="nav-item nav-item--active" data-page="team">
+        <span class="nav-icon">◎</span> Team
+      </a>
+      <a href="pages.html" class="nav-item" data-page="pages">
+        <span class="nav-icon">◧</span> Pages
+      </a>
+      <a href="media.html" class="nav-item" data-page="media">
+        <span class="nav-icon">◆</span> Media Library
+      </a>
+      <div class="nav-section-label">Growth</div>
+      <a href="analytics.html" class="nav-item" data-page="analytics">
+        <span class="nav-icon">▲</span> Analytics
+      </a>
+      <a href="seo.html" class="nav-item" data-page="seo">
+        <span class="nav-icon">◻</span> SEO
+      </a>
+      <div class="nav-section-label">System</div>
+      <a href="settings.html" class="nav-item" data-page="settings">
+        <span class="nav-icon">⊙</span> Settings
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar">H</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name">Henry</div>
+          <div class="sidebar-user-role">Administrator</div>
+        </div>
+        <button class="sidebar-logout" data-action="logout" title="Sign out">⏻</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="header">
+      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+      <div>
+        <div class="header-title">Team</div>
+        <div class="header-subtitle">Manage team members — drag to reorder</div>
+      </div>
+      <div class="header-actions">
+        <a href="/view/team.html" target="_blank" class="btn btn-ghost btn-sm">View Page →</a>
+        <button class="btn btn-primary btn-sm" id="addMemberBtn">+ Add Member</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div class="team-list" id="teamList">
+          <div class="empty-state" id="loadingState">Loading team members…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Edit / Add Modal -->
+<div class="modal-backdrop" id="editModal">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">Edit Member</div>
+    <input type="hidden" id="editMemberId" value="" />
+
+    <div class="form-row">
+      <label class="form-label" for="editName">Name</label>
+      <input class="form-input" id="editName" type="text" placeholder="Full name" />
+    </div>
+    <div class="form-row">
+      <label class="form-label" for="editRole">Role / Title</label>
+      <input class="form-input" id="editRole" type="text" placeholder="e.g. Lead Designer" />
+    </div>
+    <div class="form-row">
+      <label class="form-label" for="editBio">Bio</label>
+      <textarea class="form-textarea" id="editBio" placeholder="Short bio paragraph…"></textarea>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Photo</label>
+      <div class="photo-preview-wrap">
+        <div class="photo-preview" id="editPhotoPreview"></div>
+        <button class="btn-pick-photo" id="pickPhotoBtn">Choose Photo</button>
+      </div>
+      <input type="hidden" id="editPhoto" value="" />
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="modalCancelBtn">Cancel</button>
+      <button class="btn-save" id="modalSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Photo Picker -->
+<div class="photo-picker-backdrop" id="photoPickerBackdrop">
+  <div class="photo-picker">
+    <div class="photo-picker-head">
+      <div class="photo-picker-title">Choose a Photo</div>
+      <input class="photo-picker-search" id="photoSearch" type="text" placeholder="Search…" />
+      <button class="photo-picker-close" id="photoPickerClose">✕</button>
+    </div>
+    <div class="photo-picker-grid" id="photoPickerGrid"></div>
+  </div>
+</div>
+
+<script src="js/admin.js"></script>
+<script>
+Admin.requireAuth();
+Admin.init('team');
+
+var TOKEN = Admin.getToken();
+var members = [];
+var allImages = [];
+
+function apiFetch(method, path, body) {
+  return fetch(path, {
+    method: method,
+    headers: Object.assign({'X-Admin-Token': TOKEN}, body ? {'Content-Type': 'application/json'} : {}),
+    body: body ? JSON.stringify(body) : undefined
+  }).then(function(r) { return r.json(); });
+}
+
+// ── Load & Render ──────────────────────────────────────────────────────────────
+function loadMembers() {
+  apiFetch('GET', '/admin/api/team').then(function(data) {
+    members = Array.isArray(data) ? data : [];
+    renderList();
+  });
+}
+
+function renderList() {
+  var list = document.getElementById('teamList');
+  if (!members.length) {
+    list.innerHTML = '<div class="empty-state">No team members yet. Click "+ Add Member" to get started.</div>';
+    return;
+  }
+  list.innerHTML = members.map(function(m, i) {
+    var photoStyle = m.photo ? 'background-image:url(\'' + m.photo + '\')' : '';
+    return '<div class="team-row' + (m.active ? '' : ' inactive') + '" draggable="true" data-id="' + m.id + '" data-idx="' + i + '">' +
+      '<span class="drag-handle" title="Drag to reorder">⠿</span>' +
+      '<div class="member-photo" style="' + photoStyle + '"></div>' +
+      '<div class="member-info">' +
+        '<div class="member-name">' + escHtml(m.name) + '</div>' +
+        '<div class="member-role">' + escHtml(m.role) + '</div>' +
+      '</div>' +
+      '<div class="member-actions">' +
+        '<button class="toggle-active' + (m.active ? ' on' : '') + '" data-id="' + m.id + '" data-active="' + m.active + '" title="' + (m.active ? 'Active — click to hide' : 'Hidden — click to show') + '"></button>' +
+        '<button class="btn-edit-member" data-id="' + m.id + '">Edit</button>' +
+        '<button class="btn-delete-member" data-id="' + m.id + '" title="Delete">✕</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  attachRowListeners();
+  attachDragListeners();
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Row event listeners ────────────────────────────────────────────────────────
+function attachRowListeners() {
+  document.querySelectorAll('.btn-edit-member').forEach(function(btn) {
+    btn.addEventListener('click', function() { openEditModal(parseInt(btn.dataset.id)); });
+  });
+  document.querySelectorAll('.btn-delete-member').forEach(function(btn) {
+    btn.addEventListener('click', function() { deleteMember(parseInt(btn.dataset.id)); });
+  });
+  document.querySelectorAll('.toggle-active').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = parseInt(btn.dataset.id);
+      var nowActive = btn.dataset.active === 'true';
+      apiFetch('PUT', '/admin/api/team/' + id, {active: !nowActive}).then(loadMembers);
+    });
+  });
+}
+
+// ── Drag-to-reorder ────────────────────────────────────────────────────────────
+var dragSrcIdx = null;
+
+function attachDragListeners() {
+  var rows = document.querySelectorAll('.team-row');
+  rows.forEach(function(row) {
+    row.addEventListener('dragstart', function(e) {
+      dragSrcIdx = parseInt(row.dataset.idx);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      document.querySelectorAll('.team-row').forEach(function(r) { r.classList.remove('drag-over'); });
+      row.classList.add('drag-over');
+    });
+    row.addEventListener('dragleave', function() { row.classList.remove('drag-over'); });
+    row.addEventListener('drop', function(e) {
+      e.preventDefault();
+      row.classList.remove('drag-over');
+      var dropIdx = parseInt(row.dataset.idx);
+      if (dragSrcIdx === null || dragSrcIdx === dropIdx) return;
+      var moved = members.splice(dragSrcIdx, 1)[0];
+      members.splice(dropIdx, 0, moved);
+      renderList();
+      saveOrder();
+    });
+  });
+}
+
+function saveOrder() {
+  var payload = members.map(function(m, i) { return {id: m.id, display_order: i + 1}; });
+  apiFetch('PUT', '/admin/api/team/reorder', payload);
+}
+
+// ── Edit Modal ─────────────────────────────────────────────────────────────────
+function openEditModal(id) {
+  var m = id ? members.find(function(x) { return x.id === id; }) : null;
+  document.getElementById('modalTitle').textContent = m ? 'Edit Member' : 'Add Member';
+  document.getElementById('editMemberId').value = m ? m.id : '';
+  document.getElementById('editName').value = m ? m.name : '';
+  document.getElementById('editRole').value = m ? m.role : '';
+  document.getElementById('editBio').value = m ? (m.bio || '') : '';
+  document.getElementById('editPhoto').value = m ? (m.photo || '') : '';
+  updatePhotoPreview(m ? m.photo : '');
+  document.getElementById('editModal').classList.add('open');
+}
+
+function updatePhotoPreview(photoPath) {
+  var el = document.getElementById('editPhotoPreview');
+  el.style.backgroundImage = photoPath ? 'url(\'' + photoPath + '\')' : '';
+}
+
+document.getElementById('modalCancelBtn').addEventListener('click', function() {
+  document.getElementById('editModal').classList.remove('open');
+});
+
+document.getElementById('editModal').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+
+document.getElementById('modalSaveBtn').addEventListener('click', function() {
+  var btn = this;
+  var id = document.getElementById('editMemberId').value;
+  var payload = {
+    name: document.getElementById('editName').value.trim(),
+    role: document.getElementById('editRole').value.trim(),
+    bio: document.getElementById('editBio').value.trim(),
+    photo: document.getElementById('editPhoto').value
+  };
+  if (!payload.name) { alert('Name is required.'); return; }
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  var req = id
+    ? apiFetch('PUT', '/admin/api/team/' + id, payload)
+    : apiFetch('POST', '/admin/api/team', payload);
+  req.then(function() {
+    document.getElementById('editModal').classList.remove('open');
+    loadMembers();
+  }).catch(function() { alert('Save failed. Please try again.'); })
+  .finally(function() { btn.disabled = false; btn.textContent = 'Save'; });
+});
+
+function deleteMember(id) {
+  var m = members.find(function(x) { return x.id === id; });
+  if (!m) return;
+  if (!confirm('Delete ' + m.name + '? This cannot be undone.')) return;
+  apiFetch('DELETE', '/admin/api/team/' + id).then(loadMembers);
+}
+
+document.getElementById('addMemberBtn').addEventListener('click', function() {
+  openEditModal(null);
+});
+
+// ── Photo Picker (paginated) ───────────────────────────────────────────────────
+var PHOTO_PAGE = 36;
+var pickerImgs = [];
+var pickerCount = 0;
+
+function openPhotoPicker() {
+  document.getElementById('photoPickerBackdrop').classList.add('open');
+  document.getElementById('photoSearch').value = '';
+  if (!allImages.length) loadImages();
+  else renderImageGrid(allImages);
+}
+
+function loadImages() {
+  var grid = document.getElementById('photoPickerGrid');
+  grid.innerHTML = '<div style="padding:20px; color:#64748b; font-size:13px;">Loading images…</div>';
+  apiFetch('GET', '/admin/api/pages/images').then(function(imgs) {
+    allImages = Array.isArray(imgs) ? imgs : [];
+    renderImageGrid(allImages);
+  });
+}
+
+function renderImageGrid(imgs) {
+  var grid = document.getElementById('photoPickerGrid');
+  if (!imgs.length) {
+    grid.innerHTML = '<div style="padding:20px; color:#64748b; font-size:13px;">No images found.</div>';
+    return;
+  }
+  pickerImgs = imgs;
+  pickerCount = 0;
+  grid.innerHTML = '';
+  appendPhotoBatch();
+}
+
+function appendPhotoBatch() {
+  var grid = document.getElementById('photoPickerGrid');
+  var currentPhoto = document.getElementById('editPhoto').value;
+  var batch = pickerImgs.slice(pickerCount, pickerCount + PHOTO_PAGE);
+  batch.forEach(function(img) {
+    var sel = img.hero_path === currentPhoto ? ' selected' : '';
+    var el = document.createElement('div');
+    el.className = 'photo-picker-item' + sel;
+    el.style.backgroundImage = 'url(\'' + img.thumb_path + '\')';
+    el.dataset.path = img.hero_path;
+    var displayLabel = img.label || img.project || '';
+    if (displayLabel) {
+      var cap = document.createElement('div');
+      cap.className = 'photo-picker-caption';
+      cap.textContent = displayLabel;
+      el.appendChild(cap);
+    }
+    el.addEventListener('click', function() {
+      document.getElementById('editPhoto').value = img.hero_path;
+      updatePhotoPreview(img.hero_path);
+      document.getElementById('photoPickerBackdrop').classList.remove('open');
+    });
+    grid.appendChild(el);
+  });
+  pickerCount += batch.length;
+
+  // Remove old sentinel
+  var old = grid.querySelector('.photo-sentinel');
+  if (old) old.remove();
+
+  if (pickerCount < pickerImgs.length) {
+    var sentinel = document.createElement('div');
+    sentinel.className = 'photo-sentinel';
+    sentinel.style.cssText = 'grid-column:1/-1;height:1px;';
+    grid.appendChild(sentinel);
+    var obs = new IntersectionObserver(function(entries) {
+      if (entries[0].isIntersecting) { obs.disconnect(); appendPhotoBatch(); }
+    }, { root: grid, rootMargin: '200px' });
+    obs.observe(sentinel);
+  }
+}
+
+document.getElementById('pickPhotoBtn').addEventListener('click', openPhotoPicker);
+document.getElementById('photoPickerClose').addEventListener('click', function() {
+  document.getElementById('photoPickerBackdrop').classList.remove('open');
+});
+document.getElementById('photoPickerBackdrop').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+document.getElementById('photoSearch').addEventListener('input', function() {
+  var q = this.value.toLowerCase();
+  var filtered = allImages.filter(function(img) {
+    return img.filename.toLowerCase().includes(q) ||
+           (img.label || '').toLowerCase().includes(q) ||
+           (img.project || '').toLowerCase().includes(q);
+  });
+  renderImageGrid(filtered);
+});
+
+loadMembers();
+</script>
+</body>
+</html>

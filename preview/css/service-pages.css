@@ -1,0 +1,203 @@
+/* ============================================================
+   Service × Location Pages — Ridgecrest Designs
+   ============================================================ */
+
+/* ── Page hero variant with CTA buttons ── */
+.page-hero--service {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8rem 2rem 5rem;
+  background: var(--charcoal);
+  color: var(--off-white);
+}
+
+.page-hero--service .page-hero__eyebrow {
+  font-size: 0.68rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 1.2rem;
+  font-family: var(--font-sans);
+  font-weight: 500;
+}
+
+.page-hero--service .page-hero__title {
+  font-family: var(--font-display);
+  font-size: clamp(2.8rem, 6vw, 5rem);
+  font-weight: 300;
+  line-height: 1.1;
+  margin-bottom: 1.2rem;
+  max-width: 820px;
+}
+
+.page-hero--service .page-hero__sub {
+  font-size: 1.05rem;
+  font-weight: 300;
+  color: var(--mid);
+  margin-bottom: 2.5rem;
+  letter-spacing: 0.04em;
+}
+
+.page-hero__actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ── Service intro body ── */
+.service-intro-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+  margin-top: 2rem;
+  font-size: 1.05rem;
+  color: var(--charcoal);
+  line-height: 1.85;
+}
+
+/* ── What's included ── */
+.service-included {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5rem;
+  align-items: start;
+}
+
+.service-included__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.service-budget-note {
+  font-size: 0.88rem;
+  color: var(--slate);
+  border-left: 2px solid var(--accent);
+  padding-left: 1rem;
+  line-height: 1.6;
+  font-style: italic;
+}
+
+.service-checklist {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.service-checklist li {
+  font-size: 0.97rem;
+  line-height: 1.6;
+  padding-left: 1.6rem;
+  position: relative;
+  color: var(--charcoal);
+}
+
+.service-checklist li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+/* ── Differentiators grid ── */
+.diff-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2.5rem;
+  margin-top: 3rem;
+}
+
+.diff-item {
+  border-top: 1px solid rgba(200, 184, 154, 0.3);
+  padding-top: 1.5rem;
+}
+
+.diff-item__title {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  color: var(--accent);
+  margin-bottom: 0.8rem;
+}
+
+.diff-item__body {
+  font-size: 0.93rem;
+  color: var(--mid);
+  line-height: 1.75;
+}
+
+/* ── Featured projects ── */
+.service-projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 2rem;
+  margin-top: 2.5rem;
+}
+
+.service-project__link {
+  display: block;
+  background: var(--charcoal);
+  color: var(--off-white);
+  padding: 2.5rem;
+  transition: background var(--transition);
+}
+
+.service-project__link:hover {
+  background: #2a2a2a;
+}
+
+.service-project__name {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  font-weight: 400;
+  margin: 0.5rem 0;
+}
+
+.service-project__desc {
+  font-size: 0.93rem;
+  color: var(--mid);
+  line-height: 1.65;
+  margin-bottom: 1.2rem;
+}
+
+.service-project__cta {
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .service-included {
+    grid-template-columns: 1fr;
+    gap: 3rem;
+  }
+
+  .diff-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .page-hero__actions {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .diff-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .service-projects-grid {
+    grid-template-columns: 1fr;
+  }
+}

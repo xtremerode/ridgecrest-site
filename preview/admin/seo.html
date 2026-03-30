@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SEO — Ridgecrest Admin</title>
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-wordmark">Ridgecrest Designs</div>
+      <div class="sidebar-sub">Admin Panel</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <a href="dashboard.html" class="nav-item" data-page="dashboard"><span class="nav-icon">◈</span> Dashboard</a>
+      <div class="nav-section-label">Leads</div>
+      <a href="leads.html" class="nav-item" data-page="leads"><span class="nav-icon">◉</span> Lead Inbox</a>
+      <div class="nav-section-label">Content</div>
+      <a href="blog.html" class="nav-item" data-page="blog">
+        <span class="nav-icon">✎</span> Blog (RD Edit)
+      </a>
+      <a href="portfolio.html" class="nav-item" data-page="portfolio"><span class="nav-icon">▣</span> Portfolio</a>
+      <a href="team.html" class="nav-item" data-page="team">
+        <span class="nav-icon">◎</span> Team
+      </a>
+      <a href="pages.html" class="nav-item" data-page="pages">
+        <span class="nav-icon">◧</span> Pages
+      </a>
+      <a href="media.html" class="nav-item" data-page="media"><span class="nav-icon">◆</span> Media Library</a>
+      <div class="nav-section-label">Growth</div>
+      <a href="analytics.html" class="nav-item" data-page="analytics"><span class="nav-icon">▲</span> Analytics</a>
+      <a href="seo.html" class="nav-item" data-page="seo"><span class="nav-icon">◻</span> SEO</a>
+      <div class="nav-section-label">System</div>
+      <a href="settings.html" class="nav-item" data-page="settings"><span class="nav-icon">⊙</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar">H</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name">Henry</div>
+          <div class="sidebar-user-role">Administrator</div>
+        </div>
+        <button class="sidebar-logout" data-action="logout" title="Sign out">⏻</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="header">
+      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+      <div>
+        <div class="header-title">SEO Tools</div>
+        <div class="header-subtitle">Per-page meta, schema, sitemap</div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-ghost btn-sm" onclick="generateSitemap()">Generate Sitemap</button>
+        <button class="btn btn-gold btn-sm" onclick="saveSeoChanges()">Save All Changes</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- Tabs -->
+      <div class="tabs" id="seoTabs">
+        <button class="tab active" data-target="meta">Page Meta</button>
+        <button class="tab" data-target="schema">Schema Markup</button>
+        <button class="tab" data-target="sitemap">Sitemap</button>
+        <button class="tab" data-target="redirects">Redirects</button>
+      </div>
+
+      <!-- Meta Tab -->
+      <div id="metaPanel">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Per-Page SEO Settings</div>
+              <div class="card-sub">Click a page to edit title, description, and OG tags</div>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="seo-page-list" id="seoPageList" style="padding:16px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Schema Tab -->
+      <div id="schemaPanel" style="display:none">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Local Business Schema</div></div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">Business Name</label>
+                <input class="form-input" value="Ridgecrest Designs" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Business Type</label>
+                <input class="form-input" value="GeneralContractor" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Phone</label>
+                <input class="form-input" value="+19257842798" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Address</label>
+                <input class="form-input" value="5502 Sunol Blvd, Suite 100, Pleasanton, CA 94566" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Service Area</label>
+                <input class="form-input" value="East Bay, California" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Price Range</label>
+                <input class="form-input" value="$$$$" />
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Generated JSON-LD Preview</div></div>
+            <div class="card-body">
+              <pre style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px;font-size:11px;color:var(--text-2);overflow:auto;max-height:320px">{
+  "@context": "https://schema.org",
+  "@type": "GeneralContractor",
+  "name": "Ridgecrest Designs",
+  "telephone": "+19257842798",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "5502 Sunol Blvd, Suite 100",
+    "addressLocality": "Pleasanton",
+    "addressRegion": "CA",
+    "postalCode": "94566"
+  },
+  "priceRange": "$$$$",
+  "areaServed": "East Bay, California",
+  "url": "https://ridgecrestdesigns.com"
+}</pre>
+              <button class="btn btn-ghost btn-sm" style="margin-top:12px;width:100%" onclick="copySchema()">Copy Schema</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sitemap Tab -->
+      <div id="sitemapPanel" style="display:none">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">XML Sitemap</div>
+            <div class="card-sub">Auto-generated from all published pages</div>
+          </div>
+          <div class="card-body">
+            <pre id="sitemapPreview" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px;font-size:11px;color:var(--text-2);overflow:auto;max-height:400px">Click "Generate Sitemap" to preview</pre>
+            <div style="display:flex;gap:10px;margin-top:12px">
+              <button class="btn btn-ghost" onclick="generateSitemap()">Generate</button>
+              <button class="btn btn-ghost" onclick="copySitemap()">Copy XML</button>
+              <button class="btn btn-primary" onclick="downloadSitemap()">Download sitemap.xml</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Redirects Tab -->
+      <div id="redirectsPanel" style="display:none">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">URL Redirects</div>
+            <div class="card-sub">301 redirects for old pages</div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>From URL</th><th>To URL</th><th>Type</th><th>Status</th><th></th></tr>
+              </thead>
+              <tbody id="redirectsBody">
+              </tbody>
+            </table>
+          </div>
+          <div style="padding:16px;border-top:1px solid var(--border)">
+            <div style="display:flex;gap:10px;align-items:center">
+              <input class="form-input" id="redirectFrom" placeholder="/old-page" style="flex:1" />
+              <span style="color:var(--text-3)">→</span>
+              <input class="form-input" id="redirectTo" placeholder="/new-page" style="flex:1" />
+              <select class="filter-select" id="redirectType">
+                <option value="301">301 Permanent</option>
+                <option value="302">302 Temporary</option>
+              </select>
+              <button class="btn btn-primary btn-sm" onclick="addRedirect()">Add</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Page SEO Edit Modal -->
+<div class="modal-overlay" id="seoModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title" id="seoModalTitle">Edit Page SEO</div>
+      <button class="modal-close" data-modal-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Page Title <span style="color:var(--text-3);font-weight:400">(50–60 chars ideal)</span></label>
+        <input class="form-input" id="seoTitle" />
+        <div style="font-size:11px;color:var(--text-3);margin-top:4px"><span id="seoTitleCount">0</span> characters</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Meta Description <span style="color:var(--text-3);font-weight:400">(140–160 chars ideal)</span></label>
+        <textarea class="form-input" id="seoDesc" rows="3"></textarea>
+        <div style="font-size:11px;color:var(--text-3);margin-top:4px"><span id="seoDescCount">0</span> characters</div>
+      </div>
+      <div class="divider"></div>
+      <div class="form-group">
+        <label class="form-label">OG Title (Social Preview)</label>
+        <input class="form-input" id="ogTitle" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">OG Description</label>
+        <textarea class="form-input" id="ogDesc" rows="2"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">OG Image URL</label>
+        <input class="form-input" id="ogImage" placeholder="https://…/social-card.jpg" />
+      </div>
+      <div class="divider"></div>
+      <div class="form-group">
+        <label class="form-label">Canonical URL</label>
+        <input class="form-input" id="seoCanonical" placeholder="https://ridgecrestdesigns.com/…" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Robots</label>
+        <select class="form-input" id="seoRobots">
+          <option value="index, follow">index, follow (default)</option>
+          <option value="noindex, follow">noindex, follow</option>
+          <option value="noindex, nofollow">noindex, nofollow</option>
+        </select>
+      </div>
+
+      <!-- SERP Preview -->
+      <div style="margin-top:20px">
+        <div class="form-label" style="margin-bottom:8px">SERP Preview</div>
+        <div style="background:white;border-radius:var(--radius);padding:16px">
+          <div style="font-size:12px;color:#1a73e8;margin-bottom:2px" id="serpUrl">ridgecrestdesigns.com › …</div>
+          <div style="font-size:18px;color:#1a0dab;margin-bottom:4px" id="serpTitle">Page Title</div>
+          <div style="font-size:13px;color:#3c4043" id="serpDesc">Page description will appear here…</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-modal-close>Cancel</button>
+      <button class="btn btn-primary" onclick="saveSeoPage()">Save SEO Settings</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/admin.js"></script>
+<script>
+  if (!Admin.requireAuth()) throw new Error('unauth');
+  Admin.init('seo');
+
+  // Show/hide panels on tab click
+  document.querySelectorAll('#seoTabs .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('#seoTabs .tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      ['meta','schema','sitemap','redirects'].forEach(id => {
+        document.getElementById(id+'Panel').style.display = tab.dataset.target === id ? '' : 'none';
+      });
+    });
+  });
+
+  const PAGES = [
+    { slug: 'index.html', title: 'Home', meta_title: 'Ridgecrest Designs — Luxury Design-Build | East Bay, California', meta_desc: 'Ridgecrest Designs is a full-service luxury design-build firm serving Pleasanton, Walnut Creek, Danville, Lafayette, and the East Bay. Custom homes and high-end remodels.', status: 'good' },
+    { slug: 'about.html', title: 'About', meta_title: 'About — Ridgecrest Designs | East Bay Luxury Design-Build', meta_desc: 'Learn about Ridgecrest Designs — our story, team, philosophy, and approach to luxury design-build in the East Bay.', status: 'good' },
+    { slug: 'process.html', title: 'Process', meta_title: 'Our Process — Ridgecrest Designs | Design-Build Experts', meta_desc: 'Discover our five-stage design-build process: consultation, design, proposal, build, and completion. No surprises.', status: 'good' },
+    { slug: 'portfolio.html', title: 'Portfolio', meta_title: 'Portfolio — Ridgecrest Designs | Luxury Homes & Remodels, East Bay CA', meta_desc: 'Explore Ridgecrest Designs\' portfolio of luxury custom homes and high-end remodels across Pleasanton, Danville, Lafayette, Orinda, and the East Bay.', status: 'good' },
+    { slug: 'team.html', title: 'Team', meta_title: 'Our Team — Ridgecrest Designs', meta_desc: 'Meet the experts behind Ridgecrest Designs — architects, designers, engineers, and builders dedicated to flawless execution.', status: 'good' },
+    { slug: 'contact.html', title: 'Contact', meta_title: 'Start a Project — Ridgecrest Designs', meta_desc: 'Start your custom home or luxury remodel. Contact Ridgecrest Designs in Pleasanton, CA.', status: 'good' },
+    { slug: 'danville-dream.html', title: 'Danville Dream Home', meta_title: 'Danville Dream Home — Ridgecrest Designs Portfolio', meta_desc: 'A complete luxury home remodel in Danville, CA. See photos and details of this stunning transformation.', status: 'ok' },
+    { slug: 'pleasanton-custom.html', title: 'Pleasanton Custom Home', meta_title: 'Pleasanton Custom Home — Ridgecrest Designs Portfolio', meta_desc: 'A custom luxury home built in Pleasanton, CA. Photo-realistic renders, flawless execution.', status: 'ok' },
+    { slug: 'lafayette-bistro.html', title: 'Lafayette Bistro Kitchen', meta_title: 'Lafayette Modern Bistro Kitchen — Ridgecrest Designs', meta_desc: 'A high-end kitchen remodel in Lafayette, CA featuring custom cabinetry and premium stonework.', status: 'ok' },
+  ];
+
+  let currentPageSlug = null;
+  const seoData = {};
+
+  function seoStatus(s) {
+    const map = { good:'badge-green', ok:'badge-yellow', missing:'badge-red' };
+    const labels = { good:'Optimized', ok:'OK', missing:'Missing' };
+    return `<span class="badge ${map[s]||'badge-gray'}">${labels[s]||s}</span>`;
+  }
+
+  function renderPageList() {
+    document.getElementById('seoPageList').innerHTML = PAGES.map(p => `
+      <div class="seo-page-item" onclick="openSeoModal('${p.slug}')">
+        <span class="nav-icon" style="color:var(--text-3)">◈</span>
+        <span class="seo-page-name">${p.title} <span style="color:var(--text-3);font-size:11px">(${p.slug})</span></span>
+        <div style="flex:1;min-width:0;padding:0 12px">
+          <div style="font-size:12px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.meta_title}</div>
+        </div>
+        <span class="seo-page-status">${seoStatus(p.status)}</span>
+        <span style="color:var(--text-3);font-size:16px">›</span>
+      </div>
+    `).join('');
+  }
+
+  function openSeoModal(slug) {
+    currentPageSlug = slug;
+    const p = PAGES.find(x => x.slug === slug);
+    if (!p) return;
+
+    const d = seoData[slug] || p;
+    document.getElementById('seoModalTitle').textContent = `SEO: ${p.title}`;
+    document.getElementById('seoTitle').value = d.meta_title || '';
+    document.getElementById('seoDesc').value = d.meta_desc || '';
+    document.getElementById('ogTitle').value = d.og_title || d.meta_title || '';
+    document.getElementById('ogDesc').value = d.og_desc || d.meta_desc || '';
+    document.getElementById('ogImage').value = d.og_image || '';
+    document.getElementById('seoCanonical').value = d.canonical || '';
+    document.getElementById('seoRobots').value = d.robots || 'index, follow';
+
+    updateSeoPreview();
+    Admin.openModal('seoModal');
+  }
+
+  function updateSeoPreview() {
+    const title = document.getElementById('seoTitle').value;
+    const desc = document.getElementById('seoDesc').value;
+    const slug = currentPageSlug || '';
+    document.getElementById('serpTitle').textContent = title || 'Page Title';
+    document.getElementById('serpDesc').textContent = desc || 'No description';
+    document.getElementById('serpUrl').textContent = 'ridgecrestdesigns.com › ' + slug.replace('.html', '');
+    document.getElementById('seoTitleCount').textContent = title.length;
+    document.getElementById('seoDescCount').textContent = desc.length;
+  }
+
+  document.getElementById('seoTitle').addEventListener('input', updateSeoPreview);
+  document.getElementById('seoDesc').addEventListener('input', updateSeoPreview);
+
+  function saveSeoPage() {
+    seoData[currentPageSlug] = {
+      meta_title: document.getElementById('seoTitle').value,
+      meta_desc: document.getElementById('seoDesc').value,
+      og_title: document.getElementById('ogTitle').value,
+      og_desc: document.getElementById('ogDesc').value,
+      og_image: document.getElementById('ogImage').value,
+      canonical: document.getElementById('seoCanonical').value,
+      robots: document.getElementById('seoRobots').value,
+    };
+    Admin.toast('SEO settings saved (apply to HTML files to publish)', 'success');
+    Admin.closeModal('seoModal');
+  }
+
+  function saveSeoChanges() {
+    Admin.post('/seo', seoData).then(r => {
+      Admin.toast(r?.ok ? 'All SEO settings saved' : 'Saved locally — connect backend to persist', 'info');
+    });
+  }
+
+  const REDIRECTS = [];
+  function renderRedirects() {
+    const tbody = document.getElementById('redirectsBody');
+    if (!REDIRECTS.length) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-3)">No redirects configured</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = REDIRECTS.map((r,i) => `
+      <tr>
+        <td class="td-mono">${r.from}</td>
+        <td class="td-mono">${r.to}</td>
+        <td><span class="badge badge-blue">${r.type}</span></td>
+        <td><span class="badge badge-green">Active</span></td>
+        <td><button class="btn btn-danger btn-sm" onclick="removeRedirect(${i})">Remove</button></td>
+      </tr>
+    `).join('');
+  }
+
+  function addRedirect() {
+    const from = document.getElementById('redirectFrom').value.trim();
+    const to = document.getElementById('redirectTo').value.trim();
+    const type = document.getElementById('redirectType').value;
+    if (!from || !to) { Admin.toast('Enter both From and To URLs', 'error'); return; }
+    REDIRECTS.push({ from, to, type });
+    document.getElementById('redirectFrom').value = '';
+    document.getElementById('redirectTo').value = '';
+    renderRedirects();
+    Admin.toast('Redirect added (configure in your server/nginx to activate)', 'info');
+  }
+
+  function removeRedirect(i) {
+    REDIRECTS.splice(i, 1);
+    renderRedirects();
+  }
+
+  const SITEMAP_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
+${PAGES.map(p => `  <url>
+    <loc>https://ridgecrestdesigns.com/${p.slug === 'index.html' ? '' : p.slug}</loc>
+    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>${p.slug === 'index.html' ? '1.0' : p.slug.includes('.html') ? '0.7' : '0.5'}</priority>
+  </url>`).join('\n')}
+</urlset>`;
+
+  function generateSitemap() {
+    document.getElementById('sitemapPreview').textContent = SITEMAP_XML;
+    Admin.toast('Sitemap generated', 'success');
+    // Switch to sitemap tab
+    document.querySelectorAll('#seoTabs .tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.target === 'sitemap');
+    });
+    ['meta','schema','redirects'].forEach(id => document.getElementById(id+'Panel').style.display = 'none');
+    document.getElementById('sitemapPanel').style.display = '';
+  }
+
+  function copySitemap() {
+    navigator.clipboard.writeText(SITEMAP_XML).then(() => Admin.toast('Sitemap XML copied', 'success'));
+  }
+
+  function downloadSitemap() {
+    const blob = new Blob([SITEMAP_XML], { type: 'text/xml' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'sitemap.xml';
+    a.click();
+    Admin.toast('sitemap.xml downloaded', 'success');
+  }
+
+  function copySchema() {
+    const schema = document.querySelector('pre').textContent;
+    navigator.clipboard.writeText(schema).then(() => Admin.toast('Schema JSON-LD copied', 'success'));
+  }
+
+  renderPageList();
+  renderRedirects();
+</script>
+</body>
+</html>

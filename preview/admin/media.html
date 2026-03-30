@@ -1,0 +1,2204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Media Library — Ridgecrest Admin</title>
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-wordmark">Ridgecrest Designs</div>
+      <div class="sidebar-sub">Admin Panel</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <a href="dashboard.html" class="nav-item" data-page="dashboard"><span class="nav-icon">◈</span> Dashboard</a>
+      <div class="nav-section-label">Leads</div>
+      <a href="leads.html" class="nav-item" data-page="leads"><span class="nav-icon">◉</span> Lead Inbox</a>
+      <div class="nav-section-label">Content</div>
+      <a href="blog.html" class="nav-item" data-page="blog"><span class="nav-icon">✎</span> Blog (RD Edit)</a>
+      <a href="portfolio.html" class="nav-item" data-page="portfolio"><span class="nav-icon">▣</span> Portfolio</a>
+      <a href="team.html" class="nav-item" data-page="team">
+        <span class="nav-icon">◎</span> Team
+      </a>
+      <a href="pages.html" class="nav-item" data-page="pages">
+        <span class="nav-icon">◧</span> Pages
+      </a>
+      <a href="media.html" class="nav-item nav-item--active" data-page="media"><span class="nav-icon">◆</span> Media Library</a>
+      <div class="nav-section-label">Growth</div>
+      <a href="analytics.html" class="nav-item" data-page="analytics"><span class="nav-icon">▲</span> Analytics</a>
+      <a href="seo.html" class="nav-item" data-page="seo"><span class="nav-icon">◻</span> SEO</a>
+      <div class="nav-section-label">System</div>
+      <a href="settings.html" class="nav-item" data-page="settings"><span class="nav-icon">⊙</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar">H</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name">Henry</div>
+          <div class="sidebar-user-role">Administrator</div>
+        </div>
+        <button class="sidebar-logout" data-action="logout" title="Sign out">⏻</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="header">
+      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+      <div>
+        <div class="header-title">Media Library</div>
+        <div class="header-subtitle" id="mediaSubtitle">Loading…</div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-sm btn--delete" id="deleteSelectedBtn" style="display:none" onclick="confirmDeleteSelected()">✕ Delete Selected (<span id="deleteCount">0</span>)</button>
+        <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border)" onclick="startScan()" id="scanBtn">⟳ Scan Live Site</button>
+        <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border)" onclick="startLabelAll(false)" id="labelBtn">✦ Label All</button>
+        <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border)" onclick="startLabelAll(true)" id="relabelBtn">↺ Re-label All</button>
+        <button class="btn btn-gold btn-sm" onclick="document.getElementById('uploadInput').click()">+ Upload</button>
+        <input type="file" id="uploadInput" accept="image/*" multiple style="display:none" onchange="handleUpload(this.files)" />
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- Stats bar -->
+      <div class="stats-row" id="statsRow" style="display:none">
+        <div class="stat-pill"><span id="statTotal">0</span> in library</div>
+        <div class="stat-pill stat-pill--green"><span id="statMigrated">0</span> on your server</div>
+        <div class="stat-pill stat-pill--yellow"><span id="statPending">0</span> still on Wix</div>
+      </div>
+
+      <!-- Scan progress (hidden until running) -->
+      <div class="card" id="scanCard" style="display:none">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Live Site Scan</div>
+            <div class="card-sub" id="scanStatus">Initializing…</div>
+          </div>
+          <div id="scanCounts" style="font-size:13px;color:var(--text-2)"></div>
+        </div>
+        <div class="card-body">
+          <div class="migration-progress-bar">
+            <div class="migration-progress-fill" id="scanFill" style="width:0%;background:var(--accent)"></div>
+          </div>
+          <div class="scan-log" id="scanLog"></div>
+        </div>
+      </div>
+
+      <!-- AI Labeling progress (hidden until running) -->
+      <div class="card" id="labelCard" style="display:none">
+        <div class="card-header">
+          <div>
+            <div class="card-title">AI Image Labeling</div>
+            <div class="card-sub" id="labelStatus">Initializing…</div>
+          </div>
+          <div id="labelCounts" style="font-size:13px;color:var(--text-2)"></div>
+        </div>
+        <div class="card-body">
+          <div class="migration-progress-bar">
+            <div class="migration-progress-fill" id="labelFill" style="width:0%;background:var(--accent)"></div>
+          </div>
+          <div class="scan-log" id="labelLog"></div>
+        </div>
+      </div>
+
+      <!-- Wix Migration card (shown when there are unmigrated images) -->
+      <div class="card" id="migrateCard" style="display:none">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Wix Image Migration</div>
+            <div class="card-sub" id="migrateStatus">Ready to migrate</div>
+          </div>
+          <div id="migrateCount" style="font-size:13px;color:var(--text-2)"></div>
+        </div>
+        <div class="card-body">
+          <div class="migration-progress-bar">
+            <div class="migration-progress-fill" id="migrateFill" style="width:0%"></div>
+          </div>
+          <div class="migration-log" id="migrateLog"></div>
+        </div>
+      </div>
+
+      <!-- Label dropdown popover (shared) — options baked in HTML so they always render -->
+      <div id="labelPopover" class="label-popover" style="display:none">
+        <div class="label-popover__row">
+          <label class="label-popover__lbl">Project</label>
+          <select id="lpProject" class="label-popover__sel">
+            <option value="">— No Project —</option>
+          </select>
+        </div>
+        <div class="label-popover__row">
+          <label class="label-popover__lbl">Room / Space</label>
+          <select id="lpRoom" class="label-popover__sel">
+            <option value="">— No Room —</option>
+            <optgroup label="Main Living">
+              <option value="Living Room">Living Room</option>
+              <option value="Great Room / Family Room">Great Room / Family Room</option>
+              <option value="Dining Room">Dining Room</option>
+              <option value="Kitchen">Kitchen</option>
+              <option value="Kitchen / Dining">Kitchen / Dining</option>
+              <option value="Open Concept Main Floor">Open Concept Main Floor</option>
+            </optgroup>
+            <optgroup label="Bedrooms">
+              <option value="Primary Bedroom">Primary Bedroom</option>
+              <option value="Bedroom">Bedroom</option>
+              <option value="Guest Bedroom">Guest Bedroom</option>
+              <option value="Kids Room">Kids Room</option>
+            </optgroup>
+            <optgroup label="Bathrooms">
+              <option value="Primary Bath">Primary Bath</option>
+              <option value="Bathroom">Bathroom</option>
+              <option value="Guest Bath">Guest Bath</option>
+              <option value="Powder Room / Half Bath">Powder Room / Half Bath</option>
+            </optgroup>
+            <optgroup label="Work &amp; Flex">
+              <option value="Home Office / Study">Home Office / Study</option>
+              <option value="Mudroom / Laundry">Mudroom / Laundry</option>
+              <option value="Basement / Bonus Room">Basement / Bonus Room</option>
+              <option value="Sunroom / Flex Room">Sunroom / Flex Room</option>
+              <option value="Gym / Wellness Room">Gym / Wellness Room</option>
+              <option value="Home Theater / Media Room">Home Theater / Media Room</option>
+            </optgroup>
+            <optgroup label="Circulation">
+              <option value="Entryway / Foyer">Entryway / Foyer</option>
+              <option value="Hallway / Staircase">Hallway / Staircase</option>
+            </optgroup>
+            <optgroup label="Utility &amp; Storage">
+              <option value="Garage">Garage</option>
+              <option value="Pantry / Butlers Pantry">Pantry / Butlers Pantry</option>
+              <option value="Walk-In Closet">Walk-In Closet</option>
+            </optgroup>
+            <optgroup label="Outdoor">
+              <option value="Outdoor / Patio / Deck">Outdoor / Patio / Deck</option>
+              <option value="Pool Area">Pool Area</option>
+              <option value="Exterior / Facade">Exterior / Facade</option>
+            </optgroup>
+            <optgroup label="Whole Property">
+              <option value="Whole Home">Whole Home</option>
+              <option value="Detail Shot / Finishes">Detail Shot / Finishes</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="label-popover__row">
+          <label class="label-popover__lbl">Image Type</label>
+          <select id="lpType" class="label-popover__sel">
+            <option value="">— No Type —</option>
+            <option value="Render">Render</option>
+            <option value="Before">Before</option>
+            <option value="After">After</option>
+          </select>
+        </div>
+        <div class="label-popover__actions">
+          <button class="btn btn-sm btn-gold" onclick="saveLabelDropdown()">Save</button>
+          <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border)" onclick="closeLabelDropdown()">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Delete confirmation modal -->
+      <div id="deleteModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeDeleteModal()">
+        <div class="modal-box">
+          <div class="modal-title">Delete <span id="deleteModalCount">0</span> images?</div>
+          <div id="deleteModalBody" class="modal-body"></div>
+          <div class="modal-actions">
+            <button class="btn btn--delete" onclick="executeDelete()">Delete Permanently</button>
+            <button class="btn" style="background:var(--surface-2);border:1px solid var(--border)" onclick="closeDeleteModal()">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lightbox (moved to document.body on open to escape modal stacking contexts) -->
+      <div id="lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:99999;align-items:center;justify-content:center;flex-direction:column" onclick="if(event.target===this)closeLightbox()">
+        <button onclick="closeLightbox()" style="position:absolute;top:16px;right:20px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer;line-height:1;opacity:.7" title="Close (Esc)">✕</button>
+        <button id="lbPrev" onclick="lightboxNav(-1)" style="position:absolute;left:16px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.12);border:none;color:#fff;font-size:36px;cursor:pointer;border-radius:8px;padding:8px 14px;line-height:1;opacity:.8" title="Previous">‹</button>
+        <button id="lbNext" onclick="lightboxNav(1)"  style="position:absolute;right:16px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.12);border:none;color:#fff;font-size:36px;cursor:pointer;border-radius:8px;padding:8px 14px;line-height:1;opacity:.8" title="Next">›</button>
+        <img id="lbImg" src="" style="max-width:88vw;max-height:82vh;object-fit:contain;border-radius:6px;box-shadow:0 8px 40px rgba(0,0,0,.6)" />
+        <div style="display:flex;align-items:center;gap:12px;margin-top:14px;min-height:32px;flex-wrap:wrap;justify-content:center">
+          <div id="lbCaption" style="color:rgba(255,255,255,.6);font-size:12px;text-align:center"></div>
+          <div id="lbCounter" style="color:rgba(255,255,255,.4);font-size:11px"></div>
+          <span id="lbActiveBadge" style="display:none;background:rgba(34,197,94,.18);border:1px solid rgba(34,197,94,.5);color:#4ade80;font-size:12px;padding:5px 14px;border-radius:6px;font-weight:600">✓ Active</span>
+          <button id="lbUseBtn" onclick="lbUseVersion()" style="display:none;background:#16a34a;border:none;color:#fff;font-size:12px;padding:6px 16px;border-radius:6px;cursor:pointer;font-weight:600">✓ Use This Version</button>
+          <button id="lbEditBtn" onclick="lbEditWithAI()" style="display:none;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:12px;padding:6px 14px;border-radius:6px;cursor:pointer">✦ Edit with AI</button>
+          <button id="lbDeleteBtn" onclick="lbDeleteVersion()" style="display:none;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#fca5a5;font-size:12px;padding:6px 14px;border-radius:6px;cursor:pointer">✕ Delete Render</button>
+        </div>
+        <div id="lbPrompt" style="display:none;max-width:640px;width:90vw;text-align:center;font-size:11px;color:rgba(255,255,255,.5);font-style:italic;line-height:1.6;padding:6px 16px 0;white-space:pre-line"></div>
+      </div>
+
+      <!-- Re-render modal -->
+      <div id="rerenderModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeRerender()">
+        <div class="modal-box" style="max-width:860px;width:95vw">
+          <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between">
+            <span>✦ AI Re-render — <span id="rerenderSourceLabel" style="font-weight:400;opacity:.7;font-size:14px">Original</span></span>
+            <button class="btn btn-ghost btn-sm" onclick="closeRerender()" style="font-size:18px;padding:2px 8px">✕</button>
+          </div>
+
+          <!-- Image panels -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0 10px">
+            <div>
+              <div id="rerenderOriginalLabel" style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Source</div>
+              <div id="rerenderOriginal" style="width:100%;aspect-ratio:4/3;background:var(--surface-2);background-size:cover;background-position:center;border-radius:6px;border:1px solid var(--border);cursor:zoom-in" onclick="rerenderLightbox(0)" title="Click to enlarge"></div>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;display:flex;align-items:center;gap:8px">
+                <span id="rerenderResultLabel">Result</span>
+                <span id="rerenderPassBadge" style="display:none;background:var(--accent);color:#fff;font-size:10px;padding:1px 7px;border-radius:10px"></span>
+              </div>
+              <div id="rerenderResult" style="width:100%;aspect-ratio:4/3;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px;background-size:cover;background-position:center;position:relative;cursor:zoom-in" onclick="rerenderLightbox(1)" title="Click to enlarge">
+                <span id="rerenderPlaceholder">Result will appear here</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Version filmstrip — all AI renders for this image -->
+          <div id="rerenderFilmstrip" style="display:none;margin:4px 0 14px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em">Render From</div>
+              <span id="rerenderStripCount" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;font-size:10px;padding:1px 8px;color:var(--text-2)">0</span>
+              <div style="flex:1"></div>
+              <button id="rerenderBulkDeleteBtn" onclick="bulkDeleteStrip()" style="display:none;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#fca5a5;font-size:11px;padding:3px 10px;border-radius:5px;cursor:pointer;line-height:1.4"></button>
+              <button id="rerenderSelectBtn" onclick="toggleStripSelectMode()" style="background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);font-size:11px;padding:3px 10px;border-radius:5px;cursor:pointer;line-height:1.4">Select</button>
+            </div>
+            <div id="rerenderStripScroll" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin;scrollbar-color:var(--border) transparent"></div>
+          </div>
+
+          <!-- Adjustment sliders (hidden until result displayed) -->
+          <div id="rerenderAdjustRow" style="display:none;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:12px">
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Adjust Result</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+              <label style="font-size:12px;color:var(--text-2)">
+                Brightness <span id="brightnessVal">100</span>%
+                <input type="range" min="50" max="150" value="100" id="adjBrightness" oninput="applyAdjust()" style="width:100%;margin-top:4px;accent-color:var(--accent)">
+              </label>
+              <label style="font-size:12px;color:var(--text-2)">
+                Contrast <span id="contrastVal">100</span>%
+                <input type="range" min="50" max="150" value="100" id="adjContrast" oninput="applyAdjust()" style="width:100%;margin-top:4px;accent-color:var(--accent)">
+              </label>
+              <label style="font-size:12px;color:var(--text-2)">
+                Saturation <span id="saturationVal">100</span>%
+                <input type="range" min="0" max="200" value="100" id="adjSaturation" oninput="applyAdjust()" style="width:100%;margin-top:4px;accent-color:var(--accent)">
+              </label>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="resetAdjust()" style="margin-top:8px;font-size:11px">Reset adjustments</button>
+          </div>
+
+          <!-- Prompt -->
+          <div style="margin-bottom:12px">
+            <label style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">Prompt</label>
+            <textarea id="rerenderPrompt" rows="3" style="width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:10px 12px;font-size:13px;resize:vertical;font-family:inherit" placeholder="e.g. photorealistic luxury kitchen render, marble countertops, natural light, high-end appliances"></textarea>
+          </div>
+
+          <!-- Action buttons -->
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-gold" id="rerenderRunBtn" onclick="runRerender(false)" title="New render from source image">✦ Re-render</button>
+            <button class="btn btn-gold" id="rerenderRefineBtn" onclick="runRerender(true)" style="display:none" title="Continue refining from the current result">✦ Refine Result</button>
+            <button class="btn btn-ghost btn-sm" id="rerenderRestartBtn" onclick="restartRerender()" style="display:none">↺ Reset View</button>
+            <div style="flex:1"></div>
+            <button id="rerenderUseBtn" onclick="rerenderUseVersion()" style="display:none;background:#16a34a;border:none;color:#fff;font-size:13px;padding:7px 18px;border-radius:6px;cursor:pointer;font-weight:600">✓ Use This Version</button>
+            <span id="rerenderStatus" style="font-size:13px;color:var(--text-muted);width:100%;margin-top:4px"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pending migration banner -->
+      <div class="migration-banner" id="migrationBanner" style="display:none">
+        <div class="migration-banner__icon">⚠</div>
+        <div class="migration-banner__body">
+          <div class="migration-banner__title" id="bannerTitle">Images still hosted on Wix</div>
+          <div class="migration-banner__sub" id="bannerSub">Scan the live site first to discover all images, then migrate them to your server in one click.</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-gold" id="migrateAllBtn" onclick="startMigration()">Migrate via Server →</button>
+          <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border)" onclick="showLocalScript()">Run from Laptop →</button>
+        </div>
+      </div>
+
+      <!-- Local script instructions (shown when server-side migration fails or user clicks) -->
+      <div class="card" id="localScriptCard" style="display:none">
+        <div class="card-header">
+          <div class="card-title">Run Migration from Your Laptop</div>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('localScriptCard').style.display='none'">✕</button>
+        </div>
+        <div class="card-body">
+          <p style="margin:0 0 12px;color:var(--text-2);font-size:14px">The server's IP is blocked by Wix CDN. Running from your Mac/laptop bypasses this — your home IP isn't blocked. This is a one-time migration.</p>
+          <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:6px;padding:12px;font-family:monospace;font-size:13px;color:var(--text-1)">
+            <div style="color:var(--text-3);margin-bottom:6px"># In Terminal on your Mac:</div>
+            <div>cd ~/Downloads</div>
+            <div>curl -O http://147.182.242.54:8081/migrate_images.py</div>
+            <div>python3 migrate_images.py</div>
+          </div>
+          <p style="margin:10px 0 0;color:var(--text-3);font-size:12px">The script downloads all <span id="scriptImageCount">185</span> images from Wix and uploads them to your server automatically. Takes about 2 minutes. Requires Python 3 (already on your Mac).</p>
+        </div>
+      </div>
+
+      <!-- Image library grid (all discovered, with status) -->
+      <div class="card" id="libraryCard" style="display:none">
+        <div class="card-header">
+          <div class="card-title">Image Library</div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border);font-size:11px" onclick="toggleSelectAll()" id="selectAllBtn">Select All</button>
+            <span style="font-size:12px;color:var(--text-3)" id="libraryCount"></span>
+          </div>
+        </div>
+        <!-- Project filter tabs -->
+        <div class="project-tabs" id="projectTabs" style="display:none"></div>
+        <div class="card-body">
+          <div class="media-grid" id="libraryGrid">
+            <div class="loading-state">Loading…</div>
+          </div>
+        </div>
+      </div>
+
+
+    </div>
+  </div>
+</div>
+
+<script src="js/admin.js"></script>
+<script>
+if (!Admin.requireAuth()) throw new Error('unauth');
+Admin.init('media');
+
+const token = Admin.getToken();
+let _libraryItems = [];
+
+// ── Auth helper — call Admin.logout() on 401 ─────────────────────────────────
+function handleFetchError(res, label) {
+  if (res.status === 401) {
+    Admin.toast('Session expired — please log in again', 'error');
+    setTimeout(() => Admin.logout(), 1500);
+    return true;
+  }
+  if (!res.ok) throw new Error(`${label}: server returned ${res.status}`);
+  return false;
+}
+
+// ── Load everything on init ───────────────────────────────────────────────────
+async function init() {
+  await Promise.all([loadLibraryStatus(), loadProjectOptions()]);
+}
+
+async function loadProjectOptions() {
+  try {
+    const res = await fetch('/admin/api/projects', { headers: { 'X-Admin-Token': token } });
+    if (!res.ok) return;
+    const projects = await res.json();
+    const sel = document.getElementById('lpProject');
+    // Keep the blank option, replace the rest
+    sel.innerHTML = '<option value="">— No Project —</option>' +
+      projects.map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
+  } catch(e) { /* silently keep the blank fallback */ }
+}
+
+// ── Library status from DB ────────────────────────────────────────────────────
+const MEDIA_PAGE = 36;
+let _mediaRenderedCount = 0;
+
+let _libCacheBust = Date.now();
+
+async function loadLibraryStatus() {
+  try {
+    // Load from local optimized images — migration is complete
+    const res = await fetch('/admin/api/pages/images', { headers: { 'X-Admin-Token': token } });
+    if (handleFetchError(res, 'Media')) return;
+    _libraryItems = await res.json();
+    _libCacheBust = Date.now(); // new bust key so thumbs reload after any save
+    const total = _libraryItems.length;
+
+    document.getElementById('statsRow').style.display = 'flex';
+    document.getElementById('statTotal').textContent    = total;
+    document.getElementById('statMigrated').textContent = total;
+    document.getElementById('statPending').textContent  = 0;
+    document.getElementById('mediaSubtitle').textContent = `${total} images — all on your server`;
+    document.getElementById('migrationBanner').style.display = 'none';
+
+    if (total > 0) {
+      document.getElementById('libraryCard').style.display = '';
+      buildProjectTabs();
+      renderLibraryGrid();
+    }
+  } catch(e) {
+    document.getElementById('mediaSubtitle').textContent = 'Could not load images — ' + e.message;
+  }
+}
+
+// ── Project filter tabs ───────────────────────────────────────────────────────
+let _activeProjectFilter = 'all'; // 'all' | '__edited__' | project name | '__unlabeled__'
+
+function buildProjectTabs() {
+  const tabsEl = document.getElementById('projectTabs');
+  if (!tabsEl) return;
+
+  // Collect unique projects from loaded items (preserve order of first appearance)
+  const seen = new Set();
+  const projects = [];
+  let hasUnlabeled = false;
+  const editedCount = _libraryItems.filter(i => i.has_renders).length;
+  _libraryItems.forEach(item => {
+    if (!item.project) { hasUnlabeled = true; return; }
+    if (!seen.has(item.project)) { seen.add(item.project); projects.push(item.project); }
+  });
+
+  const tabs = [
+    { key: 'all', label: `All (${_libraryItems.length})` },
+  ];
+  if (editedCount > 0) {
+    tabs.push({ key: '__edited__', label: `✦ Edited (${editedCount})`, edited: true });
+  }
+  tabs.push(...projects.map(p => ({ key: p, label: `${p} (${_libraryItems.filter(i => i.project === p).length})` })));
+  if (hasUnlabeled) {
+    tabs.push({ key: '__unlabeled__', label: `Unlabeled (${_libraryItems.filter(i => !i.project).length})` });
+  }
+
+  if (tabs.length <= 1) { tabsEl.style.display = 'none'; return; }
+
+  tabsEl.innerHTML = tabs.map(t => {
+    const isActive = t.key === _activeProjectFilter;
+    const editedStyle = t.edited ? 'color:var(--accent-purple,#c4b5fd)' : '';
+    return `<button class="project-tab ${isActive ? 'project-tab--active' : ''}" onclick="setProjectFilter('${escHtml(t.key)}')" style="${editedStyle}">${escHtml(t.label)}</button>`;
+  }).join('');
+  tabsEl.style.display = 'flex';
+}
+
+function setProjectFilter(key) {
+  _activeProjectFilter = key;
+  buildProjectTabs();
+  renderLibraryGrid();
+}
+
+function _filteredItems() {
+  if (_activeProjectFilter === 'all')          return _libraryItems;
+  if (_activeProjectFilter === '__edited__')   return _libraryItems.filter(i => i.has_renders);
+  if (_activeProjectFilter === '__unlabeled__') return _libraryItems.filter(i => !i.project);
+  return _libraryItems.filter(i => i.project === _activeProjectFilter);
+}
+
+// ── Render library grid (paginated) ──────────────────────────────────────────
+function renderLibraryGrid() {
+  const filtered = _filteredItems();
+  document.getElementById('libraryCount').textContent = filtered.length + ' images';
+  const grid = document.getElementById('libraryGrid');
+  if (!filtered.length) {
+    grid.innerHTML = '<div class="empty-state">No images in this category.</div>';
+    return;
+  }
+  _mediaRenderedCount = 0;
+  grid.innerHTML = '';
+  appendMediaBatch(grid, filtered);
+}
+
+function appendMediaBatch(grid, filteredItems) {
+  if (!grid) grid = document.getElementById('libraryGrid');
+  const source = filteredItems || _filteredItems();
+  const batch = source.slice(_mediaRenderedCount, _mediaRenderedCount + MEDIA_PAGE);
+  batch.forEach(item => {
+    const name  = item.filename;
+    const src   = item.hero_path;
+    const thumb = item.thumb_path;
+    const label      = item.label || '';
+    const project    = item.project || '';
+    const room       = item.room || '';
+    const image_type = item.image_type || '';
+    const displayLabel = label || [project, room].filter(Boolean).join(' ') || '';
+    const typeBadge = image_type ? `<span class="media-type-badge media-type-badge--${image_type.toLowerCase()}">${escHtml(image_type)}</span>` : '';
+    const editedBadge = item.active_version
+      ? `<span class="lib-badge" style="background:rgba(139,92,246,.25);color:#c4b5fd;border:1px solid rgba(139,92,246,.4);top:auto;bottom:4px;left:4px;right:auto">✦ Edited</span>`
+      : '';
+    const card = document.createElement('div');
+    card.className = 'media-card';
+    card.dataset.filename = name;
+    card.innerHTML = `
+      <div class="media-card__img" style="background-image:url('${escHtml(thumb)}?v=${_libCacheBust}');cursor:zoom-in" onclick="openLibraryLightbox('${escHtml(name)}')" title="Click to view versions">
+        <input type="checkbox" class="media-card__check" onclick="event.stopPropagation();onCardCheck(this,'${escHtml(name)}')" title="Select">
+        <span class="lib-badge lib-badge--ok">✓ local</span>
+        ${typeBadge}
+        ${editedBadge}
+        <div class="media-card__overlay">
+          <a class="btn btn-ghost btn-sm" href="${escHtml(src)}" download="${escHtml(name)}" onclick="event.stopPropagation()">↓ Download</a>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();rotateImage('${escHtml(name)}',this)">↻ Rotate</button>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openRerender('${escHtml(name)}','${escHtml(displayLabel)}','${escHtml(item.active_version||name)}')">✦ Re-render</button>
+        </div>
+      </div>
+      <div class="media-card__name" title="${escHtml(name)}">${escHtml(name.substring(0,28))}${name.length>28?'…':''}</div>
+      <div class="media-card__label ${displayLabel ? '' : 'media-card__label--empty'}" onclick="openLabelDropdown(event,this,'${escHtml(name)}','${escHtml(project)}','${escHtml(room)}','${escHtml(image_type)}')" title="Click to set project, room &amp; type">${escHtml(displayLabel) || '<span style="opacity:.45">+ add label</span>'}</div>`;
+    grid.appendChild(card);
+  });
+  _mediaRenderedCount += batch.length;
+
+  // Remove old sentinel
+  const old = grid.querySelector('.media-sentinel');
+  if (old) old.remove();
+
+  const totalFiltered = source.length;
+  if (_mediaRenderedCount < totalFiltered) {
+    const sentinel = document.createElement('div');
+    sentinel.className = 'media-sentinel';
+    sentinel.style.cssText = 'grid-column:1/-1;height:1px;';
+    grid.appendChild(sentinel);
+    const obs = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) { obs.disconnect(); appendMediaBatch(grid, source); }
+    }, { root: grid.closest('.card-body') || null, rootMargin: '300px' });
+    obs.observe(sentinel);
+  }
+}
+
+// ── Scan live site ────────────────────────────────────────────────────────────
+let scanRunning = false;
+
+async function startScan() {
+  if (scanRunning) return;
+  scanRunning = true;
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true;
+  btn.textContent = '⟳ Scanning…';
+
+  document.getElementById('migrationBanner').style.display = 'none';
+  document.getElementById('scanCard').style.display = '';
+  const log    = document.getElementById('scanLog');
+  const status = document.getElementById('scanStatus');
+  const counts = document.getElementById('scanCounts');
+  const fill   = document.getElementById('scanFill');
+  log.innerHTML = '';
+
+  let pagesScanned = 0;
+  let imagesFound  = 0;
+
+  try {
+    // EventSource doesn't support custom headers — use fetch + ReadableStream
+    const res = await fetch('/admin/api/media/scan-live-site', {
+      headers: { 'X-Admin-Token': token }
+    });
+
+    if (res.status === 401) {
+      Admin.toast('Session expired — please log in again', 'error');
+      setTimeout(() => Admin.logout(), 1500);
+      scanRunning = false; btn.disabled = false; btn.textContent = '⟳ Scan Live Site';
+      return;
+    }
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const evt = JSON.parse(line.slice(6));
+          if (evt.type === 'status') {
+            status.textContent = evt.msg;
+            addScanLog('info', evt.msg);
+          } else if (evt.type === 'page') {
+            pagesScanned = evt.n;
+            counts.textContent = `${pagesScanned} pages · ${imagesFound} images`;
+            fill.style.width = Math.min(90, pagesScanned * 1.2) + '%';
+          } else if (evt.type === 'page_error') {
+            addScanLog('error', `Skip: ${evt.url} — ${evt.error}`);
+          } else if (evt.type === 'found') {
+            imagesFound = evt.total;
+            counts.textContent = `${pagesScanned} pages · ${imagesFound} images`;
+            addScanLog('ok', `+${evt.new} images from ${evt.page.replace('https://www.ridgecrestdesigns.com','')||'/'}`);
+          } else if (evt.type === 'done') {
+            fill.style.width = '100%';
+            fill.style.background = 'var(--green)';
+            status.textContent = `Done — ${evt.total} images found across ${evt.pages} pages. ${evt.new_to_db} new to library.`;
+            addScanLog('ok', `Saved ${evt.new_to_db} new images to library`);
+          } else if (evt.type === 'error') {
+            addScanLog('error', evt.msg);
+          }
+        } catch(e) {}
+      }
+    }
+  } catch(e) {
+    status.textContent = 'Scan failed';
+    addScanLog('error', 'Scan error: ' + e.message);
+    console.error('Scan error', e);
+  }
+
+  scanRunning = false;
+  btn.disabled = false;
+  btn.textContent = '⟳ Scan Live Site';
+
+  // Reload library after scan
+  setTimeout(async () => {
+    await loadLibraryStatus();
+  }, 500);
+}
+
+function addScanLog(type, msg) {
+  const log = document.getElementById('scanLog');
+  const el  = document.createElement('div');
+  el.className = 'migration-log-item migration-log-item--' + type;
+  el.innerHTML = `<span class="migration-log-icon">${type==='ok'?'✓':type==='error'?'✗':'ℹ'}</span> ${escHtml(msg)}`;
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+}
+
+// ── Migrate all Wix images → local server ─────────────────────────────────────
+let migrationRunning = false;
+
+async function startMigration() {
+  if (migrationRunning) return;
+  migrationRunning = true;
+
+  const migrateCard   = document.getElementById('migrateCard');
+  const log           = document.getElementById('migrateLog');
+  const status        = document.getElementById('migrateStatus');
+  const count         = document.getElementById('migrateCount');
+  const fill          = document.getElementById('migrateFill');
+  const btn           = document.getElementById('migrateAllBtn');
+
+  document.getElementById('migrationBanner').style.display = 'none';
+  migrateCard.style.display = '';
+  log.innerHTML = '';
+  if (btn) btn.disabled = true;
+
+  try {
+    // ── Step 1: load URL list ───────────────────────────────────────────────
+    status.textContent = 'Loading image list…';
+    const res = await fetch('/admin/api/media/wix-urls', { headers: { 'X-Admin-Token': token } });
+    if (res.status === 401) {
+      status.textContent = 'Session expired — please refresh and log in again.';
+      addMigrateLog('error', 'Session expired (401). Refresh the page and log in.');
+      return;
+    }
+    if (!res.ok) {
+      status.textContent = `Failed to load URL list (HTTP ${res.status})`;
+      addMigrateLog('error', `Server returned ${res.status} on /admin/api/media/wix-urls`);
+      return;
+    }
+    const data = await res.json();
+    const wixUrls = data.urls || [];
+
+    if (!wixUrls.length) {
+      status.textContent = 'No Wix images found — all done!';
+      addMigrateLog('info', 'Library shows no unmigrated images.');
+      return;
+    }
+
+    // ── Step 2: deduplicate — base filename, strip transform paths ──────────
+    const seenFilenames = new Set();
+    const tasks = [];
+    for (const url of wixUrls) {
+      const mediaPart = url.split('/media/')[1] || '';
+      const filename  = mediaPart.split('?')[0].split('/')[0] || null;
+      if (!filename) continue;
+      if (seenFilenames.has(filename)) continue;
+      seenFilenames.add(filename);
+      tasks.push({
+        originalUrl: url,
+        baseUrl: `https://static.wixstatic.com/media/${filename}`,
+        filename
+      });
+    }
+
+    addMigrateLog('info', `${tasks.length} unique images · ${wixUrls.length} total references`);
+
+    if (!tasks.length) {
+      status.textContent = 'No downloadable images found after deduplication.';
+      return;
+    }
+
+    // ── Step 3: server-side batch download (edge-function pattern) ───────────
+    // Server fetches from Wix CDN via corsproxy.io (unblocked IPs), saves directly
+    // to disk, updates all DB + HTML refs. Browser is not involved in the download.
+    status.textContent = `Downloading ${tasks.length} images via server…`;
+    count.textContent  = `0 / ${tasks.length}`;
+    addMigrateLog('info', `Server will fetch all ${tasks.length} images via proxy…`);
+
+    let done = 0, succeeded = 0, failed = 0;
+    const BATCH = 10;
+
+    for (let i = 0; i < tasks.length; i += BATCH) {
+      const batch = tasks.slice(i, i + BATCH);
+      try {
+        const res = await fetch('/admin/api/media/migrate-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+          body: JSON.stringify({ tasks: batch })
+        });
+        if (res.status === 401) {
+          status.textContent = 'Session expired — please refresh and log in again.';
+          addMigrateLog('error', 'Session expired (401).');
+          return;
+        }
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+        const data = await res.json();
+
+        for (const r of (data.results || [])) {
+          done++;
+          fill.style.width = Math.round((done / tasks.length) * 100) + '%';
+          count.textContent = `${done} / ${tasks.length}`;
+          if (r.ok) {
+            succeeded++;
+            const label = r.skipped
+              ? `${r.filename} (already on server)`
+              : `${r.filename} (${formatBytes(r.bytes)})`;
+            addMigrateLog('ok', label);
+          } else {
+            failed++;
+            addMigrateLog('error', `${r.filename} — ${r.error}`);
+          }
+        }
+      } catch(e) {
+        for (const t of batch) {
+          done++; failed++;
+          fill.style.width = Math.round((done / tasks.length) * 100) + '%';
+          count.textContent = `${done} / ${tasks.length}`;
+          addMigrateLog('error', `${t.filename} — ${e.message}`);
+        }
+      }
+      status.textContent = `Downloading… ${done} / ${tasks.length} · ${succeeded} saved · ${failed} failed`;
+    }
+
+    fill.style.background = succeeded > 0 ? 'var(--green)' : 'var(--red)';
+    status.textContent = `Done — ${succeeded} saved, ${failed} failed.`;
+    if (succeeded > 0) {
+      addMigrateLog('info', 'All references updated. Images now served from your server.');
+    }
+    if (failed > 0 && succeeded === 0) {
+      addMigrateLog('error', 'Server IP is blocked by Wix CDN. Run the migration from your laptop instead.');
+      setTimeout(showLocalScript, 500);
+    }
+
+  } catch(e) {
+    // Catch any unexpected JS error and show it clearly
+    status.textContent = 'Unexpected error — see details below.';
+    addMigrateLog('error', `Unexpected error: ${e.message || e}`);
+    console.error('Migration error:', e);
+  } finally {
+    migrationRunning = false;
+    if (btn) btn.disabled = false;
+    setTimeout(async () => {
+      await loadLibraryStatus();
+    }, 600);
+  }
+}
+
+function showLocalScript() {
+  const card = document.getElementById('localScriptCard');
+  if (card) {
+    card.style.display = '';
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  // Update image count from current pending count
+  const pending = parseInt(document.getElementById('statPending')?.textContent || '185', 10);
+  const countEl = document.getElementById('scriptImageCount');
+  if (countEl && pending > 0) countEl.textContent = pending;
+}
+
+function addMigrateLog(type, msg) {
+  const log = document.getElementById('migrateLog');
+  const el  = document.createElement('div');
+  el.className = 'migration-log-item migration-log-item--' + type;
+  el.innerHTML = `<span class="migration-log-icon">${type==='ok'?'✓':type==='error'?'✗':'ℹ'}</span> ${escHtml(msg)}`;
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+}
+
+// ── AI Image Labeling ─────────────────────────────────────────────────────────
+let labelRunning = false;
+
+async function startLabelAll(force = false) {
+  if (labelRunning) return;
+  if (!force) {
+    const unlabeled = _libraryItems.filter(i => !i.label).length;
+    if (unlabeled === 0) {
+      Admin.toast('All images already labeled — use Re-label All to redo with portfolio context', 'success');
+      return;
+    }
+  }
+
+  labelRunning = true;
+  const btn      = document.getElementById('labelBtn');
+  const relabBtn = document.getElementById('relabelBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '✦ Labeling…'; }
+  if (relabBtn) relabBtn.disabled = true;
+
+  const card   = document.getElementById('labelCard');
+  const log    = document.getElementById('labelLog');
+  const status = document.getElementById('labelStatus');
+  const counts = document.getElementById('labelCounts');
+  const fill   = document.getElementById('labelFill');
+  card.style.display = '';
+  log.innerHTML = '';
+  fill.style.width = '0%';
+  fill.style.background = 'var(--accent)';
+  status.textContent = 'Connecting…';
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  let labeled = 0, skipped = 0, failed = 0, total = 184;
+
+  try {
+    const res = await fetch('/admin/api/images/label-all', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+      body: JSON.stringify({ force })
+    });
+    if (res.status === 401) {
+      status.textContent = 'Session expired — logging out';
+      addLabelLog('error', 'Auth failed (401). Redirecting to login…');
+      setTimeout(() => Admin.logout(), 1500);
+      return;
+    }
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      throw new Error(`HTTP ${res.status}: ${txt.substring(0,200)}`);
+    }
+
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const evt = JSON.parse(line.slice(6));
+          if (evt.type === 'labeled') {
+            labeled = evt.done;
+            total   = evt.total;
+            fill.style.width = (evt.pct || 0) + '%';
+            counts.textContent = `${labeled} / ${total}`;
+            status.textContent = `Labeling… ${labeled} of ${total}`;
+            addLabelLog('ok', `${evt.filename}: "${evt.label}"`);
+            const item = _libraryItems.find(i => i.filename === evt.filename);
+            if (item) { item.label = evt.label; if (evt.project) item.project = evt.project; }
+            const cardEl = document.querySelector(`.media-card[data-filename="${CSS.escape(evt.filename)}"] .media-card__label`);
+            if (cardEl) {
+              cardEl.textContent = evt.label;
+              cardEl.classList.remove('media-card__label--empty');
+            }
+          } else if (evt.type === 'error_item') {
+            failed++;
+            addLabelLog('error', `${evt.filename}: ${evt.error}`);
+          } else if (evt.type === 'done') {
+            labeled = evt.done || labeled;
+            skipped = evt.skipped || 0;
+            fill.style.width = '100%';
+            fill.style.background = 'var(--green)';
+            status.textContent = `Done — ${labeled} labeled, ${skipped} already had labels, ${evt.errors || failed} errors`;
+            addLabelLog('ok', `Labeling complete: ${labeled} new labels applied`);
+          } else if (evt.type === 'status') {
+            status.textContent = evt.msg;
+          } else if (evt.type === 'error') {
+            addLabelLog('error', evt.msg || evt.error);
+          }
+        } catch(e) {}
+      }
+    }
+  } catch(e) {
+    status.textContent = 'Error — ' + e.message;
+    addLabelLog('error', e.message);
+    console.error('Label error', e);
+  } finally {
+    labelRunning = false;
+    if (btn) { btn.disabled = false; btn.textContent = '✦ Label All Images'; }
+    if (relabBtn) relabBtn.disabled = false;
+  }
+}
+
+function addLabelLog(type, msg) {
+  const log = document.getElementById('labelLog');
+  const el  = document.createElement('div');
+  el.className = 'migration-log-item migration-log-item--' + type;
+  el.innerHTML = `<span class="migration-log-icon">${type==='ok'?'✓':type==='error'?'✗':'ℹ'}</span> ${escHtml(msg)}`;
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+}
+
+// ── Selection ─────────────────────────────────────────────────────────────────
+const _selected = new Set();
+
+function onCardCheck(cb, filename) {
+  if (cb.checked) _selected.add(filename);
+  else _selected.delete(filename);
+  updateSelectionUI();
+}
+
+function updateSelectionUI() {
+  const n = _selected.size;
+  const btn = document.getElementById('deleteSelectedBtn');
+  const cnt = document.getElementById('deleteCount');
+  const selBtn = document.getElementById('selectAllBtn');
+  if (btn) btn.style.display = n > 0 ? '' : 'none';
+  if (cnt) cnt.textContent = n;
+  const visibleCount = _filteredItems().length;
+  if (selBtn) selBtn.textContent = n === visibleCount && visibleCount > 0 ? 'Deselect All' : 'Select All';
+}
+
+function toggleSelectAll() {
+  const visible = _filteredItems();
+  const allVisibleSelected = visible.every(i => _selected.has(i.filename));
+  if (allVisibleSelected) {
+    // Deselect visible
+    visible.forEach(i => _selected.delete(i.filename));
+    document.querySelectorAll('.media-card__check').forEach(cb => cb.checked = false);
+  } else {
+    // Select all visible (including unrendered pages — add to set, check rendered checkboxes)
+    visible.forEach(i => _selected.add(i.filename));
+    document.querySelectorAll('.media-card__check').forEach(cb => cb.checked = true);
+  }
+  updateSelectionUI();
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+let _deleteAffectedPages = [];
+
+async function confirmDeleteSelected() {
+  if (!_selected.size) return;
+  const filenames = [..._selected];
+
+  // Dry run to get affected pages
+  try {
+    const res = await fetch('/admin/api/images/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+      body: JSON.stringify({ filenames, dry_run: true })
+    });
+    const data = await res.json();
+    _deleteAffectedPages = data.affected_pages || [];
+  } catch(e) {
+    _deleteAffectedPages = [];
+  }
+
+  const modal = document.getElementById('deleteModal');
+  const countEl = document.getElementById('deleteModalCount');
+  const body = document.getElementById('deleteModalBody');
+  countEl.textContent = filenames.length;
+
+  let html = `<p style="color:var(--text-2);font-size:13px;margin:0 0 12px">This will permanently delete the original file and all 5 optimized WebP variants from the server. This cannot be undone.</p>`;
+  if (_deleteAffectedPages.length) {
+    html += `<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:12px">
+      <strong style="color:var(--yellow)">⚠ ${_deleteAffectedPages.length} page(s) use these images as their hero</strong>
+      <div style="color:var(--text-2);margin-top:4px">${_deleteAffectedPages.map(p => escHtml(p.title || p.slug)).join(', ')}</div>
+      <div style="color:var(--text-3);margin-top:4px">A replacement image will be auto-assigned to each affected page.</div>
+    </div>`;
+  }
+  body.innerHTML = html;
+  modal.style.display = 'flex';
+}
+
+function closeDeleteModal() {
+  document.getElementById('deleteModal').style.display = 'none';
+}
+
+async function executeDelete() {
+  const filenames = [..._selected];
+  closeDeleteModal();
+
+  try {
+    const res = await fetch('/admin/api/images/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+      body: JSON.stringify({ filenames, dry_run: false })
+    });
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+
+    // Remove from _libraryItems and re-render
+    filenames.forEach(f => {
+      const idx = _libraryItems.findIndex(i => i.filename === f);
+      if (idx !== -1) _libraryItems.splice(idx, 1);
+    });
+    _selected.clear();
+    updateSelectionUI();
+    renderLibraryGrid();
+
+    const replaced = data.replacements?.length || 0;
+    Admin.toast(`Deleted ${filenames.length} image${filenames.length > 1 ? 's' : ''}${replaced ? ` · ${replaced} page hero${replaced > 1 ? 's' : ''} auto-reassigned` : ''}`, 'success');
+  } catch(e) {
+    Admin.toast('Delete failed: ' + e.message, 'error');
+  }
+}
+
+// ── Label dropdown popover ────────────────────────────────────────────────────
+// Project / Room / Type options are baked directly into the HTML <select> elements above.
+// No need for JS arrays — openLabelDropdown just sets .value on the pre-populated selects.
+
+let _lpFilename = null;
+let _lpLabelEl  = null;
+
+function openLabelDropdown(evt, labelEl, filename, currentProject, currentRoom, currentType) {
+  evt.stopPropagation();
+  _lpFilename = filename;
+  _lpLabelEl  = labelEl;
+
+  // Set current values — options are pre-baked in HTML
+  document.getElementById('lpProject').value = currentProject || '';
+  document.getElementById('lpRoom').value    = currentRoom    || '';
+  document.getElementById('lpType').value    = currentType    || '';
+
+  // Position near the label element
+  const pop  = document.getElementById('labelPopover');
+  const rect = labelEl.getBoundingClientRect();
+  pop.style.top  = (rect.bottom + window.scrollY + 4) + 'px';
+  pop.style.left = Math.min(rect.left + window.scrollX, window.innerWidth - 300) + 'px';
+  pop.style.display = 'block';
+
+  setTimeout(() => document.addEventListener('click', closeLabelOnOutside), 0);
+}
+
+function closeLabelOnOutside(e) {
+  const pop = document.getElementById('labelPopover');
+  if (!pop.contains(e.target)) {
+    closeLabelDropdown();
+  }
+}
+
+function closeLabelDropdown() {
+  document.getElementById('labelPopover').style.display = 'none';
+  document.removeEventListener('click', closeLabelOnOutside);
+  _lpFilename = null;
+  _lpLabelEl  = null;
+}
+
+async function saveLabelDropdown() {
+  const project    = document.getElementById('lpProject').value;
+  const room       = document.getElementById('lpRoom').value;
+  const image_type = document.getElementById('lpType').value;
+  const filename   = _lpFilename;
+  const labelEl    = _lpLabelEl;
+  closeLabelDropdown();
+
+  const parts = [project, room, image_type].filter(Boolean);
+  let composed = parts.join(' ');
+
+  try {
+    const res = await fetch(`/admin/api/images/label/${encodeURIComponent(filename)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+      body: JSON.stringify({ project, room, image_type })
+    });
+    const data = await res.json();
+    const newLabel = data.label || composed;
+    const item = _libraryItems.find(i => i.filename === filename);
+    if (item) { item.label = newLabel; item.project = project; item.room = room; item.image_type = image_type; }
+    if (labelEl) {
+      labelEl.innerHTML = newLabel ? escHtml(newLabel) : '<span style="opacity:.45">+ add label</span>';
+      labelEl.classList.toggle('media-card__label--empty', !newLabel);
+    }
+  } catch(e) {
+    Admin.toast('Failed to save label', 'error');
+  }
+}
+
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+async function handleUpload(files) {
+  for (const file of files) {
+    const buf = await file.arrayBuffer();
+    const b64 = arrayBufferToBase64(buf);
+    try {
+      const res  = await fetch('/media/receive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'Hb2425hb+', filename: file.name, data: b64 })
+      });
+      const data = await res.json();
+      if (data.ok) Admin.toast(`${file.name} uploaded`, 'success');
+      else Admin.toast('Upload failed: ' + data.error, 'error');
+    } catch(e) { Admin.toast('Upload error: ' + e.message, 'error'); }
+  }
+  loadLibraryStatus();
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function arrayBufferToBase64(buf) {
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 8192)
+    bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  return btoa(bin);
+}
+
+function copyUrl(path) {
+  const full = path.startsWith('http') ? path : window.location.origin + path;
+  navigator.clipboard.writeText(full).then(() => Admin.toast('URL copied', 'success'));
+}
+
+async function rotateImage(filename, btn) {
+  btn.disabled = true;
+  btn.textContent = '↻…';
+  try {
+    const res = await fetch('/admin/api/images/rotate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+      body: JSON.stringify({ filename, degrees: 90 })
+    });
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error || 'rotate failed');
+    // Cache-bust the thumbnail so the browser reloads the rotated image
+    const card = btn.closest('.media-card');
+    const imgEl = card.querySelector('.media-card__img');
+    const base = imgEl.style.backgroundImage.replace(/url\(['"]?([^'")?]+)[?'")?].*\)/, '$1').replace(/['"]/g,'').split('?')[0];
+    imgEl.style.backgroundImage = `url('${base}?v=${Date.now()}')`;
+    Admin.toast('Image rotated 90°', 'success');
+  } catch(e) {
+    Admin.toast('Rotate failed: ' + e.message, 'error');
+  }
+  btn.textContent = '↻ Rotate';
+  btn.disabled = false;
+}
+
+// ── AI Re-render ─────────────────────────────────────────────────────────────
+let _rerenderFilename = '';       // base/original file — used for version chain naming
+let _rerenderSourceFilename = ''; // actual source fed to Gemini (may be an AI render)
+let _rerenderResultPath = '';     // hero path of the image currently shown in the result panel
+let _rerenderPass = 0;            // renders made this session
+let _rerenderStrip = [];          // [{filename, heroPath, isActive, isOriginal, prompt, source_filename}]
+let _stripSelectMode = false;
+let _stripSelected = new Set();
+
+// sourceFilename: optional — the image to render FROM (defaults to baseFilename)
+function openRerender(baseFilename, label, sourceFilename) {
+  _rerenderFilename = baseFilename;
+  _rerenderSourceFilename = sourceFilename || baseFilename;
+  _rerenderResultPath = '';
+  _rerenderPass = 0;
+  _rerenderStrip = [];
+  _stripSelectMode = false;
+  _stripSelected.clear();
+
+  const isOriginal = !sourceFilename || sourceFilename === baseFilename;
+  const sourceLabel = isOriginal ? 'Original' : _versionLabel(sourceFilename);
+  document.getElementById('rerenderSourceLabel').textContent = sourceLabel;
+  document.getElementById('rerenderOriginalLabel').textContent = isOriginal ? 'Original' : 'Source — ' + sourceLabel;
+  document.getElementById('rerenderRunBtn').title = isOriginal
+    ? 'New render from original image'
+    : `New render from ${sourceLabel}`;
+
+  const src = `/assets/images-opt/${_rerenderSourceFilename}`;
+  document.getElementById('rerenderOriginal').style.backgroundImage = `url('${src}?v=${_libCacheBust}')`;
+  const resultEl = document.getElementById('rerenderResult');
+  resultEl.style.backgroundImage = '';
+  resultEl.style.filter = '';
+  document.getElementById('rerenderPlaceholder').style.display = '';
+  document.getElementById('rerenderPlaceholder').textContent = 'Result will appear here';
+  document.getElementById('rerenderPrompt').value = label
+    ? `photorealistic luxury architectural render — ${label}, high-end finishes, natural light, professional photography`
+    : 'photorealistic luxury architectural render, high-end finishes, natural light, professional photography';
+  document.getElementById('rerenderUseBtn').style.display = 'none';
+  document.getElementById('rerenderRefineBtn').style.display = 'none';
+  document.getElementById('rerenderRestartBtn').style.display = 'none';
+  document.getElementById('rerenderRunBtn').style.display = '';
+  document.getElementById('rerenderRunBtn').disabled = false;
+  document.getElementById('rerenderPassBadge').style.display = 'none';
+  document.getElementById('rerenderAdjustRow').style.display = 'none';
+  document.getElementById('rerenderFilmstrip').style.display = 'none';
+  document.getElementById('rerenderStripScroll').innerHTML = '';
+  const _selBtn = document.getElementById('rerenderSelectBtn');
+  if (_selBtn) { _selBtn.textContent = 'Select'; _selBtn.style.color = 'var(--text-2)'; _selBtn.style.borderColor = 'var(--border)'; }
+  document.getElementById('rerenderBulkDeleteBtn').style.display = 'none';
+  document.getElementById('rerenderStatus').textContent = '';
+  resetAdjust(true);
+  document.getElementById('rerenderModal').style.display = 'flex';
+  // Load existing renders into filmstrip (non-blocking)
+  _initFilmstrip();
+}
+
+// Derive "AI Render N" label from filename
+function _versionLabel(filename) {
+  if (!filename) return 'Original';
+  const m = filename.match(/_ai_(\d+)\.webp$/);
+  return m ? `AI Render ${m[1]}` : filename;
+}
+
+// Fetch all versions (original + AI renders) and populate the filmstrip
+async function _initFilmstrip() {
+  if (!_rerenderFilename) return;
+  try {
+    const d = await Admin.get(`/images/versions/${encodeURIComponent(_rerenderFilename)}`);
+    const all = d.versions || [];
+    _rerenderStrip = all.map(v => ({
+      filename:        v.filename,
+      heroPath:        v.hero_path,
+      isActive:        v.is_active,
+      isOriginal:      v.is_original,
+      prompt:          v.prompt || null,
+      source_filename: v.source_filename || null,
+    }));
+    _renderStrip();
+    // Auto-populate prompt textarea if the current source has a stored prompt
+    const _srcItem = _rerenderStrip.find(s => s.filename === _rerenderSourceFilename);
+    if (_srcItem && _srcItem.prompt) {
+      document.getElementById('rerenderPrompt').value = _srcItem.prompt;
+    }
+  } catch(e) { /* strip is non-critical */ }
+}
+
+// Rebuild the filmstrip DOM
+function _renderStrip() {
+  const scroll = document.getElementById('rerenderStripScroll');
+  const sourceFile = _rerenderSourceFilename || _rerenderFilename;
+  scroll.innerHTML = _rerenderStrip.map(item => {
+    const label = item.isOriginal ? 'Original' : _versionLabel(item.filename);
+
+    if (_stripSelectMode) {
+      // Select mode — clicking toggles selection; originals cannot be deleted
+      const canSelect = !item.isOriginal;
+      const isSelected = canSelect && _stripSelected.has(item.filename);
+      const borderColor = isSelected ? '#ef4444' : 'var(--border)';
+      const cursor = canSelect ? 'pointer' : 'default';
+      const opacity = !canSelect ? 'opacity:.45;' : '';
+      const clickAttr = canSelect ? `onclick="toggleStripSelect('${escHtml(item.filename)}')"` : '';
+      const titleTxt = canSelect
+        ? (isSelected ? `${escHtml(label)} — click to deselect` : `${escHtml(label)} — click to select`)
+        : `${escHtml(label)} — original cannot be deleted`;
+      const selBadge = canSelect
+        ? `<span style="position:absolute;top:4px;left:4px;width:16px;height:16px;border-radius:50%;background:${isSelected ? 'rgba(239,68,68,.9)' : 'rgba(0,0,0,.35)'};border:2px solid ${isSelected ? '#ef4444' : 'rgba(255,255,255,.5)'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;pointer-events:none">${isSelected ? '✓' : ''}</span>`
+        : '';
+      const activeBadge = item.isActive
+        ? `<span style="position:absolute;top:4px;right:4px;background:rgba(34,197,94,.92);color:#fff;font-size:9px;padding:2px 5px;border-radius:3px;font-weight:700;line-height:1.4;pointer-events:none">✓ Active</span>`
+        : '';
+      const origBadge = item.isOriginal
+        ? `<span style="position:absolute;top:4px;right:4px;background:rgba(251,191,36,.85);color:#000;font-size:9px;padding:2px 5px;border-radius:3px;font-weight:700;line-height:1.4;pointer-events:none">Original</span>`
+        : '';
+      return `<div class="rrstrip-item" data-filename="${escHtml(item.filename)}"
+          ${clickAttr}
+          style="position:relative;flex:0 0 auto;width:120px;cursor:${cursor};border-radius:6px;overflow:hidden;border:2px solid ${borderColor};transition:border-color .15s;${opacity}"
+          title="${titleTxt}">
+        <div style="width:116px;height:87px;background-image:url('${item.heroPath}?v=${_libCacheBust}');background-size:cover;background-position:center"></div>
+        <div style="padding:3px 6px 4px;background:var(--surface-2);font-size:10px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(label)}</div>
+        ${selBadge}${activeBadge}${origBadge}
+      </div>`;
+    } else {
+      // Normal mode — clicking sets source
+      const isSource = item.filename === sourceFile;
+      const borderColor = isSource ? 'var(--accent)' : 'var(--border)';
+      const activeBadge = item.isActive
+        ? `<span style="position:absolute;top:4px;left:4px;background:rgba(34,197,94,.92);color:#fff;font-size:9px;padding:2px 5px;border-radius:3px;font-weight:700;line-height:1.4;pointer-events:none">✓ Active</span>`
+        : '';
+      const origBadge = item.isOriginal
+        ? `<span style="position:absolute;top:4px;right:4px;background:rgba(251,191,36,.85);color:#000;font-size:9px;padding:2px 5px;border-radius:3px;font-weight:700;line-height:1.4;pointer-events:none">Original</span>`
+        : '';
+      return `<div class="rrstrip-item" data-filename="${escHtml(item.filename)}"
+          onclick="stripSelectSource('${escHtml(item.filename)}','${escHtml(item.heroPath)}',${item.isOriginal})"
+          style="position:relative;flex:0 0 auto;width:120px;cursor:pointer;border-radius:6px;overflow:hidden;border:2px solid ${borderColor};transition:border-color .15s"
+          title="${escHtml(label)} — click to render from this">
+        <div style="width:116px;height:87px;background-image:url('${item.heroPath}?v=${_libCacheBust}');background-size:cover;background-position:center"></div>
+        <div style="padding:3px 6px 4px;background:var(--surface-2);font-size:10px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(label)}</div>
+        ${activeBadge}${origBadge}
+      </div>`;
+    }
+  }).join('');
+  document.getElementById('rerenderStripCount').textContent = _rerenderStrip.length;
+  document.getElementById('rerenderFilmstrip').style.display = _rerenderStrip.length > 0 ? '' : 'none';
+  _updateBulkDeleteBtn();
+}
+
+// Update the bulk-delete button label/visibility based on current selection
+function _updateBulkDeleteBtn() {
+  const btn = document.getElementById('rerenderBulkDeleteBtn');
+  if (!btn) return;
+  if (_stripSelectMode && _stripSelected.size > 0) {
+    btn.style.display = '';
+    if (btn.dataset.confirm !== '1') {
+      btn.textContent = `✕ Delete ${_stripSelected.size} selected`;
+      btn.style.background = 'rgba(239,68,68,.15)';
+    }
+  } else {
+    btn.style.display = 'none';
+    btn.dataset.confirm = '';
+  }
+}
+
+// Toggle select mode on/off
+function toggleStripSelectMode() {
+  _stripSelectMode = !_stripSelectMode;
+  _stripSelected.clear();
+  const selBtn = document.getElementById('rerenderSelectBtn');
+  if (_stripSelectMode) {
+    selBtn.textContent = '✕ Cancel';
+    selBtn.style.color = '#fca5a5';
+    selBtn.style.borderColor = 'rgba(239,68,68,.4)';
+  } else {
+    selBtn.textContent = 'Select';
+    selBtn.style.color = 'var(--text-2)';
+    selBtn.style.borderColor = 'var(--border)';
+  }
+  _renderStrip();
+}
+
+// Toggle selection of a single strip item
+function toggleStripSelect(filename) {
+  if (_stripSelected.has(filename)) {
+    _stripSelected.delete(filename);
+  } else {
+    _stripSelected.add(filename);
+  }
+  _updateBulkDeleteBtn();
+  _renderStrip();
+}
+
+// Bulk delete all selected AI renders
+async function bulkDeleteStrip() {
+  if (!_stripSelectMode || _stripSelected.size === 0) return;
+  const btn = document.getElementById('rerenderBulkDeleteBtn');
+  const count = _stripSelected.size;
+
+  if (btn.dataset.confirm !== '1') {
+    btn.dataset.confirm = '1';
+    btn.textContent = `Confirm delete ${count}?`;
+    btn.style.background = 'rgba(239,68,68,.35)';
+    setTimeout(() => {
+      if (btn.dataset.confirm === '1') {
+        btn.dataset.confirm = '';
+        btn.textContent = `✕ Delete ${_stripSelected.size} selected`;
+        btn.style.background = 'rgba(239,68,68,.15)';
+      }
+    }, 4000);
+    return;
+  }
+
+  // Confirmed — proceed with deletion
+  btn.dataset.confirm = '';
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+
+  const toDelete = [..._stripSelected];
+  let deletedCount = 0;
+  let failedCount  = 0;
+
+  for (const fname of toDelete) {
+    try {
+      const d = await Admin.post('/images/delete-version', { filename: fname });
+      if (d.ok) {
+        _rerenderStrip = _rerenderStrip.filter(s => s.filename !== fname);
+        _stripSelected.delete(fname);
+        deletedCount++;
+        // If deleted file was the active source, reset source to original
+        if (_rerenderSourceFilename === fname) {
+          const orig = _rerenderStrip.find(s => s.isOriginal);
+          if (orig) stripSelectSource(orig.filename, orig.heroPath, true);
+        }
+      } else {
+        failedCount++;
+      }
+    } catch(e) {
+      failedCount++;
+    }
+  }
+
+  btn.disabled = false;
+
+  if (failedCount === 0) {
+    Admin.toast(`${deletedCount} render${deletedCount !== 1 ? 's' : ''} deleted`, 'success');
+  } else {
+    Admin.toast(`${deletedCount} deleted, ${failedCount} failed`, 'error');
+  }
+
+  // Exit select mode
+  _stripSelectMode = false;
+  _stripSelected.clear();
+  const selBtn = document.getElementById('rerenderSelectBtn');
+  selBtn.textContent = 'Select';
+  selBtn.style.color = 'var(--text-2)';
+  selBtn.style.borderColor = 'var(--border)';
+
+  _renderStrip();
+  await loadLibraryStatus();
+}
+
+// Add a newly-rendered item to the strip
+function _stripAppend(filename, heroPath, prompt, source_filename) {
+  _rerenderStrip.push({ filename, heroPath, isActive: false, isOriginal: false,
+    prompt: prompt || null, source_filename: source_filename || null });
+  _renderStrip();
+  const scroll = document.getElementById('rerenderStripScroll');
+  scroll.scrollLeft = scroll.scrollWidth;
+}
+
+// Highlight the strip item matching the current source (no-op in select mode)
+function _stripHighlight(filename) {
+  if (_stripSelectMode) return;
+  document.querySelectorAll('#rerenderStripScroll .rrstrip-item').forEach(el => {
+    el.style.borderColor = el.dataset.filename === filename ? 'var(--accent)' : 'var(--border)';
+  });
+}
+
+// Click a strip thumbnail → sets it as the SOURCE for the next render
+function stripSelectSource(filename, heroPath, isOriginal) {
+  _rerenderSourceFilename = filename;
+
+  // Update source panel (left)
+  const src = heroPath + '?v=' + Date.now();
+  document.getElementById('rerenderOriginal').style.backgroundImage = `url('${src}')`;
+  const label = isOriginal ? 'Original' : _versionLabel(filename);
+  document.getElementById('rerenderOriginalLabel').textContent = isOriginal ? 'Original' : 'Source — ' + label;
+  document.getElementById('rerenderSourceLabel').textContent = label;
+  document.getElementById('rerenderRunBtn').title = isOriginal
+    ? 'New render from original image'
+    : `New render from ${label}`;
+
+  // Clear result panel — haven't rendered from this source yet
+  _rerenderResultPath = '';
+  const resultEl = document.getElementById('rerenderResult');
+  resultEl.style.backgroundImage = '';
+  resultEl.style.filter = '';
+  document.getElementById('rerenderPlaceholder').style.display = '';
+  document.getElementById('rerenderPlaceholder').textContent = 'Result will appear here';
+  document.getElementById('rerenderPassBadge').style.display = 'none';
+  document.getElementById('rerenderAdjustRow').style.display = 'none';
+  document.getElementById('rerenderUseBtn').style.display = 'none';
+  document.getElementById('rerenderRefineBtn').style.display = 'none';
+  document.getElementById('rerenderRestartBtn').style.display = 'none';
+  document.getElementById('rerenderStatus').textContent = '';
+  resetAdjust(true);
+
+  // Always update prompt textarea when selecting a source from the filmstrip
+  const stripItem = _rerenderStrip.find(s => s.filename === filename);
+  const promptEl = document.getElementById('rerenderPrompt');
+  if (stripItem && stripItem.prompt) {
+    // Stored prompt — use it
+    promptEl.value = stripItem.prompt;
+  } else if (isOriginal) {
+    // Back to original — restore default template
+    const _lbl = document.getElementById('rerenderSourceLabel').textContent;
+    promptEl.value = _lbl && _lbl !== 'Original'
+      ? `photorealistic luxury architectural render — ${_lbl}, high-end finishes, natural light, professional photography`
+      : 'photorealistic luxury architectural render, high-end finishes, natural light, professional photography';
+  } else {
+    // Old render with no stored prompt — clear so user knows to write a fresh one
+    promptEl.value = '';
+  }
+
+  _stripHighlight(filename);
+}
+
+function closeRerender() {
+  document.getElementById('rerenderModal').style.display = 'none';
+}
+
+
+function restartRerender() {
+  _rerenderResultPath = '';
+  _rerenderPass = 0;
+  const resultEl = document.getElementById('rerenderResult');
+  resultEl.style.backgroundImage = '';
+  resultEl.style.filter = '';
+  document.getElementById('rerenderPlaceholder').style.display = '';
+  document.getElementById('rerenderPlaceholder').textContent = 'Result will appear here';
+  document.getElementById('rerenderUseBtn').style.display = 'none';
+  document.getElementById('rerenderRefineBtn').style.display = 'none';
+  document.getElementById('rerenderRestartBtn').style.display = 'none';
+  document.getElementById('rerenderRunBtn').style.display = '';
+  document.getElementById('rerenderRunBtn').disabled = false;
+  document.getElementById('rerenderPassBadge').style.display = 'none';
+  document.getElementById('rerenderAdjustRow').style.display = 'none';
+  document.getElementById('rerenderStatus').textContent = '';
+  resetAdjust(true);
+  // Deselect all strip items
+  document.querySelectorAll('#rerenderStripScroll .rrstrip-item').forEach(el => {
+    el.style.borderColor = 'var(--border)';
+  });
+}
+
+function applyAdjust() {
+  const b = document.getElementById('adjBrightness').value;
+  const c = document.getElementById('adjContrast').value;
+  const s = document.getElementById('adjSaturation').value;
+  document.getElementById('brightnessVal').textContent = b;
+  document.getElementById('contrastVal').textContent = c;
+  document.getElementById('saturationVal').textContent = s;
+  document.getElementById('rerenderResult').style.filter =
+    `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
+}
+
+function resetAdjust(silent) {
+  ['adjBrightness','adjContrast','adjSaturation'].forEach(id => {
+    document.getElementById(id).value = 100;
+  });
+  document.getElementById('brightnessVal').textContent = '100';
+  document.getElementById('contrastVal').textContent = '100';
+  document.getElementById('saturationVal').textContent = '100';
+  document.getElementById('rerenderResult').style.filter = '';
+}
+
+async function runRerender(refine) {
+  const prompt = document.getElementById('rerenderPrompt').value.trim();
+  if (!prompt) { Admin.toast('Enter a prompt first', 'error'); return; }
+
+  // Refine uses current result as source; Re-render uses the original source
+  const sourceFile = refine ? _rerenderResultPath.split('/').pop() : _rerenderSourceFilename;
+
+  const runBtn    = document.getElementById('rerenderRunBtn');
+  const refineBtn = document.getElementById('rerenderRefineBtn');
+  const activeBtn = refine ? refineBtn : runBtn;
+  activeBtn.disabled = true;
+  activeBtn.textContent = '✦ Rendering…';
+  if (!refine) runBtn.disabled = true;
+  if (refine)  refineBtn.disabled = true;
+  document.getElementById('rerenderUseBtn').style.display = 'none';
+
+  document.getElementById('rerenderStatus').textContent = 'Sending to Gemini — this takes ~20–40 seconds…';
+  document.getElementById('rerenderPlaceholder').style.display = '';
+  document.getElementById('rerenderPlaceholder').textContent = '⏳ Generating…';
+  const resultEl = document.getElementById('rerenderResult');
+  resultEl.style.backgroundImage = '';
+  resultEl.style.filter = '';
+  resetAdjust(true);
+
+  try {
+    const res = await fetch('/admin/api/images/rerender', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+      body: JSON.stringify({ filename: sourceFile, base_filename: _rerenderFilename, prompt, mode: 'new' })
+    });
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error || 'rerender failed');
+
+    _rerenderResultPath = d.hero_path;
+    _rerenderPass++;
+    const newFilename = d.filename || d.hero_path.split('/').pop();
+
+    resultEl.style.backgroundImage = `url('${d.hero_path}?v=${Date.now()}')`;
+    resultEl.style.backgroundSize  = 'cover';
+    resultEl.style.backgroundPosition = 'center';
+    document.getElementById('rerenderPlaceholder').style.display = 'none';
+    document.getElementById('rerenderAdjustRow').style.display = '';
+    document.getElementById('rerenderUseBtn').style.display = '';
+    document.getElementById('rerenderUseBtn').disabled = false;
+    document.getElementById('rerenderUseBtn').textContent = '✓ Use This Version';
+
+    // Pass badge shows which AI render number this is
+    const badge = document.getElementById('rerenderPassBadge');
+    badge.textContent = _versionLabel(newFilename);
+    badge.style.display = '';
+
+    runBtn.style.display = '';
+    runBtn.disabled = false;
+    runBtn.textContent = '✦ Re-render';
+    refineBtn.style.display = '';
+    refineBtn.disabled = false;
+    refineBtn.textContent = '✦ Refine Result';
+    document.getElementById('rerenderRestartBtn').style.display = '';
+    document.getElementById('rerenderStatus').textContent = '✓ Render saved — click "✓ Use This Version" to make it live, or keep rendering';
+
+    // Add to filmstrip with stored prompt; keep source highlighted
+    _stripAppend(newFilename, d.hero_path, prompt, sourceFile);
+    _stripHighlight(_rerenderSourceFilename);
+  } catch(e) {
+    document.getElementById('rerenderStatus').textContent = '✕ ' + e.message;
+    document.getElementById('rerenderPlaceholder').textContent = 'Generation failed';
+    runBtn.style.display = '';
+    runBtn.disabled = false;
+    runBtn.textContent = '✦ Re-render';
+    refineBtn.style.display = _rerenderPass > 0 ? '' : 'none';
+    refineBtn.disabled = false;
+    if (_rerenderPass > 0) refineBtn.textContent = '✦ Refine Result';
+  }
+}
+
+// "✓ Use This Version" — bake adjustments (if any) then set as the active site version
+async function rerenderUseVersion() {
+  if (!_rerenderResultPath) return;
+  const filename = _rerenderResultPath.split('/').pop();
+
+  const brightness = parseInt(document.getElementById('adjBrightness').value);
+  const contrast   = parseInt(document.getElementById('adjContrast').value);
+  const saturation = parseInt(document.getElementById('adjSaturation').value);
+  const hasAdjust  = brightness !== 100 || contrast !== 100 || saturation !== 100;
+
+  const useBtn = document.getElementById('rerenderUseBtn');
+  useBtn.disabled = true;
+  useBtn.textContent = 'Saving…';
+  document.getElementById('rerenderStatus').textContent = 'Saving…';
+
+  try {
+    // Bake slider adjustments into the file first (modifies _ai_N.webp in-place)
+    if (hasAdjust) {
+      const adjRes = await fetch('/admin/api/images/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ filename, brightness, contrast, saturation })
+      });
+      const adjData = await adjRes.json();
+      if (!adjData.ok) throw new Error(adjData.error || 'adjust failed');
+      // Reset sliders — adjustments are now baked into the file
+      resetAdjust(true);
+      // Refresh the result panel thumbnail with the baked version
+      const ts = Date.now();
+      document.getElementById('rerenderResult').style.backgroundImage = `url('${_rerenderResultPath}?v=${ts}')`;
+      // Update the strip thumbnail for this item too
+      const stripEl = document.querySelector(`#rerenderStripScroll .rrstrip-item[data-filename="${CSS.escape(filename)}"] div`);
+      if (stripEl) stripEl.style.backgroundImage = `url('${_rerenderResultPath}?v=${ts}')`;
+    }
+
+    // Set as the active version
+    const d = await Admin.post('/images/set-version', {
+      base_filename: _rerenderFilename,
+      version_filename: filename,
+    });
+    if (!d.ok) throw new Error(d.error || 'set-version failed');
+
+    // Update isActive flags in strip data and re-render strip badges
+    _rerenderStrip.forEach(s => { s.isActive = s.filename === filename; });
+    _renderStrip();
+    _stripHighlight(_rerenderSourceFilename); // keep source highlighted
+
+    Admin.toast('✓ Active version updated — site will now show this image', 'success');
+    document.getElementById('rerenderStatus').textContent = `✓ "${_versionLabel(filename)}" is now the active version shown on the site`;
+    await loadLibraryStatus();
+  } catch(e) {
+    Admin.toast('Failed: ' + e.message, 'error');
+    document.getElementById('rerenderStatus').textContent = '✕ ' + e.message;
+  }
+  useBtn.disabled = false;
+  useBtn.textContent = '✓ Use This Version';
+}
+
+
+// ── Lightbox ──────────────────────────────────────────────────────────────────
+let _lbImages      = [];   // [{src, label, filename, isOriginal, isActive}]
+let _lbIndex       = 0;
+let _lbMode        = 'versions'; // 'versions' | 'compare'
+let _lbBaseFilename = '';  // base filename when in versions mode
+
+function openLightbox(images, index, mode) {
+  _lbImages = images;
+  _lbIndex  = Math.max(0, Math.min(index, images.length - 1));
+  _lbMode   = mode || 'versions';
+  document.body.appendChild(document.getElementById('lightbox'));
+  _lbRender();
+  document.getElementById('lightbox').style.display = 'flex';
+  document.addEventListener('keydown', _lbKey);
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').style.display = 'none';
+  document.removeEventListener('keydown', _lbKey);
+}
+
+function _lbRender() {
+  const item = _lbImages[_lbIndex];
+  document.getElementById('lbImg').src = item.src;
+  document.getElementById('lbCaption').textContent = item.label || '';
+  document.getElementById('lbCounter').textContent =
+    _lbImages.length > 1 ? `${_lbIndex + 1} / ${_lbImages.length}` : '';
+
+  // Prompt display
+  const promptEl = document.getElementById('lbPrompt');
+  if (item.prompt) {
+    let txt = `"${item.prompt}"`;
+    if (item.source_filename) {
+      const srcLabel = item.source_filename === _lbBaseFilename
+        ? 'Original'
+        : _versionLabel(item.source_filename);
+      txt += `\nRendered from: ${srcLabel}`;
+    }
+    promptEl.textContent = txt;
+    promptEl.style.display = '';
+  } else {
+    promptEl.style.display = 'none';
+  }
+  document.getElementById('lbPrev').style.visibility = _lbImages.length > 1 ? '' : 'hidden';
+  document.getElementById('lbNext').style.visibility = _lbImages.length > 1 ? '' : 'hidden';
+
+  const editBtn     = document.getElementById('lbEditBtn');
+  const useBtn      = document.getElementById('lbUseBtn');
+  const activeBadge = document.getElementById('lbActiveBadge');
+  const deleteBtn   = document.getElementById('lbDeleteBtn');
+
+  if (_lbMode === 'versions') {
+    editBtn.style.display = '';
+    deleteBtn.style.display = item.isOriginal ? 'none' : '';
+    deleteBtn.textContent = '✕ Delete Render';
+    deleteBtn.disabled = false;
+    if (item.isActive) {
+      useBtn.style.display      = 'none';
+      activeBadge.style.display = '';
+    } else {
+      useBtn.style.display      = '';
+      activeBadge.style.display = 'none';
+    }
+  } else {
+    editBtn.style.display     = 'none';
+    useBtn.style.display      = 'none';
+    activeBadge.style.display = 'none';
+    deleteBtn.style.display   = 'none';
+  }
+}
+
+function lightboxNav(dir) {
+  _lbIndex = (_lbIndex + dir + _lbImages.length) % _lbImages.length;
+  _lbRender();
+}
+
+function _lbKey(e) {
+  if (e.key === 'Escape')     closeLightbox();
+  if (e.key === 'ArrowLeft')  lightboxNav(-1);
+  if (e.key === 'ArrowRight') lightboxNav(1);
+}
+
+function lbEditWithAI() {
+  closeLightbox();
+  const base = _lbBaseFilename;
+  if (!base) return;
+  const currentItem = _lbImages[_lbIndex];
+  const sourceFilename = currentItem?.filename || base;
+  const item = _libraryItems.find(i => i.filename === base);
+  // Pass sourceFilename so the modal renders from the currently-viewed version
+  openRerender(base, item?.label || '', sourceFilename);
+}
+
+async function lbUseVersion() {
+  const item   = _lbImages[_lbIndex];
+  const useBtn = document.getElementById('lbUseBtn');
+  useBtn.disabled    = true;
+  useBtn.textContent = 'Saving…';
+  try {
+    const d = await Admin.post('/images/set-version', {
+      base_filename:    _lbBaseFilename,
+      version_filename: item.isOriginal ? '' : item.filename,
+    });
+    if (!d.ok) throw new Error(d.error || 'failed');
+    // Update active flags locally so UI reflects the change immediately
+    _lbImages.forEach(i => { i.isActive = (i.filename === item.filename); });
+    Admin.toast('Active version updated — site pages will now show this image', 'success');
+    _lbRender();
+    await loadLibraryStatus();
+    // Sync re-render modal strip if it's open behind the lightbox
+    if (document.getElementById('rerenderModal').style.display !== 'none') {
+      _rerenderStrip.forEach(s => { s.isActive = (s.filename === item.filename); });
+      _renderStrip();
+      _stripHighlight(_rerenderSourceFilename);
+    }
+  } catch(e) {
+    Admin.toast('Failed: ' + e.message, 'error');
+  }
+  useBtn.disabled    = false;
+  useBtn.textContent = '✓ Use This Version';
+}
+
+async function lbDeleteVersion() {
+  const item      = _lbImages[_lbIndex];
+  if (item.isOriginal) return; // safety — should never be reachable
+  const deleteBtn = document.getElementById('lbDeleteBtn');
+  const label     = item.label || _versionLabel(item.filename);
+
+  // First click: ask for confirmation inline
+  if (deleteBtn.dataset.confirm !== '1') {
+    deleteBtn.dataset.confirm = '1';
+    deleteBtn.textContent = 'Confirm delete?';
+    deleteBtn.style.background = 'rgba(239,68,68,.35)';
+    // Auto-reset after 4s if not confirmed
+    setTimeout(() => {
+      if (deleteBtn.dataset.confirm === '1') {
+        deleteBtn.dataset.confirm = '';
+        deleteBtn.textContent = '✕ Delete Render';
+        deleteBtn.style.background = 'rgba(239,68,68,.15)';
+      }
+    }, 4000);
+    return;
+  }
+
+  // Second click: confirmed — delete
+  deleteBtn.dataset.confirm = '';
+  deleteBtn.disabled = true;
+  deleteBtn.textContent = 'Deleting…';
+  try {
+    const d = await Admin.post('/images/delete-version', { filename: item.filename });
+    if (!d.ok) throw new Error(d.error || 'delete failed');
+
+    // Remove from lightbox images array
+    _lbImages.splice(_lbIndex, 1);
+
+    if (_lbImages.length === 0) {
+      // No versions left — close lightbox
+      closeLightbox();
+      Admin.toast('Render deleted', 'success');
+    } else {
+      // Navigate to adjacent item (prev if at end, else next)
+      _lbIndex = Math.min(_lbIndex, _lbImages.length - 1);
+      _lbRender();
+      Admin.toast(`${label} deleted`, 'success');
+    }
+    await loadLibraryStatus();
+    // Sync re-render modal strip if it's open behind the lightbox
+    if (document.getElementById('rerenderModal').style.display !== 'none') {
+      const deletedFile = item.filename;
+      _rerenderStrip = _rerenderStrip.filter(s => s.filename !== deletedFile);
+      // If the deleted file was the current source, reset to original
+      if (_rerenderSourceFilename === deletedFile) {
+        const orig = _rerenderStrip.find(s => s.isOriginal);
+        if (orig) stripSelectSource(orig.filename, orig.heroPath, true);
+      } else {
+        _renderStrip();
+        _stripHighlight(_rerenderSourceFilename);
+      }
+    }
+  } catch(e) {
+    Admin.toast('Delete failed: ' + e.message, 'error');
+    deleteBtn.disabled = false;
+    deleteBtn.textContent = '✕ Delete Render';
+  }
+}
+
+// Open version picker lightbox for a base image
+async function openLibraryLightbox(filename) {
+  _lbBaseFilename = filename;
+  try {
+    const d = await Admin.get(`/images/versions/${encodeURIComponent(filename)}`);
+    if (!d || !d.versions || !d.versions.length) {
+      Admin.toast('No versions found', 'error'); return;
+    }
+    const ts = Date.now();
+    const images = d.versions.map(v => ({
+      src:             v.hero_path + '?v=' + ts,
+      label:           v.label,
+      filename:        v.filename,
+      isOriginal:      v.is_original,
+      isActive:        v.is_active,
+      prompt:          v.prompt || null,
+      source_filename: v.source_filename || null,
+    }));
+    const activeIdx = images.findIndex(i => i.isActive);
+    openLightbox(images, activeIdx >= 0 ? activeIdx : 0, 'versions');
+  } catch(e) {
+    Admin.toast('Could not load versions: ' + e.message, 'error');
+  }
+}
+
+// Open from re-render modal — original vs result
+function rerenderLightbox(panelIndex) {
+  // panelIndex 0 = source panel clicked, 1 = result panel clicked
+  if (!_rerenderFilename) return;
+  if (panelIndex === 1 && !_rerenderResultPath) return;
+
+  // Build image list from strip with all flags needed for versions-mode buttons
+  let images = _rerenderStrip.map(item => ({
+    src:             item.heroPath + '?v=' + _libCacheBust,
+    label:           item.isOriginal ? 'Original' : _versionLabel(item.filename),
+    filename:        item.filename,
+    isOriginal:      item.isOriginal,
+    isActive:        item.isActive,
+    prompt:          item.prompt || null,
+    source_filename: item.source_filename || null,
+  }));
+
+  // Determine start position
+  let startIdx = 0;
+  if (panelIndex === 0) {
+    const si = images.findIndex(i => i.filename === _rerenderSourceFilename);
+    startIdx = si >= 0 ? si : 0;
+  } else {
+    const resultFile = _rerenderResultPath.split('/').pop();
+    const ri = images.findIndex(i => i.filename === resultFile);
+    if (ri >= 0) {
+      startIdx = ri;
+    } else {
+      // Freshly rendered, not yet in strip — append temporarily
+      const freshStrip = _rerenderStrip.find(s => s.filename === resultFile);
+      images.push({
+        src:             _rerenderResultPath + '?v=' + Date.now(),
+        label:           _versionLabel(resultFile),
+        filename:        resultFile,
+        isOriginal:      false,
+        isActive:        false,
+        prompt:          freshStrip?.prompt || null,
+        source_filename: freshStrip?.source_filename || null,
+      });
+      startIdx = images.length - 1;
+    }
+  }
+
+  if (!images.length) return;
+  // Set base filename so Use/Delete/Edit buttons work correctly
+  _lbBaseFilename = _rerenderFilename;
+  openLightbox(images, startIdx, 'versions');
+}
+
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(0) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+init();
+</script>
+
+<style>
+/* Stats row */
+.stats-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.stat-pill {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.stat-pill span { font-weight: 600; color: var(--text); }
+.stat-pill--green span { color: var(--green); }
+.stat-pill--yellow span { color: var(--yellow); }
+
+/* Migration banner */
+.migration-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.04));
+  border: 1px solid rgba(245,158,11,0.3);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+.migration-banner__icon { font-size: 24px; color: var(--yellow); flex-shrink: 0; }
+.migration-banner__body { flex: 1; }
+.migration-banner__title { font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.migration-banner__sub { font-size: 12px; color: var(--text-2); }
+
+/* Progress bar */
+.migration-progress-bar {
+  height: 6px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.migration-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* Logs */
+.migration-log, .scan-log {
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.migration-log-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-family: 'Menlo','Monaco',monospace;
+  padding: 3px 0;
+  color: var(--text-2);
+}
+.migration-log-item--ok    { color: var(--green); }
+.migration-log-item--error { color: var(--red); }
+.migration-log-item--info  { color: var(--text-3); }
+.migration-log-icon { width: 14px; text-align: center; flex-shrink: 0; }
+
+/* Media grid */
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+.media-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.media-card--wix {
+  border-color: rgba(245,158,11,0.35);
+}
+.media-card__img {
+  height: 120px;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--bg);
+  position: relative;
+}
+.media-card__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.media-card:hover .media-card__overlay { opacity: 1; }
+.media-card__name {
+  padding: 6px 8px 2px;
+  font-size: 11px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.media-card__size { padding: 0 8px 8px; font-size: 10px; color: var(--text-3); }
+
+/* Library badges */
+.lib-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.lib-badge--ok  { background: var(--green); color: #000; }
+.lib-badge--wix { background: var(--yellow); color: #000; }
+
+/* Image type badge (Render / Before / After) */
+.media-type-badge {
+  position: absolute;
+  bottom: 6px; right: 6px;
+  font-size: 9px; font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.media-type-badge--render { background: #6366f1; color: #fff; }
+.media-type-badge--before { background: #f59e0b; color: #000; }
+.media-type-badge--after  { background: var(--green); color: #000; }
+
+/* Delete button */
+.btn--delete { background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.4); color: #ef4444; }
+.btn--delete:hover { background: rgba(239,68,68,.25); }
+
+/* Checkbox on card */
+.media-card__check {
+  position: absolute;
+  top: 7px; left: 7px;
+  width: 16px; height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent);
+  opacity: 0;
+  transition: opacity .15s;
+  z-index: 2;
+}
+.media-card:hover .media-card__check,
+.media-card__check:checked { opacity: 1; }
+
+/* Label dropdown popover */
+.label-popover {
+  position: fixed;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  z-index: 9999;
+  min-width: 240px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+}
+.label-popover__row { margin-bottom: 8px; }
+.label-popover__lbl { display: block; font-size: 11px; color: #555; margin-bottom: 3px; }
+.label-popover__sel {
+  width: 100%; font-size: 12px;
+  background: #fff; border: 1px solid #ccc;
+  color: #111; border-radius: 4px; padding: 4px 6px;
+}
+.label-popover__sel option,
+.label-popover__sel optgroup {
+  background: #fff;
+  color: #111;
+}
+.label-popover__actions { display: flex; gap: 6px; margin-top: 10px; }
+
+/* Delete modal */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 10000;
+}
+.modal-box {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  max-width: 480px; width: 90%;
+}
+.modal-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 14px; }
+.modal-body { margin-bottom: 16px; }
+.modal-actions { display: flex; gap: 8px; }
+
+/* Image label row */
+.media-card__label {
+  padding: 0 8px 7px;
+  font-size: 11px;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  min-height: 18px;
+}
+.media-card__label:hover { color: var(--accent); }
+.media-card__label--empty { color: var(--text-3); }
+.media-label-input {
+  width: 100%;
+  font-size: 11px;
+  background: var(--surface-1);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  color: var(--text);
+  padding: 1px 4px;
+  outline: none;
+}
+
+/* Project filter tabs */
+.project-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+}
+.project-tab {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .15s;
+}
+.project-tab:hover { background: var(--surface-3, #333); color: var(--text); }
+.project-tab--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+  font-weight: 600;
+}
+</style>
+</body>
+</html>

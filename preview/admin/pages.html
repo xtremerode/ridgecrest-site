@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pages — Ridgecrest Admin</title>
+  <link rel="stylesheet" href="css/admin.css" />
+  <style>
+    /* ── Visual Editor layout ── */
+    .editor-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      background: var(--surface, #1a2332);
+      border-bottom: 1px solid var(--border, #2a3748);
+      flex-shrink: 0;
+    }
+    .editor-toolbar select {
+      flex: 1;
+      max-width: 360px;
+      background: var(--surface2, #111b27);
+      color: var(--text, #e2e8f0);
+      border: 1px solid var(--border, #2a3748);
+      border-radius: 6px;
+      padding: 7px 12px;
+      font-size: 13px;
+    }
+    .editor-toolbar select:focus { outline: none; border-color: #3b82f6; }
+    .btn-edit-mode {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--border, #2a3748);
+      background: var(--surface2, #111b27);
+      color: var(--text-muted, #94a3b8);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .btn-edit-mode:hover { border-color: #3b82f6; color: #3b82f6; }
+    .btn-edit-mode.active {
+      background: #3b82f6;
+      border-color: #3b82f6;
+      color: #fff;
+    }
+    .edit-mode-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .edit-status {
+      font-size: 12px;
+      color: var(--text-muted, #94a3b8);
+      white-space: nowrap;
+    }
+    .edit-status.ready { color: #22c55e; }
+    /* .main fills sidebar remainder; .header is 56px; frame-wrap takes the rest */
+    .editor-frame-wrap {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+      overflow: hidden;
+      background: #111b27;
+    }
+    #siteFrame {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+    .frame-loading {
+      position: absolute;
+      inset: 0;
+      background: #111b27;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-3, #64748b);
+      font-size: 14px;
+      pointer-events: none;
+      transition: opacity .3s;
+    }
+    .frame-loading.hidden { opacity: 0; }
+    /* Put page-select + controls into header-actions area */
+    .header-actions select {
+      background: var(--surface-2, #1e2d3d);
+      color: var(--text, #e2e8f0);
+      border: 1px solid var(--border, #2a3748);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 13px;
+      max-width: 280px;
+      width: 280px;
+    }
+    .header-actions select:focus { outline: none; border-color: var(--accent, #3b82f6); }
+
+    /* ── Image Picker Modal ── */
+    .picker-backdrop {
+      display: none;          /* hidden by default — no invisible overlay risk */
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.65);
+      z-index: 10000;
+      align-items: center;
+      justify-content: center;
+    }
+    .picker-backdrop.open {
+      display: flex;          /* only rendered when actually open */
+    }
+    .picker-modal {
+      background: var(--surface, #1a2332);
+      border: 1px solid var(--border, #2a3748);
+      border-radius: 12px;
+      width: 860px;
+      max-width: 95vw;
+      height: 82vh;
+      max-height: 82vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 24px 80px rgba(0,0,0,.5);
+    }
+    .picker-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border, #2a3748);
+      flex-shrink: 0;
+    }
+    .picker-header h3 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text, #e2e8f0);
+    }
+    .picker-header .picker-close {
+      background: none;
+      border: none;
+      color: var(--text-muted, #94a3b8);
+      font-size: 20px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 4px;
+    }
+    .picker-header .picker-close:hover { color: var(--text, #e2e8f0); }
+    .picker-search {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border, #2a3748);
+      flex-shrink: 0;
+    }
+    .picker-search input {
+      width: 100%;
+      background: var(--surface2, #111b27);
+      border: 1px solid var(--border, #2a3748);
+      border-radius: 6px;
+      color: var(--text, #e2e8f0);
+      padding: 8px 12px;
+      font-size: 13px;
+      box-sizing: border-box;
+    }
+    .picker-search input:focus { outline: none; border-color: #3b82f6; }
+    .picker-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+      padding: 16px 20px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .picker-item {
+      position: relative;
+      height: 130px;
+      border-radius: 6px;
+      overflow: hidden;
+      cursor: pointer;
+      border: 2px solid transparent;
+      background: #0d1a22;
+      transition: border-color .15s, transform .15s;
+    }
+    .picker-item__label {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: rgba(0,0,0,.65);
+      color: #fff;
+      font-size: 9px;
+      font-weight: 500;
+      padding: 3px 5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+      letter-spacing: 0.02em;
+    }
+    .picker-item:hover { border-color: #3b82f6; transform: scale(1.02); }
+    .picker-item.selected { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.3); }
+    .picker-item.current { border-color: #22c55e; }
+    .picker-item img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+      pointer-events: none;
+    }
+    .picker-item .check {
+      position: absolute;
+      top: 6px; right: 6px;
+      width: 22px; height: 22px;
+      background: #3b82f6;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 900;
+      opacity: 0;
+      transition: opacity .15s;
+    }
+    .picker-item.selected .check { opacity: 1; }
+    .picker-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-top: 1px solid var(--border, #2a3748);
+      flex-shrink: 0;
+    }
+    .picker-selected-label {
+      font-size: 12px;
+      color: var(--text-muted, #94a3b8);
+      max-width: 500px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .picker-footer-btns { display: flex; gap: 10px; }
+    .btn-cancel {
+      padding: 8px 18px;
+      border-radius: 6px;
+      border: 1px solid var(--border, #2a3748);
+      background: transparent;
+      color: var(--text-muted, #94a3b8);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-cancel:hover { border-color: #94a3b8; color: var(--text, #e2e8f0); }
+    .btn-use {
+      padding: 8px 18px;
+      border-radius: 6px;
+      border: none;
+      background: #3b82f6;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      opacity: .5;
+      transition: opacity .15s, background .15s;
+    }
+    .btn-use:not(:disabled) { opacity: 1; }
+    .btn-use:not(:disabled):hover { background: #2563eb; }
+    .picker-loading {
+      grid-column: 1/-1;
+      text-align: center;
+      color: var(--text-muted, #94a3b8);
+      padding: 40px;
+      font-size: 14px;
+    }
+    .picker-tabs {
+      display: flex;
+      gap: 6px;
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--border, #2a3748);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .picker-tab {
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border, #2a3748);
+      background: transparent;
+      color: var(--text-muted, #94a3b8);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .12s, color .12s, border-color .12s;
+      white-space: nowrap;
+    }
+    .picker-tab:hover { border-color: #94a3b8; color: var(--text, #e2e8f0); }
+    .picker-tab.active {
+      background: var(--accent, #f59e0b);
+      border-color: var(--accent, #f59e0b);
+      color: #000;
+    }
+    .picker-tab.edited.active {
+      background: #c4b5fd;
+      border-color: #c4b5fd;
+      color: #1e1b4b;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-wordmark">Ridgecrest Designs</div>
+      <div class="sidebar-sub">Admin Panel</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <a href="dashboard.html" class="nav-item" data-page="dashboard">
+        <span class="nav-icon">◈</span> Dashboard
+      </a>
+      <div class="nav-section-label">Leads</div>
+      <a href="leads.html" class="nav-item" data-page="leads">
+        <span class="nav-icon">◉</span> Lead Inbox
+        <span class="nav-badge" id="navLeadBadge" style="display:none"></span>
+      </a>
+      <div class="nav-section-label">Content</div>
+      <a href="blog.html" class="nav-item" data-page="blog">
+        <span class="nav-icon">✎</span> Blog (RD Edit)
+      </a>
+      <a href="portfolio.html" class="nav-item" data-page="portfolio">
+        <span class="nav-icon">▣</span> Portfolio
+      </a>
+      <a href="team.html" class="nav-item" data-page="team">
+        <span class="nav-icon">◎</span> Team
+      </a>
+      <a href="pages.html" class="nav-item active" data-page="pages">
+        <span class="nav-icon">◧</span> Pages
+      </a>
+      <a href="media.html" class="nav-item" data-page="media">
+        <span class="nav-icon">◆</span> Media Library
+      </a>
+      <div class="nav-section-label">Growth</div>
+      <a href="analytics.html" class="nav-item" data-page="analytics">
+        <span class="nav-icon">▲</span> Analytics
+      </a>
+      <a href="seo.html" class="nav-item" data-page="seo">
+        <span class="nav-icon">◻</span> SEO
+      </a>
+      <div class="nav-section-label">System</div>
+      <a href="settings.html" class="nav-item" data-page="settings">
+        <span class="nav-icon">⊙</span> Settings
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar">H</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name">Henry</div>
+          <div class="sidebar-user-role">Administrator</div>
+        </div>
+        <button class="sidebar-logout" data-action="logout" title="Sign out">⏻</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main" id="mainContent">
+    <div class="header">
+      <div class="header-title">Pages</div>
+      <div class="header-actions">
+        <select id="pageSelect" title="Select page to edit"></select>
+        <button class="btn-edit-mode" id="editModeBtn">
+          <span class="edit-mode-dot"></span>
+          Edit Mode
+        </button>
+        <span class="edit-status" id="editStatus">Select a page</span>
+        <button class="btn btn-sm" style="background:var(--surface-2,#1e2d3d);border:1px solid var(--border,#2a3748);color:var(--text,#e2e8f0)" onclick="openAutoPlace()">✦ AI Auto-Place</button>
+      </div>
+    </div>
+    <div class="editor-frame-wrap">
+      <div class="frame-loading" id="frameLoading">Select a page to preview</div>
+      <iframe id="siteFrame" src="about:blank" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+    </div>
+  </div>
+</div>
+
+<!-- Image Picker Modal -->
+<div class="picker-backdrop" id="pickerBackdrop">
+  <div class="picker-modal">
+    <div class="picker-header">
+      <h3>Choose Image</h3>
+      <button class="picker-close" id="pickerClose">&times;</button>
+    </div>
+    <div class="picker-tabs" id="pickerTabs"></div>
+    <div class="picker-search">
+      <input type="text" id="pickerSearch" placeholder="Search images…" autocomplete="off" />
+    </div>
+    <div class="picker-grid" id="pickerGrid">
+      <div class="picker-loading">Loading images…</div>
+    </div>
+    <div class="picker-footer">
+      <div class="picker-selected-label" id="pickerSelectedLabel">No image selected</div>
+      <div class="picker-footer-btns">
+        <button class="btn-cancel" id="pickerCancel">Cancel</button>
+        <button class="btn-use" id="pickerUse" disabled>Use Image</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AI Auto-Place Modal -->
+<div id="autoPlaceModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;align-items:center;justify-content:center">
+  <div style="background:var(--surface-2,#1e2d3d);border:1px solid var(--border,#2a3748);border-radius:12px;padding:24px;max-width:640px;width:92%;max-height:80vh;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:16px;font-weight:600;color:var(--text,#e2e8f0)">AI Auto-Place Images</div>
+      <button onclick="closeAutoPlace()" style="background:none;border:none;color:var(--text-3,#64748b);font-size:18px;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:13px;color:var(--text-2,#94a3b8)">Claude will review all <strong style="color:var(--text,#e2e8f0)">92+ page contexts</strong> and <strong style="color:var(--text,#e2e8f0)">labeled images</strong> and intelligently assign the best hero image to each page. You can review and override before applying.</div>
+    <div id="apStatus" style="font-size:13px;color:var(--text-3,#64748b)">Ready.</div>
+    <div style="height:6px;background:var(--surface-1,#0d1a22);border-radius:3px;overflow:hidden"><div id="apFill" style="height:100%;width:0%;background:var(--accent,#3b82f6);transition:width .3s"></div></div>
+
+    <!-- Proposal table (shown after dry run) -->
+    <div id="apProposalWrap" style="display:none;overflow-y:auto;max-height:320px">
+      <div style="font-size:12px;color:var(--text-3,#64748b);margin-bottom:8px" id="apProposalMeta"></div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px" id="apTable">
+        <thead><tr style="color:var(--text-3,#64748b);border-bottom:1px solid var(--border,#2a3748)">
+          <th style="padding:6px 8px;text-align:left;font-weight:500">Page</th>
+          <th style="padding:6px 8px;text-align:left;font-weight:500">Proposed Image</th>
+          <th style="padding:6px 8px;text-align:left;font-weight:500">Accept?</th>
+        </tr></thead>
+        <tbody id="apTableBody"></tbody>
+      </table>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap" id="apActions">
+      <button class="btn btn-gold btn-sm" onclick="runAutoPlace(true)" id="apRunBtn">✦ Generate Proposals</button>
+      <button class="btn btn-sm" style="background:var(--surface-2,#1e2d3d);border:1px solid var(--border,#2a3748);color:var(--text,#e2e8f0);display:none" onclick="applyAutoPlace()" id="apApplyBtn">Apply Selected →</button>
+      <button class="btn btn-sm" style="background:var(--surface-2,#1e2d3d);border:1px solid var(--border,#2a3748);color:var(--text,#e2e8f0)" onclick="closeAutoPlace()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/admin.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  Admin.init('pages');
+  if (!Admin.requireAuth()) return;
+
+  const TOKEN = Admin.getToken() || '';
+  const API = (path, opts={}) => fetch(path, {
+    ...opts,
+    headers: { 'X-Admin-Token': TOKEN, 'Content-Type': 'application/json', ...(opts.headers||{}) }
+  }).then(r => r.json());
+
+  // ── State ────────────────────────────────────────────────────────────────
+  let pages = [];
+  let allImages = [];
+  let editMode = false;
+  let currentSlug = '';
+  let pendingPick = null;      // {slug, elementIndex, currentImage} — hero pick
+  let pendingCardPick = null;  // {cardId} — card image pick
+  let selectedImage = null; // {hero_path, thumb_path, filename}
+  // Transform state — updated by rd_transform_changed / rd_image_cycled
+  let pendingImage = null;
+  let pendingZoom  = null;
+  let pendingPosX  = null;
+  let pendingPosY  = null;
+
+  // ── Elements ─────────────────────────────────────────────────────────────
+  const pageSelect   = document.getElementById('pageSelect');
+  const editModeBtn  = document.getElementById('editModeBtn');
+  const editStatus   = document.getElementById('editStatus');
+  const siteFrame    = document.getElementById('siteFrame');
+  const frameLoading = document.getElementById('frameLoading');
+  const pickerBackdrop = document.getElementById('pickerBackdrop');
+  const pickerGrid   = document.getElementById('pickerGrid');
+  const pickerTabs   = document.getElementById('pickerTabs');
+  const pickerSearch = document.getElementById('pickerSearch');
+  const pickerUse    = document.getElementById('pickerUse');
+  const pickerSelectedLabel = document.getElementById('pickerSelectedLabel');
+  let pickerActiveTab = 'all';
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  async function init() {
+    try {
+      pages = await API('/admin/api/pages');
+      populatePageSelect(pages);
+    } catch(e) {
+      editStatus.textContent = 'Error loading pages';
+    }
+  }
+
+  function populatePageSelect(pages) {
+    pageSelect.innerHTML = '<option value="">— Select a page —</option>';
+    // Group pages
+    const groups = {
+      'Main Pages': [],
+      'Portfolio': [],
+      'Service Pages': [],
+      'Other': []
+    };
+    pages.forEach(p => {
+      if (!p.page_path) return;
+      const path = p.page_path;
+      if (path.startsWith('services/')) {
+        groups['Service Pages'].push(p);
+      } else if (['danville-dream', 'danville-hilltop', 'lafayette-bistro', 'lafayette-luxury',
+                  'alamo-luxury', 'orinda-kitchen', 'pleasanton-custom', 'san-ramon', 'sunol-homestead']
+                  .some(s => p.slug === s)) {
+        groups['Portfolio'].push(p);
+      } else if (['home','about','contact','portfolio','process','services','team'].includes(p.slug)) {
+        groups['Main Pages'].push(p);
+      } else {
+        groups['Other'].push(p);
+      }
+    });
+    Object.entries(groups).forEach(([label, items]) => {
+      if (!items.length) return;
+      const og = document.createElement('optgroup');
+      og.label = label;
+      items.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.slug;
+        const friendlyNames = { home: 'Home', about: 'About', contact: 'Contact',
+          portfolio: 'Portfolio', process: 'Process', services: 'Services', team: 'Team' };
+        opt.textContent = friendlyNames[p.slug] || p.title || p.slug;
+        og.appendChild(opt);
+      });
+      pageSelect.appendChild(og);
+    });
+  }
+
+  function getPagePath(slug) {
+    const p = pages.find(x => x.slug === slug);
+    if (!p || !p.page_path) return null;
+    return p.page_path;
+  }
+
+  function loadPage(slug) {
+    if (!slug) return;
+    currentSlug = slug;
+    // Reset edit mode and pending transform when switching pages
+    editMode = false;
+    editModeBtn.classList.remove('active');
+    pendingImage = null; pendingZoom = null; pendingPosX = null; pendingPosY = null;
+    const pageData = pages.find(p => p.slug === slug);
+    if (pageData) {
+      pendingZoom = pageData.hero_zoom  != null ? pageData.hero_zoom  : 1.0;
+      pendingPosX = parseFloat((pageData.hero_position || '50% 50%').split(' ')[0]) || 50;
+      pendingPosY = parseFloat((pageData.hero_position || '50% 50%').split(' ')[1]) || 50;
+    }
+    const path = getPagePath(slug);
+    if (!path) return;
+    frameLoading.classList.remove('hidden');
+    editStatus.textContent = 'Loading…';
+    editStatus.className = 'edit-status';
+    siteFrame.src = `/view/${path}`;
+  }
+
+  // ── Page select ──────────────────────────────────────────────────────────
+  pageSelect.addEventListener('change', () => {
+    const slug = pageSelect.value;
+    if (!slug) return;
+    loadPage(slug);
+  });
+
+  // ── Edit mode toggle (no reload — inject/remove overlay in live iframe) ──
+  async function toggleEditOverlay() {
+    if (!currentSlug) return;
+    const iframeDoc = siteFrame.contentDocument;
+    if (!iframeDoc) return;
+
+    if (!editMode) {
+      // Remove all overlay elements
+      iframeDoc.querySelectorAll('[data-rd-overlay]').forEach(el => el.remove());
+      const s1 = iframeDoc.getElementById('rd-edit-overlay');
+      const s2 = iframeDoc.getElementById('rd-card-edit-overlay');
+      if (s1) s1.remove();
+      if (s2) s2.remove();
+      editStatus.textContent = 'Viewing — enable Edit Mode to swap images';
+    } else {
+      editStatus.textContent = 'Loading edit overlay…';
+      try {
+        const resp = await fetch(`/admin/api/overlay-scripts?slug=${encodeURIComponent(currentSlug)}&token=${encodeURIComponent(TOKEN)}`, {
+          headers: { 'X-Admin-Token': TOKEN }
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const js = await resp.text();
+        const script = iframeDoc.createElement('script');
+        script.textContent = js;
+        iframeDoc.body.appendChild(script);
+        // Update status and send image pool directly — don't rely on rd_overlay_ready from injected script
+        editStatus.textContent = 'Click: cycle  ·  Scroll: zoom  ·  Drag: pan  ·  Browse All to pick';
+        editStatus.className = 'edit-status ready';
+        const imgs = allImages.length ? allImages : await API('/admin/api/pages/images').then(r => { allImages = r; return r; });
+        siteFrame.contentWindow.postMessage({ type: 'rd_set_pool', images: imgs.map(i => i.hero_path) }, '*');
+      } catch(e) {
+        editStatus.textContent = 'Error loading edit overlay: ' + e.message;
+        editMode = false;
+        editModeBtn.classList.remove('active');
+      }
+    }
+  }
+
+  editModeBtn.addEventListener('click', () => {
+    editMode = !editMode;
+    editModeBtn.classList.toggle('active', editMode);
+    toggleEditOverlay();
+  });
+
+  // ── Frame load events ────────────────────────────────────────────────────
+  siteFrame.addEventListener('load', () => {
+    frameLoading.classList.add('hidden');
+    editStatus.textContent = 'Viewing — enable Edit Mode to swap images';
+  });
+
+  // ── Debounced auto-save ───────────────────────────────────────────────────
+  let saveTimer = null;
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    editStatus.textContent = 'Unsaved changes…';
+    editStatus.className = 'edit-status';
+    saveTimer = setTimeout(async () => {
+      editStatus.textContent = 'Saving…';
+      const payload = {};
+      if (pendingImage) payload.hero_image = pendingImage;
+      if (pendingZoom  != null) payload.hero_zoom     = pendingZoom;
+      if (pendingPosX  != null && pendingPosY != null)
+        payload.hero_position = pendingPosX.toFixed(1) + '% ' + pendingPosY.toFixed(1) + '%';
+      try {
+        await API(`/admin/api/pages/${currentSlug}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+        editStatus.textContent = 'Saved ✓';
+        editStatus.className = 'edit-status ready';
+        // Update local pages list so loadPage picks up new values
+        const pg = pages.find(p => p.slug === currentSlug);
+        if (pg) {
+          if (pendingImage) pg.hero_image = pendingImage;
+          if (pendingZoom  != null) pg.hero_zoom = pendingZoom;
+          if (payload.hero_position) pg.hero_position = payload.hero_position;
+        }
+      } catch(e) {
+        editStatus.textContent = 'Save failed — try again';
+        editStatus.className = 'edit-status';
+      }
+    }, 1500);
+  }
+
+  // ── postMessage from iframe overlay ─────────────────────────────────────
+  window.addEventListener('message', (e) => {
+    const d = e.data || {};
+    if (d.type === 'rd_overlay_ready') {
+      editStatus.textContent = `Click: cycle  ·  Scroll: zoom  ·  Drag: pan  ·  Browse All to pick`;
+      editStatus.className = 'edit-status ready';
+      // Send image pool to iframe so it can cycle
+      if (allImages.length) {
+        siteFrame.contentWindow.postMessage({ type: 'rd_set_pool', images: allImages.map(i => i.hero_path) }, '*');
+      } else {
+        API('/admin/api/pages/images').then(imgs => {
+          allImages = imgs;
+          siteFrame.contentWindow.postMessage({ type: 'rd_set_pool', images: imgs.map(i => i.hero_path) }, '*');
+        });
+      }
+    }
+    if (d.type === 'rd_image_cycled') {
+      pendingImage = d.newImage;
+      scheduleSave();
+    }
+    if (d.type === 'rd_transform_changed') {
+      pendingZoom = d.zoom;
+      pendingPosX = d.posX;
+      pendingPosY = d.posY;
+      scheduleSave();
+    }
+    if (d.type === 'rd_pick_image') {
+      pendingPick = { slug: d.slug, elementIndex: d.elementIndex, currentImage: d.currentImage };
+      pendingCardPick = null;
+      openPicker(d.currentImage);
+    }
+    if (d.type === 'rd_pick_card_image') {
+      pendingCardPick = { cardId: d.cardId };
+      pendingPick = null;
+      openPicker(d.currentImage);
+    }
+  });
+
+  // ── Image Picker ─────────────────────────────────────────────────────────
+  const PICKER_PAGE_SIZE = 36;
+  let pickerCurrentImages = [];  // filtered list currently showing
+  let pickerRenderedCount = 0;
+
+  async function openPicker(currentImage) {
+    selectedImage = null;
+    pickerUse.disabled = true;
+    pickerSelectedLabel.textContent = 'No image selected';
+    pickerSearch.value = '';
+    pickerActiveTab = 'all';
+    pickerBackdrop.classList.add('open');
+
+    if (!allImages.length) {
+      pickerGrid.innerHTML = '<div class="picker-loading">Loading images…</div>';
+      try {
+        allImages = await API('/admin/api/pages/images');
+      } catch(e) {
+        pickerGrid.innerHTML = '<div class="picker-loading">Error loading images</div>';
+        return;
+      }
+    }
+    buildPickerTabs(currentImage);
+    renderPickerGrid(allImages, currentImage, '');
+    pickerSearch.focus();
+  }
+
+  function buildPickerTabs(currentImage) {
+    // Collect unique projects (non-empty), sorted alphabetically
+    const projects = [...new Set(
+      allImages.map(i => i.project).filter(Boolean)
+    )].sort();
+    const hasEdited = allImages.some(i => i.has_renders);
+
+    const tabs = [{ key: 'all', label: 'All' }];
+    projects.forEach(p => tabs.push({ key: p, label: p }));
+    if (hasEdited) tabs.push({ key: '__edited__', label: '✦ Edited', edited: true });
+
+    pickerTabs.innerHTML = tabs.map(t =>
+      `<button class="picker-tab${t.edited ? ' edited' : ''}${pickerActiveTab === t.key ? ' active' : ''}"
+         data-tab="${t.key.replace(/"/g, '&quot;')}"
+         data-current="${(currentImage||'').replace(/"/g, '&quot;')}">
+         ${t.label}
+       </button>`
+    ).join('');
+  }
+
+  function setPickerTab(tab, currentImage) {
+    pickerActiveTab = tab;
+    // Update active style on tab buttons
+    pickerTabs.querySelectorAll('.picker-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    renderPickerGrid(allImages, currentImage, pickerSearch.value);
+  }
+
+  function renderPickerGrid(images, currentImage, query) {
+    const q = (query || '').toLowerCase();
+
+    // Tab filter first
+    let tabFiltered;
+    if (pickerActiveTab === 'all') {
+      tabFiltered = images;
+    } else if (pickerActiveTab === '__edited__') {
+      tabFiltered = images.filter(img => img.has_renders);
+    } else {
+      tabFiltered = images.filter(img => img.project === pickerActiveTab);
+    }
+
+    const filtered = q ? tabFiltered.filter(img =>
+      img.filename.toLowerCase().includes(q) ||
+      (img.label || '').toLowerCase().includes(q) ||
+      (img.project || '').toLowerCase().includes(q)
+    ) : tabFiltered;
+
+    if (!filtered.length) {
+      pickerGrid.innerHTML = '<div class="picker-loading">No images found</div>';
+      return;
+    }
+
+    pickerCurrentImages = filtered;
+    pickerRenderedCount = 0;
+    pickerGrid.innerHTML = '';
+    appendPickerBatch(currentImage);
+  }
+
+  function appendPickerBatch(currentImage) {
+    const batch = pickerCurrentImages.slice(pickerRenderedCount, pickerRenderedCount + PICKER_PAGE_SIZE);
+    batch.forEach(img => {
+      const div = document.createElement('div');
+      div.className = 'picker-item';
+      if (img.hero_path === currentImage) div.classList.add('current');
+      if (selectedImage && selectedImage.hero_path === img.hero_path) div.classList.add('selected');
+
+      const image = document.createElement('img');
+      image.src = img.thumb_path;
+      image.alt = img.filename;
+      image.loading = 'lazy';
+      image.onerror = () => { image.src = img.hero_path; };
+
+      const check = document.createElement('div');
+      check.className = 'check';
+      check.textContent = '✓';
+
+      const displayLabel = img.label || img.project || '';
+      const caption = document.createElement('div');
+      caption.className = 'picker-item__label';
+      caption.textContent = displayLabel || img.filename.substring(0, 20);
+      caption.title = displayLabel || img.filename;
+
+      div.appendChild(image);
+      div.appendChild(check);
+      div.appendChild(caption);
+      div.addEventListener('click', () => selectPickerImage(img));
+      pickerGrid.appendChild(div);
+    });
+    pickerRenderedCount += batch.length;
+
+    // Remove old sentinel if present
+    const oldSentinel = pickerGrid.querySelector('.picker-sentinel');
+    if (oldSentinel) oldSentinel.remove();
+
+    // Add sentinel + observer if more images remain
+    if (pickerRenderedCount < pickerCurrentImages.length) {
+      const sentinel = document.createElement('div');
+      sentinel.className = 'picker-sentinel';
+      sentinel.style.cssText = 'grid-column:1/-1;height:1px;';
+      pickerGrid.appendChild(sentinel);
+
+      const obs = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+          obs.disconnect();
+          appendPickerBatch(currentImage);
+        }
+      }, { root: pickerGrid, rootMargin: '200px' });
+      obs.observe(sentinel);
+    }
+  }
+
+  function selectPickerImage(img) {
+    selectedImage = img;
+    pickerUse.disabled = false;
+    pickerSelectedLabel.textContent = img.label || img.project || img.filename;
+
+    // Update visual selection
+    pickerGrid.querySelectorAll('.picker-item').forEach(el => {
+      const path = el.querySelector('img') && el.querySelector('img').alt;
+      el.classList.toggle('selected', img.filename === path);
+    });
+  }
+
+  // Tab click — event delegation so closure-scoped functions are reachable
+  pickerTabs.addEventListener('click', (e) => {
+    const btn = e.target.closest('.picker-tab');
+    if (!btn) return;
+    const tab     = btn.dataset.tab;
+    const current = btn.dataset.current || '';
+    setPickerTab(tab, current);
+  });
+
+  pickerSearch.addEventListener('input', () => {
+    const current = pendingPick ? pendingPick.currentImage : '';
+    renderPickerGrid(allImages, current, pickerSearch.value);
+  });
+
+
+  function closePicker() {
+    pickerBackdrop.classList.remove('open');  // display:none via CSS — no invisible overlay
+    pendingPick = null;
+    pendingCardPick = null;
+    selectedImage = null;
+    pickerActiveTab = 'all';
+    pickerTabs.innerHTML = '';
+  }
+  document.getElementById('pickerClose').addEventListener('click', closePicker);
+  document.getElementById('pickerCancel').addEventListener('click', closePicker);
+  pickerBackdrop.addEventListener('click', (e) => { if (e.target === pickerBackdrop) closePicker(); });
+
+  // Escape key closes the picker from anywhere on the page
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && pickerBackdrop.classList.contains('open')) closePicker();
+  });
+
+  pickerUse.addEventListener('click', async () => {
+    if (!selectedImage) return;
+    const newImage = selectedImage.hero_path;
+
+    // Card image pick — card overlay saves to DB via saveCard()
+    if (pendingCardPick) {
+      siteFrame.contentWindow.postMessage({ type: 'rd_set_card_image', cardId: pendingCardPick.cardId, newImage }, '*');
+      editStatus.textContent = 'Card image updated';
+      editStatus.className = 'edit-status ready';
+      closePicker();
+      return;
+    }
+
+    // Hero pick — save to pages DB + update iframe
+    if (!pendingPick) return;
+    const { slug, elementIndex } = pendingPick;
+
+    pickerUse.disabled = true;
+    pickerUse.textContent = 'Saving…';
+
+    try {
+      await API(`/admin/api/pages/${slug}`, {
+        method: 'PUT',
+        body: JSON.stringify({ hero_image: newImage })
+      });
+      siteFrame.contentWindow.postMessage({ type: 'rd_set_image', elementIndex, newImage }, '*');
+      editStatus.textContent = 'Saved — image updated';
+      editStatus.className = 'edit-status ready';
+    } catch(e) {
+      editStatus.textContent = 'Error saving — try again';
+      editStatus.className = 'edit-status';
+    } finally {
+      pickerUse.textContent = 'Use Image';
+      pickerUse.disabled = false;
+      closePicker();   // guaranteed to always close, even if the API throws
+    }
+  });
+
+  // Init
+  init();
+
+})();
+</script>
+
+<script>
+// ── AI Auto-Place (outside IIFE — uses global Admin) ─────────────────────────
+let _apProposals = [];  // [{slug, filename, hero_path, accepted: true}]
+
+function openAutoPlace() {
+  document.getElementById('autoPlaceModal').style.display = 'flex';
+  document.getElementById('apStatus').textContent = 'Ready. Press "Generate Proposals" to start.';
+  document.getElementById('apFill').style.width = '0%';
+  document.getElementById('apProposalWrap').style.display = 'none';
+  document.getElementById('apApplyBtn').style.display = 'none';
+  document.getElementById('apRunBtn').style.display = '';
+  _apProposals = [];
+}
+
+function closeAutoPlace() {
+  document.getElementById('autoPlaceModal').style.display = 'none';
+}
+
+async function runAutoPlace(dryRun = true) {
+  const runBtn  = document.getElementById('apRunBtn');
+  const status  = document.getElementById('apStatus');
+  const fill    = document.getElementById('apFill');
+  runBtn.disabled = true;
+  runBtn.textContent = '✦ Thinking…';
+  status.textContent = 'Connecting…';
+  fill.style.width = '10%';
+
+  try {
+    const res = await fetch('/admin/api/images/auto-place', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': Admin.getToken() },
+      body: JSON.stringify({ dry_run: true })
+    });
+    if (res.status === 401) { Admin.toast('Session expired', 'error'); setTimeout(() => Admin.logout(), 1500); return; }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const evt = JSON.parse(line.slice(6));
+          if (evt.type === 'status') {
+            status.textContent = evt.msg;
+            fill.style.width = Math.min(90, parseFloat(fill.style.width) + 15) + '%';
+          } else if (evt.type === 'done') {
+            fill.style.width = '100%';
+            _apProposals = (evt.assignments || []).map(a => ({ ...a, accepted: true }));
+            renderProposalTable();
+            document.getElementById('apProposalWrap').style.display = '';
+            document.getElementById('apApplyBtn').style.display = '';
+            runBtn.textContent = '↺ Re-generate';
+            status.textContent = `${_apProposals.length} proposals ready — review below, then click Apply.`;
+            if (evt.skipped?.length) {
+              status.textContent += ` (${evt.skipped.length} pages skipped — image file not found)`;
+            }
+          } else if (evt.type === 'error') {
+            status.textContent = 'Error: ' + (evt.msg || evt.error);
+          }
+        } catch(e) {}
+      }
+    }
+  } catch(e) {
+    status.textContent = 'Failed: ' + e.message;
+  } finally {
+    runBtn.disabled = false;
+  }
+}
+
+function renderProposalTable() {
+  const tbody = document.getElementById('apTableBody');
+  const meta  = document.getElementById('apProposalMeta');
+  meta.textContent = `${_apProposals.length} assignments — uncheck any you want to skip`;
+  tbody.innerHTML = _apProposals.map((p, i) => `
+    <tr style="border-bottom:1px solid var(--border,#2a3748)">
+      <td style="padding:6px 8px;color:var(--text,#e2e8f0)">${escHtml(p.slug)}</td>
+      <td style="padding:6px 8px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:40px;height:28px;border-radius:3px;background:center/cover url('${escHtml(p.hero_path)}') var(--surface-1,#0d1a22);flex-shrink:0"></div>
+          <span style="color:var(--text-2,#94a3b8);font-size:11px;word-break:break-all">${escHtml(p.filename)}</span>
+        </div>
+      </td>
+      <td style="padding:6px 8px;text-align:center">
+        <input type="checkbox" ${p.accepted ? 'checked' : ''} onchange="_apProposals[${i}].accepted=this.checked" style="accent-color:var(--accent,#3b82f6)">
+      </td>
+    </tr>
+  `).join('');
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function applyAutoPlace() {
+  const accepted = _apProposals.filter(p => p.accepted);
+  if (!accepted.length) { Admin.toast('No assignments selected', 'error'); return; }
+
+  const applyBtn = document.getElementById('apApplyBtn');
+  applyBtn.disabled = true;
+  applyBtn.textContent = 'Applying…';
+
+  try {
+    const res = await fetch('/admin/api/images/auto-place', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': Admin.getToken() },
+      body: JSON.stringify({ dry_run: false })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    // Drain the SSE stream to completion
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+    }
+
+    Admin.toast(`Applied ${accepted.length} hero image assignments`, 'success');
+    closeAutoPlace();
+  } catch(e) {
+    Admin.toast('Apply failed: ' + e.message, 'error');
+  } finally {
+    applyBtn.disabled = false;
+    applyBtn.textContent = 'Apply Selected →';
+  }
+}
+</script>
+</body>
+</html>

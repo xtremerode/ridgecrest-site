@@ -1,0 +1,17 @@
+[Unit]
+Description=Ridgecrest Designs Preview Server
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/claudeuser/agent
+ExecStart=/root/agent/venv/bin/python /home/claudeuser/agent/preview_server.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/preview_server.log
+StandardError=append:/var/log/preview_server.log
+
+[Install]
+WantedBy=multi-user.target

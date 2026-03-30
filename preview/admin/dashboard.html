@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — Ridgecrest Admin</title>
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-wordmark">Ridgecrest Designs</div>
+      <div class="sidebar-sub">Admin Panel</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <a href="dashboard.html" class="nav-item" data-page="dashboard">
+        <span class="nav-icon">◈</span> Dashboard
+      </a>
+      <div class="nav-section-label">Leads</div>
+      <a href="leads.html" class="nav-item" data-page="leads">
+        <span class="nav-icon">◉</span> Lead Inbox
+        <span class="nav-badge" id="navLeadBadge" style="display:none"></span>
+      </a>
+      <div class="nav-section-label">Content</div>
+      <a href="blog.html" class="nav-item" data-page="blog">
+        <span class="nav-icon">✎</span> Blog (RD Edit)
+      </a>
+      <a href="portfolio.html" class="nav-item" data-page="portfolio">
+        <span class="nav-icon">▣</span> Portfolio
+      </a>
+      <a href="team.html" class="nav-item" data-page="team">
+        <span class="nav-icon">◎</span> Team
+      </a>
+      <a href="pages.html" class="nav-item" data-page="pages">
+        <span class="nav-icon">◧</span> Pages
+      </a>
+      <a href="media.html" class="nav-item" data-page="media">
+        <span class="nav-icon">◆</span> Media Library
+      </a>
+      <div class="nav-section-label">Growth</div>
+      <a href="analytics.html" class="nav-item" data-page="analytics">
+        <span class="nav-icon">▲</span> Analytics
+      </a>
+      <a href="seo.html" class="nav-item" data-page="seo">
+        <span class="nav-icon">◻</span> SEO
+      </a>
+      <div class="nav-section-label">System</div>
+      <a href="settings.html" class="nav-item" data-page="settings">
+        <span class="nav-icon">⊙</span> Settings
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar">H</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name">Henry</div>
+          <div class="sidebar-user-role">Administrator</div>
+        </div>
+        <button class="sidebar-logout" data-action="logout" title="Sign out">⏻</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="header">
+      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+      <div>
+        <div class="header-title">Dashboard</div>
+        <div class="header-subtitle" id="headerDate"></div>
+      </div>
+      <div class="header-actions">
+        <div class="header-chip">
+          <span class="header-chip-dot"></span>
+          Site Live
+        </div>
+        <a href="/view/index.html" target="_blank" class="btn btn-ghost btn-sm">View Site →</a>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- KPI Row -->
+      <div class="kpi-grid" id="kpiGrid">
+        <div class="kpi-card green">
+          <div class="kpi-label">New Leads (30d)</div>
+          <div class="kpi-value" id="kpiLeads">—</div>
+          <div class="kpi-delta" id="kpiLeadsDelta">Loading…</div>
+        </div>
+        <div class="kpi-card gold">
+          <div class="kpi-label">Avg CPL</div>
+          <div class="kpi-value" id="kpiCpl">—</div>
+          <div class="kpi-delta">Target: $150–$500</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Total Ad Spend (30d)</div>
+          <div class="kpi-value" id="kpiSpend">—</div>
+          <div class="kpi-delta" id="kpiSpendDelta">Loading…</div>
+        </div>
+        <div class="kpi-card yellow">
+          <div class="kpi-label">Open Inquiries</div>
+          <div class="kpi-value" id="kpiOpen">—</div>
+          <div class="kpi-delta">Awaiting follow-up</div>
+        </div>
+      </div>
+
+      <!-- Main Grid -->
+      <div class="grid-2">
+
+        <!-- Recent Leads -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Recent Leads</div>
+              <div class="card-sub">Last 10 project inquiries</div>
+            </div>
+            <a href="leads.html" class="btn btn-ghost btn-sm">View All →</a>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Service</th>
+                  <th>Status</th>
+                  <th>Received</th>
+                </tr>
+              </thead>
+              <tbody id="recentLeadsBody">
+                <tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-3)"><span class="loader"></span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Campaign Performance -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Campaign Performance</div>
+              <div class="card-sub">Active campaigns · last 7 days</div>
+            </div>
+            <a href="analytics.html" class="btn btn-ghost btn-sm">Full Report →</a>
+          </div>
+          <div class="campaign-mini-grid" id="campaignGrid">
+            <div style="padding:24px;text-align:center;color:var(--text-3)"><span class="loader"></span></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Second Row -->
+      <div class="grid-2">
+
+        <!-- Activity Feed -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Recent Activity</div>
+          </div>
+          <div class="card-body">
+            <div class="activity-feed" id="activityFeed">
+              <div style="text-align:center;color:var(--text-3)"><span class="loader"></span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Actions + System Status -->
+        <div style="display:flex;flex-direction:column;gap:16px">
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Quick Actions</div>
+            </div>
+            <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+              <a href="leads.html" class="btn btn-ghost" style="justify-content:flex-start;gap:10px"><span>◉</span> Review Lead Inbox</a>
+              <a href="portfolio.html?action=add" class="btn btn-ghost" style="justify-content:flex-start;gap:10px"><span>▣</span> Add Portfolio Project</a>
+              <a href="/view/index.html" target="_blank" class="btn btn-ghost" style="justify-content:flex-start;gap:10px"><span>◈</span> Preview Website</a>
+              <a href="analytics.html" class="btn btn-ghost" style="justify-content:flex-start;gap:10px"><span>▲</span> View Analytics</a>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">System Status</div>
+            </div>
+            <div class="card-body">
+              <div class="settings-section" id="systemStatus">
+                <div class="setting-row">
+                  <div class="setting-info">
+                    <div class="setting-label">Orchestrator</div>
+                    <div class="setting-desc">Ridgecrest Marketing Automation</div>
+                  </div>
+                  <span class="badge badge-gray" id="statusOrchestrator">Checking…</span>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-info">
+                    <div class="setting-label">Campaign Automation</div>
+                    <div class="setting-desc">Meta · Microsoft · Google Ads</div>
+                  </div>
+                  <span class="badge" id="statusAutomation">Checking…</span>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-info">
+                    <div class="setting-label">Active Ad Days</div>
+                    <div class="setting-desc">Fri · Sat · Sun · Mon</div>
+                  </div>
+                  <span class="badge badge-green">Configured</span>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-info">
+                    <div class="setting-label">Weekly Budget</div>
+                    <div class="setting-desc">Max $1,000 / week</div>
+                  </div>
+                  <span class="badge badge-blue">Enforced</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script src="js/admin.js"></script>
+<script>
+  if (!Admin.requireAuth()) throw new Error('unauth');
+  Admin.init('dashboard');
+
+  // Set date
+  document.getElementById('headerDate').textContent =
+    new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+  // Load dashboard data
+  async function loadDashboard() {
+    // KPIs
+    const kpi = await Admin.get('/dashboard');
+    if (kpi) {
+      document.getElementById('kpiLeads').textContent = kpi.leads_30d ?? '—';
+      document.getElementById('kpiLeadsDelta').textContent = kpi.leads_delta ?? '';
+      document.getElementById('kpiCpl').textContent = kpi.avg_cpl ? `$${kpi.avg_cpl}` : '—';
+      document.getElementById('kpiSpend').textContent = kpi.spend_30d ? `$${kpi.spend_30d.toLocaleString()}` : '—';
+      document.getElementById('kpiSpendDelta').textContent = kpi.spend_delta ?? '';
+      document.getElementById('kpiOpen').textContent = kpi.open_inquiries ?? '—';
+
+      // Lead badge in nav
+      if (kpi.open_inquiries > 0) {
+        const badge = document.getElementById('navLeadBadge');
+        badge.textContent = kpi.open_inquiries;
+        badge.style.display = '';
+      }
+    }
+
+    // Recent leads
+    const leads = await Admin.get('/leads?limit=8');
+    const tbody = document.getElementById('recentLeadsBody');
+    if (leads && leads.items && leads.items.length) {
+      tbody.innerHTML = leads.items.map(l => `
+        <tr onclick="location.href='leads.html'" style="cursor:pointer">
+          <td><strong>${l.name || '—'}</strong><br><span class="td-light" style="font-size:11px">${l.email || ''}</span></td>
+          <td class="td-light">${l.service || '—'}</td>
+          <td>${statusBadge(l.status)}</td>
+          <td class="td-light">${Admin.timeAgo(l.created_at)}</td>
+        </tr>
+      `).join('');
+    } else {
+      tbody.innerHTML = `<tr><td colspan="4"><div class="empty"><div class="empty-icon">◉</div><div class="empty-title">No leads yet</div><div class="empty-sub">Leads from your inquiry form will appear here</div></div></td></tr>`;
+    }
+
+    // Campaigns
+    const campaigns = await Admin.get('/campaigns?limit=6');
+    const cGrid = document.getElementById('campaignGrid');
+    if (campaigns && campaigns.length) {
+      cGrid.innerHTML = campaigns.map(c => `
+        <div class="campaign-mini">
+          <span class="status-dot ${c.status === 'ENABLED' ? 'green' : 'gray'}"></span>
+          <span class="campaign-mini-name">${c.name}</span>
+          <span class="campaign-mini-platform">${platformLabel(c.platform)}</span>
+          <span class="campaign-mini-spend">${c.spend ? '$' + Number(c.spend).toFixed(0) : '—'}</span>
+          <span class="campaign-mini-cpl">${c.cpl ? 'CPL $' + Number(c.cpl).toFixed(0) : ''}</span>
+        </div>
+      `).join('');
+    } else {
+      cGrid.innerHTML = `<div class="empty" style="padding:32px"><div class="empty-title">No campaign data</div><div class="empty-sub">Campaign sync requires Meta/Google API access</div></div>`;
+    }
+
+    // Activity
+    const activity = await Admin.get('/activity');
+    const feed = document.getElementById('activityFeed');
+    if (activity && activity.length) {
+      feed.innerHTML = activity.map(a => `
+        <div class="activity-item">
+          <div class="activity-dot ${a.color || ''}"></div>
+          <div>
+            <div class="activity-text">${a.text}</div>
+            <div class="activity-time">${Admin.formatDateTime(a.created_at)}</div>
+          </div>
+        </div>
+      `).join('');
+    } else {
+      feed.innerHTML = `<div style="color:var(--text-3);font-size:13px;text-align:center;padding:20px">No recent activity</div>`;
+    }
+
+    // System status
+    const sys = await Admin.get('/system');
+    if (sys) {
+      const orchEl = document.getElementById('statusOrchestrator');
+      orchEl.textContent = sys.orchestrator_running ? 'Running' : 'Stopped';
+      orchEl.className = 'badge ' + (sys.orchestrator_running ? 'badge-green' : 'badge-red');
+
+      const autoEl = document.getElementById('statusAutomation');
+      autoEl.textContent = sys.automation_enabled ? 'Active' : 'Manual Mode';
+      autoEl.className = 'badge ' + (sys.automation_enabled ? 'badge-green' : 'badge-yellow');
+    }
+  }
+
+  function statusBadge(s) {
+    const map = { new: 'badge-blue', contacted: 'badge-yellow', qualified: 'badge-green', closed: 'badge-gray', dead: 'badge-red' };
+    return `<span class="badge ${map[s] || 'badge-gray'}">${s || 'new'}</span>`;
+  }
+
+  function platformLabel(p) {
+    const map = { meta: 'META', google_ads: 'GOOG', microsoft_ads: 'MSFT' };
+    return map[p] || p || '—';
+  }
+
+  loadDashboard();
+</script>
+</body>
+</html>

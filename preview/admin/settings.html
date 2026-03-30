@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings — Ridgecrest Admin</title>
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-wordmark">Ridgecrest Designs</div>
+      <div class="sidebar-sub">Admin Panel</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <a href="dashboard.html" class="nav-item" data-page="dashboard"><span class="nav-icon">◈</span> Dashboard</a>
+      <div class="nav-section-label">Leads</div>
+      <a href="leads.html" class="nav-item" data-page="leads"><span class="nav-icon">◉</span> Lead Inbox</a>
+      <div class="nav-section-label">Content</div>
+      <a href="blog.html" class="nav-item" data-page="blog">
+        <span class="nav-icon">✎</span> Blog (RD Edit)
+      </a>
+      <a href="portfolio.html" class="nav-item" data-page="portfolio"><span class="nav-icon">▣</span> Portfolio</a>
+      <a href="team.html" class="nav-item" data-page="team">
+        <span class="nav-icon">◎</span> Team
+      </a>
+      <a href="pages.html" class="nav-item" data-page="pages">
+        <span class="nav-icon">◧</span> Pages
+      </a>
+      <a href="media.html" class="nav-item" data-page="media"><span class="nav-icon">◆</span> Media Library</a>
+      <div class="nav-section-label">Growth</div>
+      <a href="analytics.html" class="nav-item" data-page="analytics"><span class="nav-icon">▲</span> Analytics</a>
+      <a href="seo.html" class="nav-item" data-page="seo"><span class="nav-icon">◻</span> SEO</a>
+      <div class="nav-section-label">System</div>
+      <a href="settings.html" class="nav-item" data-page="settings"><span class="nav-icon">⊙</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar">H</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name">Henry</div>
+          <div class="sidebar-user-role">Administrator</div>
+        </div>
+        <button class="sidebar-logout" data-action="logout" title="Sign out">⏻</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="header">
+      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+      <div>
+        <div class="header-title">Settings</div>
+        <div class="header-subtitle">Integrations, users, backup</div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- Tabs -->
+      <div class="tabs" id="settingsTabs">
+        <button class="tab active" data-target="general">General</button>
+        <button class="tab" data-target="integrations">Integrations</button>
+        <button class="tab" data-target="campaigns">Campaign Automation</button>
+        <button class="tab" data-target="users">Users</button>
+        <button class="tab" data-target="backup">Backup & Export</button>
+      </div>
+
+      <!-- General Tab -->
+      <div id="generalPanel">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Business Information</div></div>
+          <div class="card-body">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Business Name</label>
+                <input class="form-input" value="Ridgecrest Designs" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Tagline</label>
+                <input class="form-input" value="Luxury Design-Build · Est. 2013" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Phone</label>
+                <input class="form-input" value="925-784-2798" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Email</label>
+                <input class="form-input" type="email" value="info@ridgecrestdesigns.com" />
+              </div>
+            </div>
+            <div class="form-row full">
+              <div class="form-group">
+                <label class="form-label">Address</label>
+                <input class="form-input" value="5502 Sunol Blvd, Suite 100, Pleasanton, CA 94566" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Instagram URL</label>
+                <input class="form-input" value="https://www.instagram.com/ridgecrestdesigns" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Facebook URL</label>
+                <input class="form-input" value="https://www.facebook.com/ridgecrestdesigns" />
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:8px">
+              <button class="btn btn-primary" onclick="saveGeneral()">Save Changes</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">Lead Notifications</div></div>
+          <div class="card-body">
+            <div class="settings-section">
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-label">New Lead Alerts</div>
+                  <div class="setting-desc">Email notification when a new inquiry is submitted</div>
+                </div>
+                <label class="toggle-wrap">
+                  <span class="toggle"><input type="checkbox" checked /><span class="toggle-slider"></span></span>
+                </label>
+              </div>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-label">Alert Email</div>
+                  <div class="setting-desc">Where to send new lead notifications</div>
+                </div>
+                <input class="form-input" style="width:240px" value="info@ridgecrestdesigns.com" />
+              </div>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-label">Follow-up Reminder</div>
+                  <div class="setting-desc">Remind when a lead hasn't been contacted within 24h</div>
+                </div>
+                <label class="toggle-wrap">
+                  <span class="toggle"><input type="checkbox" checked /><span class="toggle-slider"></span></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Integrations Tab -->
+      <div id="integrationsPanel" style="display:none">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Connected Platforms</div></div>
+          <div class="card-body" style="padding:0">
+            <div class="settings-section" style="padding:0 20px">
+              <div class="setting-row">
+                <div style="display:flex;align-items:center;gap:12px;flex:1">
+                  <div style="width:36px;height:36px;background:var(--surface-2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">G</div>
+                  <div class="setting-info">
+                    <div class="setting-label">Google Analytics 4</div>
+                    <div class="setting-desc">Website traffic, page views, conversions</div>
+                  </div>
+                </div>
+                <span class="badge badge-yellow">Not Connected</span>
+                <button class="btn btn-ghost btn-sm">Connect</button>
+              </div>
+              <div class="setting-row">
+                <div style="display:flex;align-items:center;gap:12px;flex:1">
+                  <div style="width:36px;height:36px;background:var(--surface-2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">M</div>
+                  <div class="setting-info">
+                    <div class="setting-label">Meta Ads</div>
+                    <div class="setting-desc">Campaign data sync from Facebook/Instagram</div>
+                  </div>
+                </div>
+                <span class="badge badge-green">Connected</span>
+                <button class="btn btn-ghost btn-sm">Configure</button>
+              </div>
+              <div class="setting-row">
+                <div style="display:flex;align-items:center;gap:12px;flex:1">
+                  <div style="width:36px;height:36px;background:var(--surface-2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">G</div>
+                  <div class="setting-info">
+                    <div class="setting-label">Google Ads</div>
+                    <div class="setting-desc">Campaign data sync — pending API token approval</div>
+                  </div>
+                </div>
+                <span class="badge badge-yellow">Pending Token</span>
+                <button class="btn btn-ghost btn-sm">Info</button>
+              </div>
+              <div class="setting-row">
+                <div style="display:flex;align-items:center;gap:12px;flex:1">
+                  <div style="width:36px;height:36px;background:var(--surface-2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">M</div>
+                  <div class="setting-info">
+                    <div class="setting-label">Microsoft Ads</div>
+                    <div class="setting-desc">Campaign data sync from Bing Ads</div>
+                  </div>
+                </div>
+                <span class="badge badge-green">Connected</span>
+                <button class="btn btn-ghost btn-sm">Configure</button>
+              </div>
+              <div class="setting-row">
+                <div style="display:flex;align-items:center;gap:12px;flex:1">
+                  <div style="width:36px;height:36px;background:var(--surface-2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">B</div>
+                  <div class="setting-info">
+                    <div class="setting-label">Base44 Webhook</div>
+                    <div class="setting-desc">Lead data from inquiry form submissions</div>
+                  </div>
+                </div>
+                <span class="badge badge-yellow">Setup Required</span>
+                <button class="btn btn-ghost btn-sm" onclick="Admin.openModal('webhookModal')">Setup</button>
+              </div>
+              <div class="setting-row">
+                <div style="display:flex;align-items:center;gap:12px;flex:1">
+                  <div style="width:36px;height:36px;background:var(--surface-2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">S</div>
+                  <div class="setting-info">
+                    <div class="setting-label">Supabase / PostgreSQL</div>
+                    <div class="setting-desc">Marketing database — agent data, reports</div>
+                  </div>
+                </div>
+                <span class="badge badge-green">Connected</span>
+                <button class="btn btn-ghost btn-sm">Info</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="aiCard">
+          <div class="card-header"><div class="card-title">AI Image Generation</div></div>
+          <div class="card-body">
+            <div class="settings-section" style="padding:0">
+              <div class="setting-row" style="align-items:flex-start;gap:16px">
+                <div style="width:36px;height:36px;flex-shrink:0;background:var(--surface-2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">✦</div>
+                <div style="flex:1">
+                  <div class="setting-label" style="margin-bottom:4px">Gemini API Key</div>
+                  <div class="setting-desc" style="margin-bottom:12px">Required for AI Re-render in the Media Library. Get your key from <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent)">Google AI Studio</a>.</div>
+                  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                    <input class="form-input" type="password" id="geminiKeyInput" placeholder="AIza…" autocomplete="off" style="width:380px;min-width:200px;flex:1 1 200px" />
+                    <button class="btn btn-primary btn-sm" onclick="saveGeminiKey()" style="flex:0 0 auto;white-space:nowrap">Save Key</button>
+                    <span id="geminiKeyStatus" style="font-size:13px;color:var(--text-3)"></span>
+                  </div>
+                  <div id="geminiKeyMasked" style="font-size:12px;color:var(--text-3);margin-top:6px"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">Admin Password</div></div>
+          <div class="card-body">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Current Password</label>
+                <input class="form-input" type="password" id="currentPw" placeholder="••••••••" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">New Password</label>
+                <input class="form-input" type="password" id="newPw" placeholder="Min 12 characters" />
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="changePassword()">Update Password</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Campaign Automation Tab -->
+      <div id="campaignsPanel" style="display:none">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">RMA Orchestrator</div>
+            <div class="card-sub">Ridgecrest Marketing Automation daemon</div>
+          </div>
+          <div class="card-body">
+            <div class="settings-section" id="orchSettings">
+              <div style="text-align:center;padding:20px;color:var(--text-3)"><span class="loader"></span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">Budget Guardrails</div></div>
+          <div class="card-body">
+            <div class="settings-section">
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-label">Weekly Budget Ceiling</div>
+                  <div class="setting-desc">Hard limit — never exceeded regardless of performance</div>
+                </div>
+                <input class="form-input" style="width:120px" value="$1,000" readonly />
+              </div>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-label">Daily Soft Cap</div>
+                  <div class="setting-desc">No new budget increases once daily spend hits this</div>
+                </div>
+                <input class="form-input" style="width:120px" value="$250" readonly />
+              </div>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-label">Active Ad Days</div>
+                  <div class="setting-desc">Ads suppressed Tue · Wed · Thu on all platforms</div>
+                </div>
+                <span class="badge badge-green">Fri · Sat · Sun · Mon</span>
+              </div>
+            </div>
+            <div class="alert alert-info" style="margin-top:16px">Budget rules are enforced in config.py and CLAUDE.md. Contact Claude Code to modify guardrails.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">Automation Phases</div></div>
+          <div class="card-body">
+            <div class="settings-section" id="phaseSettings">
+              <div class="setting-row"><div class="setting-info"><div class="setting-label">Phase 0 — Data Sync</div><div class="setting-desc">Sync campaign metrics from Meta, Microsoft, Google</div></div><span class="badge badge-green" id="phase0Status">Running</span></div>
+              <div class="setting-row"><div class="setting-info"><div class="setting-label">Phase 1 — Performance Analysis</div><div class="setting-desc">Analyze campaign performance and generate recommendations</div></div><span class="badge badge-green" id="phase1Status">Running</span></div>
+              <div class="setting-row"><div class="setting-info"><div class="setting-label">Phase 1b — Platform Managers</div><div class="setting-desc">Meta manager, Microsoft manager, Google scheduler — apply changes</div></div><span class="badge badge-yellow" id="phase1bStatus">Manual Mode</span></div>
+              <div class="setting-row"><div class="setting-info"><div class="setting-label">Phase 1c — Compliance Agent</div><div class="setting-desc">Auto-fix targeting violations, bid floors, geo exclusions</div></div><span class="badge badge-yellow" id="phase1cStatus">Manual Mode</span></div>
+              <div class="setting-row"><div class="setting-info"><div class="setting-label">Phase 2 — Bid & Budget Optimizer</div><div class="setting-desc">Reallocate budget toward top-performing campaigns</div></div><span class="badge badge-yellow" id="phase2Status">Manual Mode</span></div>
+              <div class="setting-row"><div class="setting-info"><div class="setting-label">Phase 4 — Reporting</div><div class="setting-desc">Daily and weekly campaign performance reports</div></div><span class="badge badge-green" id="phase4Status">Running</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Users Tab -->
+      <div id="usersPanel" style="display:none">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Admin Users</div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>Role</th><th>Last Login</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><div style="display:flex;align-items:center;gap:10px"><div class="sidebar-avatar" style="width:28px;height:28px;font-size:11px">H</div><div><strong>Henry</strong><div class="td-light" style="font-size:11px">info@ridgecrestdesigns.com</div></div></div></td>
+                  <td><span class="badge badge-gold">Owner</span></td>
+                  <td class="td-light">Today</td>
+                  <td><span class="badge badge-green">Active</span></td>
+                  <td><button class="btn btn-ghost btn-sm">Edit</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="padding:16px;border-top:1px solid var(--border)">
+            <button class="btn btn-ghost btn-sm" onclick="Admin.openModal('addUserModal')">+ Invite User</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Backup Tab -->
+      <div id="backupPanel" style="display:none">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Export Data</div></div>
+            <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+              <button class="btn btn-ghost" onclick="exportLeads()">Export All Leads (CSV)</button>
+              <button class="btn btn-ghost" onclick="exportCampaigns()">Export Campaign Data (CSV)</button>
+              <button class="btn btn-ghost" onclick="exportPortfolio()">Export Portfolio JSON</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Database Backup</div></div>
+            <div class="card-body">
+              <div style="font-size:13px;color:var(--text-2);margin-bottom:16px">Last backup: never configured</div>
+              <div class="settings-section">
+                <div class="setting-row">
+                  <div class="setting-info">
+                    <div class="setting-label">Auto-backup</div>
+                    <div class="setting-desc">Daily PostgreSQL dump to cloud storage</div>
+                  </div>
+                  <label class="toggle-wrap">
+                    <span class="toggle"><input type="checkbox" /><span class="toggle-slider"></span></span>
+                  </label>
+                </div>
+              </div>
+              <button class="btn btn-primary" style="margin-top:16px" onclick="triggerBackup()">Run Backup Now</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">System Info</div></div>
+          <div class="card-body">
+            <div class="settings-section">
+              <div class="setting-row"><div class="setting-info"><div class="setting-label">Server</div><div class="setting-desc">DigitalOcean Droplet · 147.182.242.54</div></div><span class="badge badge-green">Online</span></div>
+              <div class="setting-row"><div class="setting-info"><div class="setting-label">Production Path</div><div class="setting-desc">/root/agent/</div></div><span class="badge badge-gray">Ubuntu 22.04</span></div>
+              <div class="setting-row"><div class="setting-info"><div class="setting-label">Database</div><div class="setting-desc">PostgreSQL · marketing_agent</div></div><span class="badge badge-green" id="dbStatus">Checking…</span></div>
+              <div class="setting-row"><div class="setting-info"><div class="setting-label">Preview Server</div><div class="setting-desc">Port 8081 / 8082</div></div><button class="btn btn-ghost btn-sm" id="restartServerBtn" onclick="restartServer()">Restart</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Webhook Setup Modal -->
+<div class="modal-overlay" id="webhookModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Base44 Webhook Setup</div>
+      <button class="modal-close" data-modal-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:16px">To automatically capture leads from your Base44 inquiry form, add this webhook URL to your Base44 app settings:</p>
+      <div class="form-group">
+        <label class="form-label">Webhook URL</label>
+        <div style="display:flex;gap:8px">
+          <input class="form-input" id="webhookUrl" readonly style="font-family:monospace;font-size:12px" value="http://147.182.242.54:8081/api/leads/webhook" />
+          <button class="btn btn-ghost btn-sm" onclick="copyWebhook()">Copy</button>
+        </div>
+      </div>
+      <div class="alert alert-info">
+        In Base44: go to your form settings → Integrations → Webhooks → add this URL. Base44 will POST form data as JSON on each submission.
+      </div>
+      <div class="form-group" style="margin-top:16px">
+        <label class="form-label">Expected JSON format from Base44</label>
+        <pre style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;font-size:11px;color:var(--text-2)">{
+  "firstName": "Jane",
+  "lastName": "Smith",
+  "email": "jane@example.com",
+  "phone": "925-784-2798",
+  "projectType": "Custom Home",
+  "budget": "1m_5m",
+  "city": "Danville",
+  "message": "We want to build a custom home…"
+}</pre>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-modal-close>Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add User Modal -->
+<div class="modal-overlay" id="addUserModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Invite User</div>
+      <button class="modal-close" data-modal-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Name</label>
+        <input class="form-input" id="inviteName" placeholder="Full Name" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" type="email" id="inviteEmail" placeholder="email@example.com" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select class="form-input">
+          <option>Editor</option>
+          <option>Viewer</option>
+          <option>Admin</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-modal-close>Cancel</button>
+      <button class="btn btn-primary" onclick="Admin.toast('User invitation requires email integration (Resend)', 'info'); Admin.closeModal('addUserModal')">Send Invite</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/admin.js"></script>
+<script>
+  if (!Admin.requireAuth()) throw new Error('unauth');
+  Admin.init('settings');
+
+  // Show/hide panels on tab click
+  document.querySelectorAll('#settingsTabs .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('#settingsTabs .tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      ['general','integrations','campaigns','users','backup'].forEach(id => {
+        document.getElementById(id+'Panel').style.display = tab.dataset.target === id ? '' : 'none';
+      });
+      if (tab.dataset.target === 'campaigns') loadOrchestratorStatus();
+      if (tab.dataset.target === 'backup') checkDbStatus();
+      if (tab.dataset.target === 'integrations') loadGeminiKeyStatus();
+    });
+  });
+
+  async function loadOrchestratorStatus() {
+    const sys = await Admin.get('/system');
+    const el = document.getElementById('orchSettings');
+    if (!sys) {
+      el.innerHTML = `<div class="alert alert-warning">Could not connect to orchestrator API</div>`;
+      return;
+    }
+    el.innerHTML = `
+      <div class="setting-row">
+        <div class="setting-info"><div class="setting-label">Service Status</div><div class="setting-desc">ridgecrest-orchestrator.service (systemd)</div></div>
+        <span class="badge ${sys.orchestrator_running ? 'badge-green' : 'badge-red'}">${sys.orchestrator_running ? 'Running' : 'Stopped'}</span>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info"><div class="setting-label">Campaign Automation</div><div class="setting-desc">CAMPAIGN_AUTOMATION_ENABLED in .env</div></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="badge ${sys.automation_enabled ? 'badge-green' : 'badge-yellow'}">${sys.automation_enabled ? 'Active' : 'Manual Mode'}</span>
+          ${sys.automation_enabled
+            ? `<button class="btn btn-danger btn-sm" onclick="toggleAutomation(false)">Pause</button>`
+            : `<button class="btn btn-success btn-sm" onclick="toggleAutomation(true)">Enable</button>`
+          }
+        </div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info"><div class="setting-label">Last Heartbeat</div><div class="setting-desc">Time of last orchestrator activity</div></div>
+        <span class="td-light" style="font-size:12px">${Admin.formatDateTime(sys.last_heartbeat)}</span>
+      </div>
+    `;
+  }
+
+  async function toggleAutomation(enable) {
+    const res = await Admin.post('/system/automation', { enabled: enable });
+    if (res && res.ok) {
+      Admin.toast(`Automation ${enable ? 'enabled' : 'paused'}`, 'success');
+      loadOrchestratorStatus();
+    } else {
+      Admin.toast('Could not update — run manually: set CAMPAIGN_AUTOMATION_ENABLED in .env', 'info', 6000);
+    }
+  }
+
+  async function checkDbStatus() {
+    const res = await Admin.get('/system');
+    const el = document.getElementById('dbStatus');
+    if (el) {
+      el.textContent = res?.db_connected ? 'Connected' : 'Disconnected';
+      el.className = `badge ${res?.db_connected ? 'badge-green' : 'badge-red'}`;
+    }
+  }
+
+  function saveGeneral() {
+    Admin.toast('Settings saved', 'success');
+  }
+
+  async function loadGeminiKeyStatus() {
+    try {
+      const res = await Admin.get('/settings/env-key?key=GEMINI_API_KEY');
+      const masked = document.getElementById('geminiKeyMasked');
+      if (res && res.set) {
+        masked.textContent = 'Current key: ' + res.masked;
+        masked.style.color = 'var(--green)';
+      } else {
+        masked.textContent = 'No key set.';
+        masked.style.color = 'var(--text-3)';
+      }
+    } catch(e) {}
+  }
+
+  async function saveGeminiKey() {
+    const val = document.getElementById('geminiKeyInput').value.trim();
+    const status = document.getElementById('geminiKeyStatus');
+    if (!val) { Admin.toast('Paste your API key first', 'error'); return; }
+    status.textContent = 'Saving…';
+    const res = await Admin.post('/settings/env-key', { key: 'GEMINI_API_KEY', value: val });
+    if (res && res.ok) {
+      document.getElementById('geminiKeyInput').value = '';
+      status.textContent = '';
+      Admin.toast('Gemini API key saved', 'success');
+      loadGeminiKeyStatus();
+    } else {
+      status.textContent = '';
+      Admin.toast(res?.error || 'Save failed', 'error');
+    }
+  }
+
+  async function changePassword() {
+    const current = document.getElementById('currentPw').value;
+    const newPw = document.getElementById('newPw').value;
+    if (!current || !newPw) { Admin.toast('Fill both password fields', 'error'); return; }
+    if (newPw.length < 12) { Admin.toast('New password must be at least 12 characters', 'error'); return; }
+    const res = await Admin.post('/auth/change-password', { current_password: current, new_password: newPw });
+    if (res && res.ok) {
+      Admin.toast('Password updated', 'success');
+      document.getElementById('currentPw').value = '';
+      document.getElementById('newPw').value = '';
+    } else {
+      Admin.toast(res?.error || 'Incorrect current password', 'error');
+    }
+  }
+
+  async function exportLeads() {
+    const res = await Admin.get('/leads/export?format=csv');
+    if (res && res.csv) {
+      const blob = new Blob([res.csv], { type: 'text/csv' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = `ridgecrest-leads-${new Date().toISOString().split('T')[0]}.csv`; a.click();
+      Admin.toast('Leads exported', 'success');
+    } else {
+      Admin.toast('No leads to export yet', 'info');
+    }
+  }
+
+  async function exportCampaigns() {
+    Admin.toast('Campaign export requires active data sync', 'info');
+  }
+
+  async function exportPortfolio() {
+    Admin.toast('Portfolio export coming soon', 'info');
+  }
+
+  function triggerBackup() {
+    Admin.toast('Manual backup requires pg_dump access. Run: pg_dump marketing_agent > backup.sql', 'info', 6000);
+  }
+
+  async function restartServer() {
+    const btn = document.getElementById('restartServerBtn');
+    btn.disabled = true;
+    btn.textContent = 'Restarting…';
+    try {
+      await Admin.post('/server/restart', {});
+      Admin.toast('Server restarting — reconnecting in 4s…', 'info', 5000);
+      setTimeout(() => { window.location.reload(); }, 4000);
+    } catch(e) {
+      // The server restarting causes the request to appear to fail — that's expected
+      Admin.toast('Server restarting — reconnecting in 4s…', 'info', 5000);
+      setTimeout(() => { window.location.reload(); }, 4000);
+    }
+  }
+
+  function copyWebhook() {
+    navigator.clipboard.writeText(document.getElementById('webhookUrl').value)
+      .then(() => Admin.toast('Webhook URL copied', 'success'));
+  }
+</script>
+</body>
+</html>

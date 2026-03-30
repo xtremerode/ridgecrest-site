@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blog — Ridgecrest Admin</title>
+  <link rel="stylesheet" href="css/admin.css" />
+  <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet" />
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-wordmark">Ridgecrest Designs</div>
+      <div class="sidebar-sub">Admin Panel</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <a href="dashboard.html" class="nav-item" data-page="dashboard">
+        <span class="nav-icon">◈</span> Dashboard
+      </a>
+      <div class="nav-section-label">Leads</div>
+      <a href="leads.html" class="nav-item" data-page="leads">
+        <span class="nav-icon">◉</span> Lead Inbox
+        <span class="nav-badge" id="navLeadBadge" style="display:none"></span>
+      </a>
+      <div class="nav-section-label">Content</div>
+      <a href="blog.html" class="nav-item nav-item--active" data-page="blog">
+        <span class="nav-icon">✎</span> Blog (RD Edit)
+      </a>
+      <a href="portfolio.html" class="nav-item" data-page="portfolio">
+        <span class="nav-icon">▣</span> Portfolio
+      </a>
+      <a href="team.html" class="nav-item" data-page="team">
+        <span class="nav-icon">◎</span> Team
+      </a>
+      <a href="pages.html" class="nav-item" data-page="pages">
+        <span class="nav-icon">◧</span> Pages
+      </a>
+      <a href="media.html" class="nav-item" data-page="media">
+        <span class="nav-icon">◆</span> Media Library
+      </a>
+      <div class="nav-section-label">Growth</div>
+      <a href="analytics.html" class="nav-item" data-page="analytics">
+        <span class="nav-icon">▲</span> Analytics
+      </a>
+      <a href="seo.html" class="nav-item" data-page="seo">
+        <span class="nav-icon">◻</span> SEO
+      </a>
+      <div class="nav-section-label">System</div>
+      <a href="settings.html" class="nav-item" data-page="settings">
+        <span class="nav-icon">⊙</span> Settings
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar">H</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name">Henry</div>
+          <div class="sidebar-user-role">Administrator</div>
+        </div>
+        <button class="sidebar-logout" data-action="logout" title="Sign out">⏻</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="header">
+      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+      <div>
+        <div class="header-title">The RD Edit</div>
+        <div class="header-subtitle">Blog post management</div>
+      </div>
+      <div class="header-actions">
+        <a href="/blog" target="_blank" class="btn btn-ghost btn-sm">View Blog →</a>
+        <button class="btn btn-primary btn-sm" id="newPostBtn">+ New Post</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- POST LIST VIEW -->
+      <div id="listView">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">All Posts</div>
+            <div class="blog-filter-row">
+              <select id="filterStatus" class="form-input form-input--sm">
+                <option value="">All statuses</option>
+                <option value="published">Published</option>
+                <option value="draft">Draft</option>
+              </select>
+            </div>
+          </div>
+          <div id="postsTable">
+            <div class="loading-state">Loading posts…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- POST EDITOR VIEW -->
+      <div id="editorView" style="display:none" class="editor-wrap">
+
+        <!-- Editor toolbar -->
+        <div class="blog-editor__header">
+          <button class="btn btn-ghost btn-sm" id="backToListBtn">← Back</button>
+          <div class="blog-editor__actions">
+            <button class="btn btn-ghost btn-sm" id="previewToggleBtn" title="Toggle preview pane">◫ Preview</button>
+            <a id="viewLiveBtn" href="#" target="_blank" class="btn btn-ghost btn-sm" style="display:none">↗ View Live</a>
+            <button class="btn btn-ghost btn-sm" id="saveDraftBtn">Save Draft</button>
+            <button class="btn btn-publish btn-sm" id="publishBtn">Publish</button>
+          </div>
+        </div>
+
+        <!-- Split: editor + preview -->
+        <div class="editor-split" id="editorSplit">
+
+          <!-- Left: content editing -->
+          <div class="editor-split__left">
+            <div class="blog-editor__body">
+              <div class="blog-editor__main">
+                <input type="text" id="postTitle" class="blog-title-input" placeholder="Post title…" />
+                <div id="quillEditor" class="blog-quill-editor"></div>
+              </div>
+
+              <div class="blog-editor__sidebar">
+
+                <div class="editor-panel">
+                  <div class="editor-panel__title">URL Slug</div>
+                  <input type="text" id="postSlug" class="form-input" placeholder="url-slug-here" />
+                  <p class="editor-panel__hint">/blog/<span id="slugPreview">url-slug-here</span></p>
+                </div>
+
+                <div class="editor-panel">
+                  <div class="editor-panel__title">Featured Image URL</div>
+                  <input type="text" id="postFeaturedImage" class="form-input" placeholder="https://…" />
+                  <div id="featuredImageThumb" class="featured-img-thumb" style="display:none"></div>
+                </div>
+
+                <div class="editor-panel">
+                  <div class="editor-panel__title">Excerpt</div>
+                  <textarea id="postExcerpt" class="form-input" rows="3" placeholder="Short summary shown in blog listing…"></textarea>
+                </div>
+
+                <div class="editor-panel">
+                  <div class="editor-panel__title">Category</div>
+                  <input type="text" id="postCategory" class="form-input" placeholder="e.g. Design Tips" list="categoryList" />
+                  <datalist id="categoryList">
+                    <option value="Design Tips">
+                    <option value="Design Trends">
+                    <option value="Design Process">
+                    <option value="Kitchen &amp; Bath">
+                    <option value="Custom Homes">
+                    <option value="Project Features">
+                    <option value="From the Team">
+                  </datalist>
+                </div>
+
+                <div class="editor-panel">
+                  <div class="editor-panel__title">Publish Date</div>
+                  <input type="date" id="postDate" class="form-input" />
+                </div>
+
+                <div class="editor-panel">
+                  <div class="editor-panel__title">SEO Title</div>
+                  <input type="text" id="postMetaTitle" class="form-input" placeholder="SEO title (under 60 chars)" />
+                  <p class="editor-panel__hint" id="metaTitleCount">0 / 60</p>
+                </div>
+
+                <div class="editor-panel">
+                  <div class="editor-panel__title">Meta Description</div>
+                  <textarea id="postMetaDesc" class="form-input" rows="3" placeholder="150–160 character summary for search engines"></textarea>
+                  <p class="editor-panel__hint" id="metaDescCount">0 / 160</p>
+                </div>
+
+                <div class="editor-panel">
+                  <button class="btn btn-danger btn-sm" id="deletePostBtn" style="display:none; width:100%">Delete Post</button>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: live preview iframe (hidden until toggled) -->
+          <div class="editor-split__preview" id="previewPane" style="display:none">
+            <div class="preview-toolbar">
+              <span class="preview-label">Live Preview</span>
+              <div class="preview-toolbar-actions">
+                <button class="btn btn-ghost btn-sm" id="refreshPreviewBtn" title="Reload preview">↺ Refresh</button>
+                <button class="btn btn-ghost btn-sm" id="closePreviewBtn">✕</button>
+              </div>
+            </div>
+            <iframe id="previewIframe" src="about:blank" class="preview-iframe" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+          </div>
+
+        </div><!-- .editor-split -->
+
+        <input type="hidden" id="postId" value="" />
+        <input type="hidden" id="postStatus" value="published" />
+      </div>
+
+    </div><!-- .content -->
+  </div><!-- .main -->
+</div><!-- .app -->
+
+<script src="https://cdn.quilljs.com/1.3.7/quill.js"></script>
+<script src="js/admin.js"></script>
+<script>
+(function() {
+  if (!Admin.isLoggedIn()) { window.location.href = 'index.html'; return; }
+  const token = Admin.getToken();
+
+  // DOM
+  const listView    = document.getElementById('listView');
+  const editorView  = document.getElementById('editorView');
+  const postsTable  = document.getElementById('postsTable');
+  const filterStatus = document.getElementById('filterStatus');
+  const postId        = document.getElementById('postId');
+  const postStatus    = document.getElementById('postStatus');
+  const postTitle     = document.getElementById('postTitle');
+  const postSlug      = document.getElementById('postSlug');
+  const postExcerpt   = document.getElementById('postExcerpt');
+  const postCategory  = document.getElementById('postCategory');
+  const postDate      = document.getElementById('postDate');
+  const postMetaTitle = document.getElementById('postMetaTitle');
+  const postMetaDesc  = document.getElementById('postMetaDesc');
+  const postFeaturedImage = document.getElementById('postFeaturedImage');
+  const featuredImageThumb = document.getElementById('featuredImageThumb');
+  const slugPreview   = document.getElementById('slugPreview');
+  const metaTitleCount = document.getElementById('metaTitleCount');
+  const metaDescCount  = document.getElementById('metaDescCount');
+  const deleteBtn     = document.getElementById('deletePostBtn');
+  const previewPane   = document.getElementById('previewPane');
+  const previewIframe = document.getElementById('previewIframe');
+  const viewLiveBtn   = document.getElementById('viewLiveBtn');
+  const editorSplit   = document.getElementById('editorSplit');
+
+  let allPosts = [];
+  let previewOpen = false;
+
+  // Quill
+  const quill = new Quill('#quillEditor', {
+    theme: 'snow',
+    placeholder: 'Write your post…',
+    modules: {
+      toolbar: [
+        [{ header: [2, 3, false] }],
+        ['bold', 'italic'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['blockquote', 'link'],
+        ['clean']
+      ]
+    }
+  });
+
+  // Sidebar toggle
+  document.getElementById('sidebarToggle').addEventListener('click', () => {
+    document.getElementById('sidebar').classList.toggle('open');
+  });
+
+  document.querySelector('[data-action="logout"]').addEventListener('click', () => {
+    Admin.logout(); window.location.href = 'index.html';
+  });
+
+  // ── Load posts ──────────────────────────────────────────────────────────────
+  async function loadPosts() {
+    postsTable.innerHTML = '<div class="loading-state">Loading…</div>';
+    try {
+      const res = await fetch('/admin/api/blog/posts', { headers: { 'X-Admin-Token': token } });
+      allPosts = await res.json();
+      renderTable();
+    } catch (e) {
+      postsTable.innerHTML = '<div class="empty-state">Failed to load posts.</div>';
+    }
+  }
+
+  function renderTable() {
+    const filterVal = filterStatus.value;
+    const posts = filterVal ? allPosts.filter(p => p.status === filterVal) : allPosts;
+    if (!posts.length) {
+      postsTable.innerHTML = '<div class="empty-state">No posts found.</div>';
+      return;
+    }
+    let html = '<table class="data-table"><thead><tr><th>Title</th><th>Category</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody>';
+    for (const p of posts) {
+      const date = p.published_at ? new Date(p.published_at).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '—';
+      const badge = p.status === 'published'
+        ? '<span class="badge badge--green">Published</span>'
+        : '<span class="badge badge--gray">Draft</span>';
+      html += `<tr>
+        <td><strong>${escHtml(p.title)}</strong><br><small style="color:var(--text-3)">/blog/${escHtml(p.slug)}</small></td>
+        <td>${escHtml(p.category || '—')}</td>
+        <td>${badge}</td>
+        <td>${date}</td>
+        <td style="text-align:right">
+          <button class="btn btn-ghost btn-sm" onclick="openEditor(${p.id})">Edit</button>
+          <a href="/blog/${escHtml(p.slug)}" target="_blank" class="btn btn-ghost btn-sm">View ↗</a>
+        </td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    postsTable.innerHTML = html;
+  }
+
+  filterStatus.addEventListener('change', renderTable);
+
+  // ── Views ───────────────────────────────────────────────────────────────────
+  function showList() {
+    listView.style.display = '';
+    editorView.style.display = 'none';
+    closePreview();
+  }
+
+  function showEditor() {
+    listView.style.display = 'none';
+    editorView.style.display = '';
+  }
+
+  // ── Preview panel ────────────────────────────────────────────────────────────
+  function openPreview() {
+    const slug = postSlug.value.trim();
+    if (!slug) return;
+    previewIframe.src = '/blog/' + slug + '?t=' + Date.now();
+    previewPane.style.display = '';
+    editorSplit.classList.add('preview-active');
+    previewOpen = true;
+    document.getElementById('previewToggleBtn').classList.add('active');
+  }
+
+  function closePreview() {
+    previewPane.style.display = 'none';
+    editorSplit.classList.remove('preview-active');
+    previewOpen = false;
+    document.getElementById('previewToggleBtn').classList.remove('active');
+  }
+
+  function refreshPreview() {
+    const slug = postSlug.value.trim();
+    if (slug) previewIframe.src = '/blog/' + slug + '?t=' + Date.now();
+  }
+
+  document.getElementById('previewToggleBtn').addEventListener('click', () => {
+    previewOpen ? closePreview() : openPreview();
+  });
+
+  document.getElementById('closePreviewBtn').addEventListener('click', closePreview);
+  document.getElementById('refreshPreviewBtn').addEventListener('click', refreshPreview);
+
+  // ── Featured image preview ───────────────────────────────────────────────────
+  postFeaturedImage.addEventListener('input', () => {
+    const url = postFeaturedImage.value.trim();
+    if (url) {
+      featuredImageThumb.style.backgroundImage = `url('${url}')`;
+      featuredImageThumb.style.display = '';
+    } else {
+      featuredImageThumb.style.display = 'none';
+    }
+  });
+
+  // ── Open editor ──────────────────────────────────────────────────────────────
+  window.openEditor = async function(id) {
+    clearForm();
+    if (id) {
+      try {
+        const res = await fetch('/admin/api/blog/posts/' + id, { headers: { 'X-Admin-Token': token } });
+        const p = await res.json();
+        postId.value = p.id;
+        postTitle.value = p.title || '';
+        postSlug.value = p.slug || '';
+        postExcerpt.value = p.excerpt || '';
+        postCategory.value = p.category || '';
+        postStatus.value = p.status || 'published';
+        postMetaTitle.value = p.meta_title || '';
+        postMetaDesc.value = p.meta_description || '';
+        postFeaturedImage.value = p.featured_image || '';
+        if (p.published_at) postDate.value = p.published_at.substring(0, 10);
+        quill.root.innerHTML = p.body || '';
+        slugPreview.textContent = p.slug || '';
+        updateCounts();
+        deleteBtn.style.display = '';
+        // Show/update featured image thumb
+        if (p.featured_image) {
+          featuredImageThumb.style.backgroundImage = `url('${p.featured_image}')`;
+          featuredImageThumb.style.display = '';
+        }
+        // Update View Live link
+        viewLiveBtn.href = '/blog/' + p.slug;
+        viewLiveBtn.style.display = '';
+      } catch (e) { alert('Failed to load post.'); return; }
+    } else {
+      postDate.value = new Date().toISOString().substring(0, 10);
+      deleteBtn.style.display = 'none';
+      viewLiveBtn.style.display = 'none';
+    }
+    showEditor();
+  };
+
+  function clearForm() {
+    postId.value = ''; postTitle.value = ''; postSlug.value = '';
+    postExcerpt.value = ''; postCategory.value = ''; postStatus.value = 'published';
+    postMetaTitle.value = ''; postMetaDesc.value = ''; postDate.value = '';
+    postFeaturedImage.value = '';
+    featuredImageThumb.style.display = 'none';
+    quill.setText('');
+    slugPreview.textContent = '';
+    updateCounts();
+    closePreview();
+  }
+
+  // ── Auto-slug ────────────────────────────────────────────────────────────────
+  postTitle.addEventListener('input', () => {
+    if (!postId.value) {
+      const slug = postTitle.value.toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '').trim()
+        .replace(/\s+/g, '-').replace(/-+/g, '-').substring(0, 80);
+      postSlug.value = slug;
+      slugPreview.textContent = slug;
+    }
+  });
+
+  postSlug.addEventListener('input', () => {
+    slugPreview.textContent = postSlug.value;
+    viewLiveBtn.href = '/blog/' + postSlug.value;
+  });
+
+  // ── SEO counts ───────────────────────────────────────────────────────────────
+  function updateCounts() {
+    const mt = postMetaTitle.value.length;
+    const md = postMetaDesc.value.length;
+    metaTitleCount.textContent = mt + ' / 60';
+    metaTitleCount.style.color = mt > 60 ? 'var(--red)' : 'var(--text-3)';
+    metaDescCount.textContent = md + ' / 160';
+    metaDescCount.style.color = md > 160 ? 'var(--red)' : 'var(--text-3)';
+  }
+  postMetaTitle.addEventListener('input', updateCounts);
+  postMetaDesc.addEventListener('input', updateCounts);
+
+  // ── Save ─────────────────────────────────────────────────────────────────────
+  async function savePost(status) {
+    const title = postTitle.value.trim();
+    const slug  = postSlug.value.trim();
+    if (!title || !slug) { alert('Title and slug are required.'); return false; }
+
+    const body = {
+      title, slug,
+      excerpt:          postExcerpt.value.trim(),
+      body:             quill.root.innerHTML,
+      category:         postCategory.value.trim(),
+      status:           status,
+      featured_image:   postFeaturedImage.value.trim(),
+      meta_title:       postMetaTitle.value.trim(),
+      meta_description: postMetaDesc.value.trim(),
+      published_at:     postDate.value || new Date().toISOString()
+    };
+
+    const id     = postId.value;
+    const url    = id ? '/admin/api/blog/posts/' + id : '/admin/api/blog/posts';
+    const method = id ? 'PUT' : 'POST';
+
+    try {
+      const res  = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.ok) {
+        if (!id && data.id) {
+          postId.value = data.id;
+          deleteBtn.style.display = '';
+          viewLiveBtn.href = '/blog/' + slug;
+          viewLiveBtn.style.display = '';
+        }
+        postStatus.value = status;
+        await loadPosts();
+        // Refresh preview if open
+        if (previewOpen) setTimeout(refreshPreview, 400);
+        return true;
+      } else {
+        alert('Error: ' + (data.error || 'Unknown'));
+        return false;
+      }
+    } catch (e) { alert('Save failed.'); return false; }
+  }
+
+  document.getElementById('saveDraftBtn').addEventListener('click', async () => {
+    const ok = await savePost('draft');
+    if (ok) showToast('Saved as draft');
+  });
+
+  document.getElementById('publishBtn').addEventListener('click', async () => {
+    const ok = await savePost('published');
+    if (ok) showToast('Published!', 'success');
+  });
+
+  // ── Delete ────────────────────────────────────────────────────────────────────
+  deleteBtn.addEventListener('click', async () => {
+    const id = postId.value;
+    if (!id || !confirm('Delete this post? This cannot be undone.')) return;
+    try {
+      await fetch('/admin/api/blog/posts/' + id, { method: 'DELETE', headers: { 'X-Admin-Token': token } });
+      await loadPosts();
+      showList();
+    } catch (e) { alert('Delete failed.'); }
+  });
+
+  document.getElementById('backToListBtn').addEventListener('click', showList);
+  document.getElementById('newPostBtn').addEventListener('click', () => openEditor(null));
+
+  // ── Toast ─────────────────────────────────────────────────────────────────────
+  function showToast(msg, type = 'info') {
+    const t = document.createElement('div');
+    t.className = 'toast toast--' + type;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.classList.add('show'), 10);
+    setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2500);
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────────
+  function escHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  loadPosts();
+})();
+</script>
+
+<style>
+/* ── Blog-specific styles ── */
+.editor-wrap { display: flex; flex-direction: column; height: 100%; overflow: hidden; gap: 0; }
+
+.blog-editor__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.blog-editor__actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+
+/* Split layout */
+.editor-split {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.editor-split__left {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+  min-width: 0;
+}
+
+.editor-split__preview {
+  width: 420px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+}
+
+.editor-split.preview-active .editor-split__left {
+  flex: 1;
+  min-width: 480px;
+}
+
+/* Editor body (metadata sidebar) */
+.blog-editor__body {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.blog-editor__main { display: flex; flex-direction: column; gap: 1rem; }
+
+.blog-title-input {
+  font-size: 1.4rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  width: 100%;
+  color: var(--text);
+  background: var(--surface-2);
+  font-family: inherit;
+}
+.blog-title-input:focus { outline: none; border-color: var(--accent); }
+
+.blog-quill-editor { min-height: 480px; background: var(--surface-2); }
+.ql-container { font-family: Georgia, serif; font-size: 1rem; }
+.ql-editor { min-height: 440px; line-height: 1.8; color: var(--text); }
+.ql-toolbar { border-color: var(--border) !important; background: var(--surface) !important; }
+.ql-container { border-color: var(--border) !important; }
+.ql-snow .ql-stroke { stroke: var(--text-2) !important; }
+.ql-snow .ql-fill { fill: var(--text-2) !important; }
+
+.blog-editor__sidebar { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.editor-panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.875rem;
+}
+.editor-panel__title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 0.5rem;
+}
+.editor-panel__hint { font-size: 0.72rem; color: var(--text-3); margin-top: 0.3rem; }
+
+.form-input--sm { padding: 0.3rem 0.6rem; font-size: 0.85rem; }
+.blog-filter-row { display: flex; gap: 0.5rem; }
+
+/* Featured image thumbnail */
+.featured-img-thumb {
+  margin-top: 0.5rem;
+  height: 120px;
+  border-radius: 4px;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--border);
+}
+
+/* Preview pane */
+.preview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--surface);
+}
+.preview-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.preview-toolbar-actions { display: flex; gap: 0.4rem; }
+
+.preview-iframe {
+  flex: 1;
+  border: none;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+}
+
+/* Publish button */
+.btn-publish {
+  background: var(--green);
+  color: #0a1a0a;
+  font-weight: 600;
+  border: none;
+}
+.btn-publish:hover { background: #16a34a; color: #fff; }
+
+/* Active preview toggle */
+.btn-ghost.active {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* Badges */
+.badge { display: inline-block; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.2rem 0.6rem; border-radius: 2px; }
+.badge--green { background: rgba(34,197,94,0.15); color: var(--green); }
+.badge--gray  { background: var(--surface-2); color: var(--text-3); }
+
+.btn-danger { background: rgba(239,68,68,0.1); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+.btn-danger:hover { background: rgba(239,68,68,0.2); }
+
+/* Toast notifications */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  color: var(--text);
+  padding: 10px 20px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all 0.25s ease;
+  z-index: 9999;
+  box-shadow: var(--shadow);
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast--success { border-color: rgba(34,197,94,0.4); color: var(--green); }
+.toast--info { border-color: var(--border-2); }
+
+@media (max-width: 960px) {
+  .blog-editor__body { grid-template-columns: 1fr; }
+  .editor-split__preview { display: none !important; }
+}
+</style>
+</body>
+</html>

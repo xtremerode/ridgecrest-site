@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin/
+Disallow: /admin/api/
+
+Sitemap: https://www.ridgecrestdesigns.com/sitemap.xml

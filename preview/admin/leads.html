@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lead Inbox — Ridgecrest Admin</title>
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-wordmark">Ridgecrest Designs</div>
+      <div class="sidebar-sub">Admin Panel</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <a href="dashboard.html" class="nav-item" data-page="dashboard"><span class="nav-icon">◈</span> Dashboard</a>
+      <div class="nav-section-label">Leads</div>
+      <a href="leads.html" class="nav-item" data-page="leads"><span class="nav-icon">◉</span> Lead Inbox</a>
+      <div class="nav-section-label">Content</div>
+      <a href="blog.html" class="nav-item" data-page="blog">
+        <span class="nav-icon">✎</span> Blog (RD Edit)
+      </a>
+      <a href="portfolio.html" class="nav-item" data-page="portfolio"><span class="nav-icon">▣</span> Portfolio</a>
+      <a href="team.html" class="nav-item" data-page="team">
+        <span class="nav-icon">◎</span> Team
+      </a>
+      <a href="pages.html" class="nav-item" data-page="pages">
+        <span class="nav-icon">◧</span> Pages
+      </a>
+      <a href="media.html" class="nav-item" data-page="media"><span class="nav-icon">◆</span> Media Library</a>
+      <div class="nav-section-label">Growth</div>
+      <a href="analytics.html" class="nav-item" data-page="analytics"><span class="nav-icon">▲</span> Analytics</a>
+      <a href="seo.html" class="nav-item" data-page="seo"><span class="nav-icon">◻</span> SEO</a>
+      <div class="nav-section-label">System</div>
+      <a href="settings.html" class="nav-item" data-page="settings"><span class="nav-icon">⊙</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar">H</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name">Henry</div>
+          <div class="sidebar-user-role">Administrator</div>
+        </div>
+        <button class="sidebar-logout" data-action="logout" title="Sign out">⏻</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="header">
+      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+      <div>
+        <div class="header-title">Lead Inbox</div>
+        <div class="header-subtitle">Project inquiry submissions</div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-ghost btn-sm" onclick="switchView('table')">Table</button>
+        <button class="btn btn-ghost btn-sm" onclick="switchView('kanban')">Pipeline</button>
+        <button class="btn btn-gold btn-sm" onclick="Admin.openModal('addLeadModal')">+ Add Lead</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- Stat Strip -->
+      <div class="stat-row" id="leadStats" style="border-radius:var(--radius-lg);border:1px solid var(--border)">
+        <div class="stat-item"><div class="stat-value" id="statTotal">—</div><div class="stat-label">Total</div></div>
+        <div class="stat-item"><div class="stat-value" id="statNew">—</div><div class="stat-label">New</div></div>
+        <div class="stat-item"><div class="stat-value" id="statContacted">—</div><div class="stat-label">Contacted</div></div>
+        <div class="stat-item"><div class="stat-value" id="statQualified">—</div><div class="stat-label">Qualified</div></div>
+        <div class="stat-item"><div class="stat-value" id="statClosed">—</div><div class="stat-label">Closed Won</div></div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="search-box">
+          <span class="search-icon">⌕</span>
+          <input type="text" id="leadSearch" placeholder="Search leads…" />
+        </div>
+        <select class="filter-select" id="filterStatus" onchange="loadLeads()">
+          <option value="">All Statuses</option>
+          <option value="new">New</option>
+          <option value="contacted">Contacted</option>
+          <option value="qualified">Qualified</option>
+          <option value="closed">Closed Won</option>
+          <option value="dead">Dead</option>
+        </select>
+        <select class="filter-select" id="filterService" onchange="loadLeads()">
+          <option value="">All Services</option>
+          <option value="custom_home">Custom Home</option>
+          <option value="whole_house_remodel">Whole House Remodel</option>
+          <option value="kitchen_remodel">Kitchen Remodel</option>
+          <option value="bathroom_remodel">Bathroom Remodel</option>
+          <option value="other">Other</option>
+        </select>
+        <select class="filter-select" id="filterSource" onchange="loadLeads()">
+          <option value="">All Sources</option>
+          <option value="google_ads">Google Ads</option>
+          <option value="meta">Meta</option>
+          <option value="microsoft_ads">Microsoft Ads</option>
+          <option value="organic">Organic</option>
+          <option value="referral">Referral</option>
+          <option value="direct">Direct</option>
+        </select>
+      </div>
+
+      <!-- Table View -->
+      <div id="tableView">
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Contact</th>
+                  <th>Service</th>
+                  <th>Budget</th>
+                  <th>Source</th>
+                  <th>Status</th>
+                  <th>Received</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="leadsTableBody">
+                <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-3)"><span class="loader"></span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kanban View -->
+      <div id="kanbanView" style="display:none">
+        <div class="pipeline-board">
+          <div class="pipeline-col">
+            <div class="pipeline-col-header">
+              <span class="pipeline-col-name">New</span>
+              <span class="pipeline-col-count" id="colCountNew">0</span>
+            </div>
+            <div class="pipeline-cards" id="colNew"></div>
+          </div>
+          <div class="pipeline-col">
+            <div class="pipeline-col-header">
+              <span class="pipeline-col-name" style="color:#fbbf24">Contacted</span>
+              <span class="pipeline-col-count" id="colCountContacted">0</span>
+            </div>
+            <div class="pipeline-cards" id="colContacted"></div>
+          </div>
+          <div class="pipeline-col">
+            <div class="pipeline-col-header">
+              <span class="pipeline-col-name" style="color:#4ade80">Qualified</span>
+              <span class="pipeline-col-count" id="colCountQualified">0</span>
+            </div>
+            <div class="pipeline-cards" id="colQualified"></div>
+          </div>
+          <div class="pipeline-col">
+            <div class="pipeline-col-header">
+              <span class="pipeline-col-name" style="color:#c8b89a">Closed Won</span>
+              <span class="pipeline-col-count" id="colCountClosed">0</span>
+            </div>
+            <div class="pipeline-cards" id="colClosed"></div>
+          </div>
+          <div class="pipeline-col">
+            <div class="pipeline-col-header">
+              <span class="pipeline-col-name" style="color:#f87171">Dead</span>
+              <span class="pipeline-col-count" id="colCountDead">0</span>
+            </div>
+            <div class="pipeline-cards" id="colDead"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Lead Detail Modal -->
+<div class="modal-overlay" id="leadModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title" id="leadModalTitle">Lead Details</div>
+      <button class="modal-close" data-modal-close>✕</button>
+    </div>
+    <div class="modal-body" id="leadModalBody">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-modal-close>Close</button>
+      <button class="btn btn-primary" id="leadModalSave" onclick="saveLead()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Lead Modal -->
+<div class="modal-overlay" id="addLeadModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Add Lead Manually</div>
+      <button class="modal-close" data-modal-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">First Name</label>
+          <input class="form-input" id="addFirstName" placeholder="Jane" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Last Name</label>
+          <input class="form-input" id="addLastName" placeholder="Smith" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input class="form-input" type="email" id="addEmail" placeholder="jane@example.com" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone</label>
+          <input class="form-input" type="tel" id="addPhone" placeholder="925-555-1234" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Service Interested In</label>
+          <select class="form-input" id="addService">
+            <option value="">Select…</option>
+            <option value="custom_home">Custom Home</option>
+            <option value="whole_house_remodel">Whole House Remodel</option>
+            <option value="kitchen_remodel">Kitchen Remodel</option>
+            <option value="bathroom_remodel">Bathroom Remodel</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Budget Range</label>
+          <select class="form-input" id="addBudget">
+            <option value="">Unknown</option>
+            <option value="60k_150k">$60k–$150k</option>
+            <option value="150k_500k">$150k–$500k</option>
+            <option value="500k_1m">$500k–$1M</option>
+            <option value="1m_5m">$1M–$5M</option>
+            <option value="5m_plus">$5M+</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">City</label>
+          <input class="form-input" id="addCity" placeholder="Danville" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Source</label>
+          <select class="form-input" id="addSource">
+            <option value="direct">Direct</option>
+            <option value="referral">Referral</option>
+            <option value="google_ads">Google Ads</option>
+            <option value="meta">Meta</option>
+            <option value="organic">Organic</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row full">
+        <div class="form-group">
+          <label class="form-label">Notes</label>
+          <textarea class="form-input" id="addNotes" placeholder="Project description, timeline, special requests…"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-modal-close>Cancel</button>
+      <button class="btn btn-primary" onclick="addLead()">Add Lead</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/admin.js"></script>
+<script>
+  if (!Admin.requireAuth()) throw new Error('unauth');
+  Admin.init('leads');
+
+  let allLeads = [];
+  let currentLeadId = null;
+  let currentView = 'table';
+
+  function switchView(v) {
+    currentView = v;
+    document.getElementById('tableView').style.display = v === 'table' ? '' : 'none';
+    document.getElementById('kanbanView').style.display = v === 'kanban' ? '' : 'none';
+    if (v === 'kanban') renderKanban();
+  }
+
+  function statusBadge(s) {
+    const map = { new:'badge-blue', contacted:'badge-yellow', qualified:'badge-green', closed:'badge-gold', dead:'badge-red' };
+    const labels = { new:'New', contacted:'Contacted', qualified:'Qualified', closed:'Closed Won', dead:'Dead' };
+    return `<span class="badge ${map[s]||'badge-gray'}">${labels[s]||s||'New'}</span>`;
+  }
+
+  function sourceBadge(s) {
+    const map = { google_ads:'badge-blue', meta:'badge-blue', microsoft_ads:'badge-blue', organic:'badge-green', referral:'badge-gold', direct:'badge-gray' };
+    const labels = { google_ads:'Google', meta:'Meta', microsoft_ads:'MSFT', organic:'Organic', referral:'Referral', direct:'Direct' };
+    return `<span class="badge ${map[s]||'badge-gray'}">${labels[s]||s||'—'}</span>`;
+  }
+
+  function serviceLabel(s) {
+    const map = { custom_home:'Custom Home', whole_house_remodel:'Whole House Remodel', kitchen_remodel:'Kitchen Remodel', bathroom_remodel:'Bathroom Remodel' };
+    return map[s] || s || '—';
+  }
+
+  function budgetLabel(b) {
+    const map = { '60k_150k':'$60k–$150k', '150k_500k':'$150k–$500k', '500k_1m':'$500k–$1M', '1m_5m':'$1M–$5M', '5m_plus':'$5M+' };
+    return map[b] || b || '—';
+  }
+
+  async function loadLeads() {
+    const status = document.getElementById('filterStatus').value;
+    const service = document.getElementById('filterService').value;
+    const source = document.getElementById('filterSource').value;
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (service) params.append('service', service);
+    if (source) params.append('source', source);
+
+    const data = await Admin.get(`/leads?${params}`);
+    if (!data) return;
+
+    allLeads = data.items || [];
+
+    // Stats
+    document.getElementById('statTotal').textContent = data.stats?.total ?? allLeads.length;
+    document.getElementById('statNew').textContent = data.stats?.new ?? 0;
+    document.getElementById('statContacted').textContent = data.stats?.contacted ?? 0;
+    document.getElementById('statQualified').textContent = data.stats?.qualified ?? 0;
+    document.getElementById('statClosed').textContent = data.stats?.closed ?? 0;
+
+    renderTable();
+    if (currentView === 'kanban') renderKanban();
+  }
+
+  function renderTable() {
+    const q = document.getElementById('leadSearch').value.toLowerCase();
+    const filtered = allLeads.filter(l => !q ||
+      (l.name || '').toLowerCase().includes(q) ||
+      (l.email || '').toLowerCase().includes(q) ||
+      (l.city || '').toLowerCase().includes(q));
+
+    const tbody = document.getElementById('leadsTableBody');
+    if (!filtered.length) {
+      tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="empty-icon">◉</div><div class="empty-title">No leads found</div><div class="empty-sub">Leads submitted via your inquiry form will appear here automatically</div></div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(l => `
+      <tr onclick="openLead(${l.id})" style="cursor:pointer">
+        <td><strong>${l.name || '—'}</strong></td>
+        <td class="td-light"><div>${l.email || ''}</div><div style="font-size:11px">${l.phone || ''}</div></td>
+        <td class="td-light">${serviceLabel(l.service)}</td>
+        <td class="td-light">${budgetLabel(l.budget)}</td>
+        <td>${sourceBadge(l.source)}</td>
+        <td>${statusBadge(l.status)}</td>
+        <td class="td-light">${Admin.formatDate(l.created_at)}</td>
+        <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openLead(${l.id})">Open →</button></td>
+      </tr>
+    `).join('');
+  }
+
+  function renderKanban() {
+    const cols = { new:[], contacted:[], qualified:[], closed:[], dead:[] };
+    allLeads.forEach(l => {
+      const s = l.status || 'new';
+      if (cols[s]) cols[s].push(l);
+    });
+
+    Object.keys(cols).forEach(status => {
+      const container = document.getElementById(`col${status.charAt(0).toUpperCase()+status.slice(1)}`);
+      const count = document.getElementById(`colCount${status.charAt(0).toUpperCase()+status.slice(1)}`);
+      if (!container) return;
+      count.textContent = cols[status].length;
+      if (!cols[status].length) {
+        container.innerHTML = `<div style="color:var(--text-3);font-size:12px;text-align:center;padding:16px">No leads</div>`;
+        return;
+      }
+      container.innerHTML = cols[status].map(l => `
+        <div class="lead-card" onclick="openLead(${l.id})">
+          <div class="lead-card-name">${l.name || 'Unknown'}</div>
+          <div class="lead-card-service">${serviceLabel(l.service)}</div>
+          <div class="lead-card-meta">
+            <span>${l.city || ''}</span>
+            <span>${Admin.timeAgo(l.created_at)}</span>
+          </div>
+        </div>
+      `).join('');
+    });
+  }
+
+  function openLead(id) {
+    currentLeadId = id;
+    const l = allLeads.find(x => x.id === id);
+    if (!l) return;
+
+    document.getElementById('leadModalTitle').textContent = l.name || 'Lead Details';
+    document.getElementById('leadModalBody').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div>
+          <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <input class="form-input" id="editName" value="${l.name || ''}" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input class="form-input" type="email" id="editEmail" value="${l.email || ''}" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone</label>
+            <input class="form-input" id="editPhone" value="${l.phone || ''}" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">City</label>
+            <input class="form-input" id="editCity" value="${l.city || ''}" />
+          </div>
+        </div>
+        <div>
+          <div class="form-group">
+            <label class="form-label">Service</label>
+            <select class="form-input" id="editService">
+              <option value="">—</option>
+              <option value="custom_home" ${l.service==='custom_home'?'selected':''}>Custom Home</option>
+              <option value="whole_house_remodel" ${l.service==='whole_house_remodel'?'selected':''}>Whole House Remodel</option>
+              <option value="kitchen_remodel" ${l.service==='kitchen_remodel'?'selected':''}>Kitchen Remodel</option>
+              <option value="bathroom_remodel" ${l.service==='bathroom_remodel'?'selected':''}>Bathroom Remodel</option>
+              <option value="other" ${l.service==='other'?'selected':''}>Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Budget</label>
+            <select class="form-input" id="editBudget">
+              <option value="">Unknown</option>
+              <option value="60k_150k" ${l.budget==='60k_150k'?'selected':''}>$60k–$150k</option>
+              <option value="150k_500k" ${l.budget==='150k_500k'?'selected':''}>$150k–$500k</option>
+              <option value="500k_1m" ${l.budget==='500k_1m'?'selected':''}>$500k–$1M</option>
+              <option value="1m_5m" ${l.budget==='1m_5m'?'selected':''}>$1M–$5M</option>
+              <option value="5m_plus" ${l.budget==='5m_plus'?'selected':''}>$5M+</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <select class="form-input" id="editStatus">
+              <option value="new" ${l.status==='new'?'selected':''}>New</option>
+              <option value="contacted" ${l.status==='contacted'?'selected':''}>Contacted</option>
+              <option value="qualified" ${l.status==='qualified'?'selected':''}>Qualified</option>
+              <option value="closed" ${l.status==='closed'?'selected':''}>Closed Won</option>
+              <option value="dead" ${l.status==='dead'?'selected':''}>Dead</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Source</label>
+            <input class="form-input" value="${l.source || '—'}" readonly />
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes / Follow-up</label>
+        <textarea class="form-input" id="editNotes" rows="4">${l.notes || ''}</textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Submitted Message</label>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;font-size:13px;color:var(--text-2)">${l.message || 'No message submitted'}</div>
+      </div>
+      <div style="font-size:12px;color:var(--text-3)">Received ${Admin.formatDateTime(l.created_at)}</div>
+    `;
+
+    Admin.openModal('leadModal');
+  }
+
+  async function saveLead() {
+    if (!currentLeadId) return;
+    const updates = {
+      name: document.getElementById('editName').value,
+      email: document.getElementById('editEmail').value,
+      phone: document.getElementById('editPhone').value,
+      city: document.getElementById('editCity').value,
+      service: document.getElementById('editService').value,
+      budget: document.getElementById('editBudget').value,
+      status: document.getElementById('editStatus').value,
+      notes: document.getElementById('editNotes').value,
+    };
+    const res = await Admin.put(`/leads/${currentLeadId}`, updates);
+    if (res && res.ok) {
+      Admin.toast('Lead updated', 'success');
+      Admin.closeModal('leadModal');
+      loadLeads();
+    } else {
+      Admin.toast('Error saving lead', 'error');
+    }
+  }
+
+  async function addLead() {
+    const lead = {
+      name: `${document.getElementById('addFirstName').value} ${document.getElementById('addLastName').value}`.trim(),
+      email: document.getElementById('addEmail').value,
+      phone: document.getElementById('addPhone').value,
+      service: document.getElementById('addService').value,
+      budget: document.getElementById('addBudget').value,
+      city: document.getElementById('addCity').value,
+      source: document.getElementById('addSource').value,
+      notes: document.getElementById('addNotes').value,
+      status: 'new',
+    };
+    const res = await Admin.post('/leads', lead);
+    if (res && res.ok) {
+      Admin.toast('Lead added', 'success');
+      Admin.closeModal('addLeadModal');
+      loadLeads();
+    } else {
+      Admin.toast('Error adding lead', 'error');
+    }
+  }
+
+  // Search
+  document.getElementById('leadSearch').addEventListener('input', renderTable);
+
+  loadLeads();
+</script>
+</body>
+</html>

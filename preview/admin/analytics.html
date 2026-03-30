@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analytics — Ridgecrest Admin</title>
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-wordmark">Ridgecrest Designs</div>
+      <div class="sidebar-sub">Admin Panel</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <a href="dashboard.html" class="nav-item" data-page="dashboard"><span class="nav-icon">◈</span> Dashboard</a>
+      <div class="nav-section-label">Leads</div>
+      <a href="leads.html" class="nav-item" data-page="leads"><span class="nav-icon">◉</span> Lead Inbox</a>
+      <div class="nav-section-label">Content</div>
+      <a href="blog.html" class="nav-item" data-page="blog">
+        <span class="nav-icon">✎</span> Blog (RD Edit)
+      </a>
+      <a href="portfolio.html" class="nav-item" data-page="portfolio"><span class="nav-icon">▣</span> Portfolio</a>
+      <a href="team.html" class="nav-item" data-page="team">
+        <span class="nav-icon">◎</span> Team
+      </a>
+      <a href="pages.html" class="nav-item" data-page="pages">
+        <span class="nav-icon">◧</span> Pages
+      </a>
+      <a href="media.html" class="nav-item" data-page="media"><span class="nav-icon">◆</span> Media Library</a>
+      <div class="nav-section-label">Growth</div>
+      <a href="analytics.html" class="nav-item" data-page="analytics"><span class="nav-icon">▲</span> Analytics</a>
+      <a href="seo.html" class="nav-item" data-page="seo"><span class="nav-icon">◻</span> SEO</a>
+      <div class="nav-section-label">System</div>
+      <a href="settings.html" class="nav-item" data-page="settings"><span class="nav-icon">⊙</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar">H</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name">Henry</div>
+          <div class="sidebar-user-role">Administrator</div>
+        </div>
+        <button class="sidebar-logout" data-action="logout" title="Sign out">⏻</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="header">
+      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+      <div>
+        <div class="header-title">Analytics</div>
+        <div class="header-subtitle">Campaign performance + website data</div>
+      </div>
+      <div class="header-actions">
+        <select class="filter-select" id="dateRange" onchange="loadAnalytics()">
+          <option value="7">Last 7 Days</option>
+          <option value="30" selected>Last 30 Days</option>
+          <option value="90">Last 90 Days</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- KPI Row -->
+      <div class="kpi-grid" id="analyticsKpis">
+        <div class="kpi-card green">
+          <div class="kpi-label">Total Leads</div>
+          <div class="kpi-value" id="aLeads">—</div>
+          <div class="kpi-delta" id="aLeadsDelta">—</div>
+        </div>
+        <div class="kpi-card gold">
+          <div class="kpi-label">Avg CPL</div>
+          <div class="kpi-value" id="aCpl">—</div>
+          <div class="kpi-delta">Target $150–$500</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Total Spend</div>
+          <div class="kpi-value" id="aSpend">—</div>
+          <div class="kpi-delta" id="aSpendDelta">—</div>
+        </div>
+        <div class="kpi-card yellow">
+          <div class="kpi-label">Conversions</div>
+          <div class="kpi-value" id="aConv">—</div>
+          <div class="kpi-delta">Inquiry form submits</div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs" id="analyticsTabs">
+        <button class="tab active" data-target="campaigns">Campaigns</button>
+        <button class="tab" data-target="leads-source">Lead Sources</button>
+        <button class="tab" data-target="website">Website Traffic</button>
+        <button class="tab" data-target="spend">Spend by Day</button>
+      </div>
+
+      <!-- Campaigns Tab -->
+      <div id="campaignsPanel">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Campaign Performance</div>
+              <div class="card-sub">All platforms · <span id="campaignPeriodLabel">Last 30 days</span></div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Campaign</th>
+                  <th>Platform</th>
+                  <th>Status</th>
+                  <th>Spend</th>
+                  <th>Impressions</th>
+                  <th>Clicks</th>
+                  <th>CTR</th>
+                  <th>Leads</th>
+                  <th>CPL</th>
+                </tr>
+              </thead>
+              <tbody id="campaignsBody">
+                <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-3)"><span class="loader"></span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lead Sources Tab -->
+      <div id="leads-sourcePanel" style="display:none">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Leads by Source</div></div>
+            <div class="card-body">
+              <div id="sourceBreakdown" style="display:flex;flex-direction:column;gap:12px"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Leads by Service</div></div>
+            <div class="card-body">
+              <div id="serviceBreakdown" style="display:flex;flex-direction:column;gap:12px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Website Tab -->
+      <div id="websitePanel" style="display:none">
+        <div class="alert alert-info">Connect Google Analytics 4 (GA4) in Settings to see real website traffic data. Showing placeholder view.</div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Top Pages</div></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Page</th><th>Views</th><th>Avg Time</th></tr></thead>
+                <tbody>
+                  <tr><td>/</td><td>1,240</td><td>1:42</td></tr>
+                  <tr><td>/portfolio</td><td>680</td><td>2:15</td></tr>
+                  <tr><td>/process</td><td>320</td><td>2:08</td></tr>
+                  <tr><td>/contact</td><td>280</td><td>1:05</td></tr>
+                  <tr><td>/about</td><td>210</td><td>1:30</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Traffic Sources</div></div>
+            <div class="card-body">
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div>
+                  <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span>Paid Search (Google)</span><span class="td-light">52%</span></div>
+                  <div class="progress"><div class="progress-bar" style="width:52%"></div></div>
+                </div>
+                <div>
+                  <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span>Paid Social (Meta)</span><span class="td-light">28%</span></div>
+                  <div class="progress"><div class="progress-bar gold" style="width:28%"></div></div>
+                </div>
+                <div>
+                  <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span>Organic Search</span><span class="td-light">12%</span></div>
+                  <div class="progress"><div class="progress-bar green" style="width:12%"></div></div>
+                </div>
+                <div>
+                  <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span>Direct</span><span class="td-light">8%</span></div>
+                  <div class="progress"><div class="progress-bar" style="width:8%;background:var(--text-3)"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Spend Tab -->
+      <div id="spendPanel" style="display:none">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Daily Spend by Platform</div>
+            <div class="card-sub">Active days: Friday · Saturday · Sunday · Monday</div>
+          </div>
+          <div class="card-body">
+            <div class="table-wrap" id="spendTable">
+              <div style="text-align:center;padding:40px;color:var(--text-3)"><span class="loader"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="js/admin.js"></script>
+<script>
+  if (!Admin.requireAuth()) throw new Error('unauth');
+  Admin.init('analytics');
+
+  Admin.initTabs('analyticsTabs');
+
+  // Show/hide panels on tab click
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      ['campaigns', 'leads-source', 'website', 'spend'].forEach(id => {
+        const panel = document.getElementById(id + 'Panel');
+        if (panel) panel.style.display = tab.dataset.target === id ? '' : 'none';
+      });
+    });
+  });
+
+  function platformBadge(p) {
+    const map = { meta:'badge-blue', google_ads:'badge-green', microsoft_ads:'badge-gold' };
+    const labels = { meta:'Meta', google_ads:'Google', microsoft_ads:'MSFT' };
+    return `<span class="badge ${map[p]||'badge-gray'}">${labels[p]||p||'—'}</span>`;
+  }
+
+  function statusBadge(s) {
+    if (s === 'ENABLED') return '<span class="badge badge-green">Active</span>';
+    if (s === 'PAUSED') return '<span class="badge badge-yellow">Paused</span>';
+    return '<span class="badge badge-gray">—</span>';
+  }
+
+  async function loadAnalytics() {
+    const days = document.getElementById('dateRange').value;
+    document.getElementById('campaignPeriodLabel').textContent = `Last ${days} days`;
+
+    // KPIs
+    const kpi = await Admin.get(`/analytics/summary?days=${days}`);
+    if (kpi) {
+      document.getElementById('aLeads').textContent = kpi.total_leads ?? '—';
+      document.getElementById('aLeadsDelta').textContent = kpi.leads_delta ?? '';
+      document.getElementById('aCpl').textContent = kpi.avg_cpl ? `$${Number(kpi.avg_cpl).toFixed(0)}` : '—';
+      document.getElementById('aSpend').textContent = kpi.total_spend ? `$${Number(kpi.total_spend).toLocaleString()}` : '—';
+      document.getElementById('aSpendDelta').textContent = kpi.spend_delta ?? '';
+      document.getElementById('aConv').textContent = kpi.conversions ?? '—';
+    }
+
+    // Campaigns
+    const campaigns = await Admin.get(`/analytics/campaigns?days=${days}`);
+    const tbody = document.getElementById('campaignsBody');
+    if (campaigns && campaigns.length) {
+      tbody.innerHTML = campaigns.map(c => `
+        <tr>
+          <td><strong>${c.name}</strong></td>
+          <td>${platformBadge(c.platform)}</td>
+          <td>${statusBadge(c.status)}</td>
+          <td class="td-mono">${c.spend ? '$'+Number(c.spend).toFixed(2) : '—'}</td>
+          <td class="td-light">${c.impressions ? Number(c.impressions).toLocaleString() : '—'}</td>
+          <td class="td-light">${c.clicks ? Number(c.clicks).toLocaleString() : '—'}</td>
+          <td class="td-light">${c.ctr ? Number(c.ctr).toFixed(2)+'%' : '—'}</td>
+          <td class="td-light">${c.leads ?? '—'}</td>
+          <td class="td-mono ${c.cpl > 500 ? 'style="color:var(--red)"' : c.cpl < 200 ? 'style="color:var(--green)"' : ''}">${c.cpl ? '$'+Number(c.cpl).toFixed(0) : '—'}</td>
+        </tr>
+      `).join('');
+    } else {
+      tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-icon">▲</div><div class="empty-title">No campaign data</div><div class="empty-sub">Campaign data syncs from Meta and Microsoft Ads APIs. Google Ads sync requires developer token approval.</div></div></td></tr>`;
+    }
+
+    // Lead sources
+    const sources = await Admin.get(`/analytics/lead-sources?days=${days}`);
+    if (sources && sources.by_source) {
+      const total = Object.values(sources.by_source).reduce((a,b)=>a+b,0) || 1;
+      document.getElementById('sourceBreakdown').innerHTML = Object.entries(sources.by_source).map(([k,v]) => `
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+            <span>${sourceLabel(k)}</span>
+            <span class="td-light">${v} (${Math.round(v/total*100)}%)</span>
+          </div>
+          <div class="progress"><div class="progress-bar" style="width:${v/total*100}%"></div></div>
+        </div>
+      `).join('');
+
+      const stotal = Object.values(sources.by_service).reduce((a,b)=>a+b,0) || 1;
+      document.getElementById('serviceBreakdown').innerHTML = Object.entries(sources.by_service).map(([k,v]) => `
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+            <span>${serviceLabel(k)}</span>
+            <span class="td-light">${v} (${Math.round(v/stotal*100)}%)</span>
+          </div>
+          <div class="progress"><div class="progress-bar gold" style="width:${v/stotal*100}%"></div></div>
+        </div>
+      `).join('');
+    }
+
+    // Spend table
+    const spendData = await Admin.get(`/analytics/daily-spend?days=${Math.min(days, 30)}`);
+    const spendTable = document.getElementById('spendTable');
+    if (spendData && spendData.rows && spendData.rows.length) {
+      spendTable.innerHTML = `
+        <table>
+          <thead><tr><th>Date</th><th>Meta</th><th>Google</th><th>Microsoft</th><th>Total</th></tr></thead>
+          <tbody>${spendData.rows.map(r => `
+            <tr>
+              <td class="td-light">${Admin.formatDate(r.date)}</td>
+              <td class="td-mono">${r.meta ? '$'+Number(r.meta).toFixed(2) : '—'}</td>
+              <td class="td-mono">${r.google ? '$'+Number(r.google).toFixed(2) : '—'}</td>
+              <td class="td-mono">${r.microsoft ? '$'+Number(r.microsoft).toFixed(2) : '—'}</td>
+              <td class="td-mono"><strong>${r.total ? '$'+Number(r.total).toFixed(2) : '—'}</strong></td>
+            </tr>
+          `).join('')}</tbody>
+        </table>`;
+    } else {
+      spendTable.innerHTML = `<div class="empty" style="padding:32px"><div class="empty-title">No spend data</div><div class="empty-sub">Spend sync from ad platforms required</div></div>`;
+    }
+  }
+
+  function sourceLabel(s) {
+    const map = { google_ads:'Google Ads', meta:'Meta Ads', microsoft_ads:'Microsoft Ads', organic:'Organic', referral:'Referral', direct:'Direct' };
+    return map[s] || s;
+  }
+
+  function serviceLabel(s) {
+    const map = { custom_home:'Custom Home', whole_house_remodel:'Whole House Remodel', kitchen_remodel:'Kitchen Remodel', bathroom_remodel:'Bathroom Remodel', other:'Other' };
+    return map[s] || s;
+  }
+
+  loadAnalytics();
+</script>
+</body>
+</html>

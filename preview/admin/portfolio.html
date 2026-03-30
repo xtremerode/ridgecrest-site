@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portfolio — Ridgecrest Admin</title>
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-wordmark">Ridgecrest Designs</div>
+      <div class="sidebar-sub">Admin Panel</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <a href="dashboard.html" class="nav-item" data-page="dashboard"><span class="nav-icon">◈</span> Dashboard</a>
+      <div class="nav-section-label">Leads</div>
+      <a href="leads.html" class="nav-item" data-page="leads"><span class="nav-icon">◉</span> Lead Inbox</a>
+      <div class="nav-section-label">Content</div>
+      <a href="blog.html" class="nav-item" data-page="blog">
+        <span class="nav-icon">✎</span> Blog (RD Edit)
+      </a>
+      <a href="portfolio.html" class="nav-item" data-page="portfolio"><span class="nav-icon">▣</span> Portfolio</a>
+      <a href="team.html" class="nav-item" data-page="team">
+        <span class="nav-icon">◎</span> Team
+      </a>
+      <a href="pages.html" class="nav-item" data-page="pages">
+        <span class="nav-icon">◧</span> Pages
+      </a>
+      <a href="media.html" class="nav-item" data-page="media"><span class="nav-icon">◆</span> Media Library</a>
+      <div class="nav-section-label">Growth</div>
+      <a href="analytics.html" class="nav-item" data-page="analytics"><span class="nav-icon">▲</span> Analytics</a>
+      <a href="seo.html" class="nav-item" data-page="seo"><span class="nav-icon">◻</span> SEO</a>
+      <div class="nav-section-label">System</div>
+      <a href="settings.html" class="nav-item" data-page="settings"><span class="nav-icon">⊙</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar">H</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name">Henry</div>
+          <div class="sidebar-user-role">Administrator</div>
+        </div>
+        <button class="sidebar-logout" data-action="logout" title="Sign out">⏻</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="header">
+      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+      <div>
+        <div class="header-title">Portfolio</div>
+        <div class="header-subtitle">Manage project showcase</div>
+      </div>
+      <div class="header-actions">
+        <a href="/view/portfolio.html" target="_blank" class="btn btn-ghost btn-sm">Preview →</a>
+        <button class="btn btn-gold btn-sm" onclick="openProjectModal()">+ Add Project</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <div class="alert alert-info">
+        Portfolio projects are currently defined in the static website files. Editing here updates the project metadata — image URLs are linked from the site's CSS. To add new images, use the Media Library.
+      </div>
+
+      <div class="toolbar">
+        <div class="search-box">
+          <span class="search-icon">⌕</span>
+          <input type="text" id="portfolioSearch" placeholder="Search projects…" />
+        </div>
+        <select class="filter-select" id="filterType" onchange="filterProjects()">
+          <option value="">All Types</option>
+          <option value="Custom Home">Custom Home</option>
+          <option value="Whole House Remodel">Whole House Remodel</option>
+          <option value="Kitchen Remodel">Kitchen Remodel</option>
+          <option value="Bathroom Remodel">Bathroom Remodel</option>
+        </select>
+        <select class="filter-select" id="filterCity" onchange="filterProjects()">
+          <option value="">All Cities</option>
+          <option value="Danville">Danville</option>
+          <option value="Pleasanton">Pleasanton</option>
+          <option value="Alamo">Alamo</option>
+          <option value="Lafayette">Lafayette</option>
+          <option value="San Ramon">San Ramon</option>
+          <option value="Orinda">Orinda</option>
+          <option value="Sunol">Sunol</option>
+        </select>
+      </div>
+
+      <div class="portfolio-admin-grid" id="portfolioGrid">
+        <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-3)"><span class="loader"></span></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Project Edit Modal -->
+<div class="modal-overlay" id="projectModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title" id="projectModalTitle">Project Details</div>
+      <button class="modal-close" data-modal-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Project Name</label>
+          <input class="form-input" id="pName" placeholder="Danville Dream Home" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">City</label>
+          <input class="form-input" id="pCity" placeholder="Danville" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Project Type</label>
+          <select class="form-input" id="pType">
+            <option value="Custom Home">Custom Home</option>
+            <option value="Luxury Home Remodel">Luxury Home Remodel</option>
+            <option value="Whole House Remodel">Whole House Remodel</option>
+            <option value="Kitchen Remodel">Kitchen Remodel</option>
+            <option value="Bathroom Remodel">Bathroom Remodel</option>
+            <option value="Modern Home Remodel">Modern Home Remodel</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Year Completed</label>
+          <input class="form-input" id="pYear" placeholder="2024" type="number" min="2010" max="2030" />
+        </div>
+      </div>
+      <div class="form-row full">
+        <div class="form-group">
+          <label class="form-label">Short Description (shown on project page)</label>
+          <textarea class="form-input" id="pDesc" rows="4" placeholder="Describe the project, key features, and design intent…"></textarea>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Scope (sq ft)</label>
+          <input class="form-input" id="pSqft" placeholder="e.g. 4,800 sq ft" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Duration</label>
+          <input class="form-input" id="pDuration" placeholder="e.g. 14 months" />
+        </div>
+      </div>
+      <div class="form-row full">
+        <div class="form-group">
+          <label class="form-label">Hero Image URL (Wix CDN or uploaded)</label>
+          <input class="form-input" id="pHeroImg" placeholder="https://static.wixstatic.com/media/…" />
+        </div>
+      </div>
+      <div class="form-row full">
+        <div class="form-group">
+          <label class="form-label">Gallery Image URLs (one per line)</label>
+          <textarea class="form-input" id="pGallery" rows="5" placeholder="https://static.wixstatic.com/media/image1.jpg&#10;https://static.wixstatic.com/media/image2.jpg"></textarea>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Visibility</div>
+        <label class="toggle-wrap" style="margin-top:8px">
+          <span class="toggle"><input type="checkbox" id="pPublished" checked /><span class="toggle-slider"></span></span>
+          <span class="toggle-label">Published (visible on website)</span>
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="pDeleteBtn" style="margin-right:auto" onclick="deleteProject()">Delete</button>
+      <button class="btn btn-ghost" data-modal-close>Cancel</button>
+      <button class="btn btn-primary" onclick="saveProject()">Save Project</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/admin.js"></script>
+<script>
+  if (!Admin.requireAuth()) throw new Error('unauth');
+  Admin.init('portfolio');
+
+  // Static portfolio data (mirrors the HTML files)
+  const PROJECTS = [
+    { id: 1, name: 'Danville Dream Home', city: 'Danville', type: 'Luxury Home Remodel', year: 2024, published: true, slug: 'danville-dream', img: '/assets/images/ff5b18_3c0cef18e48849089c5ed48614041900_mv2.png' },
+    { id: 2, name: 'Danville Hilltop Hideaway', city: 'Danville', type: 'Modern Home Remodel', year: 2023, published: true, slug: 'danville-hilltop', img: '/assets/images/ff5b18_598ba1466dbb45249778e2ea0e0b95e3_mv2.jpg' },
+    { id: 3, name: 'Pleasanton Custom Home', city: 'Pleasanton', type: 'Custom Home', year: 2024, published: true, slug: 'pleasanton-custom', img: '/assets/images/ff5b18_4161051f37ba482fafc49baddabc8a96_mv2.jpg' },
+    { id: 4, name: 'Alamo Luxury Home', city: 'Alamo', type: 'Luxury Remodel', year: 2023, published: true, slug: 'alamo-luxury', img: '/assets/images/ff5b18_39536b28ce0447b9a87797bb4c70ee51_mv2.jpg' },
+    { id: 5, name: 'Lafayette Modern Bistro', city: 'Lafayette', type: 'Kitchen Remodel', year: 2024, published: true, slug: 'lafayette-bistro', img: '/assets/images/ff5b18_94919d08fc9245fc849ac03c4ea2caaf_mv2.jpg' },
+    { id: 6, name: 'Lafayette Laid-Back Luxury', city: 'Lafayette', type: 'Home Remodel', year: 2023, published: true, slug: 'lafayette-luxury', img: '/assets/images/ff5b18_6eed718eb2ab4ca0887717d1a39285ea_mv2.png' },
+    { id: 7, name: 'San Ramon Custom Home', city: 'San Ramon', type: 'Custom Home Remodel', year: 2024, published: true, slug: 'san-ramon', img: '/assets/images/ff5b18_6eed718eb2ab4ca0887717d1a39285ea_mv2.png' },
+    { id: 8, name: 'Orinda Urban Modern Kitchen', city: 'Orinda', type: 'Kitchen Remodel', year: 2023, published: true, slug: 'orinda-kitchen', img: '/assets/images/ff5b18_d741bf6a821b40e8b4730181bcf0fc48_mv2.jpg' },
+    { id: 9, name: 'Sunol Homestead', city: 'Sunol', type: 'Custom Home Remodel', year: 2022, published: true, slug: 'sunol-homestead', img: '/assets/images/ff5b18_296b1e9ff5d14e128006c21217e3f3e9_mv2.jpg' },
+  ];
+
+  let currentProjectId = null;
+
+  function filterProjects() {
+    const q = document.getElementById('portfolioSearch').value.toLowerCase();
+    const type = document.getElementById('filterType').value;
+    const city = document.getElementById('filterCity').value;
+
+    const filtered = PROJECTS.filter(p =>
+      (!q || p.name.toLowerCase().includes(q) || p.city.toLowerCase().includes(q)) &&
+      (!type || p.type.includes(type)) &&
+      (!city || p.city === city)
+    );
+
+    renderGrid(filtered);
+  }
+
+  function renderGrid(projects) {
+    const grid = document.getElementById('portfolioGrid');
+    if (!projects.length) {
+      grid.innerHTML = `<div style="grid-column:1/-1"><div class="empty"><div class="empty-icon">▣</div><div class="empty-title">No projects found</div></div></div>`;
+      return;
+    }
+    grid.innerHTML = projects.map(p => `
+      <div class="portfolio-admin-card" onclick="openProjectModal(${p.id})">
+        <div class="portfolio-admin-thumb" style="background-image:url('${p.img}')">
+          <div class="portfolio-admin-thumb-overlay">
+            <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();window.open('/view/${p.slug}.html','_blank')">Preview</button>
+            <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();openProjectModal(${p.id})">Edit</button>
+          </div>
+        </div>
+        <div class="portfolio-admin-info">
+          <div class="portfolio-admin-title">${p.name}</div>
+          <div class="portfolio-admin-loc">📍 ${p.city}, CA · ${p.year}</div>
+          <div class="portfolio-admin-type">${p.type}</div>
+          ${!p.published ? '<span class="badge badge-gray" style="margin-top:6px">Hidden</span>' : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function openProjectModal(id) {
+    currentProjectId = id || null;
+    const p = id ? PROJECTS.find(x => x.id === id) : null;
+
+    document.getElementById('projectModalTitle').textContent = p ? 'Edit Project' : 'Add Project';
+    document.getElementById('pDeleteBtn').style.display = p ? '' : 'none';
+    document.getElementById('pName').value = p?.name || '';
+    document.getElementById('pCity').value = p?.city || '';
+    document.getElementById('pYear').value = p?.year || new Date().getFullYear();
+    document.getElementById('pDesc').value = p?.description || '';
+    document.getElementById('pSqft').value = p?.sqft || '';
+    document.getElementById('pDuration').value = p?.duration || '';
+    document.getElementById('pHeroImg').value = p?.img || '';
+    document.getElementById('pGallery').value = p?.gallery || '';
+    document.getElementById('pPublished').checked = p ? p.published : true;
+
+    const typeSelect = document.getElementById('pType');
+    if (p) typeSelect.value = p.type;
+
+    Admin.openModal('projectModal');
+  }
+
+  async function saveProject() {
+    const data = {
+      name: document.getElementById('pName').value,
+      city: document.getElementById('pCity').value,
+      type: document.getElementById('pType').value,
+      year: document.getElementById('pYear').value,
+      description: document.getElementById('pDesc').value,
+      sqft: document.getElementById('pSqft').value,
+      duration: document.getElementById('pDuration').value,
+      hero_img: document.getElementById('pHeroImg').value,
+      gallery: document.getElementById('pGallery').value,
+      published: document.getElementById('pPublished').checked,
+    };
+
+    const endpoint = currentProjectId ? `/portfolio/${currentProjectId}` : '/portfolio';
+    const method = currentProjectId ? 'put' : 'post';
+    const res = await Admin[method](endpoint, data);
+
+    if (res && res.ok) {
+      Admin.toast(currentProjectId ? 'Project updated' : 'Project added', 'success');
+      Admin.closeModal('projectModal');
+    } else {
+      Admin.toast('Changes saved locally (static site — deploy required to publish)', 'info');
+      Admin.closeModal('projectModal');
+    }
+  }
+
+  async function deleteProject() {
+    if (!currentProjectId) return;
+    if (!confirm('Delete this project from the portfolio?')) return;
+    Admin.toast('Project removed (redeploy website to publish changes)', 'info');
+    Admin.closeModal('projectModal');
+  }
+
+  document.getElementById('portfolioSearch').addEventListener('input', filterProjects);
+
+  renderGrid(PROJECTS);
+</script>
+</body>
+</html>
