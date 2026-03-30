@@ -1530,6 +1530,64 @@ def serve_migration_bat():
                     headers={'Content-Disposition': 'attachment; filename=migrate.bat'})
 
 
+@app.route('/migrate_portfolio.bat')
+def serve_migrate_portfolio_bat():
+    """Windows batch file — downloads missing portfolio project images from Wix."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'migrate_portfolio.bat')
+    if not os.path.isfile(path):
+        return 'Not found', 404
+    with open(path, 'rb') as f:
+        content = f.read()
+    return Response(content, mimetype='application/octet-stream',
+                    headers={'Content-Disposition': 'attachment; filename=migrate_portfolio.bat'})
+
+
+@app.route('/migrate_portfolio_v4.bat')
+def serve_migrate_portfolio_v4_bat():
+    """Versioned Windows batch file."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'migrate_portfolio_v4.bat')
+    if not os.path.isfile(path):
+        return 'Not found', 404
+    with open(path, 'rb') as f:
+        content = f.read()
+    return Response(content, mimetype='application/octet-stream',
+                    headers={'Content-Disposition': 'attachment; filename=migrate_portfolio_v4.bat'})
+
+
+@app.route('/migrate_portfolio_images.py')
+def serve_migrate_portfolio_images():
+    """Python script fetched by migrate_portfolio.bat."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'migrate_portfolio_images.py')
+    if not os.path.isfile(path):
+        return 'Not found', 404
+    with open(path, 'rb') as f:
+        content = f.read()
+    return Response(content, mimetype='text/plain')
+
+
+@app.route('/migrate_portfolio.ps1')
+def serve_migrate_portfolio_ps1():
+    """PowerShell script fetched by migrate_portfolio.bat."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'migrate_portfolio.ps1')
+    if not os.path.isfile(path):
+        return 'Not found', 404
+    with open(path, 'rb') as f:
+        content = f.read()
+    return Response(content, mimetype='text/plain')
+
+
+@app.route('/install_browser_deps.bat')
+def serve_install_browser_deps_bat():
+    """Windows batch file — installs Playwright/Chromium system deps via SSH."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'install_browser_deps.bat')
+    if not os.path.isfile(path):
+        return 'Not found', 404
+    with open(path, 'rb') as f:
+        content = f.read()
+    return Response(content, mimetype='application/octet-stream',
+                    headers={'Content-Disposition': 'attachment; filename=install_browser_deps.bat'})
+
+
 @app.route('/assets/<path:filename>')
 def serve_assets(filename):
     """Serve files from preview/assets/ directly at /assets/<path>."""
@@ -2152,6 +2210,16 @@ def _blog_db_conn():
         return psycopg2.connect(_DB_URL, cursor_factory=psycopg2.extras.RealDictCursor)
     except Exception:
         return None
+
+
+@app.route('/therdedit')
+@app.route('/the-rd-edit')
+@app.route('/therdedit/')
+@app.route('/the-rd-edit/')
+def redirect_to_blog():
+    """301 redirects for old Wix blog URL variants → /blog."""
+    from flask import redirect
+    return redirect('/blog', code=301)
 
 
 @app.route('/blog')
@@ -5027,6 +5095,102 @@ def admin_backup_files():
                          mimetype='application/gzip')
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/server/install-browser-deps', methods=['POST'])
+def admin_install_browser_deps():
+    """Install system libraries required for Playwright/Chromium headless browser."""
+    auth = _require_admin()
+    if auth: return auth
+    pkgs = [
+        'libatk1.0-0', 'libatk-bridge2.0-0', 'libcups2', 'libxkbcommon0',
+        'libxcomposite1', 'libxdamage1', 'libxfixes3', 'libxrandr2',
+        'libgbm1', 'libasound2t64', 'libpango-1.0-0', 'libcairo2',
+    ]
+    env = {**os.environ, 'DEBIAN_FRONTEND': 'noninteractive'}
+    r = subprocess.run(
+        ['apt-get', 'install', '-y'] + pkgs,
+        capture_output=True, text=True, timeout=120, env=env
+    )
+    if r.returncode != 0:
+        return jsonify({'ok': False, 'error': r.stderr[-1000:]}), 500
+    # Verify libatk is now findable
+    check = subprocess.run(['ldconfig', '-p'], capture_output=True, text=True)
+    found = 'libatk' in check.stdout
+    return jsonify({'ok': True, 'verified': found, 'output': r.stdout[-500:]})
+
+
+@app.route('/admin/api/migrate/portfolio-images', methods=['POST'])
+def admin_migrate_portfolio_images():
+    """Download 25 missing portfolio images from Wix CDN and save to assets/images/."""
+    auth = _require_admin()
+    if auth: return auth
+
+    import urllib.request as _ur
+    import base64 as _b64
+
+    # wsrv.nl is a public image proxy — it can reach Wix CDN even though
+    # direct requests from DigitalOcean IPs are blocked by Wix's CloudFront rules.
+    WSRV_BASE = 'https://wsrv.nl/?url=static.wixstatic.com/media'
+
+    IMAGES = [
+        ('ff5b18_4161051f37ba482fafc49baddabc8a96', 'jpg'),
+        ('ff5b18_4025b406261e47e8993a0ad777ca3ebe', 'jpg'),
+        ('ff5b18_938143f6f9374aa88d8ed87d5de5bb73', 'jpg'),
+        ('ff5b18_e25234795a7a4ed08b1bea59751199a9', 'jpg'),
+        ('ff5b18_bb1013e8034740828826f718ad2216d9', 'png'),
+        ('ff5b18_c1637bae333840e4a71cbdaac8405213', 'png'),
+        ('ff5b18_de2ed75da1a541abb0861b82d04e1135', 'png'),
+        ('ff5b18_a69a1fba43ec4dd98ec66e582d5ec86f', 'png'),
+        ('ff5b18_dab676506e77455e942b02a857f21cc3', 'jpg'),
+        ('ff5b18_f8bf8933487f45db825a713b4ea4c540', 'jpg'),
+        ('ff5b18_5f016abc7ce04830a7f65e61c2b4a3fa', 'jpg'),
+        ('ff5b18_e1ef86fee44b4c14b077ecbdb2ca10f5', 'png'),
+        ('ff5b18_73ddf9ebf03a4477926cbf2283271380', 'png'),
+        ('ff5b18_f575a25ba7f14e1389d0ae63bb2d356f', 'png'),
+        ('ff5b18_9a3cb5be52fb466ebd047a075c89ee74', 'png'),
+        ('ff5b18_7bb937306ca1481894944e9f7b7b64c4', 'png'),
+        ('ff5b18_8fec027febcb4fdb9a1f34db0e462fac', 'png'),
+        ('ff5b18_fa64df3266cb4f5687726c7ab5ac76f7', 'jpg'),
+        ('ff5b18_8534e71718a54408b57038ba0fc8c02f', 'jpg'),
+        ('ff5b18_349218a966f148919fc38da254ca4619', 'jpg'),
+        ('ff5b18_29f3aa1ef62549ecbc7c5dd6b4aac717', 'jpg'),
+        ('ff5b18_c1bace39ccc64636b710dc307c31bb77', 'jpg'),
+        ('ff5b18_0ab4862750bf42ac8c38304bf1a054ed', 'jpg'),
+        ('ff5b18_f81286bb193b4eceade91c476d030da2', 'png'),
+        ('ff5b18_f2d002a1b71342199e013a4389c24d40', 'jpg'),
+    ]
+
+    save_dir = os.path.join(PREVIEW_DIR, 'assets', 'images')
+    os.makedirs(save_dir, exist_ok=True)
+
+    results = []
+    ok = fail = 0
+    for hash_id, ext in IMAGES:
+        wix_file = f'{hash_id}~mv2.{ext}'
+        local_name = f'{hash_id}_mv2.{ext}'
+        save_path = os.path.join(save_dir, local_name)
+
+        # Skip if already downloaded
+        if os.path.isfile(save_path) and os.path.getsize(save_path) > 1024:
+            results.append({'file': local_name, 'status': 'skipped', 'note': 'already exists'})
+            ok += 1
+            continue
+
+        try:
+            proxy_url = f'{WSRV_BASE}/{wix_file}'
+            req = _ur.Request(proxy_url, headers={'User-Agent': 'Mozilla/5.0'})
+            with _ur.urlopen(req, timeout=30) as r:
+                img_bytes = r.read()
+            with open(save_path, 'wb') as f:
+                f.write(img_bytes)
+            results.append({'file': local_name, 'status': 'ok', 'bytes': len(img_bytes)})
+            ok += 1
+        except Exception as e:
+            results.append({'file': local_name, 'status': 'error', 'error': str(e)})
+            fail += 1
+
+    return jsonify({'ok': fail == 0, 'downloaded': ok, 'failed': fail, 'results': results})
 
 
 # ── Startup: seed pages + team tables + load persisted sessions ──────────────
