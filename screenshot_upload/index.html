@@ -128,6 +128,53 @@
     }
     .download-btn:hover { background: #4338ca; }
     .no-downloads { color: #aaa; font-size: 13px; padding: 12px 0; }
+
+    /* File upload */
+    .upload-section { margin-top: 36px; text-align: left; }
+    .upload-section h2 { font-size: 15px; font-weight: 600; color: #444; margin-bottom: 10px; }
+    .upload-drop {
+      border: 2px dashed #d0d0d0;
+      border-radius: 8px;
+      padding: 32px 24px;
+      text-align: center;
+      color: #999;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .upload-drop:hover, .upload-drop.drag-over {
+      border-color: #4f46e5;
+      background: #f5f3ff;
+      color: #4f46e5;
+    }
+    .upload-drop input[type=file] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+    .upload-drop-icon { font-size: 28px; margin-bottom: 6px; }
+    .upload-status { margin-top: 10px; font-size: 13px; min-height: 18px; }
+    .upload-status.success { color: #16a34a; font-weight: 600; }
+    .upload-status.error { color: #dc2626; }
+    .upload-btn {
+      display: inline-block;
+      margin-top: 12px;
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      position: relative;
+      z-index: 1;
+    }
+    .upload-btn:hover { background: #4338ca; }
   </style>
 </head>
 <body>
@@ -144,6 +191,17 @@
       <button class="show-all-btn" id="showAllBtn" onclick="toggleAll()">Show all</button>
     </div>
     <div class="file-list" id="fileList"><div class="empty">No screenshots yet</div></div>
+
+    <div class="upload-section">
+      <h2>Upload a File to Claude</h2>
+      <div class="upload-drop" id="uploadDrop">
+        <input type="file" id="uploadInput" multiple />
+        <div class="upload-drop-icon">&#8593;</div>
+        <div>Drag &amp; drop a file here, or click to browse</div>
+        <button class="upload-btn" onclick="uploadInput.click(); event.stopPropagation();">Choose File</button>
+      </div>
+      <div class="upload-status" id="uploadStatus"></div>
+    </div>
 
     <div class="downloads-section">
       <h2>Files from Claude</h2>
@@ -277,6 +335,45 @@
     loadDownloads();
     setInterval(loadList, 30000);
     setInterval(loadDownloads, 30000);
+
+    // ── File upload ──
+    const uploadDrop = document.getElementById("uploadDrop");
+    const uploadInput = document.getElementById("uploadInput");
+    const uploadStatus = document.getElementById("uploadStatus");
+
+    async function uploadFiles(files) {
+      if (!files.length) return;
+      uploadStatus.className = "upload-status";
+      uploadStatus.textContent = `Uploading ${files.length} file(s)...`;
+      let ok = 0, fail = 0;
+      for (const f of files) {
+        const fd = new FormData();
+        fd.append("file", f);
+        try {
+          const res = await fetch("/upload-file", { method: "POST", body: fd });
+          const data = await res.json();
+          if (data.ok) ok++;
+          else { fail++; console.error(data.error); }
+        } catch (e) { fail++; }
+      }
+      if (fail === 0) {
+        uploadStatus.className = "upload-status success";
+        uploadStatus.textContent = `Done — ${ok} file(s) uploaded successfully`;
+      } else {
+        uploadStatus.className = "upload-status error";
+        uploadStatus.textContent = `${ok} uploaded, ${fail} failed`;
+      }
+      loadDownloads();
+    }
+
+    uploadInput.addEventListener("change", () => uploadFiles(Array.from(uploadInput.files)));
+    uploadDrop.addEventListener("dragover", e => { e.preventDefault(); uploadDrop.classList.add("drag-over"); });
+    uploadDrop.addEventListener("dragleave", () => uploadDrop.classList.remove("drag-over"));
+    uploadDrop.addEventListener("drop", e => {
+      e.preventDefault();
+      uploadDrop.classList.remove("drag-over");
+      if (e.dataTransfer.files.length) uploadFiles(Array.from(e.dataTransfer.files));
+    });
   </script>
 </body>
 </html>

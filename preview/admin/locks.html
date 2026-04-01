@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Locks — Ridgecrest Admin</title>
+  <link rel="stylesheet" href="css/admin.css" />
+  <style>
+    /* ── Locks page styles ── */
+    .locks-summary {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 28px;
+    }
+    .locks-stat {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 20px;
+      background: var(--surface-2, #1e2d3d);
+      border: 1px solid var(--border, #2a3748);
+      border-radius: 10px;
+      min-width: 140px;
+    }
+    .locks-stat-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .locks-stat-dot--dev    { background: #64748b; }
+    .locks-stat-dot--stable { background: #f59e0b; box-shadow: 0 0 6px rgba(245,158,11,.4); }
+    .locks-stat-dot--locked { background: #dc2626; box-shadow: 0 0 6px rgba(220,38,38,.4); }
+    .locks-stat-info { display: flex; flex-direction: column; }
+    .locks-stat-count { font-size: 22px; font-weight: 700; color: var(--text, #e2e8f0); line-height: 1; }
+    .locks-stat-label { font-size: 11px; color: var(--text-muted, #94a3b8); margin-top: 2px; }
+
+    /* ── Category block ── */
+    .locks-category {
+      margin-bottom: 28px;
+    }
+    .locks-category-title {
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border, #2a3748);
+    }
+    .locks-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .locks-table tr {
+      border-bottom: 1px solid rgba(42,55,72,.5);
+      transition: background .1s;
+    }
+    .locks-table tr:hover { background: rgba(255,255,255,.02); }
+    .locks-table tr:last-child { border-bottom: none; }
+    .locks-table td {
+      padding: 12px 14px;
+      vertical-align: middle;
+    }
+    .lock-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text, #e2e8f0);
+      white-space: nowrap;
+    }
+    .lock-desc {
+      font-size: 11px;
+      color: var(--text-muted, #94a3b8);
+      margin-top: 2px;
+      max-width: 480px;
+      line-height: 1.5;
+    }
+    .lock-key {
+      font-size: 10px;
+      color: #475569;
+      font-family: monospace;
+      margin-top: 2px;
+    }
+    .lock-toggle-group {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .lock-btn {
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+      min-width: 64px;
+      text-align: center;
+    }
+    /* Development */
+    .lock-btn--dev {
+      border: 1px solid #475569;
+      background: transparent;
+      color: #64748b;
+    }
+    .lock-btn--dev.active {
+      background: #475569;
+      color: #e2e8f0;
+      border-color: #475569;
+    }
+    .lock-btn--dev:hover:not(.active) { border-color: #94a3b8; color: #94a3b8; }
+    /* Stable */
+    .lock-btn--stable {
+      border: 1px solid rgba(245,158,11,.4);
+      background: transparent;
+      color: #92400e;
+    }
+    .lock-btn--stable.active {
+      background: #f59e0b;
+      color: #000;
+      border-color: #f59e0b;
+    }
+    .lock-btn--stable:hover:not(.active) { border-color: #f59e0b; color: #f59e0b; }
+    /* Locked */
+    .lock-btn--locked {
+      border: 1px solid rgba(220,38,38,.35);
+      background: transparent;
+      color: #7f1d1d;
+    }
+    .lock-btn--locked.active {
+      background: #dc2626;
+      color: #fff;
+      border-color: #dc2626;
+    }
+    .lock-btn--locked:hover:not(.active) { border-color: #dc2626; color: #dc2626; }
+
+    /* Status dot next to table row */
+    .lock-status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+      flex-shrink: 0;
+    }
+    .lock-status-dot--development { background: #64748b; }
+    .lock-status-dot--stable      { background: #f59e0b; }
+    .lock-status-dot--locked      { background: #dc2626; }
+
+    /* ── Page Locks section ── */
+    .page-locks-section {
+      margin-top: 36px;
+    }
+    .page-locks-search {
+      margin-bottom: 16px;
+    }
+    .page-locks-search input {
+      width: 100%;
+      max-width: 400px;
+      background: var(--surface2, #111b27);
+      border: 1px solid var(--border, #2a3748);
+      border-radius: 6px;
+      color: var(--text, #e2e8f0);
+      padding: 8px 12px;
+      font-size: 13px;
+      box-sizing: border-box;
+    }
+    .page-locks-search input:focus { outline: none; border-color: #3b82f6; }
+    .page-locks-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .page-lock-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--surface-2, #1e2d3d);
+      border: 1px solid var(--border, #2a3748);
+      border-radius: 8px;
+      transition: border-color .15s;
+    }
+    .page-lock-row:hover { border-color: #3b82f6; }
+    .page-lock-slug {
+      font-size: 12px;
+      color: #94a3b8;
+      font-family: monospace;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .page-lock-path {
+      font-size: 10px;
+      color: #475569;
+      flex: 1.5;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Toast */
+    .lock-toast {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      background: #1e2d3d;
+      border: 1px solid #2a3748;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 13px;
+      color: #e2e8f0;
+      z-index: 9999;
+      opacity: 0;
+      transition: opacity .25s;
+      pointer-events: none;
+    }
+    .lock-toast.visible { opacity: 1; }
+    .lock-toast.ok   { border-left: 3px solid #22c55e; }
+    .lock-toast.err  { border-left: 3px solid #dc2626; }
+  </style>
+</head>
+<body data-admin-context="locks">
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-wordmark">Ridgecrest Designs</div>
+      <div class="sidebar-sub">Admin Panel</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <a href="dashboard.html" class="nav-item" data-page="dashboard">
+        <span class="nav-icon">◈</span> Dashboard
+      </a>
+      <div class="nav-section-label">Leads</div>
+      <a href="leads.html" class="nav-item" data-page="leads">
+        <span class="nav-icon">◉</span> Lead Inbox
+        <span class="nav-badge" id="navLeadBadge" style="display:none"></span>
+      </a>
+      <div class="nav-section-label">Content</div>
+      <a href="blog.html" class="nav-item" data-page="blog">
+        <span class="nav-icon">✎</span> Blog (RD Edit)
+      </a>
+      <a href="portfolio.html" class="nav-item" data-page="portfolio">
+        <span class="nav-icon">▣</span> Portfolio
+      </a>
+      <a href="team.html" class="nav-item" data-page="team">
+        <span class="nav-icon">◎</span> Team
+      </a>
+      <a href="pages.html" class="nav-item" data-page="pages">
+        <span class="nav-icon">◧</span> Pages
+      </a>
+      <a href="media.html" class="nav-item" data-page="media">
+        <span class="nav-icon">◆</span> Media Library
+      </a>
+      <div class="nav-section-label">Growth</div>
+      <a href="analytics.html" class="nav-item" data-page="analytics">
+        <span class="nav-icon">▲</span> Analytics
+      </a>
+      <a href="seo.html" class="nav-item" data-page="seo">
+        <span class="nav-icon">◻</span> SEO
+      </a>
+      <div class="nav-section-label">System</div>
+      <a href="settings.html" class="nav-item" data-page="settings">
+        <span class="nav-icon">⊙</span> Settings
+      </a>
+      <a href="locks.html" class="nav-item nav-item--active" data-page="locks">
+        <span class="nav-icon">🔒</span> Locks
+      </a>
+      <div class="nav-section-label">Apps</div>
+      <a href="server.html" class="nav-item" data-page="server">
+        <span class="nav-icon">⬡</span> Server
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar">H</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name">Henry</div>
+          <div class="sidebar-user-role">Administrator</div>
+        </div>
+        <button class="sidebar-logout" data-action="logout" title="Sign out">⏻</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="header">
+      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+      <div>
+        <div class="header-title">Feature Locks</div>
+        <div class="header-subtitle">Control which features Claude may edit</div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- Summary stats -->
+      <div class="locks-summary" id="locksSummary">
+        <div class="locks-stat">
+          <div class="locks-stat-dot locks-stat-dot--locked"></div>
+          <div class="locks-stat-info">
+            <div class="locks-stat-count" id="countLocked">—</div>
+            <div class="locks-stat-label">Locked</div>
+          </div>
+        </div>
+        <div class="locks-stat">
+          <div class="locks-stat-dot locks-stat-dot--stable"></div>
+          <div class="locks-stat-info">
+            <div class="locks-stat-count" id="countStable">—</div>
+            <div class="locks-stat-label">Stable</div>
+          </div>
+        </div>
+        <div class="locks-stat">
+          <div class="locks-stat-dot locks-stat-dot--dev"></div>
+          <div class="locks-stat-info">
+            <div class="locks-stat-count" id="countDev">—</div>
+            <div class="locks-stat-label">Development</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature lock categories — rendered by JS -->
+      <div style="display:flex;align-items:center;padding:0 14px;margin-bottom:6px;">
+        <div style="width:44%;flex-shrink:0;"></div>
+        <div style="flex:1;display:flex;gap:4px;justify-content:flex-end;">
+          <button id="bulkDevBtn"    class="lock-btn lock-btn--dev">Dev All</button>
+          <button id="bulkStableBtn" class="lock-btn lock-btn--stable">Stable All</button>
+          <button id="bulkLockBtn"   class="lock-btn lock-btn--locked">Lock All</button>
+        </div>
+      </div>
+      <div id="featureLocks">
+        <div class="loading-state">Loading features…</div>
+      </div>
+
+      <!-- Page Locks section -->
+      <div class="page-locks-section">
+        <div class="card-title" style="margin-bottom:16px;font-size:15px;font-weight:700;color:var(--text,#e2e8f0)">Page Locks</div>
+        <div class="page-locks-search">
+          <input type="text" id="pageSearch" placeholder="Filter pages…" autocomplete="off" />
+        </div>
+        <div style="display:flex;align-items:center;padding:0 14px;margin-bottom:6px;">
+          <div style="width:14px;flex-shrink:0;margin-right:12px;"></div>
+          <div style="flex:1;min-width:0;"></div>
+          <div style="flex:1.5;min-width:0;"></div>
+          <div class="lock-toggle-group">
+            <button id="bulkPageDevBtn"    class="lock-btn lock-btn--dev">Dev All</button>
+            <button id="bulkPageStableBtn" class="lock-btn lock-btn--stable">Stable All</button>
+            <button id="bulkPageLockBtn"   class="lock-btn lock-btn--locked">Lock All</button>
+          </div>
+        </div>
+        <div class="page-locks-list" id="pageLocksList">
+          <div class="loading-state">Loading pages…</div>
+        </div>
+      </div>
+
+    </div><!-- /.content -->
+  </div><!-- /.main -->
+</div><!-- /.app -->
+
+<!-- Toast -->
+<div class="lock-toast" id="lockToast"></div>
+
+<script src="js/admin.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  Admin.init('locks');
+  if (!Admin.requireAuth()) return;
+
+  const TOKEN = Admin.getToken() || '';
+  const API = (path, opts = {}) => fetch(path, {
+    ...opts,
+    headers: {
+      'X-Admin-Token': TOKEN,
+      'Content-Type': 'application/json',
+      ...(opts.headers || {})
+    }
+  }).then(r => r.json());
+
+  // ── State ──
+  let _features = [];   // [{feature_key, feature_name, category, status, description}]
+  let _allPages = [];   // [{slug, page_path, ...}]
+  let _pageLocks = {};  // slug → status
+  let _pageSearch = '';
+
+  // ── Toast ──
+  let _toastTimer = null;
+  function showToast(msg, type = 'ok') {
+    const el = document.getElementById('lockToast');
+    el.textContent = msg;
+    el.className = `lock-toast ${type} visible`;
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => el.classList.remove('visible'), 2500);
+  }
+
+  // ── Load all data ──
+  async function init() {
+    try {
+      const [featRes, pagesRes, pageLockRes] = await Promise.all([
+        API('/admin/api/locks/features'),
+        API('/admin/api/pages'),
+        API('/admin/api/locks/pages')
+      ]);
+
+      if (featRes.ok) {
+        _features = featRes.features || [];
+      }
+      if (Array.isArray(pagesRes)) {
+        _allPages = pagesRes;
+      }
+      if (pageLockRes.ok) {
+        (pageLockRes.pages || []).forEach(p => { _pageLocks[p.slug] = p.status; });
+      }
+
+      renderSummary();
+      renderFeatures();
+      renderPageLocks();
+    } catch (e) {
+      document.getElementById('featureLocks').innerHTML =
+        '<div style="color:#f87171;font-size:13px;padding:20px">Failed to load lock data.</div>';
+    }
+  }
+
+  // ── Summary ──
+  function renderSummary() {
+    const counts = { locked: 0, stable: 0, development: 0 };
+    _features.forEach(f => { counts[f.status] = (counts[f.status] || 0) + 1; });
+    // Also count page locks
+    Object.values(_pageLocks).forEach(s => { counts[s] = (counts[s] || 0) + 1; });
+    document.getElementById('countLocked').textContent = counts.locked || 0;
+    document.getElementById('countStable').textContent = counts.stable || 0;
+    document.getElementById('countDev').textContent    = counts.development || 0;
+  }
+
+  // ── Feature table ──
+  function renderFeatures() {
+    // Group by category
+    const categories = {};
+    _features.forEach(f => {
+      if (!categories[f.category]) categories[f.category] = [];
+      categories[f.category].push(f);
+    });
+
+    const ORDER = ['Gallery', 'Pages', 'Server', 'Frontend', 'SEO'];
+    const catKeys = ORDER.filter(k => categories[k]).concat(
+      Object.keys(categories).filter(k => !ORDER.includes(k))
+    );
+
+    const html = catKeys.map(cat => {
+      const rows = categories[cat].map(f => featureRow(f)).join('');
+      return `
+        <div class="locks-category">
+          <div class="locks-category-title">${cat}</div>
+          <div style="background:var(--surface-2,#1e2d3d);border:1px solid var(--border,#2a3748);border-radius:10px;overflow:hidden">
+            <table class="locks-table">
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('featureLocks').innerHTML = html;
+
+    // Wire toggle buttons
+    document.querySelectorAll('[data-lock-key]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key    = btn.dataset.lockKey;
+        const status = btn.dataset.lockStatus;
+        setFeatureLock(key, status);
+      });
+    });
+  }
+
+  function featureRow(f) {
+    const dotClass = `lock-status-dot--${f.status}`;
+    const btns = ['development', 'stable', 'locked'].map(s => {
+      const labels = { development: 'Dev', stable: 'Stable', locked: 'Locked' };
+      const active = f.status === s ? ' active' : '';
+      return `<button class="lock-btn lock-btn--${s}${active}"
+                data-lock-key="${escHtml(f.feature_key)}"
+                data-lock-status="${s}"
+                title="${s.charAt(0).toUpperCase() + s.slice(1)}"
+              >${labels[s]}</button>`;
+    }).join('');
+
+    return `<tr data-feature-key="${escHtml(f.feature_key)}">
+      <td style="width:44%">
+        <div class="lock-name">
+          <span class="lock-status-dot ${dotClass}"></span>${escHtml(f.feature_name)}
+        </div>
+        <div class="lock-desc">${escHtml(f.description)}</div>
+        <div class="lock-key">${escHtml(f.feature_key)}</div>
+      </td>
+      <td style="text-align:right">
+        <div class="lock-toggle-group">${btns}</div>
+      </td>
+    </tr>`;
+  }
+
+  async function bulkSetAll(status) {
+    const label = { locked: 'Lock All', stable: 'Stable All', development: 'Dev All' }[status];
+    const confirmMsg = status === 'locked'
+      ? `Lock all 27 features? Claude will not be able to edit any locked feature without your explicit unlock.`
+      : status === 'development'
+      ? `Set all features to Development? This removes all guards — Claude can edit anything.`
+      : `Mark all features as Stable? Claude will ask for confirmation before editing any of them.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    const btn = document.getElementById(
+      status === 'locked' ? 'bulkLockBtn' : status === 'stable' ? 'bulkStableBtn' : 'bulkDevBtn'
+    );
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Working…';
+
+    let ok = 0, fail = 0;
+    for (const f of _features) {
+      try {
+        const res = await API(`/admin/api/locks/features/${encodeURIComponent(f.feature_key)}`, {
+          method: 'PUT',
+          body: JSON.stringify({ status })
+        });
+        if (res.ok) { f.status = status; ok++; } else fail++;
+      } catch { fail++; }
+    }
+
+    renderFeatures();
+    renderSummary();
+    btn.disabled = false;
+    btn.textContent = origText;
+    showToast(fail === 0 ? `All ${ok} features → ${status}` : `${ok} ok, ${fail} failed`, fail === 0 ? 'ok' : 'err');
+  }
+
+  async function setFeatureLock(key, status) {
+    try {
+      const res = await API(`/admin/api/locks/features/${encodeURIComponent(key)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status })
+      });
+      if (!res.ok) throw new Error(res.error || 'Failed');
+
+      // Update local state
+      const f = _features.find(x => x.feature_key === key);
+      if (f) f.status = status;
+
+      // Update row DOM without full re-render
+      const row = document.querySelector(`[data-feature-key="${CSS.escape(key)}"]`);
+      if (row) {
+        // Update dot
+        const dot = row.querySelector('.lock-status-dot');
+        if (dot) dot.className = `lock-status-dot lock-status-dot--${status}`;
+        // Update button active states
+        row.querySelectorAll('[data-lock-status]').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.lockStatus === status);
+        });
+      }
+
+      renderSummary();
+      showToast(`${key} → ${status}`, 'ok');
+    } catch (e) {
+      showToast('Save failed: ' + e.message, 'err');
+    }
+  }
+
+  // ── Page locks ──
+  function renderPageLocks() {
+    const q = _pageSearch.toLowerCase();
+    const filtered = _allPages.filter(p =>
+      !q || p.slug.includes(q) || (p.page_path || '').includes(q) || (p.title || '').toLowerCase().includes(q)
+    );
+
+    if (!filtered.length) {
+      document.getElementById('pageLocksList').innerHTML =
+        '<div style="color:#64748b;font-size:13px;padding:16px">No pages match.</div>';
+      return;
+    }
+
+    const html = filtered.map(p => {
+      const status = _pageLocks[p.slug] || 'development';
+      const dotClass = `lock-status-dot--${status}`;
+      const btns = ['development', 'stable', 'locked'].map(s => {
+        const labels = { development: 'Dev', stable: 'Stable', locked: 'Locked' };
+        const active = status === s ? ' active' : '';
+        return `<button class="lock-btn lock-btn--${s}${active}"
+                  data-page-slug="${escHtml(p.slug)}"
+                  data-lock-status="${s}"
+                >${labels[s]}</button>`;
+      }).join('');
+
+      return `<div class="page-lock-row" data-page-slug="${escHtml(p.slug)}">
+        <span class="lock-status-dot ${dotClass}"></span>
+        <span class="page-lock-slug">${escHtml(p.slug)}</span>
+        <span class="page-lock-path">${escHtml(p.page_path || '')}</span>
+        <div class="lock-toggle-group">${btns}</div>
+      </div>`;
+    }).join('');
+
+    document.getElementById('pageLocksList').innerHTML = html;
+
+    // Wire page toggle buttons
+    document.querySelectorAll('[data-page-slug][data-lock-status]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const slug   = btn.dataset.pageSlug;
+        const status = btn.dataset.lockStatus;
+        setPageLock(slug, status);
+      });
+    });
+  }
+
+  async function setPageLock(slug, status) {
+    try {
+      const res = await API(`/admin/api/locks/pages/${encodeURIComponent(slug)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status })
+      });
+      if (!res.ok) throw new Error(res.error || 'Failed');
+
+      _pageLocks[slug] = status;
+
+      // Update row DOM
+      const row = document.querySelector(`.page-lock-row[data-page-slug="${CSS.escape(slug)}"]`);
+      if (row) {
+        const dot = row.querySelector('.lock-status-dot');
+        if (dot) dot.className = `lock-status-dot lock-status-dot--${status}`;
+        row.querySelectorAll('[data-lock-status]').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.lockStatus === status);
+        });
+      }
+
+      renderSummary();
+      showToast(`${slug} → ${status}`, 'ok');
+    } catch (e) {
+      showToast('Save failed: ' + e.message, 'err');
+    }
+  }
+
+  // ── Search ──
+  document.getElementById('pageSearch').addEventListener('input', e => {
+    _pageSearch = e.target.value.trim();
+    renderPageLocks();
+  });
+
+  // ── Helpers ──
+  function escHtml(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  async function bulkSetAllPages(status) {
+    const confirmMsg = status === 'locked'
+      ? `Lock all pages? Edit Mode will be disabled for every page.`
+      : status === 'development'
+      ? `Set all pages to Development? Edit Mode will be unrestricted on every page.`
+      : `Mark all pages as Stable? Claude will confirm before saving changes to any page.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    const btn = document.getElementById(
+      status === 'locked' ? 'bulkPageLockBtn' : status === 'stable' ? 'bulkPageStableBtn' : 'bulkPageDevBtn'
+    );
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '…';
+
+    let ok = 0, fail = 0;
+    for (const p of _allPages) {
+      try {
+        const res = await API(`/admin/api/locks/pages/${encodeURIComponent(p.slug)}`, {
+          method: 'PUT',
+          body: JSON.stringify({ status })
+        });
+        if (res.ok) { _pageLocks[p.slug] = status; ok++; } else fail++;
+      } catch { fail++; }
+    }
+
+    renderPageLocks();
+    renderSummary();
+    btn.disabled = false;
+    btn.textContent = origText;
+    showToast(fail === 0 ? `All ${ok} pages → ${status}` : `${ok} ok, ${fail} failed`, fail === 0 ? 'ok' : 'err');
+  }
+
+  // ── Bulk action buttons ──
+  document.getElementById('bulkLockBtn').addEventListener('click',   () => bulkSetAll('locked'));
+  document.getElementById('bulkStableBtn').addEventListener('click', () => bulkSetAll('stable'));
+  document.getElementById('bulkDevBtn').addEventListener('click',    () => bulkSetAll('development'));
+  document.getElementById('bulkPageLockBtn').addEventListener('click',   () => bulkSetAllPages('locked'));
+  document.getElementById('bulkPageStableBtn').addEventListener('click', () => bulkSetAllPages('stable'));
+  document.getElementById('bulkPageDevBtn').addEventListener('click',    () => bulkSetAllPages('development'));
+
+  // ── Start ──
+  init();
+
+})();
+</script>
+</body>
+</html>

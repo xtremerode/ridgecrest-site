@@ -73,20 +73,23 @@
       width: 100%;
       height: 100%;
       border: none;
+      z-index: 1;
     }
     .frame-loading {
       position: absolute;
       inset: 0;
+      z-index: 2;
       background: #111b27;
       display: flex;
       align-items: center;
       justify-content: center;
       color: var(--text-3, #64748b);
       font-size: 14px;
-      pointer-events: none;
       transition: opacity .3s;
+      overflow-y: auto;
     }
-    .frame-loading.hidden { opacity: 0; }
+    .frame-loading.hidden { opacity: 0; pointer-events: none; }
+    .frame-loading.has-tree { align-items: flex-start; justify-content: flex-start; padding: 0; }
     /* Put page-select + controls into header-actions area */
     .header-actions select {
       background: var(--surface-2, #1e2d3d);
@@ -302,9 +305,225 @@
       border-color: #c4b5fd;
       color: #1e1b4b;
     }
+    /* ── Re-render modal (shared style with media.html) ── */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.6);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 10000;
+    }
+    .modal-box {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      max-width: 480px; width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 14px; }
+
+    /* ── Page Link Tree ──────────────────────────────────────────────────── */
+    .pg-tree {
+      width: 100%;
+      padding: 28px 28px 64px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      overflow-x: auto;
+    }
+    .pg-tree-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      width: 100%;
+    }
+    .pg-tree-title {
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;
+    }
+    .pg-tree-count {
+      font-size: 11px; color: #64748b;
+      background: rgba(255,255,255,.03);
+      border: 1px solid #2a3748; border-radius: 20px; padding: 2px 10px;
+    }
+    /* Node card */
+    .pg-node {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px;
+      background: #0d1a22; border: 1px solid #2a3748; border-radius: 8px;
+      cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s;
+      white-space: nowrap;
+    }
+    .pg-node:hover  { border-color: #3b82f6; background: rgba(59,130,246,.06); }
+    .pg-node.active { border-color: #14b8a6; background: rgba(20,184,166,.08); box-shadow: 0 0 0 1px rgba(20,184,166,.2); }
+    .pg-node--home  { padding: 11px 18px; }
+    .pg-node-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .pg-dot--home    { background: #f59e0b; box-shadow: 0 0 6px rgba(245,158,11,.5); }
+    .pg-dot--core    { background: #e2e8f0; }
+    .pg-dot--hub     { background: #14b8a6; }
+    .pg-dot--project { background: #3b82f6; }
+    .pg-dot--service { background: #f97316; }
+    .pg-dot--seo     { background: #64748b; }
+    .pg-dot--custom  { background: #a78bfa; }
+    .pg-node-info { display: flex; flex-direction: column; gap: 1px; }
+    .pg-node-name { font-size: 12px; font-weight: 600; color: #e2e8f0; }
+    .pg-node-slug { font-size: 10px; color: #64748b; }
+    .pg-node--home .pg-node-name { font-size: 14px; }
+    /* Collapse toggle */
+    .pg-group-toggle {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 6px 13px;
+      background: rgba(255,255,255,.03); border: 1px dashed #2a3748; border-radius: 8px;
+      cursor: pointer; color: #94a3b8; font-size: 12px; font-weight: 600;
+      transition: border-color .15s, color .15s; user-select: none; white-space: nowrap;
+    }
+    .pg-group-toggle:hover { border-color: #64748b; color: #e2e8f0; }
+    .pg-group-toggle.open  { border-color: #3b82f6; color: #e2e8f0; }
+    .pg-group-arrow { font-size: 10px; display: inline-block; transition: transform .2s; }
+    .pg-group-toggle.open .pg-group-arrow { transform: rotate(90deg); }
+    .pg-badge {
+      background: rgba(59,130,246,.15); border: 1px solid rgba(59,130,246,.3);
+      color: #93c5fd; font-size: 10px; font-weight: 700;
+      padding: 1px 7px; border-radius: 20px;
+    }
+    .pg-group-children { display: none; }
+    .pg-group-children.open { display: block; }
+
+    /* ── Tree structure & connecting lines ── */
+    /* A tree item: the node + optional indented children below */
+    .pg-ti { display: flex; flex-direction: column; }
+    /* The row containing a node (or a nodes-row or a group-toggle) */
+    .pg-ti-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+    /* Indented children group — the vertical line */
+    .pg-ti-sub {
+      margin-left: 20px;
+      padding-top: 5px;
+      padding-bottom: 3px;
+      border-left: 1px solid #2a3748;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    /* Each direct child of a sub gets a horizontal connector line */
+    .pg-ti-child {
+      position: relative;
+      padding-left: 18px;
+    }
+    .pg-ti-child::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 15px;
+      width: 18px; height: 1px;
+      background: #2a3748;
+    }
+    /* A horizontal wrapping row of nodes (used for batches like core pages, hub pages) */
+    .pg-ti-nodes-row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    /* ── Add Page Modal ── */
+    .add-page-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.65); z-index: 10001;
+      align-items: center; justify-content: center;
+    }
+    .add-page-backdrop.open { display: flex; }
+    .add-page-modal {
+      background: var(--surface, #1a2332);
+      border: 1px solid var(--border, #2a3748);
+      border-radius: 12px; padding: 24px;
+      width: 460px; max-width: 95vw;
+    }
+    .add-page-modal h3 { margin: 0 0 20px; font-size: 15px; font-weight: 700; color: var(--text, #e2e8f0); }
+    .add-page-field { margin-bottom: 16px; }
+    .add-page-field label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #64748b; margin-bottom: 6px; }
+    .add-page-field input, .add-page-field select {
+      width: 100%; box-sizing: border-box;
+      background: var(--surface2, #111b27);
+      border: 1px solid var(--border, #2a3748);
+      border-radius: 6px; color: var(--text, #e2e8f0);
+      padding: 8px 12px; font-size: 13px;
+    }
+    .add-page-field input:focus, .add-page-field select:focus { outline: none; border-color: #3b82f6; }
+    .add-page-field .slug-hint { font-size: 11px; color: #64748b; margin-top: 4px; }
+    .add-page-nav-row { display: flex; align-items: center; gap: 10px; }
+    .add-page-nav-toggle {
+      width: 36px; height: 20px; border-radius: 10px; border: none;
+      cursor: pointer; position: relative; background: #2a3748;
+      transition: background .15s; flex-shrink: 0;
+    }
+    .add-page-nav-toggle.on { background: #3b82f6; }
+    .add-page-nav-toggle::after {
+      content: ''; position: absolute; top: 3px; left: 3px;
+      width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .15s;
+    }
+    .add-page-nav-toggle.on::after { transform: translateX(16px); }
+    .add-page-nav-label { font-size: 13px; color: var(--text-muted, #94a3b8); }
+    .add-page-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+    .add-page-error { font-size: 12px; color: #f87171; margin-bottom: 10px; display: none; }
+    /* NAV badge and custom dot */
+    .pg-nav-badge {
+      background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.4);
+      color: #4ade80; font-size: 9px; font-weight: 700;
+      padding: 1px 6px; border-radius: 20px; letter-spacing: .04em;
+      vertical-align: middle; margin-left: 4px;
+    }
+    .pg-dot--custom { background: #a78bfa; }
+    .pg-add-child-btn {
+      opacity: 0; background: none; border: 1px solid #2a3748;
+      border-radius: 4px; color: #64748b; font-size: 11px;
+      cursor: pointer; padding: 1px 6px; line-height: 1.4;
+      transition: opacity .15s, color .15s, border-color .15s;
+      flex-shrink: 0;
+    }
+    .pg-node:hover .pg-add-child-btn { opacity: 1; }
+    .pg-add-child-btn:hover { color: #3b82f6; border-color: #3b82f6; }
+    .pg-btn-add-page {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 6px;
+      border: 1px dashed #2a3748; background: transparent;
+      color: #64748b; font-size: 12px; font-weight: 600;
+      cursor: pointer; white-space: nowrap; transition: all .15s;
+    }
+    .pg-btn-add-page:hover { border-color: #3b82f6; color: #3b82f6; }
+
+    /* ── Lock status badge on tree nodes ── */
+    .pg-lock-pill {
+      font-size: 9px; font-weight: 700;
+      padding: 1px 5px; border-radius: 10px;
+      margin-left: 3px; vertical-align: middle;
+      flex-shrink: 0; white-space: nowrap;
+    }
+    .pg-lock-pill--development { display: none; }
+    .pg-lock-pill--stable {
+      background: rgba(245,158,11,.18);
+      border: 1px solid rgba(245,158,11,.4);
+      color: #fbbf24;
+    }
+    .pg-lock-pill--locked {
+      background: rgba(220,38,38,.15);
+      border: 1px solid rgba(220,38,38,.4);
+      color: #fca5a5;
+    }
+
+    /* ── Lock toggle button in toolbar ── */
+    .btn-page-lock {
+      display: flex; align-items: center; gap: 5px;
+      padding: 7px 13px; border-radius: 6px;
+      border: 1px solid var(--border, #2a3748);
+      background: var(--surface2, #111b27);
+      font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: all .15s; white-space: nowrap;
+      color: var(--text-muted, #94a3b8);
+    }
+    .btn-page-lock:hover { border-color: #64748b; color: #e2e8f0; }
+    .btn-page-lock[data-lock="stable"]  { border-color: rgba(245,158,11,.5); color: #f59e0b; }
+    .btn-page-lock[data-lock="locked"]  { border-color: rgba(220,38,38,.5); color: #dc2626; }
+    .btn-page-lock[data-lock="development"] { color: #64748b; }
   </style>
 </head>
-<body>
+<body data-admin-context="pages">
 <div class="app">
 
   <!-- SIDEBAR -->
@@ -350,6 +569,9 @@
       <a href="settings.html" class="nav-item" data-page="settings">
         <span class="nav-icon">⊙</span> Settings
       </a>
+      <a href="locks.html" class="nav-item" data-page="locks">
+        <span class="nav-icon">🔒</span> Locks
+      </a>
       <div class="nav-section-label">Apps</div>
       <a href="server.html" class="nav-item" data-page="server">
         <span class="nav-icon">⬡</span> Server
@@ -372,17 +594,33 @@
     <div class="header">
       <div class="header-title">Pages</div>
       <div class="header-actions">
+        <button id="undoBtn" disabled
+          style="padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
+                 border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
+                 color:var(--text-muted,#94a3b8);cursor:not-allowed;white-space:nowrap;
+                 transition:all .15s;display:flex;align-items:center;gap:6px">
+          ↩ Nothing to undo
+        </button>
+        <button class="btn btn-sm" id="btnAddPage" onclick="openAddPageModal(null)" style="background:var(--surface-2,#1e2d3d);border:1px solid var(--border,#2a3748);color:var(--text,#e2e8f0)">+ Add Page</button>
         <select id="pageSelect" title="Select page to edit"></select>
+        <button class="btn-page-lock" id="pageLockBtn" data-lock="development" title="Page lock status — click to cycle" style="display:none">
+          🔓 Dev
+        </button>
         <button class="btn-edit-mode" id="editModeBtn">
           <span class="edit-mode-dot"></span>
           Edit Mode
+        </button>
+        <button id="saveTextBtn" style="display:none;padding:7px 16px;border-radius:6px;
+          border:none;background:#16a34a;color:#fff;font-size:13px;font-weight:700;
+          cursor:pointer;white-space:nowrap;transition:opacity .15s" title="Save text changes to file">
+          Save Text ✓
         </button>
         <span class="edit-status" id="editStatus">Select a page</span>
         <button class="btn btn-sm" style="background:var(--surface-2,#1e2d3d);border:1px solid var(--border,#2a3748);color:var(--text,#e2e8f0)" onclick="openAutoPlace()">✦ AI Auto-Place</button>
       </div>
     </div>
     <div class="editor-frame-wrap">
-      <div class="frame-loading" id="frameLoading">Select a page to preview</div>
+      <div class="frame-loading" id="frameLoading"><div class="pg-tree" id="pageTree"></div></div>
       <iframe id="siteFrame" src="about:blank" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
     </div>
   </div>
@@ -444,6 +682,127 @@
   </div>
 </div>
 
+<!-- ── Lightbox (shared with Media Library) ──────────────────────────────── -->
+<div id="lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:99999;align-items:center;justify-content:center;flex-direction:column" onclick="if(event.target===this)closeLightbox()">
+  <button onclick="closeLightbox()" style="position:absolute;top:16px;right:20px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer;line-height:1;opacity:.7" title="Close (Esc)">✕</button>
+  <button id="lbPrev" onclick="lightboxNav(-1)" style="position:absolute;left:16px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.12);border:none;color:#fff;font-size:36px;cursor:pointer;border-radius:8px;padding:8px 14px;line-height:1;opacity:.8" title="Previous">‹</button>
+  <button id="lbNext" onclick="lightboxNav(1)"  style="position:absolute;right:16px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.12);border:none;color:#fff;font-size:36px;cursor:pointer;border-radius:8px;padding:8px 14px;line-height:1;opacity:.8" title="Next">›</button>
+  <img id="lbImg" src="" style="max-width:88vw;max-height:82vh;object-fit:contain;border-radius:6px;box-shadow:0 8px 40px rgba(0,0,0,.6)" />
+  <div style="display:flex;align-items:center;gap:12px;margin-top:14px;min-height:32px;flex-wrap:wrap;justify-content:center">
+    <div id="lbCaption" style="color:rgba(255,255,255,.6);font-size:12px;text-align:center"></div>
+    <div id="lbCounter" style="color:rgba(255,255,255,.4);font-size:11px"></div>
+    <span id="lbActiveBadge" style="display:none;background:rgba(34,197,94,.18);border:1px solid rgba(34,197,94,.5);color:#4ade80;font-size:12px;padding:5px 14px;border-radius:6px;font-weight:600">✓ Active</span>
+    <button id="lbUseBtn" onclick="lbUseVersion()" style="display:none;background:#16a34a;border:none;color:#fff;font-size:12px;padding:6px 16px;border-radius:6px;cursor:pointer;font-weight:600">✓ Use This Version</button>
+    <button id="lbEditBtn" onclick="lbEditWithAI()" style="display:none;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:12px;padding:6px 14px;border-radius:6px;cursor:pointer">✦ Edit with AI</button>
+    <button id="lbDeleteBtn" onclick="lbDeleteVersion()" style="display:none;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#fca5a5;font-size:12px;padding:6px 14px;border-radius:6px;cursor:pointer">✕ Delete Render</button>
+  </div>
+  <div id="lbPrompt" style="display:none;max-width:640px;width:90vw;text-align:center;font-size:11px;color:rgba(255,255,255,.5);font-style:italic;line-height:1.6;padding:6px 16px 0;white-space:pre-line"></div>
+</div>
+
+<!-- ── AI Re-render Modal (shared with Media Library) ────────────────────── -->
+<div id="rerenderModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeRerender()">
+  <div class="modal-box" style="max-width:860px;width:95vw">
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span>✦ AI Re-render — <span id="rerenderSourceLabel" style="font-weight:400;opacity:.7;font-size:14px">Original</span></span>
+      <button class="btn btn-ghost btn-sm" onclick="closeRerender()" style="font-size:18px;padding:2px 8px">✕</button>
+    </div>
+    <!-- Image panels -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0 10px">
+      <div>
+        <div id="rerenderOriginalLabel" style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Source</div>
+        <div id="rerenderOriginal" style="width:100%;aspect-ratio:4/3;background:var(--surface-2);background-size:cover;background-position:center;border-radius:6px;border:1px solid var(--border);cursor:zoom-in" onclick="rerenderLightbox(0)" title="Click to enlarge"></div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;display:flex;align-items:center;gap:8px">
+          <span id="rerenderResultLabel">Result</span>
+          <span id="rerenderPassBadge" style="display:none;background:var(--accent);color:#fff;font-size:10px;padding:1px 7px;border-radius:10px"></span>
+        </div>
+        <div id="rerenderResult" style="width:100%;aspect-ratio:4/3;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px;background-size:cover;background-position:center;position:relative;cursor:zoom-in" onclick="rerenderLightbox(1)" title="Click to enlarge">
+          <span id="rerenderPlaceholder">Result will appear here</span>
+        </div>
+      </div>
+    </div>
+    <!-- Version filmstrip -->
+    <div id="rerenderFilmstrip" style="display:none;margin:4px 0 14px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em">Render From</div>
+        <span id="rerenderStripCount" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;font-size:10px;padding:1px 8px;color:var(--text-2)">0</span>
+        <div style="flex:1"></div>
+        <button id="rerenderBulkDeleteBtn" onclick="bulkDeleteStrip()" style="display:none;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#fca5a5;font-size:11px;padding:3px 10px;border-radius:5px;cursor:pointer;line-height:1.4"></button>
+        <button id="rerenderSelectBtn" onclick="toggleStripSelectMode()" style="background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);font-size:11px;padding:3px 10px;border-radius:5px;cursor:pointer;line-height:1.4">Select</button>
+      </div>
+      <div id="rerenderStripScroll" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin;scrollbar-color:var(--border) transparent"></div>
+    </div>
+    <!-- Adjustment sliders -->
+    <div id="rerenderAdjustRow" style="display:none;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Adjust Result</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <label style="font-size:12px;color:var(--text-2)">
+          Brightness <span id="brightnessVal">100</span>%
+          <input type="range" min="50" max="150" value="100" id="adjBrightness" oninput="applyAdjust()" style="width:100%;margin-top:4px;accent-color:var(--accent)">
+        </label>
+        <label style="font-size:12px;color:var(--text-2)">
+          Contrast <span id="contrastVal">100</span>%
+          <input type="range" min="50" max="150" value="100" id="adjContrast" oninput="applyAdjust()" style="width:100%;margin-top:4px;accent-color:var(--accent)">
+        </label>
+        <label style="font-size:12px;color:var(--text-2)">
+          Saturation <span id="saturationVal">100</span>%
+          <input type="range" min="0" max="200" value="100" id="adjSaturation" oninput="applyAdjust()" style="width:100%;margin-top:4px;accent-color:var(--accent)">
+        </label>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="resetAdjust()" style="margin-top:8px;font-size:11px">Reset adjustments</button>
+    </div>
+    <!-- Prompt -->
+    <div style="margin-bottom:12px">
+      <label style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">Prompt</label>
+      <textarea id="rerenderPrompt" rows="3" style="width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:10px 12px;font-size:13px;resize:vertical;font-family:inherit" placeholder="e.g. photorealistic luxury kitchen render, marble countertops, natural light, high-end appliances"></textarea>
+    </div>
+    <!-- Action buttons -->
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-gold" id="rerenderRunBtn" onclick="runRerender(false)" title="New render from source image">✦ Re-render</button>
+      <button class="btn btn-gold" id="rerenderRefineBtn" onclick="runRerender(true)" style="display:none" title="Continue refining from the current result">✦ Refine Result</button>
+      <button class="btn btn-ghost btn-sm" id="rerenderRestartBtn" onclick="restartRerender()" style="display:none">↺ Reset View</button>
+      <div style="flex:1"></div>
+      <button id="rerenderUseBtn" onclick="rerenderUseVersion()" style="display:none;background:#16a34a;border:none;color:#fff;font-size:13px;padding:7px 18px;border-radius:6px;cursor:pointer;font-weight:600">✓ Use This Version</button>
+      <span id="rerenderStatus" style="font-size:13px;color:var(--text-muted);width:100%;margin-top:4px"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Add Page Modal ── -->
+<div class="add-page-backdrop" id="addPageBackdrop">
+  <div class="add-page-modal">
+    <h3>+ Add New Page</h3>
+    <div class="add-page-field">
+      <label>Page Title</label>
+      <input type="text" id="apTitle" placeholder="e.g. San Francisco Kitchen" autocomplete="off" />
+    </div>
+    <div class="add-page-field">
+      <label>URL Slug</label>
+      <input type="text" id="apSlug" placeholder="e.g. san-francisco-kitchen" autocomplete="off" />
+      <div class="slug-hint" id="apSlugHint">Will be created at: /san-francisco-kitchen.html</div>
+    </div>
+    <div class="add-page-field">
+      <label>Parent Page (optional)</label>
+      <select id="apParent">
+        <option value="">— None (root level) —</option>
+      </select>
+    </div>
+    <div class="add-page-field">
+      <label>Show in Navigation</label>
+      <div class="add-page-nav-row">
+        <button class="add-page-nav-toggle" id="apNavToggle" type="button"></button>
+        <span class="add-page-nav-label" id="apNavLabel">No</span>
+      </div>
+    </div>
+    <div class="add-page-error" id="apError"></div>
+    <div class="add-page-footer">
+      <button class="btn-cancel" onclick="closeAddPageModal()">Cancel</button>
+      <button class="btn btn-sm" id="apSubmit" onclick="submitAddPage()" style="background:#3b82f6;border:none;color:#fff;font-weight:700">Create Page</button>
+    </div>
+  </div>
+</div>
+
 <script src="js/admin.js"></script>
 <script>
 (function() {
@@ -471,13 +830,20 @@
   let pendingZoom  = null;
   let pendingPosX  = null;
   let pendingPosY  = null;
+  // Text editing state
+  let textEditCount = 0;
+  // ── Lock state ──
+  let _pageLocks = {};         // slug → 'development' | 'stable' | 'locked'
+  let currentPageLock = 'development';
 
   // ── Elements ─────────────────────────────────────────────────────────────
   const pageSelect   = document.getElementById('pageSelect');
   const editModeBtn  = document.getElementById('editModeBtn');
+  const saveTextBtn  = document.getElementById('saveTextBtn');
   const editStatus   = document.getElementById('editStatus');
   const siteFrame    = document.getElementById('siteFrame');
   const frameLoading = document.getElementById('frameLoading');
+  const pageLockBtn  = document.getElementById('pageLockBtn');
   const pickerBackdrop = document.getElementById('pickerBackdrop');
   const pickerGrid   = document.getElementById('pickerGrid');
   const pickerTabs   = document.getElementById('pickerTabs');
@@ -489,10 +855,20 @@
   // ── Init ─────────────────────────────────────────────────────────────────
   async function init() {
     try {
-      pages = await API('/admin/api/pages');
+      const [pagesRes, lockRes] = await Promise.all([
+        API('/admin/api/pages'),
+        API('/admin/api/locks/pages').catch(() => ({ ok: false, pages: [] }))
+      ]);
+      pages = pagesRes;
+      if (lockRes.ok) {
+        (lockRes.pages || []).forEach(p => { _pageLocks[p.slug] = p.status; });
+      }
       populatePageSelect(pages);
+      buildTree(pages);
     } catch(e) {
       editStatus.textContent = 'Error loading pages';
+      document.getElementById('pageTree').innerHTML =
+        '<div style="color:#64748b;font-size:13px;padding:40px">Could not load pages</div>';
     }
   }
 
@@ -505,17 +881,18 @@
       'Service Pages': [],
       'Other': []
     };
+    const MAIN_SLUGS = new Set(['home','about','contact','portfolio','allprojects','process','services','team',
+      'blog','custom-homes','kitchen-remodels','bathroom-remodels','whole-house-remodels']);
     pages.forEach(p => {
       if (!p.page_path) return;
       const path = p.page_path;
       if (path.startsWith('services/')) {
         groups['Service Pages'].push(p);
-      } else if (['danville-dream', 'danville-hilltop', 'lafayette-bistro', 'lafayette-luxury',
-                  'alamo-luxury', 'orinda-kitchen', 'pleasanton-custom', 'san-ramon', 'sunol-homestead']
-                  .some(s => p.slug === s)) {
-        groups['Portfolio'].push(p);
-      } else if (['home','about','contact','portfolio','process','services','team'].includes(p.slug)) {
+      } else if (MAIN_SLUGS.has(p.slug)) {
         groups['Main Pages'].push(p);
+      } else if (!p.slug.includes('/')) {
+        // Any root-level page that isn't a main page is a portfolio/project page
+        groups['Portfolio'].push(p);
       } else {
         groups['Other'].push(p);
       }
@@ -536,18 +913,408 @@
     });
   }
 
+  // ── Page Link Tree ────────────────────────────────────────────────────────
+  function buildTree(pages) {
+    const treeEl = document.getElementById('pageTree');
+    if (!treeEl) return;
+    frameLoading.classList.add('has-tree');
+
+    // ── Static data ──
+    const CORE_SLUGS = ['about','process','team','contact'];
+    const HUB_SLUGS  = ['allprojects','custom-homes','kitchen-remodels','bathroom-remodels','whole-house-remodels'];
+    const NAMES = {
+      home:'Home', about:'About', contact:'Contact', process:'Our Process', team:'Team',
+      services:'Services', portfolio:'Portfolio', allprojects:'All Projects',
+      'custom-homes':'Custom Homes', 'kitchen-remodels':'Kitchen Remodels',
+      'bathroom-remodels':'Bathroom Remodels', 'whole-house-remodels':'Whole House Remodels'
+    };
+    const CITIES = [
+      ['Alamo','alamo'],['Danville','danville'],['Diablo','diablo'],['Dublin','dublin'],
+      ['Lafayette','lafayette'],['Moraga','moraga'],['Orinda','orinda'],['Pleasanton','pleasanton'],
+      ['Rossmoor','rossmoor'],['San Ramon','san-ramon'],['Sunol','sunol'],['Walnut Creek','walnut-creek']
+    ];
+    const SVC_TYPES = [
+      ['Kitchen Remodel',       'kitchen-remodel'],
+      ['Bathroom Remodel',      'bathroom-remodel'],
+      ['Whole House Remodel',   'whole-house-remodel'],
+      ['Custom Home Builder',   'custom-home-builder'],
+      ['Design-Build',          'design-build'],
+    ];
+
+    const fname = slug => {
+      if (NAMES[slug]) return NAMES[slug];
+      const p = pages.find(x => x.slug === slug);
+      return (p && p.title) ? p.title : slug.split('/').pop().replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+    };
+
+    // ── HTML helpers ──
+
+    // Single clickable node card
+    const nd = (slug, dot, label) => {
+      const pg = pages.find(x => x.slug === slug);
+      const navBadge = (pg && pg.show_in_nav) ? '<span class="pg-nav-badge">NAV</span>' : '';
+      const lockStatus = _pageLocks[slug] || 'development';
+      const lockLabel  = { development: '', stable: '⚠ Stable', locked: '🔒 Locked' }[lockStatus];
+      const lockPill   = lockStatus !== 'development'
+        ? `<span class="pg-lock-pill pg-lock-pill--${lockStatus}">${lockLabel}</span>`
+        : '';
+      return `<div class="pg-node" data-slug="${slug}" title="/${slug}">
+        <div class="pg-node-dot ${dot}"></div>
+        <div class="pg-node-info">
+          <div class="pg-node-name">${label||fname(slug)}${navBadge}${lockPill}</div>
+          <div class="pg-node-slug">${slug}</div>
+        </div>
+        <button class="pg-add-child-btn" data-parent="${slug}" title="Add child page">+</button>
+      </div>`;
+    };
+
+    // A tree item: node row + indented sub-children (the vertical connecting branch)
+    const branch = (nodeHtml, subHtml) => {
+      if (!subHtml) return `<div class="pg-ti"><div class="pg-ti-row">${nodeHtml}</div></div>`;
+      return `<div class="pg-ti">
+        <div class="pg-ti-row">${nodeHtml}</div>
+        <div class="pg-ti-sub">${subHtml}</div>
+      </div>`;
+    };
+
+    // Wrap HTML in a child slot (adds the horizontal connecting line)
+    const ch = html => `<div class="pg-ti-child">${html}</div>`;
+
+    // A collapsible group: toggle button + hidden children panel
+    const grp = (id, label, count, inner) =>
+      `<div class="pg-group-toggle" data-group="${id}">
+        <span class="pg-group-arrow">▶</span><span>${label}</span>
+        <span class="pg-badge">${count}</span>
+      </div>
+      <div class="pg-group-children" id="pgGroup_${id}">
+        <div class="pg-ti-sub" style="margin-left:0;padding-top:6px">
+          <div class="pg-ti-child"><div class="pg-ti-nodes-row">${inner}</div></div>
+        </div>
+      </div>`;
+
+    // ── Data ──
+    const projectPages = pages.filter(p =>
+      !p.slug.includes('/') &&
+      !CORE_SLUGS.includes(p.slug) && !HUB_SLUGS.includes(p.slug) &&
+      p.slug !== 'home' && p.slug !== 'services' && p.slug !== 'portfolio'
+    );
+
+    const classifiedSlugs = new Set([
+      'home','services','portfolio',
+      ...CORE_SLUGS, ...HUB_SLUGS,
+      ...projectPages.map(p=>p.slug),
+      ...CITIES.map(([,s])=>`services/${s}`),
+      ...SVC_TYPES.flatMap(([,st])=>CITIES.map(([,c])=>`services/${st}-${c}`))
+    ]);
+    const customPages = pages.filter(p => !classifiedSlugs.has(p.slug) && !p.parent_slug);
+
+    // ── Build each major branch ──
+
+    // Core pages (nav leaf nodes shown as a flat row)
+    const coreSub = ch(`<div class="pg-ti-nodes-row">${CORE_SLUGS.map(s=>nd(s,'pg-dot--core')).join('')}</div>`);
+
+    // Portfolio branch:
+    //   portfolio → [allprojects, custom-homes, kitchen, bathroom, whole-house]
+    //                + collapsible project pages
+    const hubNodes = HUB_SLUGS.map(s=>nd(s,'pg-dot--hub')).join('');
+    const projNodes = projectPages.map(p=>nd(p.slug,'pg-dot--project')).join('');
+    const portfolioSub =
+      ch(`<div class="pg-ti-nodes-row">${hubNodes}</div>`) +
+      ch(grp('projects','Project Pages', projectPages.length, projNodes));
+    const portfolioBranch = branch(nd('portfolio','pg-dot--hub'), portfolioSub);
+
+    // Services branch:
+    //   services → 12 city hubs → each city hub → 5 service pages (collapsible)
+    const cityBranches = CITIES.map(([cityName, citySlug]) => {
+      const cityNode = nd(`services/${citySlug}`, 'pg-dot--service', cityName);
+      const svcNodes = SVC_TYPES.map(([svcLabel, svcSlug]) =>
+        nd(`services/${svcSlug}-${citySlug}`, 'pg-dot--seo', svcLabel)
+      ).join('');
+      const citySub = ch(grp(`city_${citySlug}`, 'Service Pages', 5, svcNodes));
+      return ch(branch(cityNode, citySub));
+    }).join('');
+    const servicesChildren = CITIES.map(([cityName, citySlug]) => {
+      const cityNode = nd(`services/${citySlug}`, 'pg-dot--service', cityName);
+      const svcNodes = SVC_TYPES.map(([svcLabel, svcSlug]) =>
+        nd(`services/${svcSlug}-${citySlug}`, 'pg-dot--seo', svcLabel)
+      ).join('');
+      const cityChildren = ch(grp(`city_${citySlug}`, 'Service Pages', 5, svcNodes));
+      return ch(branch(cityNode, cityChildren));
+    }).join('');
+    const servicesBranchFinal = branch(nd('services','pg-dot--service'), servicesChildren);
+
+    // Custom pages (any unclassified pages created via Add Page)
+    const customSub = customPages.length
+      ? ch(`<div class="pg-ti-nodes-row">${customPages.map(p=>nd(p.slug,'pg-dot--custom')).join('')}</div>`)
+      : '';
+
+    // ── Assemble full tree under Home ──
+    const homeChildren =
+      coreSub +
+      ch(portfolioBranch) +
+      ch(servicesBranchFinal) +
+      customSub;
+
+    treeEl.innerHTML = `
+      <div class="pg-tree-header">
+        <div class="pg-tree-title">Site Map</div>
+        <div class="pg-tree-count">${pages.length} pages</div>
+        <button class="pg-btn-add-page" onclick="openAddPageModal(null)">+ Add Page</button>
+      </div>
+      ${branch(nd('home','pg-dot--home pg-node--home','Home'), homeChildren)}`;
+
+    // Wire collapse toggles
+    treeEl.querySelectorAll('.pg-group-toggle').forEach(tog => {
+      tog.addEventListener('click', () => {
+        const panel = document.getElementById(`pgGroup_${tog.dataset.group}`);
+        if (!panel) return;
+        tog.classList.toggle('open');
+        panel.classList.toggle('open');
+      });
+    });
+
+    // Wire node clicks
+    treeEl.querySelectorAll('.pg-node[data-slug]').forEach(node => {
+      node.addEventListener('click', (e) => {
+        if (e.target.closest('.pg-add-child-btn')) return;
+        selectTreeNode(node.dataset.slug);
+      });
+    });
+
+    // Wire add-child buttons
+    treeEl.querySelectorAll('.pg-add-child-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openAddPageModal(btn.dataset.parent);
+      });
+    });
+  }
+
+  function selectTreeNode(slug) {
+    if (!slug) return;
+    pageSelect.value = slug;
+    loadPage(slug);
+  }
+
+  function syncTreeActive(slug) {
+    document.querySelectorAll('#pageTree .pg-node').forEach(n => n.classList.remove('active'));
+    if (!slug) return;
+    const active = document.querySelector(`#pageTree .pg-node[data-slug="${CSS.escape(slug)}"]`);
+    if (!active) return;
+    // Walk up and expand ALL ancestor collapsed groups
+    let el = active.parentElement;
+    while (el && el !== document.getElementById('pageTree')) {
+      if (el.classList.contains('pg-group-children') && !el.classList.contains('open')) {
+        el.classList.add('open');
+        const groupId = el.id.replace('pgGroup_', '');
+        const tog = document.querySelector(`.pg-group-toggle[data-group="${groupId}"]`);
+        if (tog) tog.classList.add('open');
+      }
+      el = el.parentElement;
+    }
+    active.classList.add('active');
+    setTimeout(() => active.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 80);
+  }
+  // ── End Page Link Tree ────────────────────────────────────────────────────
+
+  // ── Refresh pages (re-fetch + rebuild tree + dropdown) ───────────────────
+  async function refreshPages() {
+    try {
+      pages = await API('/admin/api/pages');
+      populatePageSelect(pages);
+      buildTree(pages);
+      if (currentSlug) syncTreeActive(currentSlug);
+    } catch(e) {
+      console.error('refreshPages failed:', e);
+    }
+  }
+
+  // ── Add Page Modal ────────────────────────────────────────────────────────
+  let _apNavOn = false;
+
+  function openAddPageModal(parentSlug) {
+    const backdrop = document.getElementById('addPageBackdrop');
+    const titleEl  = document.getElementById('apTitle');
+    const slugEl   = document.getElementById('apSlug');
+    const hintEl   = document.getElementById('apSlugHint');
+    const parentEl = document.getElementById('apParent');
+    const errorEl  = document.getElementById('apError');
+
+    // Reset fields
+    titleEl.value = '';
+    slugEl.value  = '';
+    hintEl.textContent = 'Will be created at: /.html';
+    errorEl.style.display = 'none';
+    _apNavOn = false;
+    const tog = document.getElementById('apNavToggle');
+    tog.classList.remove('on');
+    document.getElementById('apNavLabel').textContent = 'No';
+
+    // Populate parent select
+    parentEl.innerHTML = '<option value="">— None (root level) —</option>';
+    pages.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.slug;
+      opt.textContent = (p.title || p.slug) + ' (' + p.slug + ')';
+      if (p.slug === parentSlug) opt.selected = true;
+      parentEl.appendChild(opt);
+    });
+
+    backdrop.classList.add('open');
+    setTimeout(() => titleEl.focus(), 80);
+  }
+
+  function closeAddPageModal() {
+    document.getElementById('addPageBackdrop').classList.remove('open');
+  }
+
+  // Auto-generate slug from title
+  document.getElementById('apTitle').addEventListener('input', () => {
+    const title = document.getElementById('apTitle').value;
+    const slugEl = document.getElementById('apSlug');
+    // Only auto-fill if user hasn't manually edited slug
+    if (!slugEl.dataset.manualEdit) {
+      const auto = title.toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .trim().replace(/\s+/g, '-').replace(/-+/g, '-');
+      slugEl.value = auto;
+      updateSlugHint();
+    }
+  });
+  document.getElementById('apSlug').addEventListener('input', (e) => {
+    e.target.dataset.manualEdit = e.target.value ? '1' : '';
+    updateSlugHint();
+  });
+  document.getElementById('apTitle').addEventListener('blur', () => {
+    // Remove manual edit lock if slug still matches auto value
+    const title = document.getElementById('apTitle').value;
+    const slugEl = document.getElementById('apSlug');
+    const auto = title.toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim().replace(/\s+/g, '-').replace(/-+/g, '-');
+    if (slugEl.value === auto) delete slugEl.dataset.manualEdit;
+  });
+  function updateSlugHint() {
+    const slug = document.getElementById('apSlug').value || '';
+    const parent = document.getElementById('apParent').value || '';
+    let full = '';
+    if (parent) {
+      full = '/' + parent + '/' + slug + '.html';
+    } else {
+      full = '/' + slug + '.html';
+    }
+    document.getElementById('apSlugHint').textContent = slug ? `Will be created at: ${full}` : 'Enter a title to auto-generate';
+  }
+  document.getElementById('apParent').addEventListener('change', updateSlugHint);
+
+  // Nav toggle
+  document.getElementById('apNavToggle').addEventListener('click', () => {
+    _apNavOn = !_apNavOn;
+    const tog = document.getElementById('apNavToggle');
+    tog.classList.toggle('on', _apNavOn);
+    document.getElementById('apNavLabel').textContent = _apNavOn ? 'Yes — shown in navigation' : 'No';
+  });
+
+  // Close on backdrop click
+  document.getElementById('addPageBackdrop').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('addPageBackdrop')) closeAddPageModal();
+  });
+
+  async function submitAddPage() {
+    const title      = document.getElementById('apTitle').value.trim();
+    const slugRaw    = document.getElementById('apSlug').value.trim();
+    const parent     = document.getElementById('apParent').value.trim() || null;
+    const errorEl    = document.getElementById('apError');
+    const submitBtn  = document.getElementById('apSubmit');
+
+    // Compute final slug (prepend parent if given)
+    const slug = parent ? parent + '/' + slugRaw : slugRaw;
+
+    errorEl.style.display = 'none';
+    if (!title) { errorEl.textContent = 'Title is required.'; errorEl.style.display = 'block'; return; }
+    if (!slugRaw) { errorEl.textContent = 'Slug is required.'; errorEl.style.display = 'block'; return; }
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(slugRaw)) {
+      errorEl.textContent = 'Slug may only contain lowercase letters, numbers, and hyphens.';
+      errorEl.style.display = 'block'; return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating…';
+    try {
+      const result = await API('/admin/api/pages/create', {
+        method: 'POST',
+        body: JSON.stringify({ title, slug, parent_slug: parent, show_in_nav: _apNavOn })
+      });
+      if (result.error) throw new Error(result.error);
+      closeAddPageModal();
+      await refreshPages();
+      // Load the new page
+      loadPage(result.slug);
+      pageSelect.value = result.slug;
+    } catch(e) {
+      errorEl.textContent = e.message || 'Failed to create page.';
+      errorEl.style.display = 'block';
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Create Page';
+    }
+  }
+
+  // Expose globally so onclick attributes in modal work
+  window.openAddPageModal  = openAddPageModal;
+  window.closeAddPageModal = closeAddPageModal;
+  window.submitAddPage     = submitAddPage;
+
   function getPagePath(slug) {
     const p = pages.find(x => x.slug === slug);
     if (!p || !p.page_path) return null;
     return p.page_path;
   }
 
+  function _applyLockUI(lockStatus) {
+    currentPageLock = lockStatus;
+    const ICONS = { development: '🔓', stable: '⚠', locked: '🔒' };
+    const LABELS = { development: 'Dev', stable: 'Stable', locked: 'Locked' };
+    pageLockBtn.textContent = `${ICONS[lockStatus]} ${LABELS[lockStatus]}`;
+    pageLockBtn.setAttribute('data-lock', lockStatus);
+    pageLockBtn.style.display = '';
+
+    if (lockStatus === 'locked') {
+      editModeBtn.disabled = true;
+      editModeBtn.title = 'Page is locked — go to Locks to unlock';
+      editModeBtn.style.opacity = '0.4';
+      editModeBtn.style.cursor = 'not-allowed';
+      if (editMode) {
+        editMode = false;
+        editModeBtn.classList.remove('active');
+        siteFrame.contentWindow && siteFrame.contentWindow.postMessage({ type: 'rd_disable_edit' }, '*');
+      }
+      editStatus.textContent = '🔒 Page Locked';
+      editStatus.className = 'edit-status';
+    } else {
+      editModeBtn.disabled = false;
+      editModeBtn.title = '';
+      editModeBtn.style.opacity = '';
+      editModeBtn.style.cursor = '';
+    }
+  }
+
   function loadPage(slug) {
     if (!slug) return;
+    // Warn if there are unsaved text edits
+    if (textEditCount > 0) {
+      const ok = window.confirm(`You have ${textEditCount} unsaved text change${textEditCount !== 1 ? 's' : ''} on this page.\n\nLeave without saving?`);
+      if (!ok) {
+        // Restore the select to the current page
+        pageSelect.value = currentSlug;
+        syncTreeActive(currentSlug);
+        return;
+      }
+    }
     currentSlug = slug;
-    // Reset edit mode and pending transform when switching pages
-    editMode = false;
-    editModeBtn.classList.remove('active');
+    syncTreeActive(slug);
+    // Keep edit mode when switching pages — siteFrame.load will re-inject overlay
+    _resetTextEditState();
     pendingImage = null; pendingZoom = null; pendingPosX = null; pendingPosY = null;
     const pageData = pages.find(p => p.slug === slug);
     if (pageData) {
@@ -560,15 +1327,167 @@
     frameLoading.classList.remove('hidden');
     editStatus.textContent = 'Loading…';
     editStatus.className = 'edit-status';
+
+    // Apply lock status from cache (or fetch if not cached)
+    const cachedLock = _pageLocks[slug] || 'development';
+    _applyLockUI(cachedLock);
+    // Also refresh from server in background to stay current
+    API(`/admin/api/locks/pages/${encodeURIComponent(slug)}`).then(res => {
+      if (res && res.ok === false && res.error) return; // error — keep cached
+    }).catch(() => {});
+    // Use check endpoint instead
+    API(`/admin/api/locks/check?slug=${encodeURIComponent(slug)}`).then(res => {
+      if (res && res.page) {
+        const status = res.page.status || 'development';
+        _pageLocks[slug] = status;
+        if (currentSlug === slug) _applyLockUI(status);
+      }
+    }).catch(() => {});
+
     siteFrame.src = `/view/${path}`;
   }
+
+  // ── Lock toggle button ────────────────────────────────────────────────────
+  pageLockBtn.addEventListener('click', async () => {
+    if (!currentSlug) return;
+    const CYCLE = { development: 'stable', stable: 'locked', locked: 'development' };
+    const newStatus = CYCLE[currentPageLock] || 'development';
+
+    if (newStatus === 'stable' && currentPageLock === 'development') {
+      // no confirm needed going from dev → stable
+    } else if (newStatus === 'locked') {
+      if (!window.confirm(`Lock this page?\n\nWhile locked, Edit Mode will be disabled.\nYou can unlock it from the Locks admin page.`)) return;
+    }
+
+    try {
+      const res = await API(`/admin/api/locks/pages/${encodeURIComponent(currentSlug)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (!res.ok) throw new Error(res.error || 'Save failed');
+      _pageLocks[currentSlug] = newStatus;
+      _applyLockUI(newStatus);
+      // Refresh tree to update pills
+      buildTree(pages);
+      syncTreeActive(currentSlug);
+      Admin.toast && Admin.toast(`Page ${currentSlug} → ${newStatus}`, 'success');
+    } catch(e) {
+      console.error('Lock toggle failed:', e);
+    }
+  });
 
   // ── Page select ──────────────────────────────────────────────────────────
   pageSelect.addEventListener('change', () => {
     const slug = pageSelect.value;
-    if (!slug) return;
+    if (!slug) {
+      // Return to tree view
+      frameLoading.classList.remove('hidden');
+      siteFrame.src = 'about:blank';
+      currentSlug = null;
+      editMode = false;
+      editModeBtn.classList.remove('active');
+      editStatus.textContent = 'Select a page';
+      editStatus.className = 'edit-status';
+      syncTreeActive(null);
+      return;
+    }
+    syncTreeActive(slug);
     loadPage(slug);
   });
+
+  // ── Text-edit script injected into iframe when edit mode is ON ──────────
+  const TEXT_EDIT_SCRIPT = `(function(){
+    if(window.__rdTextEditActive) return;
+    window.__rdTextEditActive = true;
+    window.__rdTextEdits = {};
+
+    var TAGS = 'h1,h2,h3,h4,h5,h6,p,li,blockquote,td,th,figcaption';
+    var EXCLUDE = 'nav,script,style,head,noscript,template';
+
+    var els = Array.from(document.querySelectorAll(TAGS)).filter(function(el){
+      if(el.closest(EXCLUDE)) return false;
+      if(!el.textContent.trim()) return false;
+      return true;
+    });
+
+    var style = document.createElement('style');
+    style.id = 'rd-text-edit-style';
+    style.textContent = [
+      '[data-rdeid][contenteditable=true]{cursor:text;transition:outline .1s}',
+      '[data-rdeid][contenteditable=true]:hover{outline:1px dashed rgba(59,130,246,.6);outline-offset:2px}',
+      '[data-rdeid][contenteditable=true]:focus{outline:2px solid #3b82f6;outline-offset:2px;border-radius:2px}'
+    ].join('');
+    (document.head || document.body).appendChild(style);
+
+    var originals = {};
+    els.forEach(function(el, i){
+      var key = String(i);
+      originals[key] = el.innerHTML;
+      el.setAttribute('data-rdeid', key);
+      el.setAttribute('contenteditable', 'true');
+      el.setAttribute('spellcheck', 'false');
+
+      el.addEventListener('input', function(){
+        if(el.innerHTML !== originals[key]){
+          window.__rdTextEdits[key] = el.innerHTML;
+        } else {
+          delete window.__rdTextEdits[key];
+        }
+        window.parent.postMessage({type:'rd_text_changed', count:Object.keys(window.__rdTextEdits).length}, '*');
+      });
+
+      /* Strip rich formatting on paste — plain text only */
+      el.addEventListener('paste', function(e){
+        e.preventDefault();
+        var text = (e.clipboardData || window.clipboardData).getData('text/plain');
+        document.execCommand('insertText', false, text);
+      });
+
+      /* Prevent Enter from inserting block elements inside paragraphs */
+      el.addEventListener('keydown', function(e){
+        if(e.key === 'Enter' && (el.tagName === 'P' || el.tagName.match(/^H[1-6]$/))){
+          e.preventDefault();
+        }
+      });
+    });
+
+    window.__rdTextEditCleanup = function(){
+      var s = document.getElementById('rd-text-edit-style');
+      if(s) s.remove();
+      els.forEach(function(el){
+        el.removeAttribute('data-rdeid');
+        el.removeAttribute('contenteditable');
+        el.removeAttribute('spellcheck');
+      });
+      window.__rdTextEditActive = false;
+      window.__rdTextEdits = {};
+    };
+
+    console.log('[RD Text Edit] ' + els.length + ' editable elements ready');
+  })();`;
+
+  function _resetTextEditState() {
+    textEditCount = 0;
+    saveTextBtn.style.display = 'none';
+  }
+
+  function _injectTextEdit(iframeDoc) {
+    if (iframeDoc.getElementById('rd-text-edit-style')) return; // already active
+    const s = iframeDoc.createElement('script');
+    s.id = 'rd-text-edit-script';
+    s.textContent = TEXT_EDIT_SCRIPT;
+    iframeDoc.body.appendChild(s);
+  }
+
+  function _removeTextEdit() {
+    try {
+      const cw = siteFrame.contentWindow;
+      // Exit text mode first so overlays aren't left suspended
+      if (cw && typeof cw.__rdExitTextMode === 'function' && cw.__rdTextModeActive) cw.__rdExitTextMode();
+      if (cw && typeof cw.__rdTextEditCleanup === 'function') cw.__rdTextEditCleanup();
+    } catch(e) {}
+    _resetTextEditState();
+  }
 
   // ── Edit mode toggle (no reload — inject/remove overlay in live iframe) ──
   async function toggleEditOverlay() {
@@ -577,26 +1496,29 @@
     if (!iframeDoc) return;
 
     if (!editMode) {
-      // Remove all overlay elements
+      // Remove image overlay elements
       iframeDoc.querySelectorAll('[data-rd-overlay]').forEach(el => el.remove());
       const s1 = iframeDoc.getElementById('rd-edit-overlay');
       const s2 = iframeDoc.getElementById('rd-card-edit-overlay');
       if (s1) s1.remove();
       if (s2) s2.remove();
-      editStatus.textContent = 'Viewing — enable Edit Mode to swap images';
+      // Remove text editing
+      _removeTextEdit();
+      editStatus.textContent = 'Viewing — enable Edit Mode to swap images or edit text';
     } else {
       editStatus.textContent = 'Loading edit overlay…';
       try {
-        const resp = await fetch(`/admin/api/overlay-scripts?slug=${encodeURIComponent(currentSlug)}&token=${encodeURIComponent(TOKEN)}`, {
-          headers: { 'X-Admin-Token': TOKEN }
+        const resp = await fetch(`/admin/api/overlay-scripts?slug=${encodeURIComponent(currentSlug)}&token=${encodeURIComponent(TOKEN)}&_=${Date.now()}`, {
+          headers: { 'X-Admin-Token': TOKEN, 'Cache-Control': 'no-cache' }
         });
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const js = await resp.text();
         const script = iframeDoc.createElement('script');
         script.textContent = js;
         iframeDoc.body.appendChild(script);
-        // Update status and send image pool directly — don't rely on rd_overlay_ready from injected script
-        editStatus.textContent = 'Click: cycle  ·  Scroll: zoom  ·  Drag: pan  ·  Browse All to pick';
+        // Also inject text editing
+        _injectTextEdit(iframeDoc);
+        editStatus.textContent = 'Images: click·scroll·drag  ·  Text: click any text to edit';
         editStatus.className = 'edit-status ready';
         const imgs = allImages.length ? allImages : await API('/admin/api/pages/images').then(r => { allImages = r; return r; });
         siteFrame.contentWindow.postMessage({ type: 'rd_set_pool', images: imgs.map(i => i.hero_path) }, '*');
@@ -604,6 +1526,7 @@
         editStatus.textContent = 'Error loading edit overlay: ' + e.message;
         editMode = false;
         editModeBtn.classList.remove('active');
+        _resetTextEditState();
       }
     }
   }
@@ -614,15 +1537,68 @@
     toggleEditOverlay();
   });
 
+  // ── Save text edits ──────────────────────────────────────────────────────
+  saveTextBtn.addEventListener('click', async () => {
+    const cw = siteFrame.contentWindow;
+    if (!cw || !cw.__rdTextEdits || !currentSlug) return;
+    const edits = Object.assign({}, cw.__rdTextEdits);
+    if (!Object.keys(edits).length) return;
+    // Stable page — confirm before saving
+    if (currentPageLock === 'stable') {
+      const ok = window.confirm(`This page is marked Stable — save anyway?\n\nChanges will be written to the HTML file.`);
+      if (!ok) return;
+    }
+    saveTextBtn.textContent = 'Saving…';
+    saveTextBtn.style.opacity = '0.6';
+    try {
+      const result = await API(`/admin/api/pages/${currentSlug}/text-edits`, {
+        method: 'PATCH',
+        body: JSON.stringify({ edits })
+      });
+      if (result.ok) {
+        // Clear tracked edits in iframe
+        cw.__rdTextEdits = {};
+        textEditCount = 0;
+        saveTextBtn.style.display = 'none';
+        editStatus.textContent = 'Text saved ✓  ·  Images: click·scroll·drag  ·  Text: click any text to edit';
+        editStatus.className = 'edit-status ready';
+        if (typeof window._rdRefreshUndo === 'function') window._rdRefreshUndo();
+      } else {
+        editStatus.textContent = 'Save error: ' + (result.error || 'unknown');
+        editStatus.className = 'edit-status';
+      }
+    } catch(e) {
+      editStatus.textContent = 'Save failed: ' + e.message;
+      editStatus.className = 'edit-status';
+    } finally {
+      saveTextBtn.textContent = 'Save Text ✓';
+      saveTextBtn.style.opacity = '1';
+    }
+  });
+
   // ── Frame load events ────────────────────────────────────────────────────
   siteFrame.addEventListener('load', () => {
+    // Don't hide the tree when iframe resets to about:blank
+    if (!currentSlug) return;
     frameLoading.classList.add('hidden');
-    editStatus.textContent = 'Viewing — enable Edit Mode to swap images';
+    if (editMode) {
+      // Re-inject overlays after any iframe reload (e.g. after undo)
+      _resetTextEditState();
+      toggleEditOverlay();
+    } else {
+      editStatus.textContent = 'Viewing — enable Edit Mode to swap images or edit text';
+    }
   });
 
   // ── Debounced auto-save ───────────────────────────────────────────────────
   let saveTimer = null;
   function scheduleSave() {
+    // Block saves on locked pages entirely
+    if (currentPageLock === 'locked') {
+      editStatus.textContent = '🔒 Locked — changes not saved';
+      editStatus.className = 'edit-status';
+      return;
+    }
     clearTimeout(saveTimer);
     editStatus.textContent = 'Unsaved changes…';
     editStatus.className = 'edit-status';
@@ -690,7 +1666,107 @@
       pendingPick = null;
       openPicker(d.currentImage);
     }
+    if (d.type === 'rd_open_render') {
+      // Store cardId globally so the render modal can send rd_version_activated back
+      window._rdRenderCardId = d.cardId || null;
+      if (typeof openRerender === 'function') {
+        openRerender(d.filename, null);
+      }
+    }
+    if (d.type === 'rd_auto_tag') {
+      const slug = d.slug;
+      if (!slug) return;
+      fetch(`/admin/api/gallery/${encodeURIComponent(slug)}/auto-tag`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': Admin.getToken() || '' }
+      }).then(r => r.json()).then(result => {
+        if (siteFrame.contentWindow) {
+          siteFrame.contentWindow.postMessage({ type: 'rd_tag_done', ok: !!result.ok, tagged: result.tagged || 0, total: result.total || 0 }, '*');
+        }
+      }).catch(() => {
+        if (siteFrame.contentWindow) {
+          siteFrame.contentWindow.postMessage({ type: 'rd_tag_done', ok: false }, '*');
+        }
+      });
+    }
+    if (d.type === 'rd_text_mode') {
+      if (d.active) {
+        editStatus.textContent = 'Text mode: click any text to edit  ·  Click ✓ Done on image to return';
+        editStatus.className = 'edit-status ready';
+      } else {
+        // Returned to image mode
+        const msg = textEditCount > 0
+          ? `${textEditCount} unsaved text change${textEditCount !== 1 ? 's' : ''}  ·  Images: click·scroll·drag`
+          : 'Images: click·scroll·drag  ·  Text: click any text to edit';
+        editStatus.textContent = msg;
+        editStatus.className = textEditCount > 0 ? 'edit-status' : 'edit-status ready';
+      }
+    }
+    if (d.type === 'rd_text_changed') {
+      textEditCount = d.count || 0;
+      if (textEditCount > 0) {
+        saveTextBtn.style.display = '';
+        saveTextBtn.textContent = `Save Text (${textEditCount}) ✓`;
+        // Only update status if NOT in text-mode (text-mode has its own status)
+        const cw = siteFrame.contentWindow;
+        if (!cw || !cw.__rdTextModeActive) {
+          editStatus.textContent = `${textEditCount} unsaved text change${textEditCount !== 1 ? 's' : ''}  ·  Images: click·scroll·drag`;
+          editStatus.className = 'edit-status';
+        }
+      } else {
+        saveTextBtn.style.display = 'none';
+        const cw2 = siteFrame.contentWindow;
+        if (!cw2 || !cw2.__rdTextModeActive) {
+          editStatus.textContent = 'Images: click·scroll·drag  ·  Text: click any text to edit';
+          editStatus.className = 'edit-status ready';
+        }
+      }
+    }
+    if (d.type === 'rd_refresh_undo') {
+      // Gallery action completed inside iframe (tag/delete) — refresh undo button status
+      setTimeout(() => { if (typeof window._rdRefreshUndo === 'function') window._rdRefreshUndo(); }, 300);
+    }
+    if (d.type === 'rd_pool_refresh') {
+      // Child requests fresh image pool (e.g., after activating a render version)
+      API('/admin/api/pages/images').then(imgs => {
+        allImages = imgs;
+        if (siteFrame.contentWindow) {
+          siteFrame.contentWindow.postMessage({ type: 'rd_set_pool', images: imgs.map(i => i.hero_path) }, '*');
+        }
+      }).catch(() => {});
+    }
+    if (d.type === 'rd_auto_sort') {
+      const slug = d.slug;
+      if (!slug) return;
+      // Small delay to ensure any in-flight tag saves have committed before sort reads DB
+      setTimeout(() => {
+        fetch(`/admin/api/gallery/${encodeURIComponent(slug)}/sort`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Token': Admin.getToken() || '' }
+        }).then(r => r.json()).then(result => {
+          if (siteFrame.contentWindow) {
+            siteFrame.contentWindow.postMessage({ type: 'rd_sort_done', ok: !!result.ok }, '*');
+          }
+        }).catch(() => {
+          if (siteFrame.contentWindow) {
+            siteFrame.contentWindow.postMessage({ type: 'rd_sort_done', ok: false }, '*');
+          }
+        });
+      }, 600);
+    }
   });
+
+  // Called by render modal (global scope) when a version is made active from a page edit context
+  window._notifyRenderActivated = function(newActivePath) {
+    const cardId = window._rdRenderCardId;
+    if (cardId && newActivePath && siteFrame.contentWindow) {
+      siteFrame.contentWindow.postMessage({
+        type: 'rd_version_activated',
+        cardId,
+        newActivePath
+      }, '*');
+    }
+  };
 
   // ── Image Picker ─────────────────────────────────────────────────────────
   const PICKER_PAGE_SIZE = 36;
@@ -1056,5 +2132,677 @@ async function applyAutoPlace() {
   }
 }
 </script>
+
+<script>
+// ── AI Re-render modal JS (mirrors media.html — called from page edit via rd_open_render) ────
+const _rrToken = Admin.getToken() || '';
+let _rerenderFilename = '';
+let _rerenderSourceFilename = '';
+let _rerenderResultPath = '';
+let _rerenderPass = 0;
+let _rerenderStrip = [];
+let _stripSelectMode = false;
+let _stripSelected = new Set();
+let _rrCacheBust = Date.now();
+
+function _versionLabel(filename) {
+  if (!filename) return 'Original';
+  const m = filename.match(/_ai_(\d+)\.webp$/);
+  return m ? `AI Render ${m[1]}` : filename;
+}
+
+function openRerender(baseFilename, label, sourceFilename) {
+  _rerenderFilename = baseFilename;
+  _rerenderSourceFilename = sourceFilename || baseFilename;
+  _rerenderResultPath = '';
+  _rerenderPass = 0;
+  _rerenderStrip = [];
+  _stripSelectMode = false;
+  _stripSelected.clear();
+  _rrCacheBust = Date.now();
+
+  const isOriginalSrc = !sourceFilename || sourceFilename === baseFilename;
+  const sourceLabel = isOriginalSrc ? 'Original' : _versionLabel(sourceFilename);
+  document.getElementById('rerenderSourceLabel').textContent = sourceLabel;
+  document.getElementById('rerenderOriginalLabel').textContent = isOriginalSrc ? 'Original' : 'Source — ' + sourceLabel;
+  document.getElementById('rerenderRunBtn').title = isOriginalSrc ? 'New render from original image' : `New render from ${sourceLabel}`;
+
+  const srcFile = sourceFilename || baseFilename;
+  const src = `/assets/images-opt/${srcFile}`;
+  document.getElementById('rerenderOriginal').style.backgroundImage = `url('${src}?v=${_rrCacheBust}')`;
+  const resultEl = document.getElementById('rerenderResult');
+  resultEl.style.backgroundImage = '';
+  resultEl.style.filter = '';
+  document.getElementById('rerenderPlaceholder').style.display = '';
+  document.getElementById('rerenderPlaceholder').textContent = 'Result will appear here';
+  document.getElementById('rerenderPrompt').value = label
+    ? `photorealistic luxury architectural render — ${label}, high-end finishes, natural light, professional photography`
+    : 'photorealistic luxury architectural render, high-end finishes, natural light, professional photography';
+  document.getElementById('rerenderUseBtn').style.display = 'none';
+  document.getElementById('rerenderRefineBtn').style.display = 'none';
+  document.getElementById('rerenderRestartBtn').style.display = 'none';
+  document.getElementById('rerenderRunBtn').style.display = '';
+  document.getElementById('rerenderRunBtn').disabled = false;
+  document.getElementById('rerenderPassBadge').style.display = 'none';
+  document.getElementById('rerenderAdjustRow').style.display = 'none';
+  document.getElementById('rerenderFilmstrip').style.display = 'none';
+  document.getElementById('rerenderStripScroll').innerHTML = '';
+  const selBtn = document.getElementById('rerenderSelectBtn');
+  if (selBtn) { selBtn.textContent = 'Select'; selBtn.style.color = 'var(--text-2)'; selBtn.style.borderColor = 'var(--border)'; }
+  document.getElementById('rerenderBulkDeleteBtn').style.display = 'none';
+  document.getElementById('rerenderStatus').textContent = '';
+  resetAdjust(true);
+  document.getElementById('rerenderModal').style.display = 'flex';
+  _initFilmstrip();
+}
+
+function closeRerender() {
+  document.getElementById('rerenderModal').style.display = 'none';
+}
+
+function restartRerender() {
+  _rerenderResultPath = '';
+  _rerenderPass = 0;
+  const resultEl = document.getElementById('rerenderResult');
+  resultEl.style.backgroundImage = '';
+  resultEl.style.filter = '';
+  document.getElementById('rerenderPlaceholder').style.display = '';
+  document.getElementById('rerenderPlaceholder').textContent = 'Result will appear here';
+  document.getElementById('rerenderUseBtn').style.display = 'none';
+  document.getElementById('rerenderRefineBtn').style.display = 'none';
+  document.getElementById('rerenderRestartBtn').style.display = 'none';
+  document.getElementById('rerenderRunBtn').style.display = '';
+  document.getElementById('rerenderRunBtn').disabled = false;
+  document.getElementById('rerenderPassBadge').style.display = 'none';
+  document.getElementById('rerenderAdjustRow').style.display = 'none';
+  document.getElementById('rerenderStatus').textContent = '';
+  resetAdjust(true);
+  document.querySelectorAll('#rerenderStripScroll .rrstrip-item').forEach(el => {
+    el.style.borderColor = 'var(--border)';
+  });
+}
+
+function applyAdjust() {
+  const b = document.getElementById('adjBrightness').value;
+  const c = document.getElementById('adjContrast').value;
+  const s = document.getElementById('adjSaturation').value;
+  document.getElementById('brightnessVal').textContent = b;
+  document.getElementById('contrastVal').textContent = c;
+  document.getElementById('saturationVal').textContent = s;
+  document.getElementById('rerenderResult').style.filter =
+    `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
+}
+
+function resetAdjust(silent) {
+  ['adjBrightness','adjContrast','adjSaturation'].forEach(id => {
+    document.getElementById(id).value = 100;
+  });
+  document.getElementById('brightnessVal').textContent = '100';
+  document.getElementById('contrastVal').textContent = '100';
+  document.getElementById('saturationVal').textContent = '100';
+  document.getElementById('rerenderResult').style.filter = '';
+}
+
+async function _initFilmstrip() {
+  if (!_rerenderFilename) return;
+  try {
+    const d = await Admin.get(`/images/versions/${encodeURIComponent(_rerenderFilename)}`);
+    const all = d.versions || [];
+    _rerenderStrip = all.map(v => ({
+      filename:        v.filename,
+      heroPath:        v.hero_path,
+      isActive:        v.is_active,
+      isOriginal:      v.is_original,
+      prompt:          v.prompt || null,
+      source_filename: v.source_filename || null,
+    }));
+    _renderStrip();
+    const srcItem = _rerenderStrip.find(s => s.filename === _rerenderSourceFilename);
+    if (srcItem && srcItem.prompt) {
+      document.getElementById('rerenderPrompt').value = srcItem.prompt;
+    }
+  } catch(e) { /* non-critical */ }
+}
+
+function _renderStrip() {
+  const scroll = document.getElementById('rerenderStripScroll');
+  scroll.innerHTML = _rerenderStrip.map(item => {
+    const label = item.isOriginal ? 'Original' : _versionLabel(item.filename);
+    if (_stripSelectMode) {
+      const canSelect = !item.isOriginal;
+      const isSelected = canSelect && _stripSelected.has(item.filename);
+      const borderColor = isSelected ? '#ef4444' : 'var(--border)';
+      const cursor = canSelect ? 'pointer' : 'default';
+      const opacity = !canSelect ? 'opacity:.45;' : '';
+      const clickAttr = canSelect ? `onclick="toggleStripSelect('${escHtml(item.filename)}')"` : '';
+      const selBadge = canSelect
+        ? `<span style="position:absolute;top:4px;left:4px;width:16px;height:16px;border-radius:50%;background:${isSelected ? 'rgba(239,68,68,.9)' : 'rgba(0,0,0,.35)'};border:2px solid ${isSelected ? '#ef4444' : 'rgba(255,255,255,.5)'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;pointer-events:none">${isSelected ? '✓' : ''}</span>`
+        : '';
+      const activeBadge = item.isActive
+        ? `<span style="position:absolute;top:4px;right:4px;background:rgba(34,197,94,.92);color:#fff;font-size:9px;padding:2px 5px;border-radius:3px;font-weight:700;line-height:1.4;pointer-events:none">✓ Active</span>`
+        : '';
+      const origBadge = item.isOriginal
+        ? `<span style="position:absolute;top:4px;right:4px;background:rgba(251,191,36,.85);color:#000;font-size:9px;padding:2px 5px;border-radius:3px;font-weight:700;line-height:1.4;pointer-events:none">Original</span>`
+        : '';
+      return `<div class="rrstrip-item" data-filename="${escHtml(item.filename)}"
+          ${clickAttr}
+          style="position:relative;flex:0 0 auto;width:120px;cursor:${cursor};border-radius:6px;overflow:hidden;border:2px solid ${borderColor};transition:border-color .15s;${opacity}">
+        <div style="width:116px;height:87px;background-image:url('${item.heroPath}?v=${_rrCacheBust}');background-size:cover;background-position:center"></div>
+        <div style="padding:3px 6px 4px;background:var(--surface-2);font-size:10px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(label)}</div>
+        ${selBadge}${activeBadge}${origBadge}
+      </div>`;
+    }
+    // Normal mode
+    const isCurSrc = item.filename === _rerenderSourceFilename;
+    const borderColor = isCurSrc ? 'var(--accent)' : 'var(--border)';
+    const activeBadge = item.isActive
+      ? `<span style="position:absolute;top:4px;right:4px;background:rgba(34,197,94,.92);color:#fff;font-size:9px;padding:2px 5px;border-radius:3px;font-weight:700;line-height:1.4;pointer-events:none">✓ Active</span>`
+      : '';
+    const origBadge = item.isOriginal
+      ? `<span style="position:absolute;top:4px;right:4px;background:rgba(251,191,36,.85);color:#000;font-size:9px;padding:2px 5px;border-radius:3px;font-weight:700;line-height:1.4;pointer-events:none">Original</span>`
+      : '';
+    return `<div class="rrstrip-item" data-filename="${escHtml(item.filename)}"
+        onclick="stripSelectSource('${escHtml(item.filename)}','${escHtml(item.heroPath)}',${item.isOriginal})"
+        style="position:relative;flex:0 0 auto;width:120px;cursor:pointer;border-radius:6px;overflow:hidden;border:2px solid ${borderColor};transition:border-color .15s"
+        title="${escHtml(label)} — click to render from this">
+      <div style="width:116px;height:87px;background-image:url('${item.heroPath}?v=${_rrCacheBust}');background-size:cover;background-position:center"></div>
+      <div style="padding:3px 6px 4px;background:var(--surface-2);font-size:10px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(label)}</div>
+      ${activeBadge}${origBadge}
+    </div>`;
+  }).join('');
+  document.getElementById('rerenderStripCount').textContent = _rerenderStrip.length;
+  document.getElementById('rerenderFilmstrip').style.display = _rerenderStrip.length > 0 ? '' : 'none';
+  _updateBulkDeleteBtn();
+}
+
+function _updateBulkDeleteBtn() {
+  const btn = document.getElementById('rerenderBulkDeleteBtn');
+  if (!btn) return;
+  if (_stripSelectMode && _stripSelected.size > 0) {
+    btn.style.display = '';
+    if (btn.dataset.confirm !== '1') {
+      btn.textContent = `✕ Delete ${_stripSelected.size} selected`;
+      btn.style.background = 'rgba(239,68,68,.15)';
+    }
+  } else {
+    btn.style.display = 'none';
+    btn.dataset.confirm = '';
+  }
+}
+
+function toggleStripSelectMode() {
+  _stripSelectMode = !_stripSelectMode;
+  _stripSelected.clear();
+  const selBtn = document.getElementById('rerenderSelectBtn');
+  if (_stripSelectMode) {
+    selBtn.textContent = '✕ Cancel';
+    selBtn.style.color = '#fca5a5';
+    selBtn.style.borderColor = 'rgba(239,68,68,.4)';
+  } else {
+    selBtn.textContent = 'Select';
+    selBtn.style.color = 'var(--text-2)';
+    selBtn.style.borderColor = 'var(--border)';
+  }
+  _renderStrip();
+}
+
+function toggleStripSelect(filename) {
+  if (_stripSelected.has(filename)) { _stripSelected.delete(filename); }
+  else { _stripSelected.add(filename); }
+  _updateBulkDeleteBtn();
+  _renderStrip();
+}
+
+async function bulkDeleteStrip() {
+  if (!_stripSelectMode || _stripSelected.size === 0) return;
+  const btn = document.getElementById('rerenderBulkDeleteBtn');
+  const count = _stripSelected.size;
+  if (btn.dataset.confirm !== '1') {
+    btn.dataset.confirm = '1';
+    btn.textContent = `Confirm delete ${count}?`;
+    btn.style.background = 'rgba(239,68,68,.35)';
+    setTimeout(() => {
+      if (btn.dataset.confirm === '1') {
+        btn.dataset.confirm = '';
+        btn.textContent = `✕ Delete ${_stripSelected.size} selected`;
+        btn.style.background = 'rgba(239,68,68,.15)';
+      }
+    }, 4000);
+    return;
+  }
+  btn.dataset.confirm = '';
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+  const toDelete = [..._stripSelected];
+  let deletedCount = 0, failedCount = 0;
+  for (const fname of toDelete) {
+    try {
+      const d = await Admin.post('/images/delete-version', { filename: fname });
+      if (d.ok) {
+        _rerenderStrip = _rerenderStrip.filter(s => s.filename !== fname);
+        _stripSelected.delete(fname);
+        deletedCount++;
+        if (_rerenderSourceFilename === fname) {
+          const orig = _rerenderStrip.find(s => s.isOriginal);
+          if (orig) stripSelectSource(orig.filename, orig.heroPath, true);
+        }
+      } else { failedCount++; }
+    } catch(e) { failedCount++; }
+  }
+  btn.disabled = false;
+  if (failedCount === 0) { Admin.toast(`${deletedCount} render${deletedCount !== 1 ? 's' : ''} deleted`, 'success'); }
+  else { Admin.toast(`${deletedCount} deleted, ${failedCount} failed`, 'error'); }
+  _stripSelectMode = false;
+  _stripSelected.clear();
+  const selBtn = document.getElementById('rerenderSelectBtn');
+  selBtn.textContent = 'Select';
+  selBtn.style.color = 'var(--text-2)';
+  selBtn.style.borderColor = 'var(--border)';
+  _renderStrip();
+}
+
+function _stripAppend(filename, heroPath, prompt, source_filename) {
+  _rerenderStrip.push({ filename, heroPath, isActive: false, isOriginal: false,
+    prompt: prompt || null, source_filename: source_filename || null });
+  _renderStrip();
+  const scroll = document.getElementById('rerenderStripScroll');
+  scroll.scrollLeft = scroll.scrollWidth;
+}
+
+function _stripHighlight(filename) {
+  if (_stripSelectMode) return;
+  document.querySelectorAll('#rerenderStripScroll .rrstrip-item').forEach(el => {
+    el.style.borderColor = el.dataset.filename === filename ? 'var(--accent)' : 'var(--border)';
+  });
+}
+
+function stripSelectSource(filename, heroPath, isOriginal) {
+  _rerenderSourceFilename = filename;
+  const src = heroPath + '?v=' + Date.now();
+  document.getElementById('rerenderOriginal').style.backgroundImage = `url('${src}')`;
+  const label = isOriginal ? 'Original' : _versionLabel(filename);
+  document.getElementById('rerenderOriginalLabel').textContent = isOriginal ? 'Original' : 'Source — ' + label;
+  document.getElementById('rerenderSourceLabel').textContent = label;
+  document.getElementById('rerenderRunBtn').title = isOriginal
+    ? 'New render from original image' : `New render from ${label}`;
+  _rerenderResultPath = '';
+  const resultEl = document.getElementById('rerenderResult');
+  resultEl.style.backgroundImage = '';
+  resultEl.style.filter = '';
+  document.getElementById('rerenderPlaceholder').style.display = '';
+  document.getElementById('rerenderPlaceholder').textContent = 'Result will appear here';
+  document.getElementById('rerenderPassBadge').style.display = 'none';
+  document.getElementById('rerenderAdjustRow').style.display = 'none';
+  document.getElementById('rerenderUseBtn').style.display = 'none';
+  document.getElementById('rerenderRefineBtn').style.display = 'none';
+  document.getElementById('rerenderRestartBtn').style.display = 'none';
+  document.getElementById('rerenderStatus').textContent = '';
+  resetAdjust(true);
+  const stripItem = _rerenderStrip.find(s => s.filename === filename);
+  const promptEl = document.getElementById('rerenderPrompt');
+  if (stripItem && stripItem.prompt) {
+    promptEl.value = stripItem.prompt;
+  } else if (isOriginal) {
+    promptEl.value = 'photorealistic luxury architectural render, high-end finishes, natural light, professional photography';
+  } else {
+    promptEl.value = '';
+  }
+  _stripHighlight(filename);
+}
+
+async function runRerender(refine) {
+  const prompt = document.getElementById('rerenderPrompt').value.trim();
+  if (!prompt) { Admin.toast('Enter a prompt first', 'error'); return; }
+  const sourceFile = refine ? _rerenderResultPath.split('/').pop() : _rerenderSourceFilename;
+  const runBtn = document.getElementById('rerenderRunBtn');
+  const refineBtn = document.getElementById('rerenderRefineBtn');
+  const activeBtn = refine ? refineBtn : runBtn;
+  activeBtn.disabled = true;
+  activeBtn.textContent = '✦ Rendering…';
+  if (!refine) runBtn.disabled = true;
+  if (refine)  refineBtn.disabled = true;
+  document.getElementById('rerenderUseBtn').style.display = 'none';
+  document.getElementById('rerenderStatus').textContent = 'Sending to Gemini — this takes ~20–40 seconds…';
+  document.getElementById('rerenderPlaceholder').style.display = '';
+  document.getElementById('rerenderPlaceholder').textContent = '⏳ Generating…';
+  const resultEl = document.getElementById('rerenderResult');
+  resultEl.style.backgroundImage = '';
+  resultEl.style.filter = '';
+  resetAdjust(true);
+  try {
+    const res = await fetch('/admin/api/images/rerender', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': _rrToken },
+      body: JSON.stringify({ filename: sourceFile, base_filename: _rerenderFilename, prompt, mode: 'new' })
+    });
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error || 'rerender failed');
+    _rerenderResultPath = d.hero_path;
+    _rerenderPass++;
+    const newFilename = d.filename || d.hero_path.split('/').pop();
+    resultEl.style.backgroundImage = `url('${d.hero_path}?v=${Date.now()}')`;
+    resultEl.style.backgroundSize = 'cover';
+    resultEl.style.backgroundPosition = 'center';
+    document.getElementById('rerenderPlaceholder').style.display = 'none';
+    document.getElementById('rerenderAdjustRow').style.display = '';
+    document.getElementById('rerenderUseBtn').style.display = '';
+    document.getElementById('rerenderUseBtn').disabled = false;
+    document.getElementById('rerenderUseBtn').textContent = '✓ Use This Version';
+    const badge = document.getElementById('rerenderPassBadge');
+    badge.textContent = _versionLabel(newFilename);
+    badge.style.display = '';
+    runBtn.style.display = '';
+    runBtn.disabled = false;
+    runBtn.textContent = '✦ Re-render';
+    refineBtn.style.display = '';
+    refineBtn.disabled = false;
+    refineBtn.textContent = '✦ Refine Result';
+    document.getElementById('rerenderRestartBtn').style.display = '';
+    document.getElementById('rerenderStatus').textContent = '✓ Render saved — click "✓ Use This Version" to make it live, or keep rendering';
+    _stripAppend(newFilename, d.hero_path, prompt, sourceFile);
+    _stripHighlight(_rerenderSourceFilename);
+  } catch(e) {
+    document.getElementById('rerenderStatus').textContent = '✕ ' + e.message;
+    document.getElementById('rerenderPlaceholder').textContent = 'Generation failed';
+    runBtn.style.display = '';
+    runBtn.disabled = false;
+    runBtn.textContent = '✦ Re-render';
+    refineBtn.style.display = _rerenderPass > 0 ? '' : 'none';
+    refineBtn.disabled = false;
+    if (_rerenderPass > 0) refineBtn.textContent = '✦ Refine Result';
+  }
+}
+
+async function rerenderUseVersion() {
+  if (!_rerenderResultPath) return;
+  const filename = _rerenderResultPath.split('/').pop();
+  const brightness = parseInt(document.getElementById('adjBrightness').value);
+  const contrast   = parseInt(document.getElementById('adjContrast').value);
+  const saturation = parseInt(document.getElementById('adjSaturation').value);
+  const hasAdjust  = brightness !== 100 || contrast !== 100 || saturation !== 100;
+  const useBtn = document.getElementById('rerenderUseBtn');
+  useBtn.disabled = true;
+  useBtn.textContent = 'Saving…';
+  document.getElementById('rerenderStatus').textContent = 'Saving…';
+  try {
+    if (hasAdjust) {
+      const adjRes = await fetch('/admin/api/images/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': _rrToken },
+        body: JSON.stringify({ filename, brightness, contrast, saturation })
+      });
+      const adjData = await adjRes.json();
+      if (!adjData.ok) throw new Error(adjData.error || 'adjust failed');
+      resetAdjust(true);
+      const ts = Date.now();
+      document.getElementById('rerenderResult').style.backgroundImage = `url('${_rerenderResultPath}?v=${ts}')`;
+      const stripEl = document.querySelector(`#rerenderStripScroll .rrstrip-item[data-filename="${CSS.escape(filename)}"] div`);
+      if (stripEl) stripEl.style.backgroundImage = `url('${_rerenderResultPath}?v=${ts}')`;
+    }
+    const d = await Admin.post('/images/set-version', {
+      base_filename: _rerenderFilename,
+      version_filename: filename,
+    });
+    if (!d.ok) throw new Error(d.error || 'set-version failed');
+    _rerenderStrip.forEach(s => { s.isActive = s.filename === filename; });
+    _renderStrip();
+    _stripHighlight(_rerenderSourceFilename);
+    Admin.toast('✓ Active version updated — site will now show this image', 'success');
+    document.getElementById('rerenderStatus').textContent = `✓ "${_versionLabel(filename)}" is now the active version shown on the site`;
+    // Notify iframe card to update immediately
+    if (typeof window._notifyRenderActivated === 'function' && d.new_active_path) {
+      window._notifyRenderActivated(d.new_active_path);
+    }
+  } catch(e) {
+    Admin.toast('Failed: ' + e.message, 'error');
+    document.getElementById('rerenderStatus').textContent = '✕ ' + e.message;
+  }
+  useBtn.disabled = false;
+  useBtn.textContent = '✓ Use This Version';
+}
+
+// ── Lightbox ──────────────────────────────────────────────────────────────────
+let _lbImages = [];
+let _lbIndex  = 0;
+let _lbMode   = 'versions';
+let _lbBaseFilename = '';
+
+function openLightbox(images, index, mode) {
+  _lbImages = images;
+  _lbIndex  = Math.max(0, Math.min(index, images.length - 1));
+  _lbMode   = mode || 'versions';
+  document.body.appendChild(document.getElementById('lightbox'));
+  _lbRender();
+  document.getElementById('lightbox').style.display = 'flex';
+  document.addEventListener('keydown', _lbKey);
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').style.display = 'none';
+  document.removeEventListener('keydown', _lbKey);
+}
+
+function _lbRender() {
+  const item = _lbImages[_lbIndex];
+  document.getElementById('lbImg').src = item.src;
+  document.getElementById('lbCaption').textContent = item.label || '';
+  document.getElementById('lbCounter').textContent =
+    _lbImages.length > 1 ? `${_lbIndex + 1} / ${_lbImages.length}` : '';
+
+  const promptEl = document.getElementById('lbPrompt');
+  if (item.prompt) {
+    let txt = `"${item.prompt}"`;
+    if (item.source_filename) {
+      const srcLabel = item.source_filename === _lbBaseFilename
+        ? 'Original' : _versionLabel(item.source_filename);
+      txt += `\nRendered from: ${srcLabel}`;
+    }
+    promptEl.textContent = txt;
+    promptEl.style.display = '';
+  } else {
+    promptEl.style.display = 'none';
+  }
+  document.getElementById('lbPrev').style.visibility = _lbImages.length > 1 ? '' : 'hidden';
+  document.getElementById('lbNext').style.visibility = _lbImages.length > 1 ? '' : 'hidden';
+
+  const editBtn     = document.getElementById('lbEditBtn');
+  const useBtn      = document.getElementById('lbUseBtn');
+  const activeBadge = document.getElementById('lbActiveBadge');
+  const deleteBtn   = document.getElementById('lbDeleteBtn');
+
+  if (_lbMode === 'versions') {
+    editBtn.style.display = '';
+    deleteBtn.style.display = item.isOriginal ? 'none' : '';
+    deleteBtn.textContent = '✕ Delete Render';
+    deleteBtn.disabled = false;
+    if (item.isActive) {
+      useBtn.style.display      = 'none';
+      activeBadge.style.display = '';
+    } else {
+      useBtn.style.display      = '';
+      activeBadge.style.display = 'none';
+    }
+  } else {
+    editBtn.style.display     = 'none';
+    useBtn.style.display      = 'none';
+    activeBadge.style.display = 'none';
+    deleteBtn.style.display   = 'none';
+  }
+}
+
+function lightboxNav(dir) {
+  _lbIndex = (_lbIndex + dir + _lbImages.length) % _lbImages.length;
+  _lbRender();
+}
+
+function _lbKey(e) {
+  if (e.key === 'Escape')     closeLightbox();
+  if (e.key === 'ArrowLeft')  lightboxNav(-1);
+  if (e.key === 'ArrowRight') lightboxNav(1);
+}
+
+function lbEditWithAI() {
+  closeLightbox();
+  const base = _lbBaseFilename;
+  if (!base) return;
+  const currentItem = _lbImages[_lbIndex];
+  const sourceFilename = currentItem?.filename || base;
+  openRerender(base, null, sourceFilename);
+}
+
+async function lbUseVersion() {
+  const item   = _lbImages[_lbIndex];
+  const useBtn = document.getElementById('lbUseBtn');
+  useBtn.disabled    = true;
+  useBtn.textContent = 'Saving…';
+  try {
+    const d = await Admin.post('/images/set-version', {
+      base_filename:    _lbBaseFilename,
+      version_filename: item.isOriginal ? '' : item.filename,
+    });
+    if (!d.ok) throw new Error(d.error || 'failed');
+    _lbImages.forEach(i => { i.isActive = (i.filename === item.filename); });
+    Admin.toast('Active version updated — site pages will now show this image', 'success');
+    _lbRender();
+    // Notify iframe card to update
+    if (typeof window._notifyRenderActivated === 'function' && d.new_active_path) {
+      window._notifyRenderActivated(d.new_active_path);
+    }
+    // Sync re-render modal strip if open behind the lightbox
+    if (document.getElementById('rerenderModal').style.display !== 'none') {
+      _rerenderStrip.forEach(s => { s.isActive = (s.filename === item.filename); });
+      _renderStrip();
+      _stripHighlight(_rerenderSourceFilename);
+    }
+  } catch(e) {
+    Admin.toast('Failed: ' + e.message, 'error');
+  }
+  useBtn.disabled    = false;
+  useBtn.textContent = '✓ Use This Version';
+}
+
+async function lbDeleteVersion() {
+  const item      = _lbImages[_lbIndex];
+  if (item.isOriginal) return;
+  const deleteBtn = document.getElementById('lbDeleteBtn');
+  const label     = item.label || _versionLabel(item.filename);
+
+  if (deleteBtn.dataset.confirm !== '1') {
+    deleteBtn.dataset.confirm = '1';
+    deleteBtn.textContent = 'Confirm delete?';
+    deleteBtn.style.background = 'rgba(239,68,68,.35)';
+    setTimeout(() => {
+      if (deleteBtn.dataset.confirm === '1') {
+        deleteBtn.dataset.confirm = '';
+        deleteBtn.textContent = '✕ Delete Render';
+        deleteBtn.style.background = 'rgba(239,68,68,.15)';
+      }
+    }, 4000);
+    return;
+  }
+
+  deleteBtn.dataset.confirm = '';
+  deleteBtn.disabled = true;
+  deleteBtn.textContent = 'Deleting…';
+  try {
+    const d = await Admin.post('/images/delete-version', { filename: item.filename });
+    if (!d.ok) throw new Error(d.error || 'delete failed');
+
+    _lbImages.splice(_lbIndex, 1);
+    if (_lbImages.length === 0) {
+      closeLightbox();
+      Admin.toast('Render deleted', 'success');
+    } else {
+      _lbIndex = Math.min(_lbIndex, _lbImages.length - 1);
+      _lbRender();
+      Admin.toast(`${label} deleted`, 'success');
+    }
+    // Sync re-render modal strip if open behind the lightbox
+    if (document.getElementById('rerenderModal').style.display !== 'none') {
+      const deletedFile = item.filename;
+      _rerenderStrip = _rerenderStrip.filter(s => s.filename !== deletedFile);
+      if (_rerenderSourceFilename === deletedFile) {
+        const orig = _rerenderStrip.find(s => s.isOriginal);
+        if (orig) stripSelectSource(orig.filename, orig.heroPath, true);
+      } else {
+        _renderStrip();
+        _stripHighlight(_rerenderSourceFilename);
+      }
+    }
+  } catch(e) {
+    Admin.toast('Delete failed: ' + e.message, 'error');
+    deleteBtn.disabled = false;
+    deleteBtn.textContent = '✕ Delete Render';
+  }
+}
+
+// Open lightbox from re-render modal panels — identical logic to media.html
+function rerenderLightbox(panelIndex) {
+  if (!_rerenderFilename) return;
+  if (panelIndex === 1 && !_rerenderResultPath) return;
+
+  let images = _rerenderStrip.map(item => ({
+    src:             item.heroPath + '?v=' + _rrCacheBust,
+    label:           item.isOriginal ? 'Original' : _versionLabel(item.filename),
+    filename:        item.filename,
+    isOriginal:      item.isOriginal,
+    isActive:        item.isActive,
+    prompt:          item.prompt || null,
+    source_filename: item.source_filename || null,
+  }));
+
+  let startIdx = 0;
+  if (panelIndex === 0) {
+    const si = images.findIndex(i => i.filename === _rerenderSourceFilename);
+    startIdx = si >= 0 ? si : 0;
+  } else {
+    const resultFile = _rerenderResultPath.split('/').pop();
+    const ri = images.findIndex(i => i.filename === resultFile);
+    if (ri >= 0) {
+      startIdx = ri;
+    } else {
+      const freshStrip = _rerenderStrip.find(s => s.filename === resultFile);
+      images.push({
+        src:             _rerenderResultPath + '?v=' + Date.now(),
+        label:           _versionLabel(resultFile),
+        filename:        resultFile,
+        isOriginal:      false,
+        isActive:        false,
+        prompt:          freshStrip?.prompt || null,
+        source_filename: freshStrip?.source_filename || null,
+      });
+      startIdx = images.length - 1;
+    }
+  }
+
+  if (!images.length) return;
+  _lbBaseFilename = _rerenderFilename;
+  openLightbox(images, startIdx, 'versions');
+}
+</script>
+
+<script>
+/* ── Undo button (pages context — also refreshes after iframe loads) ───── */
+(function() {
+  var refreshUndo = Admin.initUndoButton({
+    onSuccess: function(d) {
+      /* Reload iframe if the undone action affects the currently loaded page */
+      var siteFrame = document.getElementById('siteFrame');
+      if (siteFrame && d.slug) {
+        var src = siteFrame.src || '';
+        if (src.indexOf(d.slug) >= 0 || src.indexOf('?admin_edit') >= 0) {
+          setTimeout(function() { siteFrame.contentWindow.location.reload(); }, 400);
+        }
+      }
+    }
+  });
+  /* Expose globally so the main IIFE can refresh after text saves */
+  window._rdRefreshUndo = refreshUndo;
+  /* Re-poll after iframe navigates (gallery sorts happen inside the iframe) */
+  var sf = document.getElementById('siteFrame');
+  if (sf) sf.addEventListener('load', function() { setTimeout(refreshUndo, 300); });
+})();
+</script>
+
 </body>
 </html>

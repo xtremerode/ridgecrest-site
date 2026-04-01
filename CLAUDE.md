@@ -252,3 +252,32 @@ New Meta campaigns take 24–48h+ for ad review and learning phase. ACTIVE statu
 - Restrict all campaigns to the approved service areas in §12
 - All [RMA] Meta ad sets MUST use saved audience ID `6934900931693` with `advantage_audience=0`
 - Compliance agent auto-fix applies ONLY to `[RMA]` campaigns — never touch non-RMA campaigns
+
+---
+
+## 18. Feature Lock System
+
+Before editing ANY code, check the lock status:
+- Run: `PGPASSWORD=StrongPass123! psql -h 127.0.0.1 -U agent_user -d marketing_agent -t -c "SELECT feature_key, status FROM feature_locks WHERE status != 'development' ORDER BY status DESC, feature_key;"`
+- If ANY affected feature is **locked**: STOP. Do not edit. Tell the user it is locked.
+- If ANY affected feature is **stable**: State exactly what you are changing and why before editing. Do not proceed without explicit confirmation.
+- For page edits, also check: `SELECT slug, status FROM page_locks WHERE status != 'development';`
+
+### Feature-to-code mapping (what to check before editing):
+- Editing gallery tag/sort/delete/add code → check gallery-tag, gallery-sort, gallery-delete, gallery-add
+- Editing gallery.js or masonry → check gallery-masonry
+- Editing lightbox.js → check gallery-lightbox
+- Editing _CARD_EDIT_OVERLAY_TPL or setupCard → check pages-card
+- Editing _EDIT_OVERLAY_TPL → check pages-hero
+- Editing _render_project_page → check server-render
+- Editing _to_webp → check server-webp
+- Editing auth/token code → check server-auth
+- Editing undo system → check pages-undo
+- Editing toggleEditOverlay or overlay-scripts → check pages-overlay
+- Editing postMessage handlers → check pages-postmessage
+- Editing main.css → check frontend-css
+- Editing gallery.js → check frontend-gallery
+- Editing lightbox.js → check frontend-lightbox
+- Editing sitemap.xml → check seo-sitemap
+- Editing project page HTML files → check seo-project-pages
+- Editing service page HTML files → check seo-service-pages
