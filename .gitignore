@@ -43,3 +43,7 @@ Thumbs.db
 *.docx
 *.png
 report.md
+
+# Images (large binary assets — not tracked in git)
+preview/assets/images/
+preview/assets/images-opt/
