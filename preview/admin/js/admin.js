@@ -30,8 +30,10 @@ const Admin = (function() {
   // ── API calls ────────────────────────────────────────────────
   async function apiFetch(path, opts = {}) {
     const token = getToken();
+    const context = (document.body && document.body.dataset.adminContext) || '';
     const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
     if (token) headers['X-Admin-Token'] = token;
+    if (context) headers['X-Admin-Context'] = context;
     const res = await fetch(`/admin/api${path}`, { ...opts, headers });
     if (res.status === 401) { logout(); return null; }
     return res.json();
@@ -388,11 +390,69 @@ const Admin = (function() {
     initAI();
   }
 
+  // ── Undo button ──────────────────────────────────────────────
+  /**
+   * Wire up the #undoBtn for page-specific undo.
+   * Reads admin context from <body data-admin-context="...">.
+   * opts.onSuccess(data) — optional callback fired after a successful undo.
+   * Returns a `refresh` function so callers can force a status poll.
+   */
+  function initUndoButton(opts) {
+    opts = opts || {};
+    var btn = document.getElementById('undoBtn');
+    if (!btn) return function() {};
+    var ctx = (document.body && document.body.dataset.adminContext) || '';
+
+    function refresh() {
+      var url = '/admin/api/undo/status' + (ctx ? '?context=' + encodeURIComponent(ctx) : '');
+      fetch(url, { headers: { 'X-Admin-Token': getToken() || '', 'X-Admin-Context': ctx } })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.available) {
+            btn.textContent = '↩ Undo: ' + d.description;
+            btn.disabled = false;
+            btn.style.borderColor = '#92400e';
+            btn.style.color = '#f59e0b';
+            btn.style.cursor = 'pointer';
+          } else {
+            btn.textContent = '↩ Nothing to undo';
+            btn.disabled = true;
+            btn.style.borderColor = 'var(--border,#2a3748)';
+            btn.style.color = 'var(--text-muted,#94a3b8)';
+            btn.style.cursor = 'not-allowed';
+          }
+        }).catch(function() {});
+    }
+
+    btn.onclick = function() {
+      if (btn.disabled) return;
+      btn.textContent = '↩ Undoing…';
+      btn.disabled = true;
+      fetch('/admin/api/undo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': getToken() || '', 'X-Admin-Context': ctx },
+        body: JSON.stringify({ context: ctx })
+      }).then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.ok) {
+            toast('Undone: ' + d.description, 'success');
+            if (opts.onSuccess) opts.onSuccess(d);
+          } else {
+            toast(d.error || 'Undo failed', 'error');
+          }
+          setTimeout(refresh, 400);
+        }).catch(function() { setTimeout(refresh, 400); });
+    };
+
+    refresh();
+    return refresh;
+  }
+
   return {
     getToken, setToken, clearToken, isLoggedIn, requireAuth, logout,
     get, post, put, del,
     toast, openModal, closeModal, initModals, initTabs, initSearch,
-    setActiveNav, init,
+    setActiveNav, init, initUndoButton,
     formatDate, formatDateTime, timeAgo, formatCurrency
   };
 })();

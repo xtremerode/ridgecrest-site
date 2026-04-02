@@ -41,6 +41,10 @@ def upload():
         f.write(img_data)
     return jsonify({"filename": filename})
 
+@app.route("/screenshot/<filename>")
+def get_screenshot(filename):
+    return send_from_directory(SAVE_DIR, filename)
+
 @app.route("/list")
 def list_files():
     files = sorted(
@@ -63,6 +67,19 @@ def list_downloads():
 @app.route("/download/<path:filename>")
 def download_file(filename):
     return send_from_directory(DOWNLOADS_DIR, filename, as_attachment=True, mimetype="application/octet-stream")
+
+@app.route("/upload-file", methods=["POST"])
+def upload_file():
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+    f = request.files["file"]
+    filename = os.path.basename(f.filename or "")
+    if not filename:
+        return jsonify({"error": "Invalid filename"}), 400
+    save_path = os.path.join(DOWNLOADS_DIR, filename)
+    f.save(save_path)
+    size = os.path.getsize(save_path)
+    return jsonify({"ok": True, "name": filename, "size": size})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)

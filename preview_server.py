@@ -554,6 +554,47 @@ _CARD_APPLY_SCRIPT = """\
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply);
   else apply();
+
+  // Team page: apply card states to dynamically-rendered team cards
+  (function() {
+    var teamGrid = document.getElementById('teamGrid');
+    if (!teamGrid || !window.__RD_CARDS || !window.__RD_CARDS.length) return;
+    var cardStateMap = {};
+    window.__RD_CARDS.forEach(function(c) {
+      if (c.card_id && c.card_id.indexOf('team-member-') === 0) cardStateMap[c.card_id] = c;
+    });
+    if (!Object.keys(cardStateMap).length) return;
+    fetch('/api/team')
+      .then(function(r) { return r.json(); })
+      .then(function(members) {
+        var nameToId = {};
+        members.forEach(function(m) { nameToId[m.name] = m.id; });
+        function applyToCards() {
+          teamGrid.querySelectorAll('.team-card').forEach(function(card) {
+            var nameEl = card.querySelector('.team-card__name');
+            if (!nameEl) return;
+            var id = nameToId[(nameEl.textContent || '').trim()];
+            if (!id) return;
+            var state = cardStateMap['team-member-' + id];
+            if (!state) return;
+            var photoEl = card.querySelector('.team-card__photo');
+            if (!photoEl || photoEl.dataset.rdCardApplied) return;
+            photoEl.dataset.rdCardApplied = '1';
+            if (state.mode === 'image' && state.image) {
+              var z = state.zoom || 1.0;
+              photoEl.style.backgroundImage = "url('" + state.image + "')";
+              photoEl.style.backgroundSize = z > 1.001 ? Math.round(z*100) + '%' : 'cover';
+              photoEl.style.backgroundPosition = state.position || '50% 50%';
+            } else if (state.mode === 'color' && state.color) {
+              photoEl.style.background = state.color;
+              photoEl.style.backgroundImage = '';
+            }
+          });
+        }
+        applyToCards();
+        new MutationObserver(applyToCards).observe(teamGrid, {childList: true, subtree: true});
+      }).catch(function() {});
+  })();
 })();
 </script>
 """
@@ -570,6 +611,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
   var saveTimers = {{}};
   var cardIndices = {{}}; // cardId → current index in imagePool (bidirectional navigation)
   var cardRefreshPill = {{}}; // cardId → refreshPill() fn (for rd_set_card_image handler)
+  var _tmBioMap = {{}}; // memberId (string) → bio text, for team card saveCard intercept
 
   function findPoolIndex(image) {{
     if (!imagePool.length || !image) return 0;
@@ -649,6 +691,15 @@ _CARD_EDIT_OVERLAY_TPL = """\
         headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
         body: JSON.stringify(state)
       }});
+      // Team card: also persist photo to team_members table so public page reflects it
+      if (cardId.indexOf('team-member-') === 0 && state.mode === 'image' && state.image) {{
+        var _tmId = cardId.replace('team-member-', '');
+        fetch('/admin/api/team/' + _tmId, {{
+          method: 'PUT',
+          headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
+          body: JSON.stringify({{photo: state.image, bio: _tmBioMap[_tmId] || ''}})
+        }}).catch(function() {{}});
+      }}
     }}, 1500);
   }}
 
@@ -779,7 +830,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
     // Pill: [Color] [Image] toggle
     var pill = document.createElement('div');
     pill.setAttribute('data-rd-overlay','card');
-    pill.style.cssText = 'position:absolute;bottom:8px;right:8px;z-index:9991;display:flex;border-radius:4px;overflow:hidden;opacity:0;transition:opacity .15s;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.5)';
+    pill.style.cssText = 'position:absolute;bottom:8px;right:8px;z-index:9991;display:flex;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 16px);border-radius:4px;overflow:hidden;opacity:0;transition:opacity .15s;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.5)';
 
     var colorBtn = document.createElement('button');
     colorBtn.textContent = 'Color';
@@ -1240,17 +1291,55 @@ _CARD_EDIT_OVERLAY_TPL = """\
     }});
   }}
 
+  // ── Gallery section "+" upload button factory ──────────────────────────────
+  function makeAddImageBtn(imgType) {{
+    var wrap = document.createElement('span');
+    wrap.style.cssText = 'margin-left:10px;display:inline-flex;align-items:center;vertical-align:middle;';
+    var btn = document.createElement('button');
+    btn.textContent = '+';
+    btn.title = 'Upload image to ' + imgType + ' section';
+    btn.style.cssText = 'background:#1e40af;color:#fff;border:none;width:26px;height:26px;border-radius:5px;font-size:17px;font-weight:700;line-height:1;cursor:pointer;font-family:system-ui,sans-serif;padding:0;';
+    var inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*'; inp.style.display = 'none';
+    inp.addEventListener('change', function() {{
+      if (!inp.files || !inp.files.length) return;
+      btn.textContent = '\u2026'; btn.disabled = true;
+      var fd = new FormData();
+      fd.append('file', inp.files[0]);
+      fd.append('image_type', imgType);
+      fetch('/admin/api/gallery/' + SLUG + '/add-image', {{
+        method: 'POST',
+        headers: {{'X-Admin-Token': TOKEN}},
+        body: fd
+      }}).then(function(r) {{ return r.json(); }}).then(function(d) {{
+        if (d.ok) {{ window.location.reload(); }}
+        else {{
+          btn.textContent = 'ERR'; btn.style.background = '#7f1d1d';
+          setTimeout(function() {{ btn.textContent = '+'; btn.style.background = '#1e40af'; btn.disabled = false; }}, 2500);
+        }}
+      }}).catch(function() {{
+        btn.textContent = 'ERR'; btn.style.background = '#7f1d1d';
+        setTimeout(function() {{ btn.textContent = '+'; btn.style.background = '#1e40af'; btn.disabled = false; }}, 2500);
+      }});
+      inp.value = '';
+    }});
+    btn.addEventListener('click', function(e) {{ e.stopPropagation(); inp.click(); }});
+    wrap.appendChild(btn);
+    wrap.appendChild(inp);
+    return wrap;
+  }}
+
   function init() {{
     document.querySelectorAll('[data-rd-overlay="card"]').forEach(function(n){{n.remove();}});
     loadImages();
     document.querySelectorAll('[data-card-id]').forEach(setupCard);
 
-    // Inject Auto-Tag + Auto-Sort buttons above gallery grid if gallery items exist
+    // Inject Auto-Tag + Auto-Sort + section "+" buttons above gallery grid if gallery items exist
     var galGrid = document.querySelector('.gallery-masonry');
     if (galGrid && galGrid.querySelector('[data-gallery-hash]')) {{
       var sortWrap = document.createElement('div');
       sortWrap.id = 'rd-sort-wrap';
-      sortWrap.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;padding:0 0 12px 0;';
+      sortWrap.style.cssText = 'display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:0 0 12px 0;';
 
       var tagBtn = document.createElement('button');
       tagBtn.id = 'rd-tag-btn';
@@ -1264,8 +1353,14 @@ _CARD_EDIT_OVERLAY_TPL = """\
       sortBtn.title = 'Sort gallery by type: Project \u2192 Renders \u2192 Construction \u2192 Untagged';
       sortBtn.style.cssText = 'background:#1e3a8a;color:#fff;border:none;padding:8px 18px;font-size:12px;font-weight:700;font-family:system-ui,sans-serif;border-radius:4px;cursor:pointer;letter-spacing:.5px';
 
+      var projectLabel = document.createElement('span');
+      projectLabel.style.cssText = 'font-size:12px;font-weight:700;color:#94a3b8;font-family:system-ui,sans-serif;letter-spacing:.5px;margin-left:4px;';
+      projectLabel.textContent = 'Projects:';
+
       sortWrap.appendChild(tagBtn);
       sortWrap.appendChild(sortBtn);
+      sortWrap.appendChild(projectLabel);
+      sortWrap.appendChild(makeAddImageBtn('project'));
       galGrid.parentElement.insertBefore(sortWrap, galGrid);
 
       tagBtn.addEventListener('click', function() {{
@@ -1296,11 +1391,304 @@ _CARD_EDIT_OVERLAY_TPL = """\
           }}
         }}
       }});
+
+      // Section label "+" buttons (Renders / Before / Construction)
+      var sectionTypeMap = {{'Renders':'render','Before':'before','Construction':'construction'}};
+      document.querySelectorAll('.gallery-section-label').forEach(function(lbl) {{
+        var typ = sectionTypeMap[lbl.textContent.trim()];
+        if (typ) {{
+          lbl.style.display = 'flex';
+          lbl.style.alignItems = 'center';
+          lbl.appendChild(makeAddImageBtn(typ));
+        }}
+      }});
+    }}
+
+    // ── Team — two-path modal on team page ────────────────────────────────────
+    if (SLUG === 'team') {{
+      var teamGrid = document.getElementById('teamGrid');
+      if (teamGrid) {{
+        var teamAddBtn = document.createElement('button');
+        teamAddBtn.textContent = '+ Manage Team Members';
+        teamAddBtn.style.cssText = 'display:block;margin:0 auto 28px auto;background:rgba(30,58,138,.18);color:#93c5fd;border:2px dashed #3b82f6;padding:13px 32px;font-size:14px;font-weight:600;border-radius:8px;cursor:pointer;font-family:system-ui,sans-serif;letter-spacing:.3px;';
+        teamGrid.parentElement.insertBefore(teamAddBtn, teamGrid);
+
+        var tmModal = document.createElement('div');
+        tmModal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9999;align-items:flex-start;justify-content:center;padding-top:60px;font-family:system-ui,sans-serif;overflow-y:auto;';
+        var tmBox = document.createElement('div');
+        tmBox.style.cssText = 'background:#1a2332;border:1px solid #2a3748;border-radius:10px;width:100%;max-width:580px;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.55);margin-bottom:60px;';
+        tmBox.innerHTML =
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">' +
+          '<div style="font-size:18px;font-weight:700;color:#e2e8f0;">Team Members</div>' +
+          '<button id="rd-tm-close" style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1;">\u2715</button></div>' +
+          '<div style="display:flex;gap:6px;margin-bottom:20px;">' +
+          '<button id="rd-tm-tab-list" style="flex:1;padding:8px;border-radius:6px;font-size:13px;font-weight:600;background:#1e40af;color:#fff;border:none;cursor:pointer;">Manage Existing</button>' +
+          '<button id="rd-tm-tab-add" style="flex:1;padding:8px;border-radius:6px;font-size:13px;font-weight:600;background:transparent;color:#94a3b8;border:1px solid #2a3748;cursor:pointer;">+ Add New</button>' +
+          '</div>' +
+          '<div id="rd-tm-panel-list"></div>' +
+          '<div id="rd-tm-panel-add" style="display:none;">' +
+          '<div style="margin-bottom:14px;"><label style="display:block;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Name *</label>' +
+          '<input id="rd-tm-name" autocomplete="off" style="width:100%;box-sizing:border-box;background:#111b27;color:#e2e8f0;border:1px solid #2a3748;border-radius:6px;padding:9px 12px;font-size:14px;font-family:inherit;" placeholder="Full name" /></div>' +
+          '<div style="margin-bottom:14px;"><label style="display:block;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Role / Title</label>' +
+          '<input id="rd-tm-role" autocomplete="off" style="width:100%;box-sizing:border-box;background:#111b27;color:#e2e8f0;border:1px solid #2a3748;border-radius:6px;padding:9px 12px;font-size:14px;font-family:inherit;" placeholder="e.g. Lead Designer" /></div>' +
+          '<div style="margin-bottom:14px;"><label style="display:block;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Bio</label>' +
+          '<textarea id="rd-tm-bio" style="width:100%;box-sizing:border-box;background:#111b27;color:#e2e8f0;border:1px solid #2a3748;border-radius:6px;padding:9px 12px;font-size:14px;font-family:inherit;min-height:80px;resize:vertical;"></textarea></div>' +
+          '<div id="rd-tm-err" style="color:#f87171;font-size:13px;min-height:18px;margin-bottom:8px;"></div>' +
+          '<div style="display:flex;justify-content:flex-end;">' +
+          '<button id="rd-tm-save" style="padding:9px 24px;border-radius:6px;font-size:13px;font-weight:700;background:#3b82f6;color:#fff;border:none;cursor:pointer;">Add Member</button>' +
+          '</div></div>';
+        tmModal.appendChild(tmBox);
+        document.body.appendChild(tmModal);
+
+        function closeTmModal() {{ tmModal.style.display = 'none'; }}
+
+        function showTmTab(tab) {{
+          var isAdd = (tab === 'add');
+          document.getElementById('rd-tm-panel-list').style.display = isAdd ? 'none' : '';
+          document.getElementById('rd-tm-panel-add').style.display  = isAdd ? '' : 'none';
+          var btnList = document.getElementById('rd-tm-tab-list');
+          var btnAdd  = document.getElementById('rd-tm-tab-add');
+          btnList.style.background = isAdd ? 'transparent' : '#1e40af';
+          btnList.style.color      = isAdd ? '#94a3b8' : '#fff';
+          btnList.style.border     = isAdd ? '1px solid #2a3748' : 'none';
+          btnAdd.style.background  = isAdd ? '#1e40af' : 'transparent';
+          btnAdd.style.color       = isAdd ? '#fff' : '#94a3b8';
+          btnAdd.style.border      = isAdd ? 'none' : '1px solid #2a3748';
+          if (!isAdd) loadTmMemberList();
+        }}
+
+        function escTm(s) {{
+          return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }}
+
+        function loadTmMemberList() {{
+          var panel = document.getElementById('rd-tm-panel-list');
+          panel.innerHTML = '<div style="color:#94a3b8;font-size:13px;padding:16px 0;">Loading\u2026</div>';
+          fetch('/admin/api/team', {{headers: {{'X-Admin-Token': TOKEN}}}})
+            .then(function(r) {{ return r.json(); }})
+            .then(function(members) {{
+              if (!members.length) {{
+                panel.innerHTML = '<div style="color:#94a3b8;font-size:13px;padding:16px 0;">No team members yet. Use <strong>+ Add New</strong>.</div>';
+                return;
+              }}
+              panel.innerHTML = members.map(function(m) {{
+                var initials = (m.name || '?').split(' ').map(function(w) {{ return w[0] || ''; }}).slice(0, 2).join('').toUpperCase();
+                var photoStyle = m.photo ? 'background-image:url(' + escTm(m.photo) + ');background-size:cover;background-position:center;' : '';
+                return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #2a3748;">' +
+                  '<div style="width:44px;height:44px;border-radius:50%;background:#1e3a5f;' + photoStyle + 'flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#93c5fd;font-size:14px;font-weight:700;">' +
+                  (m.photo ? '' : escTm(initials)) + '</div>' +
+                  '<div style="flex:1;min-width:0;">' +
+                  '<div style="font-weight:600;color:#e2e8f0;font-size:14px;">' + escTm(m.name) + '</div>' +
+                  '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + escTm(m.role || '') + '</div></div>' +
+                  '<div style="font-size:11px;color:' + (m.active ? '#4ade80' : '#64748b') + ';font-weight:600;margin-right:8px;">' + (m.active ? 'Active' : 'Hidden') + '</div>' +
+                  '<button data-id="' + m.id + '" data-active="' + (m.active ? '1' : '0') + '" onclick="rdTmToggle(this)" style="width:44px;height:24px;border-radius:12px;border:none;cursor:pointer;background:' + (m.active ? '#22c55e' : '#374151') + ';position:relative;flex-shrink:0;transition:background .15s;padding:0;">' +
+                  '<span style="position:absolute;top:4px;' + (m.active ? 'right:4px' : 'left:4px') + ';width:16px;height:16px;border-radius:50%;background:#fff;"></span></button>' +
+                  '</div>';
+              }}).join('');
+            }}).catch(function() {{
+              panel.innerHTML = '<div style="color:#f87171;font-size:13px;padding:16px 0;">Failed to load members.</div>';
+            }});
+        }}
+
+        window.rdTmToggle = function(btn) {{
+          var id = btn.dataset.id;
+          var newActive = btn.dataset.active !== '1';
+          btn.disabled = true;
+          fetch('/admin/api/team/' + id, {{
+            method: 'PUT',
+            headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
+            body: JSON.stringify({{active: newActive}})
+          }}).then(function(r) {{ return r.json(); }}).then(function(d) {{
+            if (d.ok) {{
+              loadTmMemberList();
+              window.location.reload();
+            }}
+            btn.disabled = false;
+          }}).catch(function() {{ btn.disabled = false; }});
+        }};
+
+        document.getElementById('rd-tm-close').addEventListener('click', closeTmModal);
+        tmModal.addEventListener('click', function(e) {{ if (e.target === tmModal) closeTmModal(); }});
+        document.getElementById('rd-tm-tab-list').addEventListener('click', function() {{ showTmTab('list'); }});
+        document.getElementById('rd-tm-tab-add').addEventListener('click', function() {{ showTmTab('add'); }});
+
+        document.getElementById('rd-tm-save').addEventListener('click', function() {{
+          var name = (document.getElementById('rd-tm-name').value || '').trim();
+          var role = (document.getElementById('rd-tm-role').value || '').trim();
+          var bio  = (document.getElementById('rd-tm-bio').value || '').trim();
+          var errEl = document.getElementById('rd-tm-err');
+          if (!name) {{ errEl.textContent = 'Name is required.'; return; }}
+          errEl.textContent = '';
+          var saveBtn = document.getElementById('rd-tm-save');
+          saveBtn.textContent = 'Saving\u2026'; saveBtn.disabled = true;
+          fetch('/admin/api/team', {{
+            method: 'POST',
+            headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
+            body: JSON.stringify({{name: name, role: role, bio: bio, photo: ''}})
+          }}).then(function(r) {{ return r.json(); }}).then(function(d) {{
+            if (d.ok) {{ closeTmModal(); window.location.reload(); }}
+            else {{ errEl.textContent = d.error || 'Save failed'; saveBtn.textContent = 'Add Member'; saveBtn.disabled = false; }}
+          }}).catch(function() {{
+            errEl.textContent = 'Network error \u2014 try again.';
+            saveBtn.textContent = 'Add Member'; saveBtn.disabled = false;
+          }});
+        }});
+
+        teamAddBtn.addEventListener('click', function() {{
+          tmModal.style.display = 'flex';
+          showTmTab('list');
+        }});
+
+        // ── Wire team card photos into the standard setupCard system ─────────
+        var _tmMembers = null;
+        var _tmSetupDone = false;
+
+        function _setupTeamCards(members) {{
+          if (_tmSetupDone) return;
+          var cards = teamGrid.querySelectorAll('.team-card');
+          if (!cards.length) return;
+          _tmSetupDone = true;
+          // Populate bio map so saveCard intercept can preserve bio on save
+          members.forEach(function(m) {{ _tmBioMap[String(m.id)] = m.bio || ''; }});
+          cards.forEach(function(card) {{
+            var photoEl = card.querySelector('.team-card__photo');
+            var nameEl  = card.querySelector('.team-card__name');
+            if (!photoEl || !nameEl) return;
+            var name = (nameEl.textContent || '').trim();
+            var member = members.find(function(m) {{ return m.name === name; }});
+            if (!member) return;
+            var cid = 'team-member-' + member.id;
+            photoEl.setAttribute('data-card-id', cid);
+            // Pre-populate cardMap from current inline background-image (or color if none)
+            var bgMatch = (photoEl.style.backgroundImage || '').match(/url\(['"]?([^'")\s]+)['"]?\)/);
+            var bgImg = bgMatch ? bgMatch[1] : null;
+            if (!cardMap[cid]) {{
+              cardMap[cid] = bgImg
+                ? {{card_id: cid, mode: 'image', image: bgImg, position: '50% 50%', zoom: 1.0}}
+                : {{card_id: cid, mode: 'color', color: '#1C1C1C', position: '50% 50%', zoom: 1.0}};
+            }}
+            setupCard(photoEl);
+          }});
+        }}
+
+        fetch('/admin/api/team', {{headers: {{'X-Admin-Token': TOKEN}}}})
+          .then(function(r) {{ return r.json(); }})
+          .then(function(ms) {{ _tmMembers = ms; _setupTeamCards(ms); }})
+          .catch(function() {{}});
+
+        // Watch for cards rendered async by team page JS
+        var _tmObs = new MutationObserver(function() {{
+          if (_tmMembers) _setupTeamCards(_tmMembers);
+        }});
+        _tmObs.observe(teamGrid, {{childList: true, subtree: true}});
+        // ─────────────────────────────────────────────────────────────────────
+      }}
     }}
   }}
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
+
+  // ── Inline text editor ────────────────────────────────────────────────────
+  (function() {{
+    var TEXT_TAGS = 'h1,h2,h3,h4,h5,h6,p,li,blockquote,td,th,figcaption';
+    var EXCLUDE_ANCESTORS = {{'NAV':1,'FOOTER':1,'SCRIPT':1,'STYLE':1,'HEAD':1,'NOSCRIPT':1,'TEMPLATE':1}};
+    var pending = {{}};
+    var toast = null;
+
+    function _hasExcluded(el) {{
+      var p = el.parentElement;
+      while (p) {{
+        if (EXCLUDE_ANCESTORS[p.tagName]) return true;
+        if (p.id === 'rd-card-overlay' || p.id === 'rd-edit-overlay') return true;
+        if (p.hasAttribute && p.hasAttribute('data-rd-overlay')) return true;
+        // Exclude dynamically-rendered grid content (team grid, gallery, etc.)
+        if (p.id === 'teamGrid' || p.classList.contains('gallery-masonry')) return true;
+        p = p.parentElement;
+      }}
+      return false;
+    }}
+
+    function _getEditables() {{
+      var result = [];
+      document.querySelectorAll(TEXT_TAGS).forEach(function(el) {{
+        if (_hasExcluded(el)) return;
+        if (!(el.textContent || '').trim()) return;
+        result.push(el);
+      }});
+      return result;
+    }}
+
+    function _showToast(msg, err) {{
+      if (!toast) {{
+        toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;bottom:76px;left:50%;transform:translateX(-50%);padding:8px 20px;border-radius:6px;font-family:system-ui,sans-serif;font-size:13px;font-weight:600;z-index:99999;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap;';
+        document.body.appendChild(toast);
+      }}
+      toast.textContent = msg;
+      toast.style.background = err ? '#dc2626' : '#1a1a1a';
+      toast.style.color = '#fff';
+      toast.style.opacity = '1';
+      clearTimeout(toast._t);
+      toast._t = setTimeout(function() {{ toast.style.opacity = '0'; }}, 2200);
+    }}
+
+    function _saveEdits(edits) {{
+      fetch('/admin/api/pages/' + encodeURIComponent(SLUG) + '/text-edits', {{
+        method: 'PATCH',
+        headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
+        body: JSON.stringify({{edits: edits}})
+      }}).then(function(r) {{ return r.json(); }}).then(function(d) {{
+        if (d.ok) _showToast('\u2713 Saved');
+        else _showToast('Save failed: ' + (d.error || ''), true);
+      }}).catch(function() {{ _showToast('Save failed', true); }});
+    }}
+
+    function _initTextEditor() {{
+      var els = _getEditables();
+      els.forEach(function(el, idx) {{
+        el.setAttribute('data-edit-idx', String(idx));
+        el.setAttribute('contenteditable', 'true');
+        el.setAttribute('spellcheck', 'true');
+        el.style.outline = 'none';
+        el.style.cursor = 'text';
+        el.style.borderRadius = '2px';
+        el.style.transition = 'box-shadow .15s';
+
+        el.addEventListener('mouseenter', function() {{
+          if (document.activeElement !== el)
+            el.style.boxShadow = 'inset 0 0 0 2px rgba(79,70,229,0.22)';
+        }});
+        el.addEventListener('mouseleave', function() {{
+          if (document.activeElement !== el) el.style.boxShadow = '';
+        }});
+        el.addEventListener('focus', function() {{
+          el.style.boxShadow = 'inset 0 0 0 2px rgba(79,70,229,0.7)';
+        }});
+        el.addEventListener('blur', function() {{
+          el.style.boxShadow = '';
+          var i = el.getAttribute('data-edit-idx');
+          clearTimeout(pending[i]);
+          pending[i] = setTimeout(function() {{
+            var edits = {{}}; edits[i] = el.innerHTML;
+            _saveEdits(edits);
+          }}, 600);
+        }});
+        // Prevent block-level inserts in headings
+        var tag = el.tagName;
+        if (tag==='H1'||tag==='H2'||tag==='H3'||tag==='H4'||tag==='H5'||tag==='H6') {{
+          el.addEventListener('keydown', function(e) {{
+            if (e.key === 'Enter') e.preventDefault();
+          }});
+        }}
+      }});
+      if (els.length) _showToast('Text editing active \u2014 click any text to edit');
+    }}
+
+    // Run after init() DOM changes settle
+    setTimeout(_initTextEditor, 150);
+  }})();
+  // ─────────────────────────────────────────────────────────────────────────
 }})();
 </script>
 """
@@ -1385,11 +1773,26 @@ _EDIT_OVERLAY_TPL = """\
   }});
 
 
+  var _transformSaveTimer = null;
   function notifyTransform(idx) {{
+    // Notify parent frame (admin panel) — works when loaded in iframe
     window.parent.postMessage({{
       type: 'rd_transform_changed', slug: SLUG, elementIndex: idx,
       zoom: editables[idx].zoom, posX: editables[idx].posX, posY: editables[idx].posY
     }}, '*');
+    // Also save directly — ensures saves work whether in iframe or accessed directly
+    clearTimeout(_transformSaveTimer);
+    _transformSaveTimer = setTimeout(function() {{
+      var e = editables[idx];
+      fetch('/admin/api/pages/' + encodeURIComponent(SLUG), {{
+        method: 'PUT',
+        headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
+        body: JSON.stringify({{
+          hero_zoom: e.zoom,
+          hero_position: e.posX.toFixed(1) + '% ' + e.posY.toFixed(1) + '%'
+        }})
+      }}).catch(function() {{}});
+    }}, 800);
   }}
 
   function buildOverlay(el, idx, imgUrl) {{
@@ -1403,10 +1806,7 @@ _EDIT_OVERLAY_TPL = """\
 
     // Badge
     var badge = document.createElement('div');
-    badge.style.cssText = 'position:absolute;top:10px;left:10px;display:flex;align-items:center;gap:8px;opacity:0;transition:opacity .15s;pointer-events:none';
-    var hint = document.createElement('span');
-    hint.textContent = 'click: cycle  \u00b7  scroll: zoom  \u00b7  drag: pan';
-    hint.style.cssText = 'background:rgba(0,0,0,.78);color:#fff;font-family:system-ui,sans-serif;font-size:12px;font-weight:700;padding:5px 11px;border-radius:4px;white-space:nowrap';
+    badge.style.cssText = 'position:absolute;top:10px;left:10px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;opacity:0;transition:opacity .15s;pointer-events:none;max-width:calc(100% - 20px)';
     var browseBtn = document.createElement('button');
     browseBtn.textContent = 'Browse All';
     browseBtn.style.cssText = 'background:#3b82f6;color:#fff;border:none;font-family:system-ui,sans-serif;font-size:12px;font-weight:700;padding:5px 11px;border-radius:4px;cursor:pointer;white-space:nowrap;pointer-events:auto';
@@ -1418,7 +1818,6 @@ _EDIT_OVERLAY_TPL = """\
     backBtn.style.cssText = 'background:rgba(0,0,0,.72);color:#fff;border:none;font-family:system-ui,sans-serif;font-size:12px;font-weight:700;padding:5px 11px;border-radius:4px;cursor:pointer;white-space:nowrap;pointer-events:auto';
     var zoomLabel = document.createElement('span');
     zoomLabel.style.cssText = 'background:rgba(0,0,0,.78);color:#f59e0b;font-family:system-ui,sans-serif;font-size:11px;font-weight:700;padding:4px 9px;border-radius:4px;white-space:nowrap;display:none';
-    if (!isCard) badge.appendChild(hint);
     badge.appendChild(browseBtn);
     badge.appendChild(rotateBtn);
     badge.appendChild(backBtn);
@@ -4570,12 +4969,14 @@ def admin_pages_images():
         try:
             cur = conn.cursor()
             _ensure_image_labels_table(cur)
-            cur.execute("SELECT filename, label, project, room, image_type, active_version FROM image_labels")
+            cur.execute("SELECT filename, label, project, room, image_type, active_version, gallery_project_slug, gallery_image_type FROM image_labels")
             for r in cur.fetchall():
                 labels[r['filename']] = {
                     'label': r['label'], 'project': r['project'],
                     'room': r['room'], 'image_type': r['image_type'],
                     'active_version': r.get('active_version'),
+                    'gallery_project_slug': r.get('gallery_project_slug') or '',
+                    'gallery_image_type': r.get('gallery_image_type') or '',
                 }
         except Exception:
             pass
@@ -4624,17 +5025,59 @@ def admin_pages_images():
                 'image_type': meta.get('image_type') or '',
                 'active_version': active_version,
                 'has_renders': fname in bases_with_renders,
+                'gallery_project_slug': meta.get('gallery_project_slug') or '',
+                'gallery_image_type': meta.get('gallery_image_type') or '',
             })
     # Sort labeled images first, then unlabeled alphabetically
     result.sort(key=lambda x: (0 if x['label'] else 1, x['filename']))
     return jsonify(result)
 
 
+@app.route('/admin/api/media/sync-from-galleries', methods=['POST'])
+def media_sync_from_galleries():
+    """One-time sync: read all portfolio gallery data and write gallery_project_slug +
+    gallery_image_type into image_labels so the media library reflects gallery categorization."""
+    err = _require_admin()
+    if err: return err
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'db unavailable'}), 500
+    try:
+        cur = conn.cursor()
+        _ensure_image_labels_table(cur)
+        _ensure_gallery_image_types_table(cur)
+        # Load all projects and their gallery hashes
+        cur.execute("SELECT slug, gallery_json FROM portfolio_projects")
+        projects = cur.fetchall()
+        # Load all gallery_image_types
+        cur.execute("SELECT filename, image_type FROM gallery_image_types")
+        type_map = {r['filename']: r['image_type'] for r in cur.fetchall()}
+        synced = 0
+        for proj in projects:
+            pslug = proj['slug']
+            try:
+                gallery = json.loads(proj['gallery_json']) if isinstance(proj['gallery_json'], str) else (proj['gallery_json'] or [])
+            except Exception:
+                gallery = []
+            for item in gallery:
+                h = item[0] if isinstance(item, (list, tuple)) else item
+                gtype = type_map.get(h, 'project')
+                _sync_image_gallery_label(h, pslug, gtype, cur)
+                synced += 1
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True, 'synced': synced})
+    except Exception as e:
+        try: conn.close()
+        except: pass
+        return jsonify({'error': str(e)}), 500
+
+
 # ── Text edits API ────────────────────────────────────────────────────────────
 
 # Tags the browser and server both treat as editable (must stay in sync)
 _TEXT_EDIT_TAGS = ['h1','h2','h3','h4','h5','h6','p','li','blockquote','td','th','figcaption']
-_TEXT_EDIT_EXCLUDE_ANCESTORS = {'nav','script','style','head','noscript','template'}
+_TEXT_EDIT_EXCLUDE_ANCESTORS = {'nav','footer','script','style','head','noscript','template'}
 
 def _get_editable_elements(soup):
     """Return editable elements in document order — mirrors the browser-side JS logic exactly."""
@@ -5781,6 +6224,36 @@ def _ensure_image_labels_table(cur):
     cur.execute("ALTER TABLE image_labels ADD COLUMN IF NOT EXISTS room TEXT")
     cur.execute("ALTER TABLE image_labels ADD COLUMN IF NOT EXISTS image_type TEXT")
     cur.execute("ALTER TABLE image_labels ADD COLUMN IF NOT EXISTS active_version TEXT")
+    cur.execute("ALTER TABLE image_labels ADD COLUMN IF NOT EXISTS gallery_project_slug TEXT")
+    cur.execute("ALTER TABLE image_labels ADD COLUMN IF NOT EXISTS gallery_image_type TEXT")
+
+def _sync_image_gallery_label(filename, project_slug, gallery_type, cur):
+    """Write gallery categorization into image_labels so the media library stays in sync.
+    gallery_type: 'project'|'render'|'before'|'construction' or None to clear type.
+    filename may be a bare hash or a hash.webp — always stores with .webp extension."""
+    try:
+        _ensure_image_labels_table(cur)
+        # Ensure filename ends with .webp so it matches the filesystem key used elsewhere
+        if not filename.endswith('.webp'):
+            filename = filename + '.webp'
+        if gallery_type:
+            cur.execute("""
+                INSERT INTO image_labels (filename, gallery_project_slug, gallery_image_type)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (filename) DO UPDATE SET
+                    gallery_project_slug = EXCLUDED.gallery_project_slug,
+                    gallery_image_type   = EXCLUDED.gallery_image_type
+            """, (filename, project_slug, gallery_type))
+        else:
+            cur.execute("""
+                INSERT INTO image_labels (filename, gallery_project_slug, gallery_image_type)
+                VALUES (%s, %s, NULL)
+                ON CONFLICT (filename) DO UPDATE SET
+                    gallery_project_slug = EXCLUDED.gallery_project_slug,
+                    gallery_image_type   = NULL
+            """, (filename, project_slug))
+    except Exception:
+        pass
 
 def _project_from_url(url):
     """Extract a human-readable project name from a Wix page URL."""
@@ -7346,6 +7819,7 @@ def gallery_tag_image(slug):
             """, (filename, image_type))
         else:
             cur.execute("DELETE FROM gallery_image_types WHERE filename = %s", (filename,))
+        _sync_image_gallery_label(filename, slug, image_type if image_type else None, cur)
         conn.commit()
         # Regenerate HTML so data-image-type stays current on next page load.
         # Run synchronously so the file is written before the client receives
@@ -7409,6 +7883,16 @@ def gallery_add_image(slug):
         gallery.append([final_base, 'webp'])
         cur.execute("UPDATE portfolio_projects SET gallery_json = %s WHERE slug = %s",
                     (json.dumps(gallery), slug))
+        # Tag image_type if provided
+        image_type = (request.form.get('image_type') or '').strip().lower()
+        if image_type in ('project', 'render', 'before', 'construction'):
+            _ensure_gallery_image_types_table(cur)
+            cur.execute("""
+                INSERT INTO gallery_image_types (filename, image_type)
+                VALUES (%s, %s)
+                ON CONFLICT (filename) DO UPDATE SET image_type = EXCLUDED.image_type
+            """, (final_base, image_type))
+        _sync_image_gallery_label(final_base, slug, image_type if image_type in ('project', 'render', 'before', 'construction') else 'project', cur)
         conn.commit()
         conn.close()
         p['gallery'] = gallery
@@ -7644,6 +8128,7 @@ def gallery_auto_tag(slug):
                     VALUES (%s, %s)
                     ON CONFLICT (filename) DO UPDATE SET image_type = EXCLUDED.image_type
                 """, (h, img_type))
+                _sync_image_gallery_label(h, slug, img_type, cur2)
             conn2.commit()
             conn2.close()
 

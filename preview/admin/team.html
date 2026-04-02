@@ -118,7 +118,8 @@
     .photo-picker {
       background: var(--surface, #1a2332); border: 1px solid var(--border, #2a3748);
       border-radius: 10px; width: 100%; max-width: 760px;
-      max-height: 80vh; display: flex; flex-direction: column;
+      height: 78vh; max-height: 78vh;
+      display: flex; flex-direction: column; overflow: hidden;
     }
     .photo-picker-head {
       display: flex; align-items: center; gap: 12px;
@@ -137,13 +138,15 @@
       font-size: 20px; cursor: pointer; line-height: 1;
     }
     .photo-picker-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
       gap: 8px; padding: 16px; overflow-y: auto;
+      flex: 1; min-height: 0;
     }
     .photo-picker-item {
       position: relative;
-      aspect-ratio: 1; border-radius: 6px;
-      background: var(--surface2, #111b27) center/cover no-repeat;
+      height: 120px; border-radius: 6px;
+      background-color: var(--surface2, #111b27);
+      background-size: cover; background-position: center; background-repeat: no-repeat;
       cursor: pointer; border: 2px solid transparent;
       transition: border-color .12s, transform .12s;
       overflow: hidden;
@@ -168,7 +171,7 @@
     .empty-state { padding: 60px 20px; text-align: center; color: var(--text-muted, #64748b); font-size: 14px; }
   </style>
 </head>
-<body>
+<body data-admin-context="team">
 <div class="app">
 
   <!-- SIDEBAR -->
@@ -214,6 +217,9 @@
       <a href="settings.html" class="nav-item" data-page="settings">
         <span class="nav-icon">⊙</span> Settings
       </a>
+      <a href="locks.html" class="nav-item" data-page="locks">
+        <span class="nav-icon">🔒</span> Locks
+      </a>
       <div class="nav-section-label">Apps</div>
       <a href="server.html" class="nav-item" data-page="server">
         <span class="nav-icon">⬡</span> Server
@@ -240,6 +246,12 @@
         <div class="header-subtitle">Manage team members — drag to reorder</div>
       </div>
       <div class="header-actions">
+        <button id="undoBtn" disabled
+          style="padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
+                 border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
+                 color:var(--text-muted,#94a3b8);cursor:not-allowed;white-space:nowrap;transition:all .15s">
+          ↩ Nothing to undo
+        </button>
         <a href="/view/team.html" target="_blank" class="btn btn-ghost btn-sm">View Page →</a>
         <button class="btn btn-primary btn-sm" id="addMemberBtn">+ Add Member</button>
       </div>
@@ -562,6 +574,7 @@ document.getElementById('photoSearch').addEventListener('input', function() {
 });
 
 loadMembers();
+Admin.initUndoButton();
 </script>
 </body>
 </html>

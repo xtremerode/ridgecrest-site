@@ -6,7 +6,7 @@
   <title>Lead Inbox — Ridgecrest Admin</title>
   <link rel="stylesheet" href="css/admin.css" />
 </head>
-<body>
+<body data-admin-context="leads">
 <div class="app">
 
   <!-- SIDEBAR -->
@@ -37,6 +37,9 @@
       <a href="seo.html" class="nav-item" data-page="seo"><span class="nav-icon">◻</span> SEO</a>
       <div class="nav-section-label">System</div>
       <a href="settings.html" class="nav-item" data-page="settings"><span class="nav-icon">⊙</span> Settings</a>
+      <a href="locks.html" class="nav-item" data-page="locks">
+        <span class="nav-icon">🔒</span> Locks
+      </a>
       <div class="nav-section-label">Apps</div>
       <a href="server.html" class="nav-item" data-page="server"><span class="nav-icon">⬡</span> Server</a>
     </nav>
@@ -61,6 +64,12 @@
         <div class="header-subtitle">Project inquiry submissions</div>
       </div>
       <div class="header-actions">
+        <button id="undoBtn" disabled
+          style="padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
+                 border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
+                 color:var(--text-muted,#94a3b8);cursor:not-allowed;white-space:nowrap;transition:all .15s">
+          ↩ Nothing to undo
+        </button>
         <button class="btn btn-ghost btn-sm" onclick="switchView('table')">Table</button>
         <button class="btn btn-ghost btn-sm" onclick="switchView('kanban')">Pipeline</button>
         <button class="btn btn-gold btn-sm" onclick="Admin.openModal('addLeadModal')">+ Add Lead</button>
@@ -525,6 +534,7 @@
   document.getElementById('leadSearch').addEventListener('input', renderTable);
 
   loadLeads();
+  Admin.initUndoButton();
 </script>
 </body>
 </html>

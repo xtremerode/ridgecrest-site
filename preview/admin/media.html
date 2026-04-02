@@ -6,7 +6,7 @@
   <title>Media Library — Ridgecrest Admin</title>
   <link rel="stylesheet" href="css/admin.css" />
 </head>
-<body>
+<body data-admin-context="media">
 <div class="app">
 
   <aside class="sidebar" id="sidebar">
@@ -34,6 +34,7 @@
       <a href="seo.html" class="nav-item" data-page="seo"><span class="nav-icon">◻</span> SEO</a>
       <div class="nav-section-label">System</div>
       <a href="settings.html" class="nav-item" data-page="settings"><span class="nav-icon">⊙</span> Settings</a>
+      <a href="locks.html" class="nav-item" data-page="locks"><span class="nav-icon">🔒</span> Locks</a>
     </nav>
     <div class="sidebar-footer">
       <div class="sidebar-user">
@@ -55,10 +56,17 @@
         <div class="header-subtitle" id="mediaSubtitle">Loading…</div>
       </div>
       <div class="header-actions">
+        <button id="undoBtn" disabled
+          style="padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
+                 border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
+                 color:var(--text-muted,#94a3b8);cursor:not-allowed;white-space:nowrap;transition:all .15s">
+          ↩ Nothing to undo
+        </button>
         <button class="btn btn-sm btn--delete" id="deleteSelectedBtn" style="display:none" onclick="confirmDeleteSelected()">✕ Delete Selected (<span id="deleteCount">0</span>)</button>
         <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border)" onclick="startScan()" id="scanBtn">⟳ Scan Live Site</button>
         <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border)" onclick="startLabelAll(false)" id="labelBtn">✦ Label All</button>
         <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border)" onclick="startLabelAll(true)" id="relabelBtn">↺ Re-label All</button>
+        <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border)" onclick="syncFromGalleries()" id="syncGalleryBtn">⟳ Sync Galleries</button>
         <button class="btn btn-gold btn-sm" onclick="document.getElementById('uploadInput').click()">+ Upload</button>
         <input type="file" id="uploadInput" accept="image/*" multiple style="display:none" onchange="handleUpload(this.files)" />
       </div>
@@ -435,9 +443,15 @@ function buildProjectTabs() {
   // Collect unique projects from loaded items (preserve order of first appearance)
   const seen = new Set();
   const projects = [];
+  const gallerySeen = new Set();
+  const galleryProjects = [];
   let hasUnlabeled = false;
   const editedCount = _libraryItems.filter(i => i.has_renders).length;
   _libraryItems.forEach(item => {
+    if (item.gallery_project_slug && !gallerySeen.has(item.gallery_project_slug)) {
+      gallerySeen.add(item.gallery_project_slug);
+      galleryProjects.push(item.gallery_project_slug);
+    }
     if (!item.project) { hasUnlabeled = true; return; }
     if (!seen.has(item.project)) { seen.add(item.project); projects.push(item.project); }
   });
@@ -449,16 +463,22 @@ function buildProjectTabs() {
     tabs.push({ key: '__edited__', label: `✦ Edited (${editedCount})`, edited: true });
   }
   tabs.push(...projects.map(p => ({ key: p, label: `${p} (${_libraryItems.filter(i => i.project === p).length})` })));
+  if (galleryProjects.length > 0) {
+    tabs.push({ key: '__gallery_divider__', label: '— Galleries —', divider: true });
+    tabs.push(...galleryProjects.map(s => ({ key: '__gal__' + s, label: `📁 ${s} (${_libraryItems.filter(i => i.gallery_project_slug === s).length})`, gallery: true })));
+  }
   if (hasUnlabeled) {
-    tabs.push({ key: '__unlabeled__', label: `Unlabeled (${_libraryItems.filter(i => !i.project).length})` });
+    tabs.push({ key: '__unlabeled__', label: `Unlabeled (${_libraryItems.filter(i => !i.project && !i.gallery_project_slug).length})` });
   }
 
   if (tabs.length <= 1) { tabsEl.style.display = 'none'; return; }
 
   tabsEl.innerHTML = tabs.map(t => {
+    if (t.divider) return `<span style="padding:0 8px;color:var(--text-muted,#64748b);font-size:11px;display:flex;align-items:center">${escHtml(t.label)}</span>`;
     const isActive = t.key === _activeProjectFilter;
     const editedStyle = t.edited ? 'color:var(--accent-purple,#c4b5fd)' : '';
-    return `<button class="project-tab ${isActive ? 'project-tab--active' : ''}" onclick="setProjectFilter('${escHtml(t.key)}')" style="${editedStyle}">${escHtml(t.label)}</button>`;
+    const galleryStyle = t.gallery ? 'color:var(--accent,#3b82f6)' : '';
+    return `<button class="project-tab ${isActive ? 'project-tab--active' : ''}" onclick="setProjectFilter('${escHtml(t.key)}')" style="${editedStyle}${galleryStyle}">${escHtml(t.label)}</button>`;
   }).join('');
   tabsEl.style.display = 'flex';
 }
@@ -472,7 +492,11 @@ function setProjectFilter(key) {
 function _filteredItems() {
   if (_activeProjectFilter === 'all')          return _libraryItems;
   if (_activeProjectFilter === '__edited__')   return _libraryItems.filter(i => i.has_renders);
-  if (_activeProjectFilter === '__unlabeled__') return _libraryItems.filter(i => !i.project);
+  if (_activeProjectFilter === '__unlabeled__') return _libraryItems.filter(i => !i.project && !i.gallery_project_slug);
+  if (_activeProjectFilter.startsWith('__gal__')) {
+    const slug = _activeProjectFilter.slice(7);
+    return _libraryItems.filter(i => i.gallery_project_slug === slug);
+  }
   return _libraryItems.filter(i => i.project === _activeProjectFilter);
 }
 
@@ -507,6 +531,7 @@ function appendMediaBatch(grid, filteredItems) {
     const editedBadge = item.active_version
       ? `<span class="lib-badge" style="background:rgba(139,92,246,.25);color:#c4b5fd;border:1px solid rgba(139,92,246,.4);top:auto;bottom:4px;left:4px;right:auto">✦ Edited</span>`
       : '';
+    const galleryBadge = item.gallery_image_type ? `<span class="media-type-badge" style="background:rgba(59,130,246,.2);color:#93c5fd;border:1px solid rgba(59,130,246,.3);top:auto;bottom:4px;right:4px">${escHtml(item.gallery_image_type)}</span>` : '';
     const card = document.createElement('div');
     card.className = 'media-card';
     card.dataset.filename = name;
@@ -516,6 +541,7 @@ function appendMediaBatch(grid, filteredItems) {
         <span class="lib-badge lib-badge--ok">✓ local</span>
         ${typeBadge}
         ${editedBadge}
+        ${galleryBadge}
         <div class="media-card__overlay">
           <a class="btn btn-ghost btn-sm" href="${escHtml(src)}" download="${escHtml(name)}" onclick="event.stopPropagation()">↓ Download</a>
           <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();rotateImage('${escHtml(name)}',this)">↻ Rotate</button>
@@ -1099,6 +1125,27 @@ async function saveLabelDropdown() {
   }
 }
 
+
+// ── Sync from Galleries ───────────────────────────────────────────────────────
+async function syncFromGalleries() {
+  const btn = document.getElementById('syncGalleryBtn');
+  btn.disabled = true; btn.textContent = '⟳ Syncing…';
+  try {
+    const res = await fetch('/admin/api/media/sync-from-galleries', {
+      method: 'POST', headers: { 'X-Admin-Token': token }
+    });
+    const d = await res.json();
+    if (d.ok) {
+      Admin.toast(`Gallery sync complete — ${d.synced} images indexed`, 'success');
+      await loadLibraryStatus();
+    } else {
+      Admin.toast('Sync failed: ' + (d.error || 'unknown'), 'error');
+    }
+  } catch(e) {
+    Admin.toast('Sync error: ' + e.message, 'error');
+  }
+  btn.disabled = false; btn.textContent = '⟳ Sync Galleries';
+}
 
 // ── Upload ────────────────────────────────────────────────────────────────────
 async function handleUpload(files) {
@@ -1936,6 +1983,7 @@ function escHtml(s) {
 }
 
 init();
+Admin.initUndoButton();
 </script>
 
 <style>

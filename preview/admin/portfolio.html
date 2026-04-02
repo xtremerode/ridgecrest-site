@@ -5,8 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Portfolio — Ridgecrest Admin</title>
   <link rel="stylesheet" href="css/admin.css" />
+  <style>
+    /* Auto-save status pill in modal header */
+    .save-status {
+      font-size: 0.72rem;
+      font-weight: 500;
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-left: 10px;
+      transition: opacity 0.3s;
+      opacity: 0;
+      background: var(--surface-2, #f1f5f9);
+      color: var(--text-2, #64748b);
+    }
+    .save-status.saving { opacity: 1; color: #b45309; background: #fef3c7; }
+    .save-status.saved  { opacity: 1; color: #166534; background: #dcfce7; }
+    .save-status.error  { opacity: 1; color: #991b1b; background: #fee2e2; }
+    .modal-title-row { display: flex; align-items: center; }
+
+    /* Fieldset-style section groups inside modal */
+    .modal-section {
+      border-top: 1px solid var(--border, #e2e8f0);
+      padding-top: 18px;
+      margin-top: 18px;
+    }
+    .modal-section-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-3, #94a3b8);
+      margin-bottom: 12px;
+    }
+  </style>
 </head>
-<body>
+<body data-admin-context="portfolio">
 <div class="app">
 
   <aside class="sidebar" id="sidebar">
@@ -36,6 +69,9 @@
       <a href="seo.html" class="nav-item" data-page="seo"><span class="nav-icon">◻</span> SEO</a>
       <div class="nav-section-label">System</div>
       <a href="settings.html" class="nav-item" data-page="settings"><span class="nav-icon">⊙</span> Settings</a>
+      <a href="locks.html" class="nav-item" data-page="locks">
+        <span class="nav-icon">🔒</span> Locks
+      </a>
       <div class="nav-section-label">Apps</div>
       <a href="server.html" class="nav-item" data-page="server"><span class="nav-icon">⬡</span> Server</a>
     </nav>
@@ -59,30 +95,37 @@
         <div class="header-subtitle">Manage project showcase</div>
       </div>
       <div class="header-actions">
+        <button id="undoBtn" disabled
+          style="padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
+                 border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
+                 color:var(--text-muted,#94a3b8);cursor:not-allowed;white-space:nowrap;transition:all .15s">
+          ↩ Nothing to undo
+        </button>
         <a href="/view/portfolio.html" target="_blank" class="btn btn-ghost btn-sm">Preview →</a>
-        <button class="btn btn-gold btn-sm" onclick="openProjectModal()">+ Add Project</button>
+        <button class="btn btn-gold btn-sm" onclick="openProjectModal(null)">+ Add Project</button>
       </div>
     </div>
 
     <div class="content">
-
-      <div class="alert alert-info">
-        Portfolio projects are currently defined in the static website files. Editing here updates the project metadata — image URLs are linked from the site's CSS. To add new images, use the Media Library.
-      </div>
 
       <div class="toolbar">
         <div class="search-box">
           <span class="search-icon">⌕</span>
           <input type="text" id="portfolioSearch" placeholder="Search projects…" />
         </div>
-        <select class="filter-select" id="filterType" onchange="filterProjects()">
+        <select class="filter-select" id="filterType">
           <option value="">All Types</option>
           <option value="Custom Home">Custom Home</option>
-          <option value="Whole House Remodel">Whole House Remodel</option>
+          <option value="Luxury Home Remodel">Luxury Home Remodel</option>
+          <option value="Home Remodel">Home Remodel</option>
           <option value="Kitchen Remodel">Kitchen Remodel</option>
           <option value="Bathroom Remodel">Bathroom Remodel</option>
+          <option value="Cabin Remodel">Cabin Remodel</option>
+          <option value="Garage Remodel">Garage Remodel</option>
+          <option value="Whole House Remodel">Whole House Remodel</option>
+          <option value="Home Addition &amp; Remodel">Home Addition &amp; Remodel</option>
         </select>
-        <select class="filter-select" id="filterCity" onchange="filterProjects()">
+        <select class="filter-select" id="filterCity">
           <option value="">All Cities</option>
           <option value="Danville">Danville</option>
           <option value="Pleasanton">Pleasanton</option>
@@ -91,11 +134,16 @@
           <option value="San Ramon">San Ramon</option>
           <option value="Orinda">Orinda</option>
           <option value="Sunol">Sunol</option>
+          <option value="Napa">Napa</option>
+          <option value="Livermore">Livermore</option>
+          <option value="Castro Valley">Castro Valley</option>
+          <option value="Newark">Newark</option>
+          <option value="Sierra Mountains">Sierra Mountains</option>
         </select>
       </div>
 
       <div class="portfolio-admin-grid" id="portfolioGrid">
-        <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-3)"><span class="loader"></span></div>
+        <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-3)"><span class="loader"></span> Loading projects…</div>
       </div>
 
     </div>
@@ -106,77 +154,112 @@
 <div class="modal-overlay" id="projectModal">
   <div class="modal modal-lg">
     <div class="modal-header">
-      <div class="modal-title" id="projectModalTitle">Project Details</div>
+      <div class="modal-title-row">
+        <div class="modal-title" id="projectModalTitle">Project Details</div>
+        <span class="save-status" id="saveStatus"></span>
+      </div>
       <button class="modal-close" data-modal-close>✕</button>
     </div>
     <div class="modal-body">
+
+      <!-- Basics -->
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Project Name</label>
-          <input class="form-input" id="pName" placeholder="Danville Dream Home" />
+          <input class="form-input auto-save" id="pName" data-field="name" placeholder="Danville Dream Home" />
         </div>
         <div class="form-group">
           <label class="form-label">City</label>
-          <input class="form-input" id="pCity" placeholder="Danville" />
+          <input class="form-input auto-save" id="pCity" data-field="city" placeholder="Danville" />
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Project Type</label>
-          <select class="form-input" id="pType">
+          <select class="form-input auto-save-immediate" id="pType" data-field="project_type">
             <option value="Custom Home">Custom Home</option>
             <option value="Luxury Home Remodel">Luxury Home Remodel</option>
             <option value="Whole House Remodel">Whole House Remodel</option>
             <option value="Kitchen Remodel">Kitchen Remodel</option>
             <option value="Bathroom Remodel">Bathroom Remodel</option>
+            <option value="Cabin Remodel">Cabin Remodel</option>
+            <option value="Garage Remodel">Garage Remodel</option>
+            <option value="Home Addition &amp; Remodel">Home Addition &amp; Remodel</option>
+            <option value="Home Remodel">Home Remodel</option>
             <option value="Modern Home Remodel">Modern Home Remodel</option>
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">Year Completed</label>
-          <input class="form-input" id="pYear" placeholder="2024" type="number" min="2010" max="2030" />
+          <input class="form-input auto-save" id="pYear" data-field="year" placeholder="2024" type="number" min="2010" max="2030" />
         </div>
       </div>
-      <div class="form-row full">
-        <div class="form-group">
-          <label class="form-label">Short Description (shown on project page)</label>
-          <textarea class="form-input" id="pDesc" rows="4" placeholder="Describe the project, key features, and design intent…"></textarea>
+
+      <!-- Descriptions -->
+      <div class="modal-section">
+        <div class="modal-section-label">Descriptions</div>
+        <div class="form-row full">
+          <div class="form-group">
+            <label class="form-label">Short Description <span style="color:var(--text-3);font-weight:400">(shown in cards &amp; hero)</span></label>
+            <textarea class="form-input auto-save" id="pDescShort" data-field="desc_short" rows="3" placeholder="One-sentence project summary…"></textarea>
+          </div>
+        </div>
+        <div class="form-row full">
+          <div class="form-group">
+            <label class="form-label">Detail Description <span style="color:var(--text-3);font-weight:400">(shown on project page)</span></label>
+            <textarea class="form-input auto-save" id="pDescDetail" data-field="desc_detail" rows="5" placeholder="Full project description — scope, design intent, key features…"></textarea>
+          </div>
         </div>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Scope (sq ft)</label>
-          <input class="form-input" id="pSqft" placeholder="e.g. 4,800 sq ft" />
+
+      <!-- Specs -->
+      <div class="modal-section">
+        <div class="modal-section-label">Project Specs</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Scope / Square Footage</label>
+            <input class="form-input auto-save" id="pSqft" data-field="sqft" placeholder="e.g. 4,800 sq ft" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Duration</label>
+            <input class="form-input auto-save" id="pDuration" data-field="duration" placeholder="e.g. 14 months" />
+          </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Duration</label>
-          <input class="form-input" id="pDuration" placeholder="e.g. 14 months" />
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Budget Range</label>
+            <input class="form-input auto-save" id="pBudget" data-field="budget" placeholder="e.g. $1.2M" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Services</label>
+            <input class="form-input auto-save" id="pServices" data-field="services" placeholder="e.g. Design, Engineering, Build" />
+          </div>
         </div>
       </div>
-      <div class="form-row full">
-        <div class="form-group">
-          <label class="form-label">Hero Image URL (Wix CDN or uploaded)</label>
-          <input class="form-input" id="pHeroImg" placeholder="https://static.wixstatic.com/media/…" />
+
+      <!-- Visibility -->
+      <div class="modal-section">
+        <div class="modal-section-label">Visibility</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="toggle-wrap" style="margin-top:8px">
+              <span class="toggle"><input type="checkbox" id="pPublished" class="auto-save-immediate" data-field="published" /><span class="toggle-slider"></span></span>
+              <span class="toggle-label">Published (visible on website)</span>
+            </label>
+          </div>
+          <div class="form-group">
+            <label class="toggle-wrap" style="margin-top:8px">
+              <span class="toggle"><input type="checkbox" id="pFeatured" class="auto-save-immediate" data-field="featured" /><span class="toggle-slider"></span></span>
+              <span class="toggle-label">Featured (highlight on portfolio page)</span>
+            </label>
+          </div>
         </div>
       </div>
-      <div class="form-row full">
-        <div class="form-group">
-          <label class="form-label">Gallery Image URLs (one per line)</label>
-          <textarea class="form-input" id="pGallery" rows="5" placeholder="https://static.wixstatic.com/media/image1.jpg&#10;https://static.wixstatic.com/media/image2.jpg"></textarea>
-        </div>
-      </div>
-      <div class="form-group">
-        <div class="form-label">Visibility</div>
-        <label class="toggle-wrap" style="margin-top:8px">
-          <span class="toggle"><input type="checkbox" id="pPublished" checked /><span class="toggle-slider"></span></span>
-          <span class="toggle-label">Published (visible on website)</span>
-        </label>
-      </div>
+
     </div>
     <div class="modal-footer">
-      <button class="btn btn-danger btn-sm" id="pDeleteBtn" style="margin-right:auto" onclick="deleteProject()">Delete</button>
-      <button class="btn btn-ghost" data-modal-close>Cancel</button>
-      <button class="btn btn-primary" onclick="saveProject()">Save Project</button>
+      <button class="btn btn-danger btn-sm" id="pDeleteBtn" style="margin-right:auto;display:none" onclick="deleteProject()">Delete</button>
+      <button class="btn btn-ghost" data-modal-close>Close</button>
     </div>
   </div>
 </div>
@@ -186,33 +269,47 @@
   if (!Admin.requireAuth()) throw new Error('unauth');
   Admin.init('portfolio');
 
-  // Static portfolio data (mirrors the HTML files)
-  const PROJECTS = [
-    { id: 1, name: 'Danville Dream Home', city: 'Danville', type: 'Luxury Home Remodel', year: 2024, published: true, slug: 'danville-dream', img: '/assets/images/ff5b18_3c0cef18e48849089c5ed48614041900_mv2.png' },
-    { id: 2, name: 'Danville Hilltop Hideaway', city: 'Danville', type: 'Modern Home Remodel', year: 2023, published: true, slug: 'danville-hilltop', img: '/assets/images/ff5b18_598ba1466dbb45249778e2ea0e0b95e3_mv2.jpg' },
-    { id: 3, name: 'Pleasanton Custom Home', city: 'Pleasanton', type: 'Custom Home', year: 2024, published: true, slug: 'pleasanton-custom', img: '/assets/images/ff5b18_4161051f37ba482fafc49baddabc8a96_mv2.jpg' },
-    { id: 4, name: 'Alamo Luxury Home', city: 'Alamo', type: 'Luxury Remodel', year: 2023, published: true, slug: 'alamo-luxury', img: '/assets/images/ff5b18_39536b28ce0447b9a87797bb4c70ee51_mv2.jpg' },
-    { id: 5, name: 'Lafayette Modern Bistro', city: 'Lafayette', type: 'Kitchen Remodel', year: 2024, published: true, slug: 'lafayette-bistro', img: '/assets/images/ff5b18_94919d08fc9245fc849ac03c4ea2caaf_mv2.jpg' },
-    { id: 6, name: 'Lafayette Laid-Back Luxury', city: 'Lafayette', type: 'Home Remodel', year: 2023, published: true, slug: 'lafayette-luxury', img: '/assets/images/ff5b18_6eed718eb2ab4ca0887717d1a39285ea_mv2.png' },
-    { id: 7, name: 'San Ramon Custom Home', city: 'San Ramon', type: 'Custom Home Remodel', year: 2024, published: true, slug: 'san-ramon', img: '/assets/images/ff5b18_6eed718eb2ab4ca0887717d1a39285ea_mv2.png' },
-    { id: 8, name: 'Orinda Urban Modern Kitchen', city: 'Orinda', type: 'Kitchen Remodel', year: 2023, published: true, slug: 'orinda-kitchen', img: '/assets/images/ff5b18_d741bf6a821b40e8b4730181bcf0fc48_mv2.jpg' },
-    { id: 9, name: 'Sunol Homestead', city: 'Sunol', type: 'Custom Home Remodel', year: 2022, published: true, slug: 'sunol-homestead', img: '/assets/images/ff5b18_296b1e9ff5d14e128006c21217e3f3e9_mv2.jpg' },
-  ];
-
+  /* ── State ───────────────────────────────────────────────── */
+  let ALL_PROJECTS = [];
   let currentProjectId = null;
+  let saveTimer = null;
+  let _saveListenersAttached = false;
 
-  function filterProjects() {
-    const q = document.getElementById('portfolioSearch').value.toLowerCase();
+  /* ── Load all projects from API on boot ──────────────────── */
+  async function loadProjects() {
+    try {
+      const data = await Admin.get('/portfolio');
+      ALL_PROJECTS = Array.isArray(data) ? data : [];
+      applyFilter();
+    } catch (e) {
+      document.getElementById('portfolioGrid').innerHTML =
+        `<div style="grid-column:1/-1"><div class="alert alert-error">Failed to load projects: ${e.message}</div></div>`;
+    }
+  }
+
+  /* ── Filter + render grid ────────────────────────────────── */
+  function applyFilter() {
+    const q    = document.getElementById('portfolioSearch').value.toLowerCase();
     const type = document.getElementById('filterType').value;
     const city = document.getElementById('filterCity').value;
 
-    const filtered = PROJECTS.filter(p =>
-      (!q || p.name.toLowerCase().includes(q) || p.city.toLowerCase().includes(q)) &&
-      (!type || p.type.includes(type)) &&
+    const filtered = ALL_PROJECTS.filter(p =>
+      p.published !== false &&   // show hidden ones with a badge, not exclude
+      true
+    ).filter(p =>
+      (!q    || (p.name||'').toLowerCase().includes(q) || (p.city||'').toLowerCase().includes(q)) &&
+      (!type || (p.project_type||'').includes(type)) &&
       (!city || p.city === city)
     );
 
-    renderGrid(filtered);
+    // if filter hides some, include unpublished too when no filter active
+    const all_filtered = ALL_PROJECTS.filter(p =>
+      (!q    || (p.name||'').toLowerCase().includes(q) || (p.city||'').toLowerCase().includes(q)) &&
+      (!type || (p.project_type||'').includes(type)) &&
+      (!city || p.city === city)
+    );
+
+    renderGrid(all_filtered);
   }
 
   function renderGrid(projects) {
@@ -221,9 +318,13 @@
       grid.innerHTML = `<div style="grid-column:1/-1"><div class="empty"><div class="empty-icon">▣</div><div class="empty-title">No projects found</div></div></div>`;
       return;
     }
-    grid.innerHTML = projects.map(p => `
+    grid.innerHTML = projects.map(p => {
+      const imgUrl = p.hero_src || '';
+      const galleryCount = p.gallery_count || 0;
+      const hidden = p.published === false;
+      return `
       <div class="portfolio-admin-card" onclick="openProjectModal(${p.id})">
-        <div class="portfolio-admin-thumb" style="background-image:url('${p.img}')">
+        <div class="portfolio-admin-thumb" style="background-image:url('${imgUrl}')">
           <div class="portfolio-admin-thumb-overlay">
             <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();window.open('/view/${p.slug}.html','_blank')">Preview</button>
             <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();openProjectModal(${p.id})">Edit</button>
@@ -232,72 +333,201 @@
         <div class="portfolio-admin-info">
           <div class="portfolio-admin-title">${p.name}</div>
           <div class="portfolio-admin-loc">📍 ${p.city}, CA · ${p.year}</div>
-          <div class="portfolio-admin-type">${p.type}</div>
-          ${!p.published ? '<span class="badge badge-gray" style="margin-top:6px">Hidden</span>' : ''}
+          <div class="portfolio-admin-type">${p.project_type || ''}</div>
+          <div style="font-size:0.7rem;color:var(--text-3);margin-top:4px">${galleryCount} gallery image${galleryCount !== 1 ? 's' : ''}</div>
+          ${hidden ? '<span class="badge badge-gray" style="margin-top:6px">Hidden</span>' : ''}
+          ${p.featured ? '<span class="badge badge-gold" style="margin-top:6px;margin-left:4px">Featured</span>' : ''}
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   }
 
-  function openProjectModal(id) {
+  /* ── Open modal — load fresh from API ───────────────────── */
+  async function openProjectModal(id) {
     currentProjectId = id || null;
-    const p = id ? PROJECTS.find(x => x.id === id) : null;
+    setSaveStatus('');
 
-    document.getElementById('projectModalTitle').textContent = p ? 'Edit Project' : 'Add Project';
-    document.getElementById('pDeleteBtn').style.display = p ? '' : 'none';
-    document.getElementById('pName').value = p?.name || '';
-    document.getElementById('pCity').value = p?.city || '';
-    document.getElementById('pYear').value = p?.year || new Date().getFullYear();
-    document.getElementById('pDesc').value = p?.description || '';
-    document.getElementById('pSqft').value = p?.sqft || '';
-    document.getElementById('pDuration').value = p?.duration || '';
-    document.getElementById('pHeroImg').value = p?.img || '';
-    document.getElementById('pGallery').value = p?.gallery || '';
-    document.getElementById('pPublished').checked = p ? p.published : true;
-
-    const typeSelect = document.getElementById('pType');
-    if (p) typeSelect.value = p.type;
+    if (id) {
+      document.getElementById('projectModalTitle').textContent = 'Edit Project';
+      document.getElementById('pDeleteBtn').style.display = '';
+      // Load fresh full data from API
+      try {
+        const p = await Admin.get(`/portfolio/${id}`);
+        populateModal(p);
+      } catch (e) {
+        Admin.toast('Failed to load project data', 'error');
+        return;
+      }
+    } else {
+      document.getElementById('projectModalTitle').textContent = 'Add Project';
+      document.getElementById('pDeleteBtn').style.display = 'none';
+      populateModal({});
+    }
 
     Admin.openModal('projectModal');
+    // Reset listener flag on each open so listeners re-attach cleanly
+    _saveListenersAttached = false;
+    attachAutoSave();
   }
 
-  async function saveProject() {
-    const data = {
-      name: document.getElementById('pName').value,
-      city: document.getElementById('pCity').value,
-      type: document.getElementById('pType').value,
-      year: document.getElementById('pYear').value,
-      description: document.getElementById('pDesc').value,
-      sqft: document.getElementById('pSqft').value,
-      duration: document.getElementById('pDuration').value,
-      hero_img: document.getElementById('pHeroImg').value,
-      gallery: document.getElementById('pGallery').value,
+  function populateModal(p) {
+    // p.specs is the already-parsed dict; p.specs_json is the raw string — always use p.specs
+    const specs = (p.specs && typeof p.specs === 'object') ? p.specs : {};
+    setField('pName',       p.name || '');
+    setField('pCity',       p.city || '');
+    setField('pType',       p.project_type || 'Kitchen Remodel');
+    setField('pYear',       p.year || new Date().getFullYear());
+    setField('pDescShort',  p.desc_short || '');
+    setField('pDescDetail', p.desc_detail || '');
+    setField('pSqft',       specs.sqft || '');
+    setField('pDuration',   specs.duration || '');
+    setField('pBudget',     specs.budget || '');
+    setField('pServices',   specs.services || '');
+    document.getElementById('pPublished').checked = p.published !== false;
+    document.getElementById('pFeatured').checked  = !!p.featured;
+  }
+
+  function setField(id, val) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.tagName === 'SELECT') el.value = val;
+    else el.value = val;
+  }
+
+  /* ── Collect form → payload ───────────────────────────────── */
+  function collectPayload() {
+    return {
+      name:         document.getElementById('pName').value.trim(),
+      city:         document.getElementById('pCity').value.trim(),
+      project_type: document.getElementById('pType').value,
+      year:         parseInt(document.getElementById('pYear').value) || new Date().getFullYear(),
+      desc_short:   document.getElementById('pDescShort').value,
+      desc_detail:  document.getElementById('pDescDetail').value,
+      specs_json: {
+        sqft:     document.getElementById('pSqft').value.trim(),
+        duration: document.getElementById('pDuration').value.trim(),
+        budget:   document.getElementById('pBudget').value.trim(),
+        services: document.getElementById('pServices').value.trim(),
+      },
       published: document.getElementById('pPublished').checked,
+      featured:  document.getElementById('pFeatured').checked,
     };
+  }
 
-    const endpoint = currentProjectId ? `/portfolio/${currentProjectId}` : '/portfolio';
-    const method = currentProjectId ? 'put' : 'post';
-    const res = await Admin[method](endpoint, data);
+  /* ── Save status UI ─────────────────────────────────────── */
+  function setSaveStatus(state, text) {
+    const el = document.getElementById('saveStatus');
+    el.className = 'save-status' + (state ? ' ' + state : '');
+    el.textContent = text || '';
+  }
 
-    if (res && res.ok) {
-      Admin.toast(currentProjectId ? 'Project updated' : 'Project added', 'success');
-      Admin.closeModal('projectModal');
-    } else {
-      Admin.toast('Changes saved locally (static site — deploy required to publish)', 'info');
-      Admin.closeModal('projectModal');
+  /* ── Auto-save (debounced for text, immediate for controls) ─ */
+  // Named handlers stored so we can removeEventListener before re-adding
+  function _onTextInput() {
+    clearTimeout(saveTimer);
+    setSaveStatus('saving', 'Saving…');
+    saveTimer = setTimeout(doSave, 700);
+  }
+  function _onImmediateChange() {
+    clearTimeout(saveTimer);
+    setSaveStatus('saving', 'Saving…');
+    doSave();
+  }
+
+  function attachAutoSave() {
+    if (_saveListenersAttached) return;
+    _saveListenersAttached = true;
+    const modal = document.getElementById('projectModal');
+
+    // Text/textarea: 700ms debounce
+    modal.querySelectorAll('input.auto-save, textarea.auto-save').forEach(el => {
+      el.removeEventListener('input', _onTextInput);
+      el.addEventListener('input', _onTextInput);
+    });
+
+    // Select/checkbox: immediate
+    modal.querySelectorAll('select.auto-save-immediate, input.auto-save-immediate').forEach(el => {
+      el.removeEventListener('change', _onImmediateChange);
+      el.addEventListener('change', _onImmediateChange);
+    });
+  }
+
+  async function doSave() {
+    if (!currentProjectId) {
+      // New project — create first, then set ID
+      await createProject();
+      return;
+    }
+    setSaveStatus('saving', 'Saving…');
+    try {
+      const res = await Admin.put(`/portfolio/${currentProjectId}`, collectPayload());
+      if (res && res.ok) {
+        setSaveStatus('saved', 'Saved ✓');
+        // Refresh project in local cache
+        const idx = ALL_PROJECTS.findIndex(p => p.id === currentProjectId);
+        if (idx !== -1) Object.assign(ALL_PROJECTS[idx], res.project || {});
+        // Fade "Saved ✓" after 2.5s
+        setTimeout(() => setSaveStatus(''), 2500);
+        // Refresh card grid quietly
+        applyFilter();
+      } else {
+        setSaveStatus('error', 'Error saving');
+      }
+    } catch (e) {
+      setSaveStatus('error', 'Error saving');
     }
   }
 
-  async function deleteProject() {
-    if (!currentProjectId) return;
-    if (!confirm('Delete this project from the portfolio?')) return;
-    Admin.toast('Project removed (redeploy website to publish changes)', 'info');
-    Admin.closeModal('projectModal');
+  /* ── Create new project ──────────────────────────────────── */
+  async function createProject() {
+    setSaveStatus('saving', 'Saving…');
+    try {
+      const res = await Admin.post('/portfolio', collectPayload());
+      if (res && res.ok) {
+        currentProjectId = res.project.id;
+        document.getElementById('projectModalTitle').textContent = 'Edit Project';
+        document.getElementById('pDeleteBtn').style.display = '';
+        setSaveStatus('saved', 'Saved ✓');
+        ALL_PROJECTS.push(res.project);
+        applyFilter();
+        setTimeout(() => setSaveStatus(''), 2500);
+      } else {
+        setSaveStatus('error', 'Error saving');
+        Admin.toast('Could not create project', 'error');
+      }
+    } catch (e) {
+      setSaveStatus('error', 'Error saving');
+    }
   }
 
-  document.getElementById('portfolioSearch').addEventListener('input', filterProjects);
+  /* ── Delete ─────────────────────────────────────────────── */
+  async function deleteProject() {
+    if (!currentProjectId) return;
+    if (!confirm('Remove this project from the portfolio? This will unpublish it from the live site.')) return;
+    try {
+      await Admin.del(`/portfolio/${currentProjectId}`);
+      Admin.toast('Project removed', 'info');
+      Admin.closeModal('projectModal');
+      const idx = ALL_PROJECTS.findIndex(p => p.id === currentProjectId);
+      if (idx !== -1) ALL_PROJECTS.splice(idx, 1);
+      applyFilter();
+    } catch (e) {
+      Admin.toast('Delete failed: ' + e.message, 'error');
+    }
+  }
 
-  renderGrid(PROJECTS);
+  /* ── Wire filter inputs ──────────────────────────────────── */
+  document.getElementById('portfolioSearch').addEventListener('input', applyFilter);
+  document.getElementById('filterType').addEventListener('change', applyFilter);
+  document.getElementById('filterCity').addEventListener('change', applyFilter);
+
+  /* ── Boot ────────────────────────────────────────────────── */
+  loadProjects();
+</script>
+
+<script>
+/* ── Undo button (portfolio context) ─────────────────────────────────── */
+Admin.initUndoButton({ onSuccess: function() { loadProjects(); } });
 </script>
 </body>
 </html>

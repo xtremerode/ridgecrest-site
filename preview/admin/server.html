@@ -403,6 +403,9 @@
       <a href="settings.html" class="nav-item" data-page="settings">
         <span class="nav-icon">⊙</span> Settings
       </a>
+      <a href="locks.html" class="nav-item" data-page="locks">
+        <span class="nav-icon">🔒</span> Locks
+      </a>
       <div class="nav-section-label">Apps</div>
       <a href="server.html" class="nav-item active" data-page="server">
         <span class="nav-icon">⬡</span> Server
@@ -456,6 +459,9 @@
       </button>
       <button class="srv-tab" data-tab="config">
         <span class="srv-tab-icon">⊙</span> Config &amp; Backups
+      </button>
+      <button class="srv-tab" data-tab="downloads">
+        <span class="srv-tab-icon">↓</span> Downloads
       </button>
     </div>
 
@@ -643,6 +649,13 @@
             <button class="btn btn-ghost" id="backupFilesBtn">Run Files Backup</button>
             <div class="backup-result" id="backupFilesResult"></div>
           </div>
+          <div class="backup-card">
+            <div class="backup-icon">🌐</div>
+            <div class="backup-title">Install Browser Dependencies</div>
+            <div class="backup-desc">Install system libraries needed for visual browser scraping (Playwright/Chromium). Runs directly on the server.</div>
+            <button class="btn btn-ghost" id="installBrowserDepsBtn">Install Now</button>
+            <div class="backup-result" id="installBrowserDepsResult"></div>
+          </div>
         </div>
 
         <div>
@@ -651,6 +664,55 @@
             <div style="font-size:12px;color:var(--text-3)">Sensitive values are masked. Click ✎ to edit.</div>
           </div>
           <div id="envGroups"></div>
+        </div>
+      </div>
+
+      <!-- ══ DOWNLOADS ══ -->
+      <div class="srv-panel" id="panel-downloads">
+
+        <div class="backup-grid" style="margin-bottom:24px">
+          <div class="backup-card">
+            <div class="backup-icon">🖼</div>
+            <div class="backup-title">Migrate Portfolio Images</div>
+            <div class="backup-desc">Downloads 25 missing project images from Wix CDN directly to the server. Click once — no files to download or run.</div>
+            <button class="btn btn-ghost" id="migrateImagesBtn">Run Migration</button>
+            <div class="backup-result" id="migrateImagesResult"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Script Downloads</div>
+              <div class="card-sub">Manual fallback files — only needed if server-side migration above fails</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="proc-table" id="downloadsTable">
+              <thead>
+                <tr>
+                  <th>File</th>
+                  <th>Description</th>
+                  <th>Platform</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="font-family:monospace;font-size:12px">migrate_portfolio_v4.bat</td>
+                  <td>Double-click to run — downloads and executes the PowerShell script. No Python or installs required.</td>
+                  <td><span style="background:var(--blue);color:#fff;font-size:10px;padding:2px 7px;border-radius:3px;font-weight:600">Windows</span></td>
+                  <td><a class="btn btn-ghost btn-sm" href="/migrate_portfolio_v4.bat" download>↓ Download</a></td>
+                </tr>
+                <tr>
+                  <td style="font-family:monospace;font-size:12px">migrate_portfolio.ps1</td>
+                  <td>PowerShell script — downloads 25 Wix portfolio images and uploads them to the server. Built into every modern Windows PC.</td>
+                  <td><span style="background:var(--blue);color:#fff;font-size:10px;padding:2px 7px;border-radius:3px;font-weight:600">Windows</span></td>
+                  <td><a class="btn btn-ghost btn-sm" href="/migrate_portfolio.ps1" download>↓ Download</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -742,6 +804,7 @@
     if (tab === 'services')  loadServices();
     if (tab === 'database')  loadDbTables();
     if (tab === 'config')    { loadEnv(); }
+    // downloads tab needs no data load — static links
   }
 
   document.getElementById('srvTabs').addEventListener('click', e => {
@@ -1409,6 +1472,63 @@
     runBackup('backupDbBtn', 'backupDbResult', '/server/backup/db', 'Run DB Backup', 'sql'));
   document.getElementById('backupFilesBtn').addEventListener('click', () =>
     runBackup('backupFilesBtn', 'backupFilesResult', '/server/backup/files', 'Run Files Backup', 'tar.gz'));
+
+  document.getElementById('migrateImagesBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('migrateImagesBtn');
+    const result = document.getElementById('migrateImagesResult');
+    btn.disabled = true; btn.textContent = 'Downloading…';
+    result.style.display = 'none';
+    try {
+      const r = await Admin.post('/migrate/portfolio-images', {});
+      result.style.display = 'block';
+      if (r && r.ok) {
+        result.style.color = 'var(--green, #22c55e)';
+        result.textContent = `✓ Done — ${r.downloaded} images saved (${r.failed} failed).`;
+        btn.textContent = '✓ Complete';
+        Admin.toast('Portfolio images migrated', 'success');
+      } else if (r) {
+        result.style.color = r.failed > 0 ? 'var(--red)' : 'var(--green, #22c55e)';
+        result.textContent = `${r.downloaded} saved, ${r.failed} failed. Check if Wix is blocking the server IP — use the BAT file below if so.`;
+        btn.disabled = false; btn.textContent = 'Run Migration';
+        // Show detail
+        if (r.results) {
+          const errors = r.results.filter(x => x.status === 'error');
+          if (errors.length) result.textContent += '\n' + errors.map(e => e.file + ': ' + e.error).join('\n');
+        }
+      }
+    } catch(e) {
+      result.style.display = 'block';
+      result.style.color = 'var(--red)';
+      result.textContent = 'Error: ' + e.message;
+      btn.disabled = false; btn.textContent = 'Run Migration';
+    }
+  });
+
+  document.getElementById('installBrowserDepsBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('installBrowserDepsBtn');
+    const result = document.getElementById('installBrowserDepsResult');
+    btn.disabled = true; btn.textContent = 'Installing…';
+    result.style.display = 'none';
+    try {
+      const r = await Admin.post('/server/install-browser-deps', {});
+      result.style.display = 'block';
+      if (r && r.ok) {
+        result.textContent = r.verified ? '✓ Installed and verified — browser ready.' : '✓ Installed (verification pending).';
+        btn.textContent = '✓ Done';
+        Admin.toast('Browser dependencies installed', 'success');
+      } else {
+        result.style.color = 'var(--red)';
+        result.textContent = 'Error: ' + (r && r.error ? r.error : 'Unknown error');
+        btn.disabled = false; btn.textContent = 'Install Now';
+        Admin.toast('Install failed', 'error');
+      }
+    } catch(e) {
+      result.style.display = 'block';
+      result.style.color = 'var(--red)';
+      result.textContent = 'Error: ' + e.message;
+      btn.disabled = false; btn.textContent = 'Install Now';
+    }
+  });
 
   // Keyboard shortcuts
   document.getElementById('renameInput').addEventListener('keydown', e => {

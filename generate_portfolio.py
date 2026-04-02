@@ -75,6 +75,7 @@ Inside, the kitchen was reimagined with large family gatherings in mind. The rec
             ('ff5b18_789d474d6d0149eea64b9629dc7a9d7b_mv2', 'jpg'),
             ('ff5b18_7c54ccfe90ad4065ae0f0aa063a629e4_mv2', 'jpg'),
             ('ff5b18_6a5a8b093a7d4ec1bfb1eddf7fe753b4_mv2', 'jpg'),
+            ('ff5b18_6f6dc7ef92684e7e8af496c4f83f06be_mv2', 'jpg'),
         ],
         'featured': True,
     },
@@ -153,6 +154,7 @@ Across the hall is the downstairs powder room, featuring a marble floor and cust
             ('ff5b18_b81ad19e857d4e99b57edf295d8732b7_mv2', 'jpg'),
             ('ff5b18_a9a4054d937b4d2f87b68ae86f8e6505_mv2', 'jpg'),
             ('ff5b18_ec34ac50f5ed421b8914a9ed0c9d168e_mv2', 'jpg'),
+            ('ff5b18_9820c1603a9c414d8cc8009784d1ca7c_mv2', 'jpg'),
         ],
         'featured': True,
     },
@@ -208,6 +210,7 @@ The custom stained wood floors and trim exude warmth and richness throughout the
             ('ff5b18_ef630f1a109d4f1aa6e918307c0e02a6_mv2', 'png'),
             ('ff5b18_b651e8713e0749368367a9e5e840fa55_mv2', 'jpg'),
             ('ff5b18_8263a2cdc43a4f9d9f5b0b6945039c77_mv2', 'png'),
+            ('ff5b18_5ad4349859fe4e728734e05bf49f85e3_mv2', 'webp'),
         ],
         'featured': True,
     },
@@ -245,6 +248,7 @@ The pop of blue paired with the dark walnut creates an eye-catching contrast. Ri
             ('ff5b18_33d2068cd10941fbad0293bdc73d63d5_mv2', 'jpg'),
             ('ff5b18_4e56d06b0c6e4c80aabe636642bf8346_mv2', 'jpg'),
             ('ff5b18_cd0bbd1ca0924ba38e0578501a1958ec_mv2', 'jpg'),
+            ('ff5b18_598ba1466dbb45249778e2ea0e0b95e3_mv2', 'jpg'),
         ],
         'featured': True,
     },
@@ -310,6 +314,7 @@ The master bathroom is a minimalist's dream with neutral tones and clean lines. 
             ('ff5b18_287252fbc1f0474c8c5448c350dcfad2_mv2', 'jpg'),
             ('ff5b18_8d194ec65ece42e1a9a046dacdd67157_mv2', 'jpg'),
             ('ff5b18_d21a6cfecad9421bb43dbd6d1a63828f_mv2', 'jpg'),
+            ('ff5b18_38c7317e1d4b4773ab0a16ed48332f31_mv2', 'jpg'),
         ],
         'featured': False,
     },
@@ -340,6 +345,9 @@ Classic polished nickel fixtures adorn the bathroom walls and countertops, and e
             ('ff5b18_7f1d04c690b0453fbb22aaf1d443dc76_mv2', 'jpg'),
             ('ff5b18_4115fae529ce4974a6b6ead3ded507a9_mv2', 'jpg'),
             ('ff5b18_6ce3779e8542406db45d54ee9e8a9d33_mv2', 'jpg'),
+            ('ff5b18_94919d08fc9245fc849ac03c4ea2caaf_mv2', 'jpg'),
+            ('ff5b18_969f8423ceba4f5ab338f4ec820f8851_mv2', 'jpg'),
+            ('ff5b18_b456a82df95e4427842a990d8e61660e_mv2', 'jpg'),
         ],
         'featured': False,
     },
@@ -369,6 +377,7 @@ Bright, white, glossy cabinets with hints of white oak and black accents pop on 
             ('ff5b18_7d9860cd5e234283aebffeff9b4bfbc9_mv2', 'png'),
             ('ff5b18_5ef00a1c27fa49929b6841b112dedb12_mv2', 'png'),
             ('ff5b18_b8e188bd228f4ea990fd6c1c7120140f_mv2', 'png'),
+            ('ff5b18_d741bf6a821b40e8b4730181bcf0fc48_mv2', 'jpg'),
         ],
         'featured': False,
     },
@@ -403,6 +412,7 @@ The clients came with a vision. Ridgecrest made it precise, then built it flawle
             ('ff5b18_f9b4f2ba1f81409a86985fabcbbea3be_mv2', 'png'),
             ('ff5b18_2b1800ac28b247f98060b77e9034f227_mv2', 'png'),
             ('ff5b18_bd546d2e47244fdcbda2e0bf2e07c43d_mv2', 'png'),
+            ('ff5b18_83cbc49d23a5436294574e1dd9db3819_mv2', 'png'),
         ],
         'featured': False,
     },
@@ -428,6 +438,7 @@ From concept through construction, every decision was deliberate — no compromi
             ('ff5b18_920a949ef5b541cc85ea6be49efebb96_mv2', 'png'),
             ('ff5b18_cd5a5fdbf7ed4b23b03a9a3e7533e051_mv2', 'png'),
             ('ff5b18_ef18abb4037848e3b75100bef53ef666_mv2', 'png'),
+            ('ff5b18_39536b28ce0447b9a87797bb4c70ee51_mv2', 'jpg'),
         ],
         'featured': False,
     },
@@ -454,6 +465,7 @@ The result is a kitchen that functions as the heart of the home — equally suit
             ('ff5b18_5d2794ad0a8c491484471454087410bb_mv2', 'jpg'),
             ('ff5b18_3e1808f4f0464106ae1905f8723d25d3_mv2', 'jpg'),
             ('ff5b18_d7eb886d364544c1993777e2db5e8bb6_mv2', 'jpg'),
+            ('ff5b18_76c5e504c9114ef09ad8233549a16b39_mv2', 'jpg'),
         ],
         'featured': False,
     },
@@ -478,6 +490,7 @@ As with every Ridgecrest project, photo-realistic renders were produced before a
             ('ff5b18_f26349e8012041cbbae1f628716c19dc_mv2', 'png'),
             ('ff5b18_4d5fdc218b3548c0a2ad0b47802d0ca3_mv2', 'png'),
             ('ff5b18_09e7d253bf96411a9fe30835cc9ee34b_mv2', 'png'),
+            ('ff5b18_6eed718eb2ab4ca0887717d1a39285ea_mv2', 'png'),
         ],
         'featured': False,
     },
@@ -502,6 +515,7 @@ Traditional barn sconces flank the doors to make this structure look more like a
             ('ff5b18_5f016abc7ce04830a7f65e61c2b4a3fa_mv2', 'jpg'),
             ('ff5b18_fa6237e022fb42d5812a4e932b054bee_mv2', 'jpg'),
             ('ff5b18_e9017ba51d1544b789d5add8c4ecc484_mv2', 'jpg'),
+            ('ff5b18_042b3d66e8904b4188c0ec509b2595d6_mv2', 'jpg'),
         ],
         'featured': False,
     },
@@ -526,6 +540,7 @@ Custom millwork throughout — from built-in shelving to coffered ceilings — a
             ('ff5b18_cac57df9732942439511bdf23455bae9_mv2', 'png'),
             ('ff5b18_2bff65721a084bfb839c2c52bf19c666_mv2', 'png'),
             ('ff5b18_5a87c321b5db4ad99b66177a8685ee53_mv2', 'png'),
+            ('ff5b18_e1ef86fee44b4c14b077ecbdb2ca10f5_mv2', 'png'),
         ],
         'featured': False,
     },
@@ -546,6 +561,7 @@ Ridgecrest Designs produced full photo-realistic renders before breaking ground,
         'hero': 'ff5b18_f575a25ba7f14e1389d0ae63bb2d356f_mv2', 'hero_ext': 'png',
         'gallery': [
             ('ff5b18_9a3cb5be52fb466ebd047a075c89ee74_mv2', 'png'),
+            ('ff5b18_f575a25ba7f14e1389d0ae63bb2d356f_mv2', 'png'),
         ],
         'featured': False,
     },
@@ -569,6 +585,7 @@ Ridgecrest's design-build model was essential here: having design and constructi
             ('ff5b18_6e14ea0a4cdd4f5c88885680df88f8af_mv2', 'png'),
             ('ff5b18_727f447718cc420c89065988a2d0f818_mv2', 'png'),
             ('ff5b18_fa07e12f600447eb9ef4801fa17bf8bc_mv2', 'png'),
+            ('ff5b18_7bb937306ca1481894944e9f7b7b64c4_mv2', 'png'),
         ],
         'featured': False,
     },
@@ -596,6 +613,7 @@ The result is a home that punches well above its original footprint — not beca
             ('ff5b18_5790c7262fb04a25a5f08dc6b385e4c9_mv2', 'jpg'),
             ('ff5b18_da172978dd76485a9d179ca34d1c936b_mv2', 'jpg'),
             ('ff5b18_1eda3d15c3f849579ab21c436e0ceb0d_mv2', 'jpg'),
+            ('ff5b18_fa64df3266cb4f5687726c7ab5ac76f7_mv2', 'jpg'),
         ],
         'featured': False,
     },
@@ -627,6 +645,7 @@ The exterior was completely refaced to match the ranch house look of the main pr
             ('ff5b18_b15ebdc0b69a4cdb902a74bf1a0e1c72_mv2', 'jpg'),
             ('ff5b18_55920f3db2594268a5fd35adf593a130_mv2', 'jpg'),
             ('ff5b18_a99b2d9dbfe04a39a3aee368c065c00c_mv2', 'jpg'),
+            ('ff5b18_349218a966f148919fc38da254ca4619_mv2', 'jpg'),
         ],
         'featured': False,
     },
@@ -649,6 +668,7 @@ Ridgecrest Designs produced renders for this project that made the minimal desig
             ('ff5b18_f81286bb193b4eceade91c476d030da2_mv2', 'png'),
             ('ff5b18_f2d002a1b71342199e013a4389c24d40_mv2', 'jpg'),
             ('ff5b18_54560c45e21d46688e1c6ed98ed51d37_mv2', 'png'),
+            ('ff5b18_0ab4862750bf42ac8c38304bf1a054ed_mv2', 'jpg'),
         ],
         'featured': False,
     },
@@ -726,14 +746,18 @@ def footer_html():
         </div>
         <div class="footer__col">
           <p class="footer__col-head">Service Areas</p>
-          <a href="services/danville.html">Danville</a>
-          <a href="services/lafayette.html">Lafayette</a>
-          <a href="services/walnut-creek.html">Walnut Creek</a>
           <a href="services/alamo.html">Alamo</a>
+          <a href="services/danville.html">Danville</a>
+          <a href="services/diablo.html">Diablo</a>
+          <a href="services/dublin.html">Dublin</a>
+          <a href="services/lafayette.html">Lafayette</a>
+          <a href="services/moraga.html">Moraga</a>
           <a href="services/orinda.html">Orinda</a>
           <a href="services/pleasanton.html">Pleasanton</a>
+          <a href="services/rossmoor.html">Rossmoor</a>
           <a href="services/san-ramon.html">San Ramon</a>
-          <a href="services/dublin.html">Dublin</a>
+          <a href="services/sunol.html">Sunol</a>
+          <a href="services/walnut-creek.html">Walnut Creek</a>
         </div>
         <div class="footer__col">
           <p class="footer__col-head">Connect</p>
@@ -749,7 +773,7 @@ def footer_html():
     <div class="footer__bottom">
       <div class="container">
         <p>&copy; 2026 Ridgecrest Designs. All rights reserved.</p>
-        <p>Licensed &amp; Insured &middot; California Contractor</p>
+        <p>Licensed &amp; Insured &middot; California Contractor &middot; <a href="sitemap.html">Site Map</a></p>
       </div>
     </div>
   </footer>"""
@@ -800,14 +824,16 @@ def generate_project_page(p):
         items = ''.join(f'<div class="project-spec"><span class="project-spec__label">{k}</span><span class="project-spec__val">{v}</span></div>' for k, v in p['specs'].items())
         specs_html = f'\n      <div class="project-specs">{items}</div>'
 
-    # Gallery items
+    # ── Gallery items (flat, CSS columns masonry) ─────────────
     gallery_items = ''
     for i, (gh, ge) in enumerate(p['gallery'], 1):
         src = img_src(gh, ge)
-        gallery_items += f"""        <div class="gallery-item" data-src="{src}">
-          <div class="gallery-item__img" role="img" aria-label="{p['name']} — photo {i}" style="background-image:url('{src}')"></div>
-          <div class="gallery-item__overlay"><span class="gallery-item__zoom">+</span></div>
-        </div>\n"""
+        gallery_items += (
+            f'      <div class="gallery-item" data-src="{src}">\n'
+            f'        <img src="{src}" alt="{p["name"]} — photo {i}" loading="lazy" />\n'
+            f'        <div class="gallery-item__overlay"><span class="gallery-item__zoom">+</span></div>\n'
+            f'      </div>\n'
+        )
 
     # JSON-LD for project
     ld_project = f"""{{
@@ -874,7 +900,7 @@ def generate_project_page(p):
   <section class="project-gallery">
     <div class="container">
       <p class="project-gallery__label">Project Gallery</p>
-      <div class="gallery-grid">
+      <div class="gallery-masonry">
 {gallery_items}      </div>
     </div>
   </section>
@@ -1283,6 +1309,25 @@ write(os.path.join(PREVIEW, 'portfolio.html'), generate_portfolio_page())
 
 print('Generating allprojects.html...')
 write(os.path.join(PREVIEW, 'allprojects.html'), generate_allprojects_page())
+
+print('Writing gallery data JSON...')
+gallery_data = []
+for p in PROJECTS:
+    hero_src = img_src(p['hero'], p['hero_ext'])
+    gallery_data.append({
+        'slug': p['slug'],
+        'name': p['name'],
+        'city': p['city'],
+        'state': p['state'],
+        'type': p['type'],
+        'year': p['year'],
+        'gallery_count': len(p['gallery']),
+        'hero_src': hero_src,
+        'published': True,
+    })
+with open(os.path.join(PREVIEW, 'gallery_data.json'), 'w') as f:
+    json.dump(gallery_data, f, indent=2)
+print(f'  wrote gallery_data.json ({len(gallery_data)} projects)')
 
 print(f'\nDone. {len(PROJECTS)} project pages + portfolio.html + allprojects.html')
 print('\nMissing images (need migrate run from laptop):')
