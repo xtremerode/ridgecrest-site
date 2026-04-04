@@ -233,6 +233,43 @@
           <button id="lbEditBtn" onclick="lbEditWithAI()" style="display:none;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:12px;padding:6px 14px;border-radius:6px;cursor:pointer">✦ Edit with AI</button>
           <button id="lbDeleteBtn" onclick="lbDeleteVersion()" style="display:none;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#fca5a5;font-size:12px;padding:6px 14px;border-radius:6px;cursor:pointer">✕ Delete Render</button>
         </div>
+        <!-- Compact adjustment sliders -->
+        <div id="lbAdjRow" style="margin-top:10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:10px 16px;max-width:680px;width:90vw">
+          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px 10px;margin-bottom:8px">
+            <label style="display:flex;flex-direction:column;align-items:center;gap:1px;font-size:10px;color:rgba(255,255,255,.45)">
+              B <span id="lbBrightnessVal" style="font-size:9px;color:rgba(255,255,255,.35)">100</span>
+              <input type="range" min="50" max="150" value="100" id="lbAdjBrightness" oninput="lbApplyAdjust()" style="width:100%;accent-color:rgba(255,255,255,.6)">
+            </label>
+            <label style="display:flex;flex-direction:column;align-items:center;gap:1px;font-size:10px;color:rgba(255,255,255,.45)">
+              C <span id="lbContrastVal" style="font-size:9px;color:rgba(255,255,255,.35)">100</span>
+              <input type="range" min="50" max="150" value="100" id="lbAdjContrast" oninput="lbApplyAdjust()" style="width:100%;accent-color:rgba(255,255,255,.6)">
+            </label>
+            <label style="display:flex;flex-direction:column;align-items:center;gap:1px;font-size:10px;color:rgba(255,255,255,.45)">
+              S <span id="lbSaturationVal" style="font-size:9px;color:rgba(255,255,255,.35)">100</span>
+              <input type="range" min="0" max="200" value="100" id="lbAdjSaturation" oninput="lbApplyAdjust()" style="width:100%;accent-color:rgba(255,255,255,.6)">
+            </label>
+            <label style="display:flex;flex-direction:column;align-items:center;gap:1px;font-size:10px;color:rgba(255,255,255,.45)">
+              R <span id="lbColorRVal" style="font-size:9px;color:rgba(255,255,255,.35)">0</span>
+              <input type="range" min="-100" max="100" value="0" id="lbAdjColorR" oninput="lbApplyAdjust()" style="width:100%;accent-color:#ef4444">
+            </label>
+            <label style="display:flex;flex-direction:column;align-items:center;gap:1px;font-size:10px;color:rgba(255,255,255,.45)">
+              G <span id="lbColorGVal" style="font-size:9px;color:rgba(255,255,255,.35)">0</span>
+              <input type="range" min="-100" max="100" value="0" id="lbAdjColorG" oninput="lbApplyAdjust()" style="width:100%;accent-color:#22c55e">
+            </label>
+            <label style="display:flex;flex-direction:column;align-items:center;gap:1px;font-size:10px;color:rgba(255,255,255,.45)">
+              B <span id="lbColorBVal" style="font-size:9px;color:rgba(255,255,255,.35)">0</span>
+              <input type="range" min="-100" max="100" value="0" id="lbAdjColorB" oninput="lbApplyAdjust()" style="width:100%;accent-color:#3b82f6">
+            </label>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:10px;color:rgba(255,255,255,.4);white-space:nowrap">◀ W</span>
+            <input type="range" min="2000" max="10000" value="6500" id="lbAdjKelvin" oninput="lbApplyAdjust()" style="flex:1;accent-color:rgba(255,255,255,.6)">
+            <span id="lbKelvinVal" style="font-size:10px;color:rgba(255,255,255,.35);min-width:40px;text-align:center">6500K</span>
+            <span style="font-size:10px;color:rgba(255,255,255,.4);white-space:nowrap">C ▶</span>
+            <button id="lbSaveAdjustBtn" onclick="lbSaveAdjust()" style="background:#16a34a;border:none;color:#fff;font-size:11px;padding:4px 14px;border-radius:6px;cursor:pointer;font-weight:600;white-space:nowrap">Save</button>
+            <button onclick="lbResetAdjust()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.6);font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;white-space:nowrap">Reset</button>
+          </div>
+        </div>
         <div id="lbPrompt" style="display:none;max-width:640px;width:90vw;text-align:center;font-size:11px;color:rgba(255,255,255,.5);font-style:italic;line-height:1.6;padding:6px 16px 0;white-space:pre-line"></div>
       </div>
 
@@ -273,9 +310,9 @@
             <div id="rerenderStripScroll" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin;scrollbar-color:var(--border) transparent"></div>
           </div>
 
-          <!-- Adjustment sliders (hidden until result displayed) -->
-          <div id="rerenderAdjustRow" style="display:none;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:12px">
-            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Adjust Result</div>
+          <!-- Adjustment sliders (always visible) -->
+          <div id="rerenderAdjustRow" style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:12px">
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Adjustments</div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
               <label style="font-size:12px;color:var(--text-2)">
                 Brightness <span id="brightnessVal">100</span>%
@@ -288,6 +325,27 @@
               <label style="font-size:12px;color:var(--text-2)">
                 Saturation <span id="saturationVal">100</span>%
                 <input type="range" min="0" max="200" value="100" id="adjSaturation" oninput="applyAdjust()" style="width:100%;margin-top:4px;accent-color:var(--accent)">
+              </label>
+              <label style="font-size:12px;color:var(--text-2)">
+                Red <span id="colorRVal">0</span>
+                <input type="range" min="-100" max="100" value="0" id="adjColorR" oninput="applyAdjust()" style="width:100%;margin-top:4px;accent-color:#ef4444">
+              </label>
+              <label style="font-size:12px;color:var(--text-2)">
+                Green <span id="colorGVal">0</span>
+                <input type="range" min="-100" max="100" value="0" id="adjColorG" oninput="applyAdjust()" style="width:100%;margin-top:4px;accent-color:#22c55e">
+              </label>
+              <label style="font-size:12px;color:var(--text-2)">
+                Blue <span id="colorBVal">0</span>
+                <input type="range" min="-100" max="100" value="0" id="adjColorB" oninput="applyAdjust()" style="width:100%;margin-top:4px;accent-color:#3b82f6">
+              </label>
+            </div>
+            <div style="margin-top:10px">
+              <label style="font-size:12px;color:var(--text-2);display:block">
+                <span style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                  <span>White Point &nbsp;<span id="kelvinVal">6500</span>K</span>
+                  <span style="display:flex;gap:16px;font-size:11px;color:var(--text-muted)"><span>◀ Warm</span><span>Cool ▶</span></span>
+                </span>
+                <input type="range" min="2000" max="10000" value="6500" id="adjKelvin" oninput="applyAdjust()" style="width:100%;accent-color:var(--accent)">
               </label>
             </div>
             <button class="btn btn-ghost btn-sm" onclick="resetAdjust()" style="margin-top:8px;font-size:11px">Reset adjustments</button>
@@ -305,7 +363,7 @@
             <button class="btn btn-gold" id="rerenderRefineBtn" onclick="runRerender(true)" style="display:none" title="Continue refining from the current result">✦ Refine Result</button>
             <button class="btn btn-ghost btn-sm" id="rerenderRestartBtn" onclick="restartRerender()" style="display:none">↺ Reset View</button>
             <div style="flex:1"></div>
-            <button id="rerenderUseBtn" onclick="rerenderUseVersion()" style="display:none;background:#16a34a;border:none;color:#fff;font-size:13px;padding:7px 18px;border-radius:6px;cursor:pointer;font-weight:600">✓ Use This Version</button>
+            <button id="rerenderUseBtn" onclick="rerenderUseVersion()" style="background:#16a34a;border:none;color:#fff;font-size:13px;padding:7px 18px;border-radius:6px;cursor:pointer;font-weight:600">✓ Use This Version</button>
             <span id="rerenderStatus" style="font-size:13px;color:var(--text-muted);width:100%;margin-top:4px"></span>
           </div>
         </div>
@@ -407,6 +465,16 @@ let _mediaRenderedCount = 0;
 
 let _libCacheBust = Date.now();
 
+// ── GUARDRAIL ─────────────────────────────────────────────────────────────────
+// loadLibraryStatus() is INIT-ONLY. It fetches ALL images, rebuilds the ENTIRE
+// grid DOM, and cache-busts EVERY thumbnail. Calling it post-save causes every
+// card in the library to flash/reload even though only one image changed.
+//
+// ✅ After a save/activate: call _updateLibraryCard(baseFilename, activeVersion)
+// ❌ NEVER call loadLibraryStatus() after a save, activate, or BroadcastChannel event
+//
+// The only legitimate callers are: init(), setProjectFilter(), rotateImage()
+// ─────────────────────────────────────────────────────────────────────────────
 async function loadLibraryStatus() {
   try {
     // Load from local optimized images — migration is complete
@@ -1241,13 +1309,12 @@ function openRerender(baseFilename, label, sourceFilename) {
   document.getElementById('rerenderPrompt').value = label
     ? `photorealistic luxury architectural render — ${label}, high-end finishes, natural light, professional photography`
     : 'photorealistic luxury architectural render, high-end finishes, natural light, professional photography';
-  document.getElementById('rerenderUseBtn').style.display = 'none';
+  document.getElementById('rerenderUseBtn').disabled = false;
   document.getElementById('rerenderRefineBtn').style.display = 'none';
   document.getElementById('rerenderRestartBtn').style.display = 'none';
   document.getElementById('rerenderRunBtn').style.display = '';
   document.getElementById('rerenderRunBtn').disabled = false;
   document.getElementById('rerenderPassBadge').style.display = 'none';
-  document.getElementById('rerenderAdjustRow').style.display = 'none';
   document.getElementById('rerenderFilmstrip').style.display = 'none';
   document.getElementById('rerenderStripScroll').innerHTML = '';
   const _selBtn = document.getElementById('rerenderSelectBtn');
@@ -1502,8 +1569,7 @@ function stripSelectSource(filename, heroPath, isOriginal) {
   document.getElementById('rerenderPlaceholder').style.display = '';
   document.getElementById('rerenderPlaceholder').textContent = 'Result will appear here';
   document.getElementById('rerenderPassBadge').style.display = 'none';
-  document.getElementById('rerenderAdjustRow').style.display = 'none';
-  document.getElementById('rerenderUseBtn').style.display = 'none';
+  document.getElementById('rerenderUseBtn').disabled = false;
   document.getElementById('rerenderRefineBtn').style.display = 'none';
   document.getElementById('rerenderRestartBtn').style.display = 'none';
   document.getElementById('rerenderStatus').textContent = '';
@@ -1542,13 +1608,12 @@ function restartRerender() {
   resultEl.style.filter = '';
   document.getElementById('rerenderPlaceholder').style.display = '';
   document.getElementById('rerenderPlaceholder').textContent = 'Result will appear here';
-  document.getElementById('rerenderUseBtn').style.display = 'none';
+  document.getElementById('rerenderUseBtn').disabled = false;
   document.getElementById('rerenderRefineBtn').style.display = 'none';
   document.getElementById('rerenderRestartBtn').style.display = 'none';
   document.getElementById('rerenderRunBtn').style.display = '';
   document.getElementById('rerenderRunBtn').disabled = false;
   document.getElementById('rerenderPassBadge').style.display = 'none';
-  document.getElementById('rerenderAdjustRow').style.display = 'none';
   document.getElementById('rerenderStatus').textContent = '';
   resetAdjust(true);
   // Deselect all strip items
@@ -1558,24 +1623,64 @@ function restartRerender() {
 }
 
 function applyAdjust() {
-  const b = document.getElementById('adjBrightness').value;
-  const c = document.getElementById('adjContrast').value;
-  const s = document.getElementById('adjSaturation').value;
+  const b  = document.getElementById('adjBrightness').value;
+  const c  = document.getElementById('adjContrast').value;
+  const s  = document.getElementById('adjSaturation').value;
+  const cr = document.getElementById('adjColorR').value;
+  const cg = document.getElementById('adjColorG').value;
+  const cb = document.getElementById('adjColorB').value;
+  const kv = parseInt(document.getElementById('adjKelvin').value);
   document.getElementById('brightnessVal').textContent = b;
-  document.getElementById('contrastVal').textContent = c;
+  document.getElementById('contrastVal').textContent   = c;
   document.getElementById('saturationVal').textContent = s;
-  document.getElementById('rerenderResult').style.filter =
-    `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
+  document.getElementById('colorRVal').textContent     = cr;
+  document.getElementById('colorGVal').textContent     = cg;
+  document.getElementById('colorBVal').textContent     = cb;
+  document.getElementById('kelvinVal').textContent     = kv;
+
+  // Build CSS filter preview (approximate — real adjustments are server-side)
+  let f = `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
+  // Kelvin: approximate warm with sepia, cool with hue-rotate
+  if (kv < 6500) {
+    const t = (6500 - kv) / 4500;
+    f += ` sepia(${Math.round(t * 35)}%)`;
+  } else if (kv > 6500) {
+    const t = (kv - 6500) / 3500;
+    f += ` hue-rotate(${Math.round(t * 25)}deg)`;
+  }
+  // RGB channel preview via SVG feColorMatrix (matches server: scale = 1.0 + val*0.005)
+  const rScale = (1.0 + parseInt(cr) * 0.005).toFixed(4);
+  const gScale = (1.0 + parseInt(cg) * 0.005).toFixed(4);
+  const bScale = (1.0 + parseInt(cb) * 0.005).toFixed(4);
+  if (parseInt(cr) !== 0 || parseInt(cg) !== 0 || parseInt(cb) !== 0) {
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg'><filter id='c'><feColorMatrix type='matrix' values='${rScale} 0 0 0 0 0 ${gScale} 0 0 0 0 0 ${bScale} 0 0 0 0 0 1 0'/></filter></svg>`;
+    f += ` url("data:image/svg+xml,${encodeURIComponent(svg)}#c")`;
+  }
+
+  // Apply to the active image panel
+  const target = _rerenderResultPath
+    ? document.getElementById('rerenderResult')
+    : document.getElementById('rerenderOriginal');
+  target.style.filter = f;
 }
 
 function resetAdjust(silent) {
   ['adjBrightness','adjContrast','adjSaturation'].forEach(id => {
     document.getElementById(id).value = 100;
   });
+  ['adjColorR','adjColorG','adjColorB'].forEach(id => {
+    document.getElementById(id).value = 0;
+  });
+  document.getElementById('adjKelvin').value = 6500;
   document.getElementById('brightnessVal').textContent = '100';
-  document.getElementById('contrastVal').textContent = '100';
+  document.getElementById('contrastVal').textContent   = '100';
   document.getElementById('saturationVal').textContent = '100';
-  document.getElementById('rerenderResult').style.filter = '';
+  document.getElementById('colorRVal').textContent     = '0';
+  document.getElementById('colorGVal').textContent     = '0';
+  document.getElementById('colorBVal').textContent     = '0';
+  document.getElementById('kelvinVal').textContent     = '6500';
+  document.getElementById('rerenderResult').style.filter   = '';
+  document.getElementById('rerenderOriginal').style.filter = '';
 }
 
 async function runRerender(refine) {
@@ -1592,7 +1697,7 @@ async function runRerender(refine) {
   activeBtn.textContent = '✦ Rendering…';
   if (!refine) runBtn.disabled = true;
   if (refine)  refineBtn.disabled = true;
-  document.getElementById('rerenderUseBtn').style.display = 'none';
+  document.getElementById('rerenderUseBtn').disabled = true;
 
   document.getElementById('rerenderStatus').textContent = 'Sending to Gemini — this takes ~20–40 seconds…';
   document.getElementById('rerenderPlaceholder').style.display = '';
@@ -1619,8 +1724,6 @@ async function runRerender(refine) {
     resultEl.style.backgroundSize  = 'cover';
     resultEl.style.backgroundPosition = 'center';
     document.getElementById('rerenderPlaceholder').style.display = 'none';
-    document.getElementById('rerenderAdjustRow').style.display = '';
-    document.getElementById('rerenderUseBtn').style.display = '';
     document.getElementById('rerenderUseBtn').disabled = false;
     document.getElementById('rerenderUseBtn').textContent = '✓ Use This Version';
 
@@ -1644,6 +1747,7 @@ async function runRerender(refine) {
   } catch(e) {
     document.getElementById('rerenderStatus').textContent = '✕ ' + e.message;
     document.getElementById('rerenderPlaceholder').textContent = 'Generation failed';
+    document.getElementById('rerenderUseBtn').disabled = false;
     runBtn.style.display = '';
     runBtn.disabled = false;
     runBtn.textContent = '✦ Re-render';
@@ -1653,15 +1757,20 @@ async function runRerender(refine) {
   }
 }
 
-// "✓ Use This Version" — bake adjustments (if any) then set as the active site version
+// "✓ Use This Version" — bake adjustments (if any) then set as the active site version.
+// Works for AI renders AND for the original/source image with sliders applied.
 async function rerenderUseVersion() {
-  if (!_rerenderResultPath) return;
-  const filename = _rerenderResultPath.split('/').pop();
+  const hasResult = !!_rerenderResultPath;
 
   const brightness = parseInt(document.getElementById('adjBrightness').value);
   const contrast   = parseInt(document.getElementById('adjContrast').value);
   const saturation = parseInt(document.getElementById('adjSaturation').value);
-  const hasAdjust  = brightness !== 100 || contrast !== 100 || saturation !== 100;
+  const colorR     = parseInt(document.getElementById('adjColorR').value);
+  const colorG     = parseInt(document.getElementById('adjColorG').value);
+  const colorB     = parseInt(document.getElementById('adjColorB').value);
+  const kelvin     = parseInt(document.getElementById('adjKelvin').value);
+  const hasAdjust  = brightness !== 100 || contrast !== 100 || saturation !== 100
+                  || colorR !== 0 || colorG !== 0 || colorB !== 0 || kelvin !== 6500;
 
   const useBtn = document.getElementById('rerenderUseBtn');
   useBtn.disabled = true;
@@ -1669,40 +1778,82 @@ async function rerenderUseVersion() {
   document.getElementById('rerenderStatus').textContent = 'Saving…';
 
   try {
-    // Bake slider adjustments into the file first (modifies _ai_N.webp in-place)
-    if (hasAdjust) {
+    let activeFilename; // the filename that will become the active version
+    let activePath;     // its hero_path
+
+    if (hasResult) {
+      // ── Case A: We have a render result ──────────────────────────────────────
+      activeFilename = _rerenderResultPath.split('/').pop();
+      activePath     = _rerenderResultPath;
+
+      if (hasAdjust) {
+        // Bake all sliders into the _ai_N.webp file in-place
+        const adjRes = await fetch('/admin/api/images/adjust', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+          body: JSON.stringify({ filename: activeFilename, brightness, contrast, saturation,
+                                 color_r: colorR, color_g: colorG, color_b: colorB, kelvin })
+        });
+        const adjData = await adjRes.json();
+        if (!adjData.ok) throw new Error(adjData.error || 'adjust failed');
+        resetAdjust(true);
+        const ts = Date.now();
+        document.getElementById('rerenderResult').style.backgroundImage = `url('${activePath}?v=${ts}')`;
+        const stripEl = document.querySelector(`#rerenderStripScroll .rrstrip-item[data-filename="${CSS.escape(activeFilename)}"] div`);
+        if (stripEl) stripEl.style.backgroundImage = `url('${activePath}?v=${ts}')`;
+      }
+
+    } else if (hasAdjust) {
+      // ── Case B: No render result but sliders are set — create a new AI version ─
+      const srcFilename = _rerenderSourceFilename;
       const adjRes = await fetch('/admin/api/images/adjust', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
-        body: JSON.stringify({ filename, brightness, contrast, saturation })
+        body: JSON.stringify({ filename: srcFilename, brightness, contrast, saturation,
+                               color_r: colorR, color_g: colorG, color_b: colorB, kelvin,
+                               create_version: true, base_filename: _rerenderFilename })
       });
       const adjData = await adjRes.json();
       if (!adjData.ok) throw new Error(adjData.error || 'adjust failed');
-      // Reset sliders — adjustments are now baked into the file
+
+      activeFilename = adjData.filename;
+      activePath     = adjData.hero_path;
+
+      // Show the new version in the result panel
+      _rerenderResultPath = activePath;
+      const resultEl = document.getElementById('rerenderResult');
+      resultEl.style.backgroundImage = `url('${activePath}?v=${Date.now()}')`;
+      resultEl.style.backgroundSize   = 'cover';
+      resultEl.style.backgroundPosition = 'center';
+      document.getElementById('rerenderPlaceholder').style.display = 'none';
+      document.getElementById('rerenderPassBadge').textContent = _versionLabel(activeFilename);
+      document.getElementById('rerenderPassBadge').style.display = '';
+      document.getElementById('rerenderRefineBtn').style.display = '';
+      document.getElementById('rerenderRestartBtn').style.display = '';
       resetAdjust(true);
-      // Refresh the result panel thumbnail with the baked version
-      const ts = Date.now();
-      document.getElementById('rerenderResult').style.backgroundImage = `url('${_rerenderResultPath}?v=${ts}')`;
-      // Update the strip thumbnail for this item too
-      const stripEl = document.querySelector(`#rerenderStripScroll .rrstrip-item[data-filename="${CSS.escape(filename)}"] div`);
-      if (stripEl) stripEl.style.backgroundImage = `url('${_rerenderResultPath}?v=${ts}')`;
+      _stripAppend(activeFilename, activePath, '', srcFilename);
+      _stripHighlight(_rerenderSourceFilename);
+
+    } else {
+      // ── Case C: No result, no adjustments — set the source itself as active ──
+      activeFilename = _rerenderSourceFilename;
+      activePath     = `/assets/images-opt/${activeFilename}`;
     }
 
-    // Set as the active version
-    const d = await Admin.post('/images/set-version', {
-      base_filename: _rerenderFilename,
-      version_filename: filename,
-    });
-    if (!d.ok) throw new Error(d.error || 'set-version failed');
+    // Set as the active version on the site (scoped to this page's hero if context=hero)
+    // _activateVersion() broadcasts via BroadcastChannel so pages.html auto-reloads siteFrame
+    await _activateVersion(_rerenderFilename, activeFilename);
 
     // Update isActive flags in strip data and re-render strip badges
-    _rerenderStrip.forEach(s => { s.isActive = s.filename === filename; });
+    _rerenderStrip.forEach(s => { s.isActive = s.filename === activeFilename; });
     _renderStrip();
-    _stripHighlight(_rerenderSourceFilename); // keep source highlighted
+    _stripHighlight(_rerenderSourceFilename);
 
     Admin.toast('✓ Active version updated — site will now show this image', 'success');
-    document.getElementById('rerenderStatus').textContent = `✓ "${_versionLabel(filename)}" is now the active version shown on the site`;
-    await loadLibraryStatus();
+    document.getElementById('rerenderStatus').textContent = `✓ "${_versionLabel(activeFilename)}" is now the active version shown on the site`;
+    // Surgical update — only this card changes; no full grid rebuild
+    const _rrActiveVer = (activeFilename !== _rerenderFilename) ? activeFilename : null;
+    _updateLibraryCard(_rerenderFilename, _rrActiveVer);
   } catch(e) {
     Admin.toast('Failed: ' + e.message, 'error');
     document.getElementById('rerenderStatus').textContent = '✕ ' + e.message;
@@ -1729,11 +1880,13 @@ function openLightbox(images, index, mode) {
 }
 
 function closeLightbox() {
+  lbResetAdjust();
   document.getElementById('lightbox').style.display = 'none';
   document.removeEventListener('keydown', _lbKey);
 }
 
 function _lbRender() {
+  lbResetAdjust();
   const item = _lbImages[_lbIndex];
   document.getElementById('lbImg').src = item.src;
   document.getElementById('lbCaption').textContent = item.label || '';
@@ -1811,16 +1964,19 @@ async function lbUseVersion() {
   useBtn.disabled    = true;
   useBtn.textContent = 'Saving…';
   try {
-    const d = await Admin.post('/images/set-version', {
-      base_filename:    _lbBaseFilename,
-      version_filename: item.isOriginal ? '' : item.filename,
-    });
-    if (!d.ok) throw new Error(d.error || 'failed');
+    // _activateVersion() broadcasts via BroadcastChannel so pages.html auto-reloads siteFrame
+    await _activateVersion(_lbBaseFilename, item.isOriginal ? '' : item.filename);
+
     // Update active flags locally so UI reflects the change immediately
     _lbImages.forEach(i => { i.isActive = (i.filename === item.filename); });
-    Admin.toast('Active version updated — site pages will now show this image', 'success');
+    const toastMsg = (_ctxContext === 'hero' && _ctxPageSlug)
+      ? 'Hero image updated for this page only'
+      : 'Active version updated — site pages will now show this image';
+    Admin.toast(toastMsg, 'success');
     _lbRender();
-    await loadLibraryStatus();
+    // Surgical update — only this card changes; no full grid rebuild
+    const _luActiveVer = item.isOriginal ? null : item.filename;
+    _updateLibraryCard(_lbBaseFilename, _luActiveVer);
     // Sync re-render modal strip if it's open behind the lightbox
     if (document.getElementById('rerenderModal').style.display !== 'none') {
       _rerenderStrip.forEach(s => { s.isActive = (s.filename === item.filename); });
@@ -1896,6 +2052,153 @@ async function lbDeleteVersion() {
     deleteBtn.disabled = false;
     deleteBtn.textContent = '✕ Delete Render';
   }
+}
+
+// ── Lightbox adjustment sliders ───────────────────────────────────────────────
+
+function lbApplyAdjust() {
+  const b  = document.getElementById('lbAdjBrightness').value;
+  const c  = document.getElementById('lbAdjContrast').value;
+  const s  = document.getElementById('lbAdjSaturation').value;
+  const cr = document.getElementById('lbAdjColorR').value;
+  const cg = document.getElementById('lbAdjColorG').value;
+  const cb = document.getElementById('lbAdjColorB').value;
+  const kv = parseInt(document.getElementById('lbAdjKelvin').value);
+  document.getElementById('lbBrightnessVal').textContent = b;
+  document.getElementById('lbContrastVal').textContent   = c;
+  document.getElementById('lbSaturationVal').textContent = s;
+  document.getElementById('lbColorRVal').textContent     = cr;
+  document.getElementById('lbColorGVal').textContent     = cg;
+  document.getElementById('lbColorBVal').textContent     = cb;
+  document.getElementById('lbKelvinVal').textContent     = kv + 'K';
+  let f = `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
+  if (kv < 6500) {
+    const t = (6500 - kv) / 4500;
+    f += ` sepia(${Math.round(t * 35)}%)`;
+  } else if (kv > 6500) {
+    const t = (kv - 6500) / 3500;
+    f += ` hue-rotate(${Math.round(t * 25)}deg)`;
+  }
+  // RGB channel preview via SVG feColorMatrix (matches server: scale = 1.0 + val*0.005)
+  const rScale = (1.0 + parseInt(cr) * 0.005).toFixed(4);
+  const gScale = (1.0 + parseInt(cg) * 0.005).toFixed(4);
+  const bScale = (1.0 + parseInt(cb) * 0.005).toFixed(4);
+  if (parseInt(cr) !== 0 || parseInt(cg) !== 0 || parseInt(cb) !== 0) {
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg'><filter id='c'><feColorMatrix type='matrix' values='${rScale} 0 0 0 0 0 ${gScale} 0 0 0 0 0 ${bScale} 0 0 0 0 0 1 0'/></filter></svg>`;
+    f += ` url("data:image/svg+xml,${encodeURIComponent(svg)}#c")`;
+  }
+  document.getElementById('lbImg').style.filter = f;
+}
+
+function lbResetAdjust() {
+  ['lbAdjBrightness','lbAdjContrast','lbAdjSaturation'].forEach(id => {
+    document.getElementById(id).value = 100;
+  });
+  ['lbAdjColorR','lbAdjColorG','lbAdjColorB'].forEach(id => {
+    document.getElementById(id).value = 0;
+  });
+  document.getElementById('lbAdjKelvin').value = 6500;
+  document.getElementById('lbBrightnessVal').textContent = '100';
+  document.getElementById('lbContrastVal').textContent   = '100';
+  document.getElementById('lbSaturationVal').textContent = '100';
+  document.getElementById('lbColorRVal').textContent     = '0';
+  document.getElementById('lbColorGVal').textContent     = '0';
+  document.getElementById('lbColorBVal').textContent     = '0';
+  document.getElementById('lbKelvinVal').textContent     = '6500K';
+  document.getElementById('lbImg').style.filter = '';
+}
+
+function _lbAdjustHasChanges() {
+  return parseInt(document.getElementById('lbAdjBrightness').value) !== 100
+      || parseInt(document.getElementById('lbAdjContrast').value)   !== 100
+      || parseInt(document.getElementById('lbAdjSaturation').value) !== 100
+      || parseInt(document.getElementById('lbAdjColorR').value)     !== 0
+      || parseInt(document.getElementById('lbAdjColorG').value)     !== 0
+      || parseInt(document.getElementById('lbAdjColorB').value)     !== 0
+      || parseInt(document.getElementById('lbAdjKelvin').value)     !== 6500;
+}
+
+async function lbSaveAdjust() {
+  if (!_lbAdjustHasChanges()) { Admin.toast('No adjustments to save', 'info'); return; }
+  const item = _lbImages[_lbIndex];
+  const brightness = parseInt(document.getElementById('lbAdjBrightness').value);
+  const contrast   = parseInt(document.getElementById('lbAdjContrast').value);
+  const saturation = parseInt(document.getElementById('lbAdjSaturation').value);
+  const colorR     = parseInt(document.getElementById('lbAdjColorR').value);
+  const colorG     = parseInt(document.getElementById('lbAdjColorG').value);
+  const colorB     = parseInt(document.getElementById('lbAdjColorB').value);
+  const kelvin     = parseInt(document.getElementById('lbAdjKelvin').value);
+
+  const saveBtn = document.getElementById('lbSaveAdjustBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+
+  try {
+    let activeFilename, activePath;
+
+    if (item.isOriginal) {
+      // Create a new _ai_N version from the original
+      const res = await fetch('/admin/api/images/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ filename: item.filename, brightness, contrast, saturation,
+                               color_r: colorR, color_g: colorG, color_b: colorB, kelvin,
+                               create_version: true, base_filename: _lbBaseFilename })
+      });
+      const d = await res.json();
+      if (!d.ok) throw new Error(d.error || 'adjust failed');
+      activeFilename = d.filename;
+      activePath     = d.hero_path;
+      // Insert new version into the lightbox list right after the original
+      const newEntry = {
+        src: activePath + '?v=' + Date.now(),
+        filename: activeFilename,
+        label: _versionLabel(activeFilename),
+        isOriginal: false,
+        isActive: false
+      };
+      _lbImages.splice(1, 0, newEntry);
+      _lbIndex = 1;
+    } else {
+      // Bake adjustments in-place on the existing AI render
+      const res = await fetch('/admin/api/images/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ filename: item.filename, brightness, contrast, saturation,
+                               color_r: colorR, color_g: colorG, color_b: colorB, kelvin })
+      });
+      const d = await res.json();
+      if (!d.ok) throw new Error(d.error || 'adjust failed');
+      activeFilename = item.filename;
+      activePath     = '/assets/images-opt/' + item.filename;
+    }
+
+    // Set as the active version on the site (scoped to hero if context=hero)
+    // _activateVersion() broadcasts via BroadcastChannel so pages.html auto-reloads siteFrame
+    await _activateVersion(_lbBaseFilename, activeFilename);
+
+    _lbImages.forEach(i => { i.isActive = (i.filename === activeFilename); });
+
+    // Reset sliders, refresh image, update UI
+    lbResetAdjust();
+    const ts = Date.now();
+    _lbImages[_lbIndex].src = activePath + '?v=' + ts;
+    document.getElementById('lbImg').src = activePath + '?v=' + ts;
+    _lbRender();
+
+    Admin.toast('✓ Adjustments saved — image updated on site', 'success');
+    // Surgical update — only this card changes; no full grid rebuild
+    // activeFilename is always an AI version here (created or baked in place)
+    _updateLibraryCard(_lbBaseFilename, activeFilename);
+    if (document.getElementById('rerenderModal').style.display !== 'none') {
+      _rerenderStrip.forEach(s => { s.isActive = (s.filename === activeFilename); });
+      _renderStrip();
+    }
+  } catch(e) {
+    Admin.toast('Failed: ' + e.message, 'error');
+  }
+  saveBtn.disabled    = false;
+  saveBtn.textContent = 'Save';
 }
 
 // Open version picker lightbox for a base image
@@ -1982,7 +2285,150 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-init();
+// ── URL context params — set on load, used by _activateVersion() ────────────
+var _ctxParams   = new URLSearchParams(window.location.search);
+var _ctxPageSlug = _ctxParams.get('page_slug') || '';    // e.g. 'pleasanton-custom'
+var _ctxContext  = _ctxParams.get('context')   || '';    // 'hero' or ''
+
+// ── GUARDRAIL ─────────────────────────────────────────────────────────────────
+// _activateVersion() MUST be called by every "make this image active" path:
+//   rerenderUseVersion(), lbUseVersion(), lbSaveAdjust()
+//
+// Without it: image_labels.active_version is never written, the server never
+// re-renders the project HTML, and gallery data-src/img src stay stale forever.
+//
+// BROADCAST RULE: _activateVersion() MUST broadcast on 'rd_version_sync' channel so
+// pages.html (open in another tab) reloads its siteFrame automatically.
+// SYNC RULE: pages.html has a simplified copy of this function (no hero-context
+// branching). If you change the gallery/set-version logic here, mirror it there.
+// Any edit to either copy requires server-rerender unlock.
+// ─────────────────────────────────────────────────────────────────────────────
+async function _activateVersion(baseFilename, versionFilename) {
+  let d;
+  if (_ctxContext === 'hero' && _ctxPageSlug) {
+    const res = await fetch('/admin/api/pages/' + encodeURIComponent(_ctxPageSlug) + '/hero', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+      body: JSON.stringify({ base_filename: baseFilename, version_filename: versionFilename || '' })
+    });
+    d = await res.json();
+    if (!d.ok) throw new Error(d.error || 'hero update failed');
+    d = { ok: true, new_active_path: d.new_active_path };
+  } else {
+    d = await Admin.post('/images/set-version', {
+      base_filename: baseFilename,
+      version_filename: versionFilename,
+    });
+    if (!d.ok) throw new Error(d.error || 'set-version failed');
+  }
+  // Broadcast to other admin tabs (pages.html) so they reload the siteFrame preview
+  try {
+    const _bc = new BroadcastChannel('rd_version_sync');
+    _bc.postMessage({ type: 'version_activated', base_filename: baseFilename, new_active_path: d.new_active_path });
+    _bc.close();
+  } catch(e) {}
+  return d;
+}
+
+// ── SURGICAL CARD UPDATE ──────────────────────────────────────────────────────
+// Call this instead of loadLibraryStatus() after any save/activate.
+// Updates ONE card in the live grid without touching any other card:
+//   1. Patches _libraryItems[baseFilename].active_version in place
+//   2. Rebuilds only that card's innerHTML (so Re-render button gets fresh active_version)
+//   3. Calls buildProjectTabs() to refresh tab counts (lightweight — no grid rebuild)
+//
+// Arguments:
+//   baseFilename  — the original base image filename (key in _libraryItems)
+//   activeVersion — the new active_version value (AI filename string, or null/'' for original)
+//
+// GUARDRAIL: If you find yourself calling loadLibraryStatus() after a save,
+// call this instead. See loadLibraryStatus() comment for full explanation.
+// ─────────────────────────────────────────────────────────────────────────────
+function _updateLibraryCard(baseFilename, activeVersion) {
+  // 1. Patch _libraryItems in place so all subsequent reads see the new state
+  const item = (_libraryItems || []).find(i => i.filename === baseFilename);
+  if (item) {
+    item.active_version = activeVersion || null;
+    // Mark has_renders true whenever an AI version exists or is being set
+    if (item.active_version) item.has_renders = true;
+  }
+
+  // 2. Rebuild just this card's innerHTML — keeps it in correct grid position,
+  //    updates the ✦ Edited badge, and refreshes the Re-render button onclick param
+  const card = document.querySelector('.media-card[data-filename="' + CSS.escape(baseFilename) + '"]');
+  if (card && item) {
+    const name         = item.filename;
+    const src          = item.hero_path;
+    const thumb        = item.thumb_path;
+    const label        = item.label || '';
+    const project      = item.project || '';
+    const room         = item.room || '';
+    const image_type   = item.image_type || '';
+    const displayLabel = label || [project, room].filter(Boolean).join(' ') || '';
+    const typeBadge    = image_type
+      ? `<span class="media-type-badge media-type-badge--${image_type.toLowerCase()}">${escHtml(image_type)}</span>`
+      : '';
+    const editedBadge  = item.active_version
+      ? `<span class="lib-badge" style="background:rgba(139,92,246,.25);color:#c4b5fd;border:1px solid rgba(139,92,246,.4);top:auto;bottom:4px;left:4px;right:auto">✦ Edited</span>`
+      : '';
+    const galleryBadge = item.gallery_image_type
+      ? `<span class="media-type-badge" style="background:rgba(59,130,246,.2);color:#93c5fd;border:1px solid rgba(59,130,246,.3);top:auto;bottom:4px;right:4px">${escHtml(item.gallery_image_type)}</span>`
+      : '';
+    // Use a fresh cache-bust only for this card's thumbnail (not _libCacheBust — that's global)
+    const cardBust = Date.now();
+    card.innerHTML = `
+      <div class="media-card__img" style="background-image:url('${escHtml(thumb)}?v=${cardBust}');cursor:zoom-in" onclick="openLibraryLightbox('${escHtml(name)}')" title="Click to view versions">
+        <input type="checkbox" class="media-card__check" onclick="event.stopPropagation();onCardCheck(this,'${escHtml(name)}')" title="Select">
+        <span class="lib-badge lib-badge--ok">✓ local</span>
+        ${typeBadge}
+        ${editedBadge}
+        ${galleryBadge}
+        <div class="media-card__overlay">
+          <a class="btn btn-ghost btn-sm" href="${escHtml(src)}" download="${escHtml(name)}" onclick="event.stopPropagation()">↓ Download</a>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();rotateImage('${escHtml(name)}',this)">↻ Rotate</button>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openRerender('${escHtml(name)}','${escHtml(displayLabel)}','${escHtml(item.active_version||name)}')">✦ Re-render</button>
+        </div>
+      </div>
+      <div class="media-card__name" title="${escHtml(name)}">${escHtml(name.substring(0,28))}${name.length>28?'…':''}</div>
+      <div class="media-card__label ${displayLabel ? '' : 'media-card__label--empty'}" onclick="openLabelDropdown(event,this,'${escHtml(name)}','${escHtml(project)}','${escHtml(room)}','${escHtml(image_type)}')" title="Click to set project, room &amp; type">${escHtml(displayLabel) || '<span style="opacity:.45">+ add label</span>'}</div>`;
+  }
+
+  // 3. Refresh tab counts only — does NOT rebuild the grid
+  buildProjectTabs();
+}
+
+// ── BroadcastChannel listener — surgical card update when pages.html activates a version ──
+// Fires when the user activates a render from the project gallery in another tab.
+// Uses _updateLibraryCard() — NOT loadLibraryStatus() — so only the affected card
+// is updated; the rest of the library grid is untouched.
+(function() {
+  try {
+    var _mediaBC = new BroadcastChannel('rd_version_sync');
+    _mediaBC.onmessage = function(ev) {
+      if (!ev.data || ev.data.type !== 'version_activated') return;
+      // Extract the version filename from the path; null means original was set as active
+      var newFilename = (ev.data.new_active_path || '').split('/').pop();
+      var activeVer   = (newFilename && newFilename !== ev.data.base_filename) ? newFilename : null;
+      _updateLibraryCard(ev.data.base_filename, activeVer);
+    };
+  } catch(e) {}
+})();
+// NOTE: visibilitychange listener intentionally removed — it caused a full grid
+// rebuild on every tab switch. The BroadcastChannel above handles cross-tab sync.
+
+init().then(function() {
+  // Auto-open rerender modal if ?rerender=<filename> is in the URL
+  var params = new URLSearchParams(window.location.search);
+  var target = params.get('rerender');
+  if (!target) return;
+  var item = (_libraryItems || []).find(function(i) { return i.filename === target; });
+  var label = item ? (item.label || [item.project, item.room].filter(Boolean).join(' ') || '') : '';
+  var activeVer = item ? (item.active_version || target) : target;
+  // Scroll card into view if it has been rendered in the grid
+  var card = document.querySelector('.media-card[data-filename="' + CSS.escape(target) + '"]');
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  openRerender(target, label || null, activeVer);
+});
 Admin.initUndoButton();
 </script>
 

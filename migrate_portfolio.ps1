@@ -1,10 +1,13 @@
 # Ridgecrest Designs — Portfolio Image Migration
 # Downloads 143 missing project images from Wix CDN and uploads them to the server.
 # Run from your laptop (Wix blocks DigitalOcean IPs).
-# Usage: powershell -ExecutionPolicy Bypass -File migrate_portfolio.ps1 -Password <admin_pw>
+# Usage: powershell -ExecutionPolicy Bypass -File migrate_portfolio.ps1
 param(
-    [Parameter(Mandatory=$true)][string]$Password
+    [string]$Password = ""
 )
+if ([string]::IsNullOrEmpty($Password)) {
+    $Password = Read-Host "Enter admin password"
+}
 
 $SERVER   = "http://147.182.242.54:8081"
 $WIX_BASE = "https://static.wixstatic.com/media"

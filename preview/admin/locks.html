@@ -200,6 +200,38 @@
       white-space: nowrap;
     }
 
+    /* Inline confirm bar */
+    .inline-confirm {
+      display: none;
+      position: fixed;
+      bottom: 72px; right: 24px;
+      background: #1e2d3d;
+      border: 1px solid #f59e0b;
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 13px;
+      color: #e2e8f0;
+      z-index: 9998;
+      gap: 12px;
+      align-items: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,.5);
+      max-width: 420px;
+    }
+    .inline-confirm.visible { display: flex; }
+    .inline-confirm-msg { flex: 1; line-height: 1.4; }
+    .inline-confirm-yes {
+      padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: 700;
+      cursor: pointer; white-space: nowrap; border: none;
+      background: #dc2626; color: #fff;
+    }
+    .inline-confirm-yes:hover { background: #b91c1c; }
+    .inline-confirm-cancel {
+      padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;
+      cursor: pointer; white-space: nowrap;
+      background: transparent; border: 1px solid rgba(255,255,255,.2); color: #94a3b8;
+    }
+    .inline-confirm-cancel:hover { border-color: rgba(255,255,255,.4); color: #e2e8f0; }
+
     /* Toast */
     .lock-toast {
       position: fixed;
@@ -361,6 +393,13 @@
   </div><!-- /.main -->
 </div><!-- /.app -->
 
+<!-- Inline confirm (replaces window.confirm — works in sandboxed iframes) -->
+<div class="inline-confirm" id="inlineConfirmBox" role="alertdialog" aria-modal="true">
+  <span class="inline-confirm-msg" id="inlineConfirmMsg"></span>
+  <button class="inline-confirm-yes" id="inlineConfirmYes">Yes, proceed</button>
+  <button class="inline-confirm-cancel" id="inlineConfirmCancel">Cancel</button>
+</div>
+
 <!-- Toast -->
 <div class="lock-toast" id="lockToast"></div>
 
@@ -396,6 +435,29 @@
     el.className = `lock-toast ${type} visible`;
     clearTimeout(_toastTimer);
     _toastTimer = setTimeout(() => el.classList.remove('visible'), 2500);
+  }
+
+  // ── Inline confirm (sandbox-safe replacement for window.confirm) ──
+  function inlineConfirm(msg) {
+    return new Promise(resolve => {
+      const box    = document.getElementById('inlineConfirmBox');
+      const msgEl  = document.getElementById('inlineConfirmMsg');
+      const yesBtn = document.getElementById('inlineConfirmYes');
+      const noBtn  = document.getElementById('inlineConfirmCancel');
+      msgEl.textContent = msg;
+      box.classList.add('visible');
+
+      function finish(result) {
+        box.classList.remove('visible');
+        yesBtn.removeEventListener('click', onYes);
+        noBtn.removeEventListener('click', onNo);
+        resolve(result);
+      }
+      function onYes() { finish(true); }
+      function onNo()  { finish(false); }
+      yesBtn.addEventListener('click', onYes);
+      noBtn.addEventListener('click', onNo);
+    });
   }
 
   // ── Load all data ──
@@ -503,13 +565,12 @@
   }
 
   async function bulkSetAll(status) {
-    const label = { locked: 'Lock All', stable: 'Stable All', development: 'Dev All' }[status];
     const confirmMsg = status === 'locked'
-      ? `Lock all 27 features? Claude will not be able to edit any locked feature without your explicit unlock.`
+      ? `Lock all features? Claude will not be able to edit any locked feature without your explicit unlock.`
       : status === 'development'
       ? `Set all features to Development? This removes all guards — Claude can edit anything.`
       : `Mark all features as Stable? Claude will ask for confirmation before editing any of them.`;
-    if (!window.confirm(confirmMsg)) return;
+    if (!await inlineConfirm(confirmMsg)) return;
 
     const btn = document.getElementById(
       status === 'locked' ? 'bulkLockBtn' : status === 'stable' ? 'bulkStableBtn' : 'bulkDevBtn'
@@ -660,7 +721,7 @@
       : status === 'development'
       ? `Set all pages to Development? Edit Mode will be unrestricted on every page.`
       : `Mark all pages as Stable? Claude will confirm before saving changes to any page.`;
-    if (!window.confirm(confirmMsg)) return;
+    if (!await inlineConfirm(confirmMsg)) return;
 
     const btn = document.getElementById(
       status === 'locked' ? 'bulkPageLockBtn' : status === 'stable' ? 'bulkPageStableBtn' : 'bulkPageDevBtn'

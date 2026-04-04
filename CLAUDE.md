@@ -258,13 +258,15 @@ New Meta campaigns take 24–48h+ for ad review and learning phase. ACTIVE statu
 ## 18. Feature Lock System
 
 Before editing ANY code, check the lock status:
-- Run: `PGPASSWORD=StrongPass123! psql -h 127.0.0.1 -U agent_user -d marketing_agent -t -c "SELECT feature_key, status FROM feature_locks WHERE status != 'development' ORDER BY status DESC, feature_key;"`
+- Run: `PGPASSWORD=StrongPass123! psql -h 127.0.0.1 -U agent_user -d marketing_agent -t -c "SELECT feature_key, status FROM feature_locks WHERE status <> 'development' ORDER BY status DESC, feature_key;"`
 - If ANY affected feature is **locked**: STOP. Do not edit. Tell the user it is locked.
 - If ANY affected feature is **stable**: State exactly what you are changing and why before editing. Do not proceed without explicit confirmation.
-- For page edits, also check: `SELECT slug, status FROM page_locks WHERE status != 'development';`
+- For page edits, also check: `SELECT slug, status FROM page_locks WHERE status <> 'development';`
+- **IMPORTANT:** Use `<>` not `!=` in psql — `!=` causes a syntax error in this PostgreSQL version.
 
 ### Feature-to-code mapping (what to check before editing):
 - Editing gallery tag/sort/delete/add code → check gallery-tag, gallery-sort, gallery-delete, gallery-add
+- Editing gallery_exclusions table/logic or `_ensure_gallery_exclusions_table` → check gallery-delete, gallery-add
 - Editing gallery.js or masonry → check gallery-masonry
 - Editing lightbox.js → check gallery-lightbox
 - Editing _CARD_EDIT_OVERLAY_TPL or setupCard → check pages-card
@@ -281,3 +283,6 @@ Before editing ANY code, check the lock status:
 - Editing sitemap.xml → check seo-sitemap
 - Editing project page HTML files → check seo-project-pages
 - Editing service page HTML files → check seo-service-pages
+- Editing logo API routes (`/admin/api/settings/logo`) → check server-routes
+- Editing main.js logo injection or nav logo code → check frontend-main
+- Editing settings.html admin UI → check server-routes, frontend-main

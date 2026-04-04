@@ -1,3 +1,20 @@
+// ── Nav logo injection ────────────────────────────────────────────────────────
+// If the server injected a logo URL, prepend the logo image to the left of
+// the "Ridgecrest Designs" text in every .nav__logo link.
+(function() {
+  var logoUrl = window.__RD_LOGO_URL;
+  if (!logoUrl) return;
+  var logoLinks = document.querySelectorAll('a.nav__logo');
+  if (!logoLinks.length) return;
+  logoLinks.forEach(function(link) {
+    var img = document.createElement('img');
+    img.src = logoUrl;
+    img.alt = 'Ridgecrest Designs logo';
+    img.className = 'nav__logo-img';
+    link.insertBefore(img, link.firstChild);
+  });
+})();
+
 // Nav scroll
 const nav = document.getElementById('nav');
 if (nav) {
@@ -42,7 +59,7 @@ const HERO_POOL = [
   'ff5b18_82e5d2a1febd4d1abc6eecd7aadb0101_mv2',  // Sunol Homestead gallery 2
   'ff5b18_53f46b46f9094468addb44305dff0a55_mv2',  // Pleasanton Custom gallery 2
   'ff5b18_75a9ba9c5a87418daf6d2b69c70f60ff_mv2',  // Living room / stone fireplace
-  'ff5b18_eba842cf7eb641b58bd420804e76cb50_mv2',  // Mountain retreat kitchen
+  'ff5b18_29ec897c45d74caabd831b08f46ec1bc_mv2',  // Mountain retreat kitchen
   'ff5b18_9192e5d316c84e40b65fff6dbd4d0e36_mv2',  // Custom home office
   'ff5b18_0b10882438704be9af57966897e72b37_mv2',  // Custom library built-ins
   'ff5b18_b246a630ba864e2a8fe67d964745b9b5_mv2',  // Danville Hilltop gallery 2
@@ -87,6 +104,21 @@ if (heroBg) {
   const heroSrc = window.__RD_HERO || HERO_FALLBACK;
   heroBg.style.backgroundImage = `url('${heroSrc}')`;
   applyHeroTransform(heroBg);
+}
+
+// Project page heroes (.project-hero__img)
+// Image is already set inline by the server; just apply stored position/zoom.
+document.querySelectorAll('.project-hero__img').forEach(el => {
+  applyHeroTransform(el);
+});
+
+// Hero text position — apply stored offset to .hero__content if server injected it
+if (window.__RD_HERO_TEXT_X || window.__RD_HERO_TEXT_Y) {
+  const tx = window.__RD_HERO_TEXT_X || 0;
+  const ty = window.__RD_HERO_TEXT_Y || 0;
+  document.querySelectorAll('.hero__content').forEach(el => {
+    el.style.transform = `translate(${tx}px, ${ty}px)`;
+  });
 }
 
 // ── Fade-in on scroll ─────────────────────────────────────────────────────────

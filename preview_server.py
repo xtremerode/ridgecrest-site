@@ -175,6 +175,8 @@ def _ensure_pages_table(cur):
     # Idempotent: add zoom/position columns to existing tables
     cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS hero_position TEXT DEFAULT '50% 50%'")
     cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS hero_zoom FLOAT DEFAULT 1.0")
+    cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS hero_text_x FLOAT DEFAULT 0")
+    cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS hero_text_y FLOAT DEFAULT 0")
 
 def _seed_pages():
     """Scan all preview/ HTML files and seed the pages table (idempotent)."""
@@ -229,21 +231,31 @@ def _seed_pages():
             pass
 
 def _get_page_data(slug):
-    """Return (hero_path, hero_position, hero_zoom) for a page slug, resolving active version."""
+    """Return (hero_path, hero_position, hero_zoom, hero_text_x, hero_text_y) for a page slug."""
     conn = _db_conn()
     if not conn:
-        return None, '50% 50%', 1.0
+        return None, '50% 50%', 1.0, 0.0, 0.0
     try:
         cur = conn.cursor()
         _ensure_pages_table(cur)
-        cur.execute("SELECT hero_image, hero_position, hero_zoom FROM pages WHERE slug = %s", (slug,))
+        cur.execute("SELECT hero_image, hero_position, hero_zoom, hero_text_x, hero_text_y FROM pages WHERE slug = %s", (slug,))
         row = cur.fetchone()
         if not row or not row['hero_image']:
+            if row:
+                # Row exists but no image override — still return saved position/zoom/text
+                pos  = row['hero_position'] or '50% 50%'
+                zoom = float(row['hero_zoom'] or 1.0)
+                tx   = float(row['hero_text_x'] or 0)
+                ty   = float(row['hero_text_y'] or 0)
+                conn.close()
+                return None, pos, zoom, tx, ty
             conn.close()
-            return None, '50% 50%', 1.0
+            return None, '50% 50%', 1.0, 0.0, 0.0
         hero_path = row['hero_image']
         hero_pos  = row['hero_position'] or '50% 50%'
         hero_zoom = float(row['hero_zoom'] or 1.0)
+        tx        = float(row['hero_text_x'] or 0)
+        ty        = float(row['hero_text_y'] or 0)
         # Resolve active version: if image_labels has an active_version for this file, use it
         base_fname = hero_path.split('/')[-1]
         try:
@@ -258,9 +270,9 @@ def _get_page_data(slug):
         except Exception:
             pass
         conn.close()
-        return hero_path, hero_pos, hero_zoom
+        return hero_path, hero_pos, hero_zoom, tx, ty
     except Exception:
-        return None, '50% 50%', 1.0
+        return None, '50% 50%', 1.0, 0.0, 0.0
 
 # ── Card settings: DB-backed color/image mode per card ───────────────────────
 
@@ -287,6 +299,116 @@ def _ensure_gallery_image_types_table(cur):
             image_type TEXT
         )
     """)
+
+
+def _ensure_gallery_exclusions_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS gallery_exclusions (
+            id         SERIAL PRIMARY KEY,
+            slug       TEXT NOT NULL,
+            image_hash TEXT NOT NULL,
+            excluded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE(slug, image_hash)
+        )
+    """)
+
+
+def _ensure_file_hashes_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS file_hashes (
+            sha256   TEXT PRIMARY KEY,
+            filename TEXT NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+
+
+def _file_sha256(data: bytes) -> str:
+    import hashlib
+    return hashlib.sha256(data).hexdigest()
+
+
+def _dedup_incoming_bytes(raw: bytes, proposed_filename: str, cur) -> str | None:
+    """
+    Check whether `raw` bytes already exist in images-opt/.
+    Returns the existing canonical filename if a match is found (caller should skip saving),
+    or None if the content is new (caller should save normally).
+    Also registers the hash after saving — call with the final saved filename.
+    """
+    _ensure_file_hashes_table(cur)
+    h = _file_sha256(raw)
+    cur.execute("SELECT filename FROM file_hashes WHERE sha256 = %s", (h,))
+    row = cur.fetchone()
+    if row:
+        existing = row['filename'] if isinstance(row, dict) else row[0]
+        opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+        if os.path.isfile(os.path.join(opt_dir, existing)):
+            return existing  # duplicate found
+        # File was deleted — stale hash record, remove it and let caller save fresh
+        cur.execute("DELETE FROM file_hashes WHERE sha256 = %s", (h,))
+    return None  # content is new
+
+
+def _register_file_hash(raw: bytes, filename: str, cur):
+    """Insert a hash record for a newly saved file. Call after saving."""
+    _ensure_file_hashes_table(cur)
+    h = _file_sha256(raw)
+    cur.execute("""
+        INSERT INTO file_hashes (sha256, filename)
+        VALUES (%s, %s)
+        ON CONFLICT (sha256) DO NOTHING
+    """, (h, filename))
+
+
+def _backfill_file_hashes():
+    """Populate file_hashes for all existing images-opt/ base files not yet recorded.
+    Runs in a background thread at startup — non-blocking."""
+    import hashlib
+    opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+    if not os.path.isdir(opt_dir):
+        return
+    conn = _db_conn()
+    if not conn:
+        return
+    try:
+        cur = conn.cursor()
+        _ensure_file_hashes_table(cur)
+        # Get already-registered hashes
+        cur.execute("SELECT sha256 FROM file_hashes")
+        known = {r['sha256'] if isinstance(r, dict) else r[0] for r in cur.fetchall()}
+        added = 0
+        for fname in sorted(os.listdir(opt_dir)):
+            # Only hash base files (not responsive sizes, not AI renders)
+            if re.search(r'_\d+w\.webp$', fname):
+                continue
+            if re.search(r'_ai_\d+\.webp$', fname):
+                continue
+            ext = fname.rsplit('.', 1)[-1].lower()
+            if ext not in ('webp', 'jpg', 'jpeg', 'png'):
+                continue
+            fpath = os.path.join(opt_dir, fname)
+            try:
+                if os.path.getsize(fpath) < 100:
+                    continue
+                h = hashlib.sha256(open(fpath, 'rb').read()).hexdigest()
+                if h not in known:
+                    cur.execute("""
+                        INSERT INTO file_hashes (sha256, filename)
+                        VALUES (%s, %s)
+                        ON CONFLICT (sha256) DO NOTHING
+                    """, (h, fname))
+                    known.add(h)
+                    added += 1
+            except Exception:
+                pass
+        conn.commit()
+        if added:
+            print(f'[file_hashes] Backfilled {added} hashes for existing images')
+    except Exception as e:
+        print(f'[file_hashes] Backfill error: {e}')
+    finally:
+        try: conn.close()
+        except: pass
 
 
 def _ensure_feature_locks_table(cur):
@@ -485,6 +607,12 @@ def _apply_cards_to_html(content: bytes, cards: list) -> bytes:
     return text.encode('utf-8')
 
 
+def _safe_js(value) -> str:
+    """JSON-encode a value for inline <script> injection.
+    Escapes </ to prevent </script> tag breakout (CVE-class: stored XSS via script injection)."""
+    return json.dumps(value).replace('</', r'<\/')
+
+
 def _apply_hero_to_html(content: bytes, hero_path: str,
                          hero_position: str = '50% 50%', hero_zoom: float = 1.0) -> bytes:
     """Swap the first inline background-image URL in HTML with hero_path.
@@ -498,9 +626,9 @@ def _apply_hero_to_html(content: bytes, hero_path: str,
     )
     # Always inject script vars — main.js reads these for all hero types
     script = (
-        f'<script>window.__RD_HERO={json.dumps(hero_path)};'
-        f'window.__RD_HERO_POSITION={json.dumps(hero_position)};'
-        f'window.__RD_HERO_ZOOM={json.dumps(hero_zoom)};</script>'
+        f'<script>window.__RD_HERO={_safe_js(hero_path)};'
+        f'window.__RD_HERO_POSITION={_safe_js(hero_position)};'
+        f'window.__RD_HERO_ZOOM={_safe_js(hero_zoom)};</script>'
     )
     if '</head>' in new_text:
         new_text = new_text.replace('</head>', script + '</head>', 1)
@@ -748,7 +876,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
         if (cardRefreshPill[d.cardId]) cardRefreshPill[d.cardId]();
         saveCard(d.cardId, s);
       }}
-      window.parent.postMessage({{type:'rd_pool_refresh'}}, '*');
+      window.parent.postMessage({{type:'rd_pool_refresh'}}, window.location.origin);
     }}
   }});
 
@@ -885,6 +1013,14 @@ _CARD_EDIT_OVERLAY_TPL = """\
       var _typeCycle = ['project', 'render', 'before', 'construction', ''];
       var _typeLabels = {{'': 'Untagged', 'project': 'Project', 'render': 'Render', 'before': 'Before', 'construction': 'Construction'}};
       var _typeBg = {{'': 'rgba(0,0,0,.5)', 'project': '#16a34a', 'render': '#7c3aed', 'before': '#0369a1', 'construction': '#b45309'}};
+      // Derive slug from the page URL at action-time — more reliable than the injected
+      // SLUG variable which can be stale if the overlay was loaded while a different
+      // page was selected in the admin panel.
+      function _gallerySlug() {{
+        var p = window.location.pathname || '';
+        var s = p.replace(/^.*\/view\//, '').replace(/\.html.*$/, '');
+        return (s && s !== 'index') ? s : SLUG;
+      }}
 
       var typeBtn = document.createElement('button');
       typeBtn.textContent = _typeLabels[_imgType] || 'Untagged';
@@ -903,13 +1039,13 @@ _CARD_EDIT_OVERLAY_TPL = """\
         // sort reads old type from DB before the tag commit has finished.
         var _sb = document.getElementById('rd-sort-btn');
         if (_sb) {{ _sb.disabled = true; _sb.style.opacity = '0.5'; }}
-        fetch('/admin/api/gallery/' + encodeURIComponent(SLUG) + '/tag', {{
+        fetch('/admin/api/gallery/' + encodeURIComponent(_gallerySlug()) + '/tag', {{
           method: 'POST',
           headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
           body: JSON.stringify({{filename: _galleryHash, image_type: _imgType || null}})
         }}).then(function() {{
           // Notify parent to refresh undo button after a tag action
-          window.parent.postMessage({{type: 'rd_refresh_undo'}}, '*');
+          window.parent.postMessage({{type: 'rd_refresh_undo'}}, window.location.origin);
         }}).catch(function() {{}}).then(function() {{
           // Re-enable sort whether save succeeded or failed
           if (_sb) {{ _sb.disabled = false; _sb.style.opacity = '1'; }}
@@ -933,7 +1069,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
         // a stale gallery_json that still contains this image.
         var _sb2 = document.getElementById('rd-sort-btn');
         if (_sb2) {{ _sb2.disabled = true; _sb2.style.opacity = '0.5'; }}
-        fetch('/admin/api/gallery/' + encodeURIComponent(SLUG) + '/remove', {{
+        fetch('/admin/api/gallery/' + encodeURIComponent(_gallerySlug()) + '/remove', {{
           method: 'POST',
           headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
           body: JSON.stringify({{filename: _galleryHash}})
@@ -949,7 +1085,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
                 window.GalleryEngine.layoutAll();
               }}
               // Notify parent to refresh undo button without reloading the iframe
-              window.parent.postMessage({{type: 'rd_refresh_undo'}}, '*');
+              window.parent.postMessage({{type: 'rd_refresh_undo'}}, window.location.origin);
             }}, 220);
           }} else {{
             console.error('[RD] Delete failed:', d.error, '| hash:', _galleryHash, '| slug:', SLUG);
@@ -1097,7 +1233,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
       var f = imgPath.split('?')[0].split('/').pop();
       var base = f.replace(/_ai_\d+\.webp$/, '.webp');
       if (!base) return;
-      window.parent.postMessage({{type:'rd_open_render', cardId:cardId, filename:base}}, '*');
+      window.parent.postMessage({{type:'rd_open_render', cardId:cardId, filename:base}}, window.location.origin);
     }});
 
     rotateBtn.addEventListener('click', function(e) {{
@@ -1329,6 +1465,60 @@ _CARD_EDIT_OVERLAY_TPL = """\
     return wrap;
   }}
 
+  // ── Inject ✦ AI pill on <img> tags not already covered by a card or hero overlay ──
+  // Covers blog post images, team photos, and any other <img> not inside a [data-card-id].
+  // Background-image elements are already handled by _EDIT_OVERLAY_TPL (builds full hero badge).
+  function injectUncoveredImagePills() {{
+    var LOCAL_RE = /^\/assets\/images(?:-opt)?\//;
+    document.querySelectorAll('img').forEach(function(img) {{
+      var src = img.getAttribute('src') || '';
+      if (!LOCAL_RE.test(src)) return;
+      // Already covered by card overlay (gallery item inside data-card-id element)
+      if (img.closest('[data-card-id]')) return;
+      // Already covered by hero overlay (inside a hero element)
+      if (img.closest('[data-rd-overlay="hero"]')) return;
+      // Already injected
+      if (img.getAttribute('data-rd-ai-pill')) return;
+      img.setAttribute('data-rd-ai-pill', '1');
+
+      // Normalize filename: strip AI variant suffix to get base name
+      var f = src.split('?')[0].split('/').pop();
+      var base = f.replace(/_ai_\d+\.webp$/, '.webp');
+      if (!base) return;
+
+      // Append button to the img's parent container (which becomes the positioning context)
+      var container = img.parentElement || img;
+      if (window.getComputedStyle(container).position === 'static') {{
+        container.style.position = 'relative';
+      }}
+
+      var btn = document.createElement('button');
+      btn.textContent = '\u2728 AI';
+      btn.title = 'AI Re-render this image in the media library';
+      btn.style.cssText = [
+        'position:absolute', 'bottom:8px', 'right:8px', 'z-index:9991',
+        'padding:5px 10px', 'font-size:11px', 'font-weight:700',
+        'font-family:system-ui,sans-serif', 'border:none', 'cursor:pointer',
+        'line-height:1.4', 'white-space:nowrap',
+        'background:rgba(90,50,180,.8)', 'color:#fff', 'border-radius:4px',
+        'opacity:0', 'transition:opacity .15s', 'pointer-events:none',
+        'box-shadow:0 2px 8px rgba(0,0,0,.5)'
+      ].join(';');
+
+      container.addEventListener('mouseenter', function() {{
+        btn.style.opacity = '1'; btn.style.pointerEvents = 'auto';
+      }});
+      container.addEventListener('mouseleave', function() {{
+        btn.style.opacity = '0'; btn.style.pointerEvents = 'none';
+      }});
+      btn.addEventListener('click', function(e) {{
+        e.stopPropagation(); e.preventDefault();
+        window.open('/view/admin/media.html?rerender=' + encodeURIComponent(base), '_blank');
+      }});
+      container.appendChild(btn);
+    }});
+  }}
+
   function init() {{
     document.querySelectorAll('[data-rd-overlay="card"]').forEach(function(n){{n.remove();}});
     loadImages();
@@ -1366,12 +1556,12 @@ _CARD_EDIT_OVERLAY_TPL = """\
       tagBtn.addEventListener('click', function() {{
         tagBtn.textContent = '\u2714 Tagging\u2026';
         tagBtn.disabled = true;
-        window.parent.postMessage({{type:'rd_auto_tag', slug:SLUG}}, '*');
+        window.parent.postMessage({{type:'rd_auto_tag', slug:SLUG}}, window.location.origin);
       }});
       sortBtn.addEventListener('click', function() {{
         sortBtn.textContent = '\u21c5 Sorting\u2026';
         sortBtn.disabled = true;
-        window.parent.postMessage({{type:'rd_auto_sort', slug:SLUG}}, '*');
+        window.parent.postMessage({{type:'rd_auto_sort', slug:SLUG}}, window.location.origin);
       }});
       window.addEventListener('message', function(ev) {{
         if (ev.data && ev.data.type === 'rd_sort_done') {{
@@ -1584,6 +1774,9 @@ _CARD_EDIT_OVERLAY_TPL = """\
         // ─────────────────────────────────────────────────────────────────────
       }}
     }}
+
+    // Second pass: cover any <img> tags not inside a [data-card-id] element
+    injectUncoveredImagePills();
   }}
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
@@ -1703,6 +1896,7 @@ _EDIT_OVERLAY_TPL = """\
   var editables = [];
   var imagePool = [];
   var cycleIndices = [];
+  var _transformAckTimer = null;
 
   // Initial transform from server-injected vars
   var _initZoom = (window.__RD_HERO_ZOOM != null ? parseFloat(window.__RD_HERO_ZOOM) : 1.0) || 1.0;
@@ -1741,7 +1935,7 @@ _EDIT_OVERLAY_TPL = """\
     }});
     // Show grab handles
     (window.__rdAllGrabBtns || []).forEach(function(btn) {{ btn.style.display = 'inline-block'; }});
-    window.parent.postMessage({{type: 'rd_text_mode', active: true}}, '*');
+    window.parent.postMessage({{type: 'rd_text_mode', active: true}}, window.location.origin);
   }};
 
   window.__rdExitTextMode = function() {{
@@ -1764,7 +1958,7 @@ _EDIT_OVERLAY_TPL = """\
     }});
     // Hide grab handles
     (window.__rdAllGrabBtns || []).forEach(function(btn) {{ btn.style.display = 'none'; }});
-    window.parent.postMessage({{type: 'rd_text_mode', active: false}}, '*');
+    window.parent.postMessage({{type: 'rd_text_mode', active: false}}, window.location.origin);
   }};
 
   // Escape key always exits text mode
@@ -1773,26 +1967,25 @@ _EDIT_OVERLAY_TPL = """\
   }});
 
 
-  var _transformSaveTimer = null;
   function notifyTransform(idx) {{
-    // Notify parent frame (admin panel) — works when loaded in iframe
+    // Notify parent frame — parent's saveNow/scheduleSave handles all persistence.
     window.parent.postMessage({{
       type: 'rd_transform_changed', slug: SLUG, elementIndex: idx,
       zoom: editables[idx].zoom, posX: editables[idx].posX, posY: editables[idx].posY
-    }}, '*');
-    // Also save directly — ensures saves work whether in iframe or accessed directly
-    clearTimeout(_transformSaveTimer);
-    _transformSaveTimer = setTimeout(function() {{
-      var e = editables[idx];
+    }}, window.location.origin);
+    // Fallback: if parent doesn't ack within 2.5s (e.g. direct access, frame race),
+    // save directly so transform edits are never silently dropped.
+    clearTimeout(_transformAckTimer);
+    _transformAckTimer = setTimeout(function() {{
+      var el = editables[idx];
+      if (!el || !TOKEN) return;
+      var pos = el.posX.toFixed(1) + '% ' + el.posY.toFixed(1) + '%';
       fetch('/admin/api/pages/' + encodeURIComponent(SLUG), {{
         method: 'PUT',
         headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
-        body: JSON.stringify({{
-          hero_zoom: e.zoom,
-          hero_position: e.posX.toFixed(1) + '% ' + e.posY.toFixed(1) + '%'
-        }})
-      }}).catch(function() {{}});
-    }}, 800);
+        body: JSON.stringify({{hero_zoom: el.zoom, hero_position: pos}})
+      }}).catch(function(){{}});
+    }}, 2500);
   }}
 
   function buildOverlay(el, idx, imgUrl) {{
@@ -1906,6 +2099,21 @@ _EDIT_OVERLAY_TPL = """\
       }};
     }})(idx));
     badge.appendChild(heroUploadBtn);
+
+    // AI Re-render button — opens media library with this image pre-selected and modal open
+    var heroRenderBtn = document.createElement('button');
+    heroRenderBtn.textContent = '\u2728 AI';
+    heroRenderBtn.title = 'AI Re-render this image in the media library';
+    heroRenderBtn.style.cssText = 'background:rgba(90,50,180,.85);color:#fff;border:none;font-family:system-ui,sans-serif;font-size:12px;font-weight:700;padding:5px 11px;border-radius:4px;cursor:pointer;white-space:nowrap;pointer-events:auto';
+    heroRenderBtn.addEventListener('click', function(e) {{
+      e.stopPropagation();
+      var url = (editables[idx] && editables[idx].url) || imgUrl || '';
+      var f = url.split('?')[0].split('/').pop();
+      var base = f.replace(/_ai_\d+\.webp$/, '.webp');
+      if (!base) return;
+      window.open('/view/admin/media.html?rerender=' + encodeURIComponent(base) + '&page_slug=' + encodeURIComponent(SLUG) + '&context=hero', '_blank');
+    }});
+    badge.appendChild(heroRenderBtn);
 
     ov.appendChild(badge);
 
@@ -2070,6 +2278,92 @@ _EDIT_OVERLAY_TPL = """\
     el.appendChild(ov);
   }}
 
+  // ── Hero text drag handle ─────────────────────────────────────────────────
+  window.__rdAllGrabBtns = window.__rdAllGrabBtns || [];
+  var _heroTextX = (window.__RD_HERO_TEXT_X != null ? parseFloat(window.__RD_HERO_TEXT_X) : 0) || 0;
+  var _heroTextY = (window.__RD_HERO_TEXT_Y != null ? parseFloat(window.__RD_HERO_TEXT_Y) : 0) || 0;
+
+  function buildHeroTextHandle() {{
+    document.querySelectorAll('[data-rd-text-handle]').forEach(function(n){{n.remove();}});
+    document.querySelectorAll('.hero__content').forEach(function(contentEl) {{
+      // Ensure content is relatively positioned for absolute child
+      if (window.getComputedStyle(contentEl).position === 'static') {{
+        contentEl.style.position = 'relative';
+      }}
+      // Apply saved offset on load
+      if (_heroTextX || _heroTextY) {{
+        contentEl.style.transform = 'translate(' + _heroTextX + 'px,' + _heroTextY + 'px)';
+      }}
+
+      var handle = document.createElement('div');
+      handle.setAttribute('data-rd-text-handle', '1');
+      handle.title = 'Drag to reposition entire text block';
+      // Always visible in edit mode — no need to enter text mode first.
+      // Positioned at the top-left corner of hero__content (inside hero overflow:hidden boundary).
+      handle.style.cssText = [
+        'position:absolute',
+        'top:0',
+        'left:0',
+        'display:inline-block',
+        'background:rgba(15,23,42,.88)',
+        'color:#f59e0b',
+        'border:1px solid rgba(245,158,11,.5)',
+        'font-family:system-ui,sans-serif',
+        'font-size:12px',
+        'font-weight:700',
+        'padding:5px 12px',
+        'border-radius:0 0 4px 0',
+        'cursor:grab',
+        'user-select:none',
+        'white-space:nowrap',
+        'z-index:9999',
+        'pointer-events:auto'
+      ].join(';');
+      handle.innerHTML = '\u2630 Move';
+      contentEl.appendChild(handle);
+
+      // Drag logic
+      var isDraggingText = false;
+      handle.addEventListener('mousedown', function(e) {{
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var startX = e.clientX, startY = e.clientY;
+        var startTX = _heroTextX, startTY = _heroTextY;
+        isDraggingText = false;
+        handle.style.cursor = 'grabbing';
+
+        function onMove(ev) {{
+          var dx = ev.clientX - startX;
+          var dy = ev.clientY - startY;
+          if (Math.abs(dx) > 2 || Math.abs(dy) > 2) isDraggingText = true;
+          if (!isDraggingText) return;
+          _heroTextX = Math.round(startTX + dx);
+          _heroTextY = Math.round(startTY + dy);
+          contentEl.style.transform = 'translate(' + _heroTextX + 'px,' + _heroTextY + 'px)';
+        }}
+
+        function onUp() {{
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          handle.style.cursor = 'grab';
+          if (isDraggingText) {{
+            window.parent.postMessage({{
+              type: 'rd_hero_text_moved',
+              slug: SLUG,
+              x: _heroTextX,
+              y: _heroTextY
+            }}, window.location.origin);
+          }}
+          isDraggingText = false;
+        }}
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      }});
+    }});
+  }}
+
   function init() {{
     document.querySelectorAll('[data-rd-overlay="hero"]').forEach(function(n){{n.remove();}});
     // Ensure .hero__bg has an image so it can be found below
@@ -2090,6 +2384,8 @@ _EDIT_OVERLAY_TPL = """\
       buildOverlay(el, idx, imgUrl);
     }});
 
+    buildHeroTextHandle();
+
     window.addEventListener('message', function(e) {{
       var d = e.data || {{}};
       if (d.type === 'rd_set_pool') {{
@@ -2106,9 +2402,13 @@ _EDIT_OVERLAY_TPL = """\
         var pos = imagePool.indexOf(d.newImage);
         cycleIndices[d.elementIndex] = pos >= 0 ? pos : 0;
       }}
+      // Parent acknowledged the transform — cancel the direct-save fallback timer
+      if (d.type === 'rd_transform_ack') {{
+        clearTimeout(_transformAckTimer);
+      }}
     }});
 
-    window.parent.postMessage({{type:'rd_overlay_ready', slug:SLUG, count:editables.length}}, '*');
+    window.parent.postMessage({{type:'rd_overlay_ready', slug:SLUG, count:editables.length}}, window.location.origin);
   }}
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
@@ -2608,7 +2908,14 @@ def media_migrate_batch():
 
 @app.route('/media/receive', methods=['POST', 'OPTIONS'])
 def media_receive():
-    """Accept image data POSTed from a browser running on ridgecrestdesigns.com."""
+    """Accept image data POSTed from a browser running on ridgecrestdesigns.com.
+
+    Page-lock enforcement is intentionally not applied here. This endpoint uploads
+    new asset files to images-opt/; it does not edit any page's fields or gallery
+    layout. Uploading a file does not change what any locked page renders — that
+    would require a subsequent edit to hero_image or gallery_json, which IS gated
+    by lock checks in admin_page_update and gallery_layout_save.
+    """
     # CORS — allow browser script on any origin to post images
     if request.method == 'OPTIONS':
         resp = Response('', 204)
@@ -2619,14 +2926,10 @@ def media_receive():
 
     data = request.get_json(silent=True) or {}
     token = data.get('token', '')
-    if not _verify_admin_password(token) and token != os.getenv('ADMIN_PASSWORD', _DEFAULT_PW):
-        # Also accept a valid session token
-        env_hash = os.getenv('ADMIN_PASSWORD_HASH', '')
-        import hashlib
-        expected = hashlib.sha256((_DEFAULT_PW).encode()).hexdigest()
-        if token not in (expected, hashlib.sha256(token.encode()).hexdigest()):
-            # Simple check: just verify against stored session tokens via hmac
-            pass  # Allow through — this endpoint is only accessible if you know the password
+    if not _verify_admin_password(token) and not _valid_token(token):
+        resp = jsonify({'error': 'unauthorized'})
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        return resp, 403
 
     filename = data.get('filename', '')
     b64data  = data.get('data', '')
@@ -2652,6 +2955,26 @@ def media_receive():
         resp.headers['Access-Control-Allow-Origin'] = '*'
         return resp, 400
 
+    # ── Dedup check: return existing file if content already on disk ──────────
+    conn = _db_conn()
+    if conn:
+        try:
+            cur = conn.cursor()
+            existing = _dedup_incoming_bytes(raw, filename, cur)
+            if existing:
+                conn.commit()
+                conn.close()
+                resp = jsonify({'ok': True, 'path': f'/assets/images-opt/{existing}',
+                                'bytes': len(raw), 'dedup': True,
+                                'note': f'Identical file already exists as {existing}'})
+                resp.headers['Access-Control-Allow-Origin'] = '*'
+                return resp
+            # New content — will save below; register hash after save
+        except Exception:
+            conn.rollback()
+        finally:
+            pass  # keep conn open to register hash after save
+
     # Save to images-opt/ (convert to WebP for fast load times)
     opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
     os.makedirs(opt_dir, exist_ok=True)
@@ -2660,6 +2983,18 @@ def media_receive():
         f.write(raw)
     final_opt_path = _to_webp(opt_path)
     final_filename = os.path.basename(final_opt_path)
+
+    # Register hash for the saved file
+    if conn:
+        try:
+            cur = conn.cursor()
+            _register_file_hash(raw, final_filename, cur)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+        finally:
+            try: conn.close()
+            except: pass
 
     resp = jsonify({'ok': True, 'path': f'/assets/images-opt/{final_filename}', 'bytes': len(raw)})
     resp.headers['Access-Control-Allow-Origin'] = '*'
@@ -2692,15 +3027,50 @@ def view(filename):
 
         # Apply DB hero image + position/zoom if stored
         if HAS_DB:
-            hero, hero_pos, hero_zoom = _get_page_data(slug)
+            hero, hero_pos, hero_zoom, hero_tx, hero_ty = _get_page_data(slug)
             if hero:
                 content = _apply_hero_to_html(content, hero, hero_pos, hero_zoom)
+            elif hero_zoom > 1.001 or any(
+                    abs(float(v.rstrip('%')) - 50.0) > 0.05
+                    for v in (hero_pos or '50% 50%').split()
+                    if v.rstrip('%').replace('.','',1).isdigit()
+                ):
+                # No image override, but position/zoom differ from defaults — inject vars only
+                script = (
+                    f'<script>window.__RD_HERO_POSITION={_safe_js(hero_pos)};'
+                    f'window.__RD_HERO_ZOOM={_safe_js(hero_zoom)};</script>'
+                ).encode('utf-8')
+                if b'</head>' in content:
+                    content = content.replace(b'</head>', script + b'</head>', 1)
+                else:
+                    content = script + content
+            # Inject text offset vars if non-zero
+            if hero_tx or hero_ty:
+                txt_script = (
+                    f'<script>window.__RD_HERO_TEXT_X={_safe_js(hero_tx)};'
+                    f'window.__RD_HERO_TEXT_Y={_safe_js(hero_ty)};</script>'
+                ).encode('utf-8')
+                if b'</head>' in content:
+                    content = content.replace(b'</head>', txt_script + b'</head>', 1)
+                else:
+                    content = txt_script + content
 
         # Apply card settings (color/image mode per card)
         if HAS_DB:
             cards = _get_card_settings(slug)
             if cards:
                 content = _apply_cards_to_html(content, cards)
+
+        # Inject site logo URL so main.js can prepend it to nav text
+        _logo_path = os.path.join(PREVIEW_DIR, 'assets', 'images', 'logo.png')
+        _logo_url   = '/assets/images/logo.png' if os.path.isfile(_logo_path) else None
+        _logo_script = (
+            f'<script>window.__RD_LOGO_URL={_safe_js(_logo_url)};</script>'
+        ).encode('utf-8')
+        if b'</head>' in content:
+            content = content.replace(b'</head>', _logo_script + b'</head>', 1)
+        else:
+            content = _logo_script + content
 
         # Inject edit overlay when admin preview mode is active
         token = request.args.get('token', '')
@@ -2939,6 +3309,52 @@ def admin_server_restart():
         os.execv(sys.executable, [sys.executable] + sys.argv)
     threading.Thread(target=_do_restart, daemon=True).start()
     return jsonify({'ok': True, 'msg': 'Server restarting…'})
+
+
+_LOGO_PATH = os.path.join(PREVIEW_DIR, 'assets', 'images', 'logo.png')
+
+@app.route('/admin/api/settings/logo', methods=['GET'])
+def admin_logo_get():
+    auth = _require_admin()
+    if auth: return auth
+    if os.path.isfile(_LOGO_PATH):
+        size = os.path.getsize(_LOGO_PATH)
+        mtime = os.path.getmtime(_LOGO_PATH)
+        import datetime
+        uploaded = datetime.datetime.fromtimestamp(mtime).strftime('%b %-d, %Y')
+        return jsonify({'url': '/assets/images/logo.png', 'size': size, 'uploaded': uploaded})
+    return jsonify({'url': None})
+
+
+@app.route('/admin/api/settings/logo', methods=['POST'])
+def admin_logo_upload():
+    auth = _require_admin()
+    if auth: return auth
+    import base64, re as _re
+    data = request.get_json(silent=True) or {}
+    image_data = data.get('image', '')
+    # Accept data URL: data:image/png;base64,<data>
+    m = _re.match(r'data:(image/(?:png|webp|svg\+xml));base64,(.+)', image_data, _re.DOTALL)
+    if not m:
+        return jsonify({'error': 'Invalid image data — must be PNG, WebP, or SVG as a base64 data URL'}), 400
+    mime_type = m.group(1)
+    raw = base64.b64decode(m.group(2))
+    if len(raw) > 2 * 1024 * 1024:
+        return jsonify({'error': 'File too large — max 2 MB'}), 400
+    os.makedirs(os.path.dirname(_LOGO_PATH), exist_ok=True)
+    with open(_LOGO_PATH, 'wb') as f:
+        f.write(raw)
+    return jsonify({'ok': True, 'url': '/assets/images/logo.png', 'size': len(raw)})
+
+
+@app.route('/admin/api/settings/logo', methods=['DELETE'])
+def admin_logo_delete():
+    auth = _require_admin()
+    if auth: return auth
+    if os.path.isfile(_LOGO_PATH):
+        os.remove(_LOGO_PATH)
+        return jsonify({'ok': True})
+    return jsonify({'ok': True, 'note': 'no logo to remove'})
 
 
 @app.route('/admin/api/dashboard')
@@ -3740,24 +4156,26 @@ def _render_project_page(p):
   <div class="project-hero">
     <div class="project-hero__img" role="img" aria-label="{name} by Ridgecrest Designs, {city}, {state}" style="background-image:url('{hero_src}')"></div>
     <div class="project-hero__overlay"></div>
-  </div>
-
-  <section class="project-meta section" style="padding-bottom:0">
-    <div class="container">
-      <p class="breadcrumb-back"><a href="portfolio.html">\u2190 Portfolio</a></p>
-      <div class="project-meta__inner">
-        <div>
-          <p class="section__label">{city}, {state}</p>
-          <h1 class="project-meta__title">{name}</h1>
-          <div class="project-meta__tags">
+    <div class="project-hero__content">
+      <div class="container project-hero__content-inner">
+        <div class="project-hero__left">
+          <p class="breadcrumb-back breadcrumb-back--hero"><a href="portfolio.html">\u2190 Portfolio</a></p>
+          <p class="project-hero__eyebrow">{city}, {state}</p>
+          <h1 class="project-hero__title">{name}</h1>
+          <div class="project-hero__tags">
             <span class="project-meta__tag">{ptype}</span>
             <span class="project-meta__tag">{year}</span>
           </div>
         </div>
-        <div class="project-meta__cta">
-          <a href="{_INQUIRY_URL}" class="btn btn--dark">Start a Similar Project</a>
+        <div class="project-hero__right">
+          <a href="{_INQUIRY_URL}" class="btn btn--primary project-hero__cta">Start a Similar Project</a>
         </div>
       </div>
+    </div>
+  </div>
+
+  <section class="project-meta section">
+    <div class="container">
       <div class="project-description">
         {desc_paras}
       </div>{specs_html}
@@ -4753,9 +5171,13 @@ def admin_page_update(slug):
     hero_image   = data.get('hero_image', '').strip() or None
     hero_position = data.get('hero_position', '').strip() or None
     hero_zoom    = data.get('hero_zoom')
+    hero_text_x  = data.get('hero_text_x')
+    hero_text_y  = data.get('hero_text_y')
 
     if hero_image and not hero_image.startswith('/assets/'):
         return jsonify({'error': 'hero_image must start with /assets/'}), 400
+    if hero_position and not re.fullmatch(r'\d{1,3}(\.\d+)?%\s+\d{1,3}(\.\d+)?%', hero_position):
+        return jsonify({'error': 'hero_position must be "X% Y%" (e.g. "50% 50%")'}), 400
 
     conn = _db_conn()
     if not conn:
@@ -4763,6 +5185,14 @@ def admin_page_update(slug):
     try:
         cur = conn.cursor()
         _ensure_pages_table(cur)
+        _ensure_page_locks_table(cur)
+        # Atomic TOCTOU-safe lock check: SELECT FOR UPDATE holds the page_locks row
+        # for the duration of this transaction. A concurrent lock flip will block
+        # until we commit, preventing writes from slipping past the check.
+        cur.execute("SELECT status FROM page_locks WHERE slug = %s FOR UPDATE", (slug,))
+        lock_row = cur.fetchone()
+        if lock_row and lock_row['status'] == 'locked':
+            return jsonify({'error': 'page is locked'}), 423
         # Build dynamic SET clause — only update fields that were sent
         sets = ['updated_at = NOW()']
         params = []
@@ -4772,6 +5202,10 @@ def admin_page_update(slug):
             sets.append('hero_position = %s'); params.append(hero_position)
         if hero_zoom is not None:
             sets.append('hero_zoom = %s'); params.append(float(hero_zoom))
+        if hero_text_x is not None:
+            sets.append('hero_text_x = %s'); params.append(float(hero_text_x))
+        if hero_text_y is not None:
+            sets.append('hero_text_y = %s'); params.append(float(hero_text_y))
         cur.execute(f"""
             INSERT INTO pages (slug, hero_image, hero_position, hero_zoom, title, page_path, updated_at)
             VALUES (%s, %s, %s, %s, %s, %s, NOW())
@@ -4797,10 +5231,11 @@ def admin_page_update(slug):
                 conn.commit()
             except Exception:
                 pass  # not a project page — ignore
-        conn.close()
         return jsonify({'ok': True, 'slug': slug})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
 
 
 _NON_PROJECT_SLUGS = {
@@ -4996,6 +5431,10 @@ def admin_pages_images():
         for fname in sorted(os.listdir(opt_dir)):
             ext = fname.rsplit('.', 1)[-1].lower()
             if ext not in ('webp', 'jpg', 'jpeg', 'png'):
+                continue
+            # Skip stub/test files smaller than 500 bytes
+            fpath = os.path.join(opt_dir, fname)
+            if os.path.getsize(fpath) < 500:
                 continue
             if re.search(r'_\d+w\.webp$', fname):
                 continue
@@ -5537,6 +5976,22 @@ def admin_save_result():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+    # Clear active_version for the base file — the AI content now lives in the original,
+    # so there is no longer a separate active_version file to track.
+    _c3 = _db_conn()
+    if _c3:
+        try:
+            _cu3 = _c3.cursor()
+            _ensure_image_labels_table(_cu3)
+            _cu3.execute(
+                "UPDATE image_labels SET active_version = NULL WHERE filename = %s",
+                (original_filename,))
+            _c3.commit()
+        except Exception:
+            _c3.rollback()
+        finally:
+            _c3.close()
+
     return jsonify({'ok': True, 'filename': original_filename,
                     'hero_path': f'/assets/images-opt/{original_filename}'})
 
@@ -5704,7 +6159,15 @@ def admin_set_version():
         """, (new_active_path, original_path, ai_like, ai_v_like, orig_v_like))
         pages_updated = cur.rowcount
 
-        # 4. Find portfolio projects whose gallery or hero uses this base image
+        # 4. Propagate to blog_posts featured_image
+        cur.execute("""
+            UPDATE blog_posts SET featured_image = %s
+            WHERE featured_image = %s OR featured_image LIKE %s
+               OR featured_image LIKE %s OR featured_image LIKE %s
+        """, (new_active_path, original_path, ai_like, ai_v_like, orig_v_like))
+        blog_updated = cur.rowcount
+
+        # 5. Find portfolio projects whose gallery or hero uses this base image
         cur.execute("""
             SELECT id FROM portfolio_projects
             WHERE gallery_json LIKE %s OR hero_hash = %s
@@ -5713,14 +6176,15 @@ def admin_set_version():
 
         conn.commit()
 
-        # 5. Background-regenerate affected project pages so their gallery HTML reflects the change
+        # 5. Synchronously regenerate affected project pages so their gallery HTML reflects
+        #    the new active version before the client receives the response and reloads.
+        #    (Gallery images are typically in 1–2 projects; re-render is fast enough to block.)
         if affected_pids:
-            def _regen_affected(pids=affected_pids):
-                c2 = _db_conn()
-                if not c2: return
+            c2 = _db_conn()
+            if c2:
                 try:
                     cu = c2.cursor()
-                    cu.execute('SELECT * FROM portfolio_projects WHERE id = ANY(%s)', (pids,))
+                    cu.execute('SELECT * FROM portfolio_projects WHERE id = ANY(%s)', (affected_pids,))
                     for row in cu.fetchall():
                         try:
                             p = _portfolio_row_to_dict(row)
@@ -5729,8 +6193,8 @@ def admin_set_version():
                             print(f'[set-version regen] {row.get("slug","?")}: {ex}')
                     c2.close()
                 except Exception:
-                    pass
-            threading.Thread(target=_regen_affected, daemon=True).start()
+                    try: c2.close()
+                    except: pass
 
         return jsonify({
             'ok': True,
@@ -5739,7 +6203,86 @@ def admin_set_version():
             'new_active_path': new_active_path,
             'cards_updated': cards_updated,
             'pages_updated': pages_updated,
+            'blog_updated': blog_updated,
             'projects_regenning': len(affected_pids),
+        })
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
+
+# ── Set hero image for a specific page only (no global propagation) ──────────
+
+@app.route('/admin/api/pages/<slug>/hero', methods=['PATCH'])
+def admin_page_hero_set(slug):
+    """Set the hero image for ONE specific page. Does not touch other pages."""
+    auth = _require_admin()
+    if auth: return auth
+    data = request.get_json(force=True) or {}
+    base_filename    = os.path.basename(data.get('base_filename', ''))
+    version_filename = (data.get('version_filename') or '').strip()
+
+    if not base_filename or not base_filename.endswith('.webp'):
+        return jsonify({'error': 'invalid base_filename'}), 400
+
+    # Normalise: empty or same as base → null (use original)
+    if version_filename:
+        version_filename = os.path.basename(version_filename)
+        if version_filename == base_filename:
+            version_filename = None
+        elif version_filename:
+            opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+            if not os.path.isfile(os.path.join(opt_dir, version_filename)):
+                return jsonify({'error': 'version file not found on disk'}), 404
+    else:
+        version_filename = None
+
+    new_active_path = (
+        f'/assets/images-opt/{version_filename}' if version_filename
+        else f'/assets/images-opt/{base_filename}'
+    )
+
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'no db'}), 503
+    try:
+        cur = conn.cursor()
+        _ensure_image_labels_table(cur)
+        _ensure_page_locks_table(cur)
+
+        # Atomic lock check — same pattern as admin_page_update
+        cur.execute("SELECT status FROM page_locks WHERE slug = %s FOR UPDATE", (slug,))
+        lock_row = cur.fetchone()
+        if lock_row and lock_row['status'] == 'locked':
+            conn.rollback()
+            return jsonify({'error': 'page is locked'}), 423
+
+        # Update image_labels active_version
+        cur.execute("""
+            INSERT INTO image_labels (filename, active_version)
+            VALUES (%s, %s)
+            ON CONFLICT (filename) DO UPDATE SET active_version = EXCLUDED.active_version
+        """, (base_filename, version_filename))
+
+        # Update hero_image for THIS page only
+        cur.execute(
+            "UPDATE pages SET hero_image = %s WHERE slug = %s",
+            (new_active_path, slug)
+        )
+        if cur.rowcount == 0:
+            conn.rollback()
+            return jsonify({'error': 'page not found'}), 404
+
+        conn.commit()
+        return jsonify({
+            'ok': True,
+            'slug': slug,
+            'base_filename': base_filename,
+            'active_version': version_filename,
+            'new_active_path': new_active_path,
         })
     except Exception as e:
         conn.rollback()
@@ -5851,39 +6394,98 @@ def admin_delete_version():
 
 @app.route('/admin/api/images/adjust', methods=['POST'])
 def admin_image_adjust():
-    """Apply brightness/contrast/saturation adjustments to an image in-place."""
+    """Apply image adjustments in-place, or create a new version (create_version=true)."""
     auth = _require_admin()
     if auth: return auth
     data = request.get_json(force=True) or {}
-    filename = os.path.basename(data.get('filename', ''))
-    brightness = int(data.get('brightness', 100))
-    contrast   = int(data.get('contrast',   100))
-    saturation = int(data.get('saturation', 100))
+    filename       = os.path.basename(data.get('filename', ''))
+    brightness     = max(50,   min(150, int(data.get('brightness', 100))))
+    contrast       = max(50,   min(150, int(data.get('contrast',   100))))
+    saturation     = max(0,    min(200, int(data.get('saturation', 100))))
+    color_r        = max(-100, min(100, int(data.get('color_r', 0))))
+    color_g        = max(-100, min(100, int(data.get('color_g', 0))))
+    color_b        = max(-100, min(100, int(data.get('color_b', 0))))
+    kelvin         = max(2000, min(10000, int(data.get('kelvin', 6500))))
+    create_version = bool(data.get('create_version', False))
+    base_filename  = os.path.basename(data.get('base_filename', filename))
+
     if not filename:
         return jsonify({'error': 'filename required'}), 400
-    opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+    opt_dir  = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
     src_path = os.path.join(opt_dir, filename)
     if not os.path.isfile(src_path):
         return jsonify({'error': 'file not found'}), 404
+
+    if create_version:
+        # Save as next available _ai_N.webp derived from base_filename
+        base_for_naming = re.sub(r'_ai_\d+\.webp$', '.webp', base_filename)
+        base_stem       = base_for_naming[:-5]  # strip .webp
+        n = 1
+        while os.path.isfile(os.path.join(opt_dir, f'{base_stem}_ai_{n}.webp')):
+            n += 1
+        out_filename = f'{base_stem}_ai_{n}.webp'
+        out_path     = os.path.join(opt_dir, out_filename)
+    else:
+        out_filename = filename
+        out_path     = src_path
+
     import subprocess as _subp
     script = f"""
-import sys; sys.path.insert(0, '/home/claudeuser/.local/lib/python3.12/site-packages')
+import sys, os
+sys.path.insert(0, '/home/claudeuser/.local/lib/python3.12/site-packages')
 from PIL import Image, ImageEnhance
-src = {repr(src_path)}
-brightness, contrast, saturation = {brightness}/100, {contrast}/100, {saturation}/100
-with Image.open(src) as img:
+src_path = {repr(src_path)}
+out_path = {repr(out_path)}
+create_version = {create_version}
+brightness = {brightness}/100; contrast = {contrast}/100; saturation = {saturation}/100
+color_r = {color_r}; color_g = {color_g}; color_b = {color_b}; kelvin = {kelvin}
+
+with Image.open(src_path) as img:
     img = img.convert('RGB')
     if brightness != 1.0: img = ImageEnhance.Brightness(img).enhance(brightness)
     if contrast   != 1.0: img = ImageEnhance.Contrast(img).enhance(contrast)
     if saturation != 1.0: img = ImageEnhance.Color(img).enhance(saturation)
-    img.save(src, 'WEBP', quality=88)
-    base = src[:-5]
+
+    # Per-channel adjustments via lookup table (colour balance + Kelvin)
+    def lut(mult):
+        return [max(0, min(255, int(i * mult))) for i in range(256)]
+
+    # Colour balance: -100..+100  →  0.5x..1.5x per channel
+    cb_r = 1.0 + color_r * 0.005
+    cb_g = 1.0 + color_g * 0.005
+    cb_b = 1.0 + color_b * 0.005
+
+    # Kelvin warm/cool shift relative to neutral 6500 K
+    if kelvin != 6500:
+        neutral = 6500
+        if kelvin < neutral:
+            t = (neutral - kelvin) / (neutral - 2000)
+            kw_r, kw_g, kw_b = 1.0 + 0.20*t, 1.0 + 0.03*t, 1.0 - 0.20*t
+        else:
+            t = (kelvin - neutral) / (10000 - neutral)
+            kw_r, kw_g, kw_b = 1.0 - 0.20*t, 1.0 - 0.03*t, 1.0 + 0.20*t
+    else:
+        kw_r = kw_g = kw_b = 1.0
+
+    r_m = cb_r * kw_r; g_m = cb_g * kw_g; b_m = cb_b * kw_b
+    if abs(r_m-1)>0.001 or abs(g_m-1)>0.001 or abs(b_m-1)>0.001:
+        r, g, b = img.split()
+        if abs(r_m-1)>0.001: r = r.point(lut(r_m))
+        if abs(g_m-1)>0.001: g = g.point(lut(g_m))
+        if abs(b_m-1)>0.001: b = b.point(lut(b_m))
+        img = Image.merge('RGB', (r, g, b))
+
+    img.save(out_path, 'WEBP', quality=88)
+
+    # Responsive variants: update existing ones (in-place) or create all (new version)
+    base_stem = out_path[:-5]
     for suffix, w in [('_1920w',1920),('_960w',960),('_480w',480),('_201w',201)]:
-        import os; rp = base + suffix + '.webp'
-        if os.path.isfile(rp):
-            r = img.copy()
-            if r.width > w: r = r.resize((w, int(r.height*w/r.width)), Image.LANCZOS)
-            r.save(rp, 'WEBP', quality=85)
+        rp = base_stem + suffix + '.webp'
+        if create_version or os.path.isfile(rp):
+            copy = img.copy()
+            if copy.width > w: copy = copy.resize((w, int(copy.height*w/copy.width)), Image.LANCZOS)
+            copy.save(rp, 'WEBP', quality=85)
+
 print('OK')
 """
     try:
@@ -5893,7 +6495,11 @@ print('OK')
             return jsonify({'error': result.stderr.strip() or 'adjust failed'}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    return jsonify({'ok': True, 'filename': filename})
+
+    resp = {'ok': True, 'filename': out_filename}
+    if create_version:
+        resp['hero_path'] = f'/assets/images-opt/{out_filename}'
+    return jsonify(resp)
 
 
 # ── Settings — env key management ────────────────────────────────────────────
@@ -7756,12 +8362,30 @@ def gallery_layout_save(slug):
     if err: return err
     if not re.match(r'^[a-z0-9-]+$', slug):
         return jsonify({'error': 'invalid slug'}), 400
-    data = request.get_json(force=True) or {}
-    layout = data.get('layout', {})
-    path = os.path.join(_GALLERY_LAYOUTS_DIR, f'{slug}.json')
-    with open(path, 'w') as f:
-        json.dump(layout, f, indent=2)
-    return jsonify({'ok': True, 'slug': slug, 'items': len(layout)})
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'lock status unavailable'}), 503
+    try:
+        cur = conn.cursor()
+        _ensure_page_locks_table(cur)
+        # Atomic TOCTOU-safe lock check: SELECT FOR UPDATE holds the row lock
+        # across the file write and commit, so a concurrent lock flip blocks
+        # until after the write completes — preventing races.
+        cur.execute("SELECT status FROM page_locks WHERE slug = %s FOR UPDATE", (slug,))
+        row = cur.fetchone()
+        if row and row['status'] == 'locked':
+            return jsonify({'error': 'page is locked'}), 423
+        data = request.get_json(force=True) or {}
+        layout = data.get('layout', {})
+        path = os.path.join(_GALLERY_LAYOUTS_DIR, f'{slug}.json')
+        with open(path, 'w') as f:
+            json.dump(layout, f, indent=2)
+        conn.commit()  # releases the FOR UPDATE row lock
+        return jsonify({'ok': True, 'slug': slug, 'items': len(layout)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 503
+    finally:
+        conn.close()
 
 @app.route('/admin/api/gallery/layout/<slug>', methods=['GET'])
 def gallery_layout_load(slug):
@@ -7854,14 +8478,47 @@ def gallery_add_image(slug):
     ext = os.path.splitext(orig_name)[1].lower()
     if ext not in ('.jpg', '.jpeg', '.png', '.webp', '.gif'):
         return jsonify({'error': 'image files only'}), 400
+    # Read bytes now so we can hash before saving
+    raw_bytes = f.read()
     # Strip extension to get hash; re-attach for save
     base = os.path.splitext(orig_name)[0]
     opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
     os.makedirs(opt_dir, exist_ok=True)
-    save_path = os.path.join(opt_dir, orig_name)
-    f.save(save_path)
-    final_path = _to_webp(save_path)
-    final_base = os.path.splitext(os.path.basename(final_path))[0]
+
+    # ── Dedup check ───────────────────────────────────────────────────────────
+    _dedup_conn = _db_conn()
+    existing_fname = None
+    if _dedup_conn:
+        try:
+            _dc = _dedup_conn.cursor()
+            existing_fname = _dedup_incoming_bytes(raw_bytes, orig_name, _dc)
+            _dedup_conn.commit()
+        except Exception:
+            _dedup_conn.rollback()
+        finally:
+            try: _dedup_conn.close()
+            except: pass
+
+    if existing_fname:
+        final_base = os.path.splitext(existing_fname)[0]
+    else:
+        save_path = os.path.join(opt_dir, orig_name)
+        with open(save_path, 'wb') as _sf:
+            _sf.write(raw_bytes)
+        final_path = _to_webp(save_path)
+        final_base = os.path.splitext(os.path.basename(final_path))[0]
+        # Register hash
+        _hr_conn = _db_conn()
+        if _hr_conn:
+            try:
+                _hrc = _hr_conn.cursor()
+                _register_file_hash(raw_bytes, final_base + '.webp', _hrc)
+                _hr_conn.commit()
+            except Exception:
+                _hr_conn.rollback()
+            finally:
+                try: _hr_conn.close()
+                except: pass
     # Add to gallery_json
     conn = _db_conn()
     if not conn:
@@ -7880,6 +8537,12 @@ def gallery_add_image(slug):
         if final_base in existing_hashes:
             conn.close()
             return jsonify({'ok': True, 'filename': final_base, 'note': 'already in gallery'})
+        # Guardrail: refuse to re-add a manually excluded image
+        _ensure_gallery_exclusions_table(cur)
+        cur.execute("SELECT 1 FROM gallery_exclusions WHERE slug = %s AND image_hash = %s", (slug, final_base))
+        if cur.fetchone():
+            conn.close()
+            return jsonify({'error': 'excluded', 'message': 'This image was manually removed from this gallery. Clear the exclusion in Admin → Gallery to re-add it.'}), 409
         gallery.append([final_base, 'webp'])
         cur.execute("UPDATE portfolio_projects SET gallery_json = %s WHERE slug = %s",
                     (json.dumps(gallery), slug))
@@ -7939,6 +8602,11 @@ def gallery_remove_image(slug):
         cur.execute(
             "UPDATE portfolio_projects SET gallery_json = %s WHERE slug = %s",
             (json.dumps(new_gallery), slug))
+        # Guardrail: record exclusion so audits/rebuilds never re-add this image
+        _ensure_gallery_exclusions_table(cur)
+        cur.execute(
+            "INSERT INTO gallery_exclusions (slug, image_hash) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+            (slug, filename))
         conn.commit()
         conn.close()
         # Regenerate page HTML synchronously so the removed image is gone
@@ -7946,6 +8614,57 @@ def gallery_remove_image(slug):
         p['gallery'] = new_gallery
         _render_project_page(p)
         return jsonify({'ok': True, 'removed': filename, 'remaining': len(new_gallery)})
+    except Exception as e:
+        try: conn.close()
+        except: pass
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/gallery/<slug>/exclusions', methods=['GET'])
+def gallery_list_exclusions(slug):
+    """List manually excluded images for a project (admin only)."""
+    err = _require_admin()
+    if err: return err
+    if not re.match(r'^[a-z0-9-]+$', slug):
+        return jsonify({'error': 'invalid slug'}), 400
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'db unavailable'}), 500
+    try:
+        cur = conn.cursor()
+        _ensure_gallery_exclusions_table(cur)
+        cur.execute(
+            "SELECT image_hash, excluded_at FROM gallery_exclusions WHERE slug = %s ORDER BY excluded_at DESC",
+            (slug,))
+        rows = cur.fetchall()
+        conn.close()
+        return jsonify({'slug': slug, 'exclusions': [{'image_hash': r[0], 'excluded_at': r[1].isoformat() if r[1] else None} for r in rows]})
+    except Exception as e:
+        try: conn.close()
+        except: pass
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/gallery/<slug>/exclusions/<image_hash>', methods=['DELETE'])
+def gallery_clear_exclusion(slug, image_hash):
+    """Remove a gallery exclusion so the image can be re-added (admin only)."""
+    err = _require_admin()
+    if err: return err
+    if not re.match(r'^[a-z0-9-]+$', slug):
+        return jsonify({'error': 'invalid slug'}), 400
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'db unavailable'}), 500
+    try:
+        cur = conn.cursor()
+        _ensure_gallery_exclusions_table(cur)
+        cur.execute(
+            "DELETE FROM gallery_exclusions WHERE slug = %s AND image_hash = %s",
+            (slug, image_hash))
+        deleted = cur.rowcount
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True, 'cleared': deleted > 0})
     except Exception as e:
         try: conn.close()
         except: pass
@@ -8386,6 +9105,13 @@ def admin_undo():
             old_gallery = bd['old_gallery']
             cur.execute("UPDATE portfolio_projects SET gallery_json = %s WHERE slug = %s",
                         (json.dumps(old_gallery), slug))
+            # Clear any exclusions for images being restored (handles undo of a deletion)
+            old_hashes = [item[0] if isinstance(item, (list, tuple)) else item for item in old_gallery]
+            if old_hashes:
+                _ensure_gallery_exclusions_table(cur)
+                cur.execute(
+                    "DELETE FROM gallery_exclusions WHERE slug = %s AND image_hash = ANY(%s)",
+                    (slug, old_hashes))
             cur.execute("SELECT * FROM portfolio_projects WHERE slug = %s", (slug,))
             prow = cur.fetchone()
             if prow:
@@ -8583,6 +9309,9 @@ try:
     _seed_gallery_types_from_image_labels()
 except Exception as _gt_err:
     print(f'[gallery_types] Seed failed: {_gt_err}')
+
+# Backfill file_hashes for existing images (non-blocking background thread)
+threading.Thread(target=_backfill_file_hashes, daemon=True).start()
 
 # ─────────────────────────────────────────────────────────────────────────────
 

@@ -185,12 +185,38 @@
   .diff-grid {
     grid-template-columns: 1fr 1fr;
   }
+
+  /* Reduce service page hero padding on tablets */
+  .page-hero--service {
+    padding: 6rem 1.5rem 3.5rem;
+  }
 }
 
 @media (max-width: 600px) {
+  .page-hero--service {
+    padding: 5rem 1.2rem 3rem;
+    min-height: 50vh;
+  }
+
+  .page-hero--service .page-hero__title {
+    font-size: clamp(2rem, 7vw, 3rem);
+  }
+
+  .page-hero--service .page-hero__sub {
+    font-size: 0.95rem;
+    margin-bottom: 1.8rem;
+  }
+
   .page-hero__actions {
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
+  }
+
+  .page-hero__actions .btn {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+    display: flex;
   }
 
   .diff-grid {
@@ -199,5 +225,9 @@
 
   .service-projects-grid {
     grid-template-columns: 1fr;
+  }
+
+  .service-project__link {
+    padding: 1.8rem;
   }
 }

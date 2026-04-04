@@ -4,8 +4,11 @@
 
 param(
     [string]$ServerUrl = "http://147.182.242.54:8081",
-    [string]$Password  = "Hb2425hb+"
+    [string]$Password  = ""
 )
+if ([string]::IsNullOrEmpty($Password)) {
+    $Password = Read-Host "Enter admin password"
+}
 
 $ErrorActionPreference = "Stop"
 

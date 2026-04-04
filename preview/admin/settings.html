@@ -76,6 +76,35 @@
 
       <!-- General Tab -->
       <div id="generalPanel">
+
+        <!-- Brand Assets -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Brand Assets</div>
+              <div class="card-sub">Logo appears to the left of "Ridgecrest Designs" text in the nav bar across all pages</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="logoPreviewArea" style="display:flex;align-items:center;gap:16px;padding:16px;background:var(--surface-2);border:1px dashed var(--border-2);border-radius:8px;margin-bottom:16px;">
+              <div id="logoThumb" style="width:120px;height:52px;background:var(--bg);border:1px solid var(--border-2);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">
+                <span id="logoThumbText" style="font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-3);">No logo</span>
+                <img id="logoThumbImg" src="" alt="Logo preview" style="display:none;max-width:110px;max-height:44px;object-fit:contain;" />
+              </div>
+              <div>
+                <div id="logoStatusTitle" style="font-size:13px;color:var(--text-2);margin-bottom:4px;">No logo uploaded</div>
+                <div id="logoStatusHint" style="font-size:12px;color:var(--text-3);">Upload a logo to display it to the left of "Ridgecrest Designs" in the nav bar.</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <button class="btn btn-primary btn-sm" onclick="logoUploadTrigger()">⬆ Upload Logo</button>
+              <button id="logoRemoveBtn" class="btn btn-ghost btn-sm" onclick="logoRemove()" style="color:var(--red);border-color:rgba(239,68,68,0.3);display:none;">✕ Remove Logo</button>
+            </div>
+            <p style="font-size:12px;color:var(--text-3);margin-top:10px;">Accepted: <strong style="color:var(--text-2)">PNG, WebP, SVG</strong> &nbsp;·&nbsp; Max: <strong style="color:var(--text-2)">2 MB</strong> &nbsp;·&nbsp; Recommended height: <strong style="color:var(--text-2)">36–48 px</strong></p>
+            <input type="file" id="logoFileInput" accept="image/png,image/webp,image/svg+xml" style="display:none" onchange="logoHandleFile(this.files[0])" />
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-header"><div class="card-title">Business Information</div></div>
           <div class="card-body">
@@ -479,6 +508,11 @@
   if (!Admin.requireAuth()) throw new Error('unauth');
   Admin.init('settings');
 
+  // Load general tab state on page init
+  document.addEventListener('DOMContentLoaded', function() {
+    logoLoadState();
+  });
+
   // Show/hide panels on tab click
   document.querySelectorAll('#settingsTabs .tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -633,6 +667,73 @@
   function copyWebhook() {
     navigator.clipboard.writeText(document.getElementById('webhookUrl').value)
       .then(() => Admin.toast('Webhook URL copied', 'success'));
+  }
+
+  // ── Logo upload feature ────────────────────────────────────────────────────
+  async function logoLoadState() {
+    try {
+      const res = await Admin.get('/settings/logo');
+      const hasLogo = res && res.url;
+      const thumbImg = document.getElementById('logoThumbImg');
+      const thumbText = document.getElementById('logoThumbText');
+      const statusTitle = document.getElementById('logoStatusTitle');
+      const statusHint = document.getElementById('logoStatusHint');
+      const removeBtn = document.getElementById('logoRemoveBtn');
+      const uploadBtn = document.querySelector('[onclick="logoUploadTrigger()"]');
+
+      if (hasLogo) {
+        thumbImg.src = res.url + '?t=' + Date.now();
+        thumbImg.style.display = 'block';
+        thumbText.style.display = 'none';
+        statusTitle.innerHTML = 'logo.png &nbsp;<span style="color:var(--green);font-size:11px;">● Active</span>';
+        const kb = res.size ? Math.round(res.size / 1024) + ' KB &nbsp;·&nbsp; ' : '';
+        statusHint.innerHTML = kb + 'Showing to the left of nav text on all pages';
+        removeBtn.style.display = '';
+        if (uploadBtn) uploadBtn.textContent = '⬆ Replace Logo';
+      } else {
+        thumbImg.style.display = 'none';
+        thumbText.style.display = '';
+        statusTitle.textContent = 'No logo uploaded';
+        statusHint.textContent = 'Upload a logo to display it to the left of "Ridgecrest Designs" in the nav bar.';
+        removeBtn.style.display = 'none';
+        if (uploadBtn) uploadBtn.textContent = '⬆ Upload Logo';
+      }
+    } catch(e) {}
+  }
+
+  function logoUploadTrigger() {
+    document.getElementById('logoFileInput').value = '';
+    document.getElementById('logoFileInput').click();
+  }
+
+  async function logoHandleFile(file) {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      Admin.toast('File too large — max 2 MB', 'error'); return;
+    }
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      const dataUrl = e.target.result;
+      const res = await Admin.post('/settings/logo', { image: dataUrl });
+      if (res && res.ok) {
+        Admin.toast('Logo uploaded', 'success');
+        logoLoadState();
+      } else {
+        Admin.toast(res?.error || 'Upload failed', 'error');
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function logoRemove() {
+    if (!confirm('Remove the logo from the nav bar?')) return;
+    const res = await Admin.del('/settings/logo');
+    if (res && res.ok) {
+      Admin.toast('Logo removed', 'success');
+      logoLoadState();
+    } else {
+      Admin.toast(res?.error || 'Remove failed', 'error');
+    }
   }
 </script>
 </body>

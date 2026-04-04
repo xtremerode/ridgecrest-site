@@ -195,6 +195,17 @@ p { line-height: 1.8; }
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--white);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nav__logo-img {
+  display: block;
+  height: 36px;
+  width: auto;
+  max-width: 140px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .nav__links {
@@ -250,6 +261,7 @@ p { line-height: 1.8; }
   position: absolute;
   inset: 0;
   background-size: cover;
+  background-repeat: no-repeat;
   background-position: center 30%;
   background-color: #0d1a22;
 }
@@ -406,6 +418,9 @@ p { line-height: 1.8; }
 .team-card__photo.rd-card--image-mode::before { display: none !important; }
 .team-card__photo.rd-card--image-mode:hover::before { display: none !important; }
 .team-card__photo[data-card-id]:hover { filter: none !important; }
+/* ── Featured home image panels: static, no hover effects ── */
+.featured-home__img[data-card-id] { transition: none !important; }
+.featured-home__img[data-card-id]:hover { filter: none !important; }
 
 .service-card__num {
   font-family: var(--font-sans);
@@ -1284,15 +1299,14 @@ p { line-height: 1.8; }
   .portfolio-item:nth-child(1), .portfolio-item:nth-child(4) { grid-column: span 2; aspect-ratio: 16/9; }
   .team-grid { grid-template-columns: repeat(2, 1fr); }
   .about-split { grid-template-columns: 1fr; }
+  /* Footer nav — wrap to 2×2 at tablet/small laptop where 4 columns become too narrow */
+  .footer__nav { flex-wrap: wrap; gap: 1.5rem 1rem; }
+  .footer__col { flex: 0 0 calc(50% - 0.5rem); }
   .about-values { grid-template-columns: repeat(2, 1fr); }
   .contact-layout { grid-template-columns: 1fr; }
-}
 
-@media (max-width: 768px) {
-  :root {
-    --space-xl: 4rem;
-    --space-lg: 2.5rem;
-  }
+  /* ── Nav: switch to hamburger at 1024px so desktop nav never wraps ── */
+  .nav__toggle { display: flex; z-index: 300; }
   .nav__links {
     position: fixed;
     top: 0; right: 0;
@@ -1310,7 +1324,13 @@ p { line-height: 1.8; }
   }
   .nav__links--open { transform: translateX(0); }
   .nav__links a { font-size: 0.85rem; }
-  .nav__toggle { display: flex; z-index: 300; }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --space-xl: 4rem;
+    --space-lg: 2.5rem;
+  }
 
   .services__grid { grid-template-columns: 1fr; }
   .portfolio-strip__grid { grid-template-columns: 1fr; }
@@ -1319,14 +1339,44 @@ p { line-height: 1.8; }
   .portfolio-item:nth-child(1), .portfolio-item:nth-child(4) { grid-column: span 1; aspect-ratio: 4/3; }
   .process-strip__steps { flex-direction: column; align-items: center; }
   .step__line { width: 1px; height: 30px; margin-top: 0; margin-left: 22px; }
-  .footer__inner { grid-template-columns: 1fr; }
-  .footer__nav { flex-wrap: wrap; }
+  .footer__inner { grid-template-columns: 1fr; gap: var(--space-md); }
+  .footer__nav { flex-wrap: wrap; gap: 1.5rem 1rem; }
+  .footer__col { flex: 0 0 calc(50% - 0.5rem); }
+  .footer__col-head { font-size: 0.68rem; }
+  .footer__col a { font-size: 0.85rem; }
+  .footer__bottom .container { flex-direction: column; align-items: flex-start; gap: 0.4rem; }
   .section__header--split { flex-direction: column; align-items: flex-start; gap: 1rem; }
   .team-grid { grid-template-columns: 1fr; }
   .about-values { grid-template-columns: 1fr; }
   .diff__stats { flex-direction: column; gap: 1rem; }
   .process-step { grid-template-columns: 1fr; }
   .process-step__num { text-align: left; padding-right: 0; border-right: none; border-bottom: 1px solid var(--light); padding-bottom: 1rem; font-size: 3rem; }
+
+  /* ── Hero — mobile fixes ── */
+  /* Reset any admin-set text offset so content stays inside hero on small screens */
+  .hero__content { transform: none !important; padding-top: 6rem; padding-bottom: 2rem; }
+  .hero__sub { margin-bottom: 1.5rem; }
+  .hero__actions { flex-direction: column; gap: 0.75rem; }
+  .hero__actions .btn { width: 100%; text-align: center; justify-content: center; display: flex; }
+
+  /* ── Page hero — reduce top padding on mobile ── */
+  .page-hero { padding: 7rem var(--space-md) 3.5rem; }
+
+  /* ── Project hero — shorter on mobile ── */
+  .project-hero { height: 65vh; min-height: 420px; }
+  .project-hero__content { padding: 1.5rem 0 2rem; }
+  .project-hero__title { font-size: clamp(1.6rem, 6vw, 2.5rem); }
+  .project-hero__content-inner { flex-direction: column; align-items: flex-start; gap: 1.25rem; }
+
+  /* ── Buttons — slightly less padding on mobile ── */
+  .btn { padding: 0.9rem 1.8rem; }
+  .btn--lg { padding: 1rem 2rem; }
+
+  /* ── Contact form ── */
+  .contact-form-wrap { padding: 2rem 1.5rem; }
+
+  /* ── Contact layout ── */
+  .contact-layout { gap: var(--space-md); }
 }
 
 /* ============================================================
@@ -1343,18 +1393,75 @@ p { line-height: 1.8; }
   position: absolute;
   inset: 0;
   background-size: cover;
+  background-repeat: no-repeat;
   background-position: center;
   background-color: #0d1a22;
 }
 .project-hero__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.55) 100%);
+  background: linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.82) 100%);
 }
 .project-hero__nav-spacer { height: 80px; }
 
+/* Hero content overlay */
+.project-hero__content {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  padding: 2rem 0 3rem;
+}
+.project-hero__content-inner {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2rem;
+}
+.project-hero__left { flex: 1; min-width: 0; }
+.project-hero__right { flex-shrink: 0; padding-bottom: 0.25rem; }
+.project-hero__eyebrow {
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.7);
+  margin-bottom: 0.5rem;
+}
+.project-hero__title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, 3.8rem);
+  font-weight: 300;
+  color: #fff;
+  line-height: 1.1;
+  margin-bottom: 0.75rem;
+}
+.project-hero__tags {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+.project-hero__tags .project-meta__tag {
+  color: rgba(255,255,255,0.85);
+  border-color: rgba(255,255,255,0.35);
+}
+.project-hero__cta { white-space: nowrap; }
+.breadcrumb-back--hero { margin-bottom: 1rem; }
+.breadcrumb-back--hero a {
+  color: rgba(255,255,255,0.6);
+  text-decoration: none;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-family: var(--font-body);
+}
+.breadcrumb-back--hero a:hover { color: #fff; }
+
 .project-meta {
-  padding: 3.5rem 0 0;
+  padding: 3rem 0 0;
   background: var(--white);
 }
 .project-meta__inner {
@@ -1465,6 +1572,53 @@ p { line-height: 1.8; }
 @media (max-width: 768px) { .gallery-masonry { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 480px) { .gallery-masonry { grid-template-columns: 1fr; } }
 
+@media (max-width: 480px) {
+  :root {
+    --space-xl: 3rem;
+    --space-lg: 2rem;
+    --space-md: 1.2rem;
+  }
+
+  /* ── Hero — small phone ── */
+  .hero { min-height: 560px; }
+  .hero__content { padding-top: 5rem; }
+
+  /* ── Page hero ── */
+  .page-hero { padding: 6rem 1.2rem 3rem; }
+
+  /* ── Forms — iOS requires min 16px to prevent auto-zoom ── */
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="number"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  /* ── Section label/headline spacing ── */
+  .section__headline { margin-bottom: 1.5rem; }
+
+  /* ── Locations text minimum ── */
+  .locations__intro { font-size: 0.9rem; }
+
+  /* ── Footer on small phones: stack columns ── */
+  .footer__col { flex: 0 0 100%; }
+  .footer__col-head { font-size: 0.72rem; }
+  .footer__col a { font-size: 0.88rem; }
+
+  /* ── Tiny label text: bump minimums for readability ── */
+  .hero__eyebrow,
+  .page-hero__eyebrow,
+  .section__label,
+  .intro__label,
+  .diff__lbl,
+  .proj-card__loc,
+  .project-meta__tag,
+  .project-spec__label,
+  .project-gallery__label { font-size: 0.72rem; }
+}
+
 
 /* Lightbox */
 .lightbox {
@@ -1561,6 +1715,7 @@ p { line-height: 1.8; }
 .page-hero--service {
   position: relative;
   background-size: cover;
+  background-repeat: no-repeat;
   background-position: center center;
 }
 .page-hero--service::before {
