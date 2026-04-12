@@ -2575,6 +2575,12 @@ _SECTION_RESIZE_TPL = """\
   var DEVICE   = {device_json};
   var SAVE_URL = '/admin/api/pages/' + encodeURIComponent(SLUG) + '/sections';
 
+  // Active drag state
+  var _dragSectionId = null;
+  var _dragSection   = null;
+  var _dragStartH    = 0;
+  var _dragLabel     = null;
+
   function saveHeight(sectionId, finalH) {{
     fetch(SAVE_URL, {{
       method: 'PUT',
@@ -2606,44 +2612,63 @@ _SECTION_RESIZE_TPL = """\
     label.textContent = Math.round(section.offsetHeight) + 'px';
     handle.appendChild(label);
 
-    var dragging = false, startY = 0, startH = 0;
-
-    // Use Pointer Events + setPointerCapture so drag keeps firing even when
-    // the pointer leaves the iframe bounds during a drag gesture.
+    // Cross-frame drag: pointerdown notifies parent to own all pointer events.
+    // Parent sends rd_section_drag_update (delta) and rd_section_drag_commit.
     handle.addEventListener('pointerdown', function(e) {{
       e.preventDefault();
       e.stopPropagation();
-      handle.setPointerCapture(e.pointerId);
-      dragging = true;
-      startY = e.clientY;
-      startH = section.offsetHeight;
-      section.style.height = startH + 'px';
+      _dragSectionId = sectionId;
+      _dragSection   = section;
+      _dragStartH    = Math.round(section.offsetHeight);
+      _dragLabel     = label;
+      section.style.height    = _dragStartH + 'px';
       section.style.minHeight = 'auto';
-      section.style.overflow = 'hidden';
-    }});
-
-    handle.addEventListener('pointermove', function(e) {{
-      if (!dragging) return;
-      e.preventDefault();
-      var newH = Math.max(50, startH + (e.clientY - startY));
-      section.style.height = Math.round(newH) + 'px';
-      label.textContent = Math.round(newH) + 'px';
-    }});
-
-    handle.addEventListener('pointerup', function(e) {{
-      if (!dragging) return;
-      dragging = false;
-      var finalH = Math.round(section.offsetHeight);
-      label.textContent = finalH + 'px';
-      saveHeight(sectionId, finalH);
-    }});
-
-    handle.addEventListener('pointercancel', function() {{
-      dragging = false;
+      section.style.overflow  = 'hidden';
+      // Tell parent to take over pointer capture
+      window.parent.postMessage({{
+        type: 'rd_section_drag_start',
+        slug: SLUG,
+        section_id: sectionId,
+        start_h: _dragStartH
+      }}, window.location.origin);
     }});
 
     return handle;
   }}
+
+  // Listen for drag updates from parent frame
+  window.addEventListener('message', function(evt) {{
+    if (evt.source !== window.parent) return;
+    var d = evt.data;
+    if (!d || !d.type) return;
+
+    if (d.type === 'rd_section_drag_update') {{
+      if (!_dragSection || d.section_id !== _dragSectionId) return;
+      var newH = Math.max(50, _dragStartH + d.delta);
+      _dragSection.style.height = Math.round(newH) + 'px';
+      if (_dragLabel) _dragLabel.textContent = Math.round(newH) + 'px';
+    }}
+
+    if (d.type === 'rd_section_drag_commit') {{
+      if (!_dragSection || d.section_id !== _dragSectionId) return;
+      var finalH = Math.round(_dragSection.offsetHeight);
+      if (_dragLabel) _dragLabel.textContent = finalH + 'px';
+      saveHeight(_dragSectionId, finalH);
+      _dragSectionId = null;
+      _dragSection   = null;
+      _dragLabel     = null;
+    }}
+
+    if (d.type === 'rd_section_drag_cancel') {{
+      if (_dragSection && d.section_id === _dragSectionId) {{
+        _dragSection.style.height = _dragStartH + 'px';
+        if (_dragLabel) _dragLabel.textContent = _dragStartH + 'px';
+      }}
+      _dragSectionId = null;
+      _dragSection   = null;
+      _dragLabel     = null;
+    }}
+  }});
 
   // Footer uses auto height and should never be pixel-overridden
   var SKIP_SECTIONS = {{'footer': true}};
