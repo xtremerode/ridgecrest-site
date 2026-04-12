@@ -1726,6 +1726,28 @@
     // Resize iframe to actual page content (enables full-page scrolling)
     scaleFrame();
 
+    // ── Intercept in-iframe link clicks to reset height before navigation ─────
+    // When the user clicks a link inside the iframe (e.g. a project card on the
+    // portfolio page), the iframe navigates internally — loadPage() never runs,
+    // so siteFrame.style.height stays at the previous page's tall value. The new
+    // page then renders with 70vh = 70% × tallHeight → ginormous hero flash.
+    // Fix: reset height to PREVIEW_H on any same-frame link click BEFORE the
+    // navigation fires, so the new page always sees the correct vh baseline.
+    try {
+      const doc = siteFrame.contentDocument;
+      if (doc && !doc._rdHeightResetAttached) {
+        doc._rdHeightResetAttached = true;
+        doc.addEventListener('click', function(e) {
+          const a = e.target.closest('a[href]');
+          if (!a) return;
+          const href = a.getAttribute('href') || '';
+          // Only intercept same-frame navigation (no target="_blank", no hash-only, no javascript:)
+          if (a.target === '_blank' || href.startsWith('#') || href.startsWith('javascript:')) return;
+          siteFrame.style.height = PREVIEW_H + 'px';
+        }, true); // capture phase so it fires before the link's default action
+      }
+    } catch(e) {}
+
     frameLoading.classList.add('hidden');
     if (editMode) {
       // Re-inject overlays after any iframe reload (e.g. after undo)
