@@ -1410,6 +1410,7 @@
     // Width + scale handled entirely by scaleFrame()
     scaleFrame();
   }
+  window.setDevice = setDevice; // expose for inline onclick handlers on the device toggle buttons
 
   function loadPage(slug) {
     if (!slug) return;
