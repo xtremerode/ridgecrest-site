@@ -955,14 +955,8 @@
       }
       populatePageSelect(pages);
       buildTree(pages);
-      // Restore last-viewed page on browser refresh — no page-tree flash
-      try {
-        const lastSlug = sessionStorage.getItem('rd_last_slug');
-        if (lastSlug && pages.find(p => p.slug === lastSlug)) {
-          pageSelect.value = lastSlug;
-          loadPage(lastSlug);
-        }
-      } catch(e) {}
+      // [PX] Auto-load removed — always show page tree first
+      // User picks the page they want to edit from the tree
     } catch(e) {
       editStatus.textContent = 'Error loading pages';
       document.getElementById('pageTree').innerHTML =
@@ -2476,6 +2470,12 @@
 
   scaleFrame();
   window.addEventListener('resize', scaleFrame);
+
+  // [PX] Re-run scaleFrame after iframe content loads so proxy height matches actual content
+  siteFrame.addEventListener('load', function() {
+    setTimeout(scaleFrame, 100); // small delay to let content render
+    setTimeout(scaleFrame, 500); // second pass for lazy-loaded content
+  });
 
   // Init
   init();
