@@ -274,6 +274,33 @@ def _get_page_data(slug):
     except Exception:
         return None, '50% 50%', 1.0, 0.0, 0.0
 
+def _get_device_override(slug, device):
+    """Return (pos, zoom, tx, ty) for a device override row, or None if none exists."""
+    if device not in ('tablet', 'mobile'):
+        return None
+    conn = _db_conn()
+    if not conn:
+        return None
+    try:
+        cur = conn.cursor()
+        _ensure_page_hero_overrides_table(cur)
+        cur.execute(
+            "SELECT hero_position, hero_zoom, hero_text_x, hero_text_y FROM page_hero_overrides WHERE slug = %s AND device = %s",
+            (slug, device)
+        )
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            return None
+        return (
+            row['hero_position'] or '50% 50%',
+            float(row['hero_zoom'] or 1.0),
+            float(row['hero_text_x'] or 0),
+            float(row['hero_text_y'] or 0),
+        )
+    except Exception:
+        return None
+
 # ── Card settings: DB-backed color/image mode per card ───────────────────────
 
 def _ensure_card_settings_table(cur):
@@ -471,6 +498,21 @@ def _ensure_page_locks_table(cur):
             slug TEXT PRIMARY KEY,
             status TEXT NOT NULL DEFAULT 'development',
             updated_at TIMESTAMP DEFAULT NOW()
+        )
+    """)
+
+def _ensure_page_hero_overrides_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS page_hero_overrides (
+            id SERIAL PRIMARY KEY,
+            slug TEXT NOT NULL,
+            device TEXT NOT NULL,
+            hero_position TEXT DEFAULT '50% 50%',
+            hero_zoom FLOAT DEFAULT 1.0,
+            hero_text_x FLOAT DEFAULT 0,
+            hero_text_y FLOAT DEFAULT 0,
+            UNIQUE(slug, device),
+            CHECK (device IN ('tablet', 'mobile'))
         )
     """)
 
@@ -3065,6 +3107,23 @@ def view(filename):
         # Apply DB hero image + position/zoom if stored
         if HAS_DB:
             hero, hero_pos, hero_zoom, hero_tx, hero_ty = _get_page_data(slug)
+            # Detect device: admin preview passes ?preview_device=; live site uses UA
+            _preview_dev = request.args.get('preview_device', '').strip().lower()
+            if _preview_dev in ('tablet', 'mobile'):
+                view_device = _preview_dev
+            else:
+                _ua = request.headers.get('User-Agent', '').lower()
+                if 'ipad' in _ua or ('tablet' in _ua and 'mobile' not in _ua):
+                    view_device = 'tablet'
+                elif any(x in _ua for x in ['mobile', 'android', 'iphone', 'ipod']):
+                    view_device = 'mobile'
+                else:
+                    view_device = None
+            # Apply device-specific override on top of global if one exists
+            if view_device:
+                _ov = _get_device_override(slug, view_device)
+                if _ov:
+                    hero_pos, hero_zoom, hero_tx, hero_ty = _ov
             if hero:
                 content = _apply_hero_to_html(content, hero, hero_pos, hero_zoom)
             elif hero_zoom > 1.001 or any(
@@ -5384,6 +5443,106 @@ def _page_template(title: str, slug: str) -> str:
 </body>
 </html>
 """
+
+
+@app.route('/admin/api/pages/<path:slug>/device-overrides', methods=['GET'])
+def admin_device_overrides_get(slug):
+    """Return all device overrides for a page: {tablet: {...}|null, mobile: {...}|null}"""
+    auth = _require_admin()
+    if auth: return auth
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'tablet': None, 'mobile': None})
+    try:
+        cur = conn.cursor()
+        _ensure_page_hero_overrides_table(cur)
+        cur.execute(
+            "SELECT device, hero_position, hero_zoom, hero_text_x, hero_text_y FROM page_hero_overrides WHERE slug = %s",
+            (slug,)
+        )
+        rows = cur.fetchall()
+        conn.close()
+        result = {'tablet': None, 'mobile': None}
+        for row in rows:
+            result[row['device']] = {
+                'hero_position': row['hero_position'] or '50% 50%',
+                'hero_zoom': float(row['hero_zoom'] or 1.0),
+                'hero_text_x': float(row['hero_text_x'] or 0),
+                'hero_text_y': float(row['hero_text_y'] or 0),
+            }
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/pages/<path:slug>/device-override', methods=['PUT'])
+def admin_device_override_put(slug):
+    """Upsert a device-specific hero override (tablet or mobile). Does not affect the global hero image."""
+    auth = _require_admin()
+    if auth: return auth
+    data = request.get_json(silent=True) or {}
+    device = data.get('device', '').strip().lower()
+    if device not in ('tablet', 'mobile'):
+        return jsonify({'error': 'device must be tablet or mobile'}), 400
+    hero_position = data.get('hero_position', '').strip() or None
+    hero_zoom     = data.get('hero_zoom')
+    hero_text_x   = data.get('hero_text_x')
+    hero_text_y   = data.get('hero_text_y')
+    if hero_position and not re.fullmatch(r'\d{1,3}(\.\d+)?%\s+\d{1,3}(\.\d+)?%', hero_position):
+        return jsonify({'error': 'hero_position must be "X% Y%"'}), 400
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'no db'}), 503
+    try:
+        cur = conn.cursor()
+        _ensure_page_hero_overrides_table(cur)
+        sets = []
+        params = []
+        if hero_position is not None:
+            sets.append('hero_position = %s'); params.append(hero_position)
+        if hero_zoom is not None:
+            sets.append('hero_zoom = %s'); params.append(float(hero_zoom))
+        if hero_text_x is not None:
+            sets.append('hero_text_x = %s'); params.append(float(hero_text_x))
+        if hero_text_y is not None:
+            sets.append('hero_text_y = %s'); params.append(float(hero_text_y))
+        if not sets:
+            return jsonify({'error': 'no fields to update'}), 400
+        cur.execute(f"""
+            INSERT INTO page_hero_overrides (slug, device, hero_position, hero_zoom, hero_text_x, hero_text_y)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (slug, device) DO UPDATE SET {', '.join(sets)}
+        """, [slug, device,
+              hero_position or '50% 50%',
+              float(hero_zoom) if hero_zoom is not None else 1.0,
+              float(hero_text_x) if hero_text_x is not None else 0.0,
+              float(hero_text_y) if hero_text_y is not None else 0.0] + params)
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True, 'slug': slug, 'device': device})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/pages/<path:slug>/device-override/<device>', methods=['DELETE'])
+def admin_device_override_delete(slug, device):
+    """Delete a device override, reverting that device to global settings."""
+    auth = _require_admin()
+    if auth: return auth
+    if device not in ('tablet', 'mobile'):
+        return jsonify({'error': 'device must be tablet or mobile'}), 400
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'no db'}), 503
+    try:
+        cur = conn.cursor()
+        _ensure_page_hero_overrides_table(cur)
+        cur.execute("DELETE FROM page_hero_overrides WHERE slug = %s AND device = %s", (slug, device))
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True, 'slug': slug, 'device': device})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/admin/api/pages/create', methods=['POST'])

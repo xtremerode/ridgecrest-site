@@ -617,10 +617,14 @@
           🔓 Dev
         </button>
         <!-- Device preview toggle -->
-        <div id="deviceToggle" style="display:none;gap:2px;border:1px solid var(--border,#2a3748);border-radius:6px;overflow:hidden;flex-shrink:0">
-          <button id="devBtnPc"    onclick="setDevice('pc')"    title="Desktop preview"  style="padding:5px 10px;font-size:11px;border:none;cursor:pointer;background:var(--accent,#3b82f6);color:#fff">PC</button>
-          <button id="devBtnIpad" onclick="setDevice('ipad')"  title="iPad preview (768px)" style="padding:5px 10px;font-size:11px;border:none;cursor:pointer;background:var(--surface-2,#1e2d3d);color:var(--text-muted,#94a3b8)">iPad</button>
-          <button id="devBtnPhone" onclick="setDevice('phone')" title="Phone preview (390px)" style="padding:5px 10px;font-size:11px;border:none;cursor:pointer;background:var(--surface-2,#1e2d3d);color:var(--text-muted,#94a3b8)">Phone</button>
+        <div id="deviceToggle" style="display:none;gap:2px;align-items:center;flex-shrink:0">
+          <div style="gap:2px;display:flex;border:1px solid var(--border,#2a3748);border-radius:6px;overflow:hidden">
+            <button id="devBtnPc"    onclick="setDevice('pc')"    title="Desktop preview"  style="padding:5px 10px;font-size:11px;border:none;cursor:pointer;background:var(--accent,#3b82f6);color:#fff">PC</button>
+            <button id="devBtnIpad" onclick="setDevice('ipad')"  title="iPad preview (768px)" style="padding:5px 10px;font-size:11px;border:none;cursor:pointer;background:var(--surface-2,#1e2d3d);color:var(--text-muted,#94a3b8)">iPad</button>
+            <button id="devBtnPhone" onclick="setDevice('phone')" title="Phone preview (390px)" style="padding:5px 10px;font-size:11px;border:none;cursor:pointer;background:var(--surface-2,#1e2d3d);color:var(--text-muted,#94a3b8)">Phone</button>
+          </div>
+          <span id="devBadge" style="font-size:10px;color:var(--text-muted,#94a3b8);white-space:nowrap;display:none"></span>
+          <button id="devResetBtn" title="Reset to global (remove device override)" style="display:none;padding:3px 7px;font-size:10px;border:1px solid var(--border,#2a3748);border-radius:4px;cursor:pointer;background:var(--surface-2,#1e2d3d);color:#f87171">Reset</button>
         </div>
         <button class="btn-edit-mode" id="editModeBtn">
           <span class="edit-mode-dot"></span>
@@ -918,6 +922,9 @@
   // ── Lock state ──
   let _pageLocks = {};         // slug → 'development' | 'stable' | 'locked'
   let currentPageLock = 'development';
+  // ── Per-device override cache ──
+  // _deviceOverrides[slug] = {tablet: {hero_position,hero_zoom,hero_text_x,hero_text_y}|null, mobile: ...}
+  let _deviceOverrides = {};
 
   // ── Elements ─────────────────────────────────────────────────────────────
   const pageSelect   = document.getElementById('pageSelect');
@@ -1396,10 +1403,63 @@
   const _devBtnPc    = document.getElementById('devBtnPc');
   const _devBtnIpad  = document.getElementById('devBtnIpad');
   const _devBtnPhone = document.getElementById('devBtnPhone');
+  const _devBadge    = document.getElementById('devBadge');
+  const _devResetBtn = document.getElementById('devResetBtn');
   const _ACCENT      = 'var(--accent,#3b82f6)';
   const _SURF2       = 'var(--surface-2,#1e2d3d)';
   const _COL_ACTIVE  = '#fff';
   const _COL_IDLE    = 'var(--text-muted,#94a3b8)';
+
+  // Map admin device names to DB device keys
+  function _dbDevice(device) {
+    return device === 'ipad' ? 'tablet' : device === 'phone' ? 'mobile' : null;
+  }
+
+  // Fetch device overrides for a slug (cached). Returns promise resolving to override dict.
+  async function _fetchDeviceOverrides(slug) {
+    if (_deviceOverrides[slug] !== undefined) return _deviceOverrides[slug];
+    try {
+      const res = await API(`/admin/api/pages/${encodeURIComponent(slug)}/device-overrides`);
+      _deviceOverrides[slug] = res || {tablet: null, mobile: null};
+    } catch(e) {
+      _deviceOverrides[slug] = {tablet: null, mobile: null};
+    }
+    return _deviceOverrides[slug];
+  }
+
+  // Apply device override to pending values. Uses cached overrides.
+  function _applyDeviceOverride(device, slug) {
+    const dbDev = _dbDevice(device);
+    const overrides = _deviceOverrides[slug || currentSlug] || {};
+    const ov = dbDev ? (overrides[dbDev] || null) : null;
+    const pageData = pages.find(p => p.slug === (slug || currentSlug));
+    if (ov) {
+      // Use override values
+      pendingZoom  = ov.hero_zoom != null ? ov.hero_zoom : 1.0;
+      pendingPosX  = parseFloat((ov.hero_position || '50% 50%').split(' ')[0]) || 50;
+      pendingPosY  = parseFloat((ov.hero_position || '50% 50%').split(' ')[1]) || 50;
+      pendingTextX = ov.hero_text_x != null ? parseFloat(ov.hero_text_x) : 0;
+      pendingTextY = ov.hero_text_y != null ? parseFloat(ov.hero_text_y) : 0;
+    } else if (pageData) {
+      // Fall back to global values
+      pendingZoom  = pageData.hero_zoom  != null ? pageData.hero_zoom  : 1.0;
+      pendingPosX  = parseFloat((pageData.hero_position || '50% 50%').split(' ')[0]) || 50;
+      pendingPosY  = parseFloat((pageData.hero_position || '50% 50%').split(' ')[1]) || 50;
+      pendingTextX = pageData.hero_text_x != null ? parseFloat(pageData.hero_text_x) : 0;
+      pendingTextY = pageData.hero_text_y != null ? parseFloat(pageData.hero_text_y) : 0;
+    }
+    // Update badge and reset button
+    if (device === 'pc') {
+      _devBadge.style.display = 'none';
+      _devResetBtn.style.display = 'none';
+    } else {
+      const hasOverride = ov !== null;
+      _devBadge.textContent = hasOverride ? `${device === 'ipad' ? 'iPad' : 'Phone'} override saved` : `${device === 'ipad' ? 'iPad' : 'Phone'} (using global)`;
+      _devBadge.style.display = 'inline';
+      _devBadge.style.color = hasOverride ? '#86efac' : 'var(--text-muted,#94a3b8)';
+      _devResetBtn.style.display = hasOverride ? 'inline-block' : 'none';
+    }
+  }
 
   // Inject or update the viewport-fix style inside the iframe to match the
   // simulated device height (phone=844px, ipad=1024px, pc=admin browser height).
@@ -1445,8 +1505,44 @@
     scaleFrame();
     // Update hero height injection to match the new device's logical viewport
     _updateViewportFix();
+    // Apply device override to pending values (uses cache — already loaded by loadPage)
+    if (currentSlug) {
+      _applyDeviceOverride(device, currentSlug);
+      // Reload iframe so server injects device-specific __RD_HERO_* vars
+      const path = getPagePath(currentSlug);
+      if (path) {
+        const dbDev = _dbDevice(device);
+        const src = dbDev ? `/view/${path}?preview_device=${dbDev}` : `/view/${path}`;
+        if (siteFrame.src !== src && !siteFrame.src.endsWith(src)) {
+          siteFrame.style.height = PREVIEW_H + 'px';
+          siteFrame.src = src;
+        }
+      }
+    }
   }
   window.setDevice = setDevice; // expose for inline onclick handlers on the device toggle buttons
+
+  // Reset device override — delete from DB and revert to global
+  _devResetBtn.addEventListener('click', async () => {
+    const dbDev = _dbDevice(_currentDevice);
+    if (!dbDev || !currentSlug) return;
+    try {
+      await API(`/admin/api/pages/${encodeURIComponent(currentSlug)}/device-override/${dbDev}`, { method: 'DELETE' });
+      // Clear cache for this slug
+      delete _deviceOverrides[currentSlug];
+      // Reload overrides and re-apply
+      await _fetchDeviceOverrides(currentSlug);
+      _applyDeviceOverride(_currentDevice, currentSlug);
+      // Reload iframe to show global settings
+      const path = getPagePath(currentSlug);
+      if (path) { siteFrame.style.height = PREVIEW_H + 'px'; siteFrame.src = `/view/${path}`; }
+      editStatus.textContent = 'Device override removed — using global';
+      editStatus.className = 'edit-status ready';
+    } catch(e) {
+      editStatus.textContent = 'Reset failed';
+      editStatus.className = 'edit-status';
+    }
+  });
 
   function loadPage(slug) {
     if (!slug) return;
@@ -1485,6 +1581,10 @@
     frameLoading.classList.remove('hidden');
     editStatus.textContent = 'Loading…';
     editStatus.className = 'edit-status';
+    // Fetch device overrides (async, non-blocking — applied after cache is ready)
+    _fetchDeviceOverrides(slug).then(() => {
+      if (currentSlug === slug) _applyDeviceOverride(_currentDevice, slug);
+    });
 
     // Apply lock status from cache (or fetch if not cached)
     const cachedLock = _pageLocks[slug] || 'development';
@@ -1507,7 +1607,8 @@
     // PREVIEW_H, so 70vh inside the new page renders larger than expected and
     // then visibly shrinks when the viewport-fix style is injected on load.
     siteFrame.style.height = PREVIEW_H + 'px';
-    siteFrame.src = `/view/${path}`;
+    const _dbDev = _dbDevice(_currentDevice);
+    siteFrame.src = _dbDev ? `/view/${path}?preview_device=${_dbDev}` : `/view/${path}`;
     // Show device toggle once a page is loaded
     _deviceToggle.style.display = 'flex';
   }
@@ -1810,35 +1911,69 @@
       textX: pendingTextX,
       textY: pendingTextY,
     };
-    const payload = {};
-    if (snap.image) payload.hero_image = snap.image;
-    if (snap.zoom  != null) payload.hero_zoom = snap.zoom;
-    if (snap.posX  != null && snap.posY != null) {
-      // Format as integer percent when at a whole number, e.g. "50%" not "50.0%"
-      const fmtPct = v => Math.abs(v - Math.round(v)) < 0.05 ? Math.round(v) + '%' : v.toFixed(1) + '%';
-      payload.hero_position = fmtPct(snap.posX) + ' ' + fmtPct(snap.posY);
-    }
-    if (snap.textX != null) payload.hero_text_x = snap.textX;
-    if (snap.textY != null) payload.hero_text_y = snap.textY;
-    if (!Object.keys(payload).length) return;
+    const fmtPct = v => Math.abs(v - Math.round(v)) < 0.05 ? Math.round(v) + '%' : v.toFixed(1) + '%';
+    const fmtPos = (x, y) => (x != null && y != null) ? fmtPct(x) + ' ' + fmtPct(y) : null;
+    const dbDev = _dbDevice(_currentDevice);
+    // Early exit — nothing to save
+    if (!snap.image && snap.zoom == null && snap.posX == null && snap.textX == null) return;
+
     editStatus.textContent = 'Saving…';
     editStatus.className = 'edit-status';
+    let _savedSomething = false;
     try {
-      await API(`/admin/api/pages/${slug}`, { method: 'PUT', body: JSON.stringify(payload) });
-      // Only update UI status if still on the same page
-      if (currentSlug === slug) {
+      // Image changes always go to global (hero image is device-independent)
+      if (snap.image) {
+        await API(`/admin/api/pages/${slug}`, { method: 'PUT', body: JSON.stringify({ hero_image: snap.image }) });
+        const pg = pages.find(p => p.slug === slug);
+        if (pg) pg.hero_image = snap.image;
+        _savedSomething = true;
+      }
+
+      if (dbDev) {
+        // iPad or Phone — save position/zoom/text to device override endpoint
+        const devPayload = { device: dbDev };
+        if (snap.zoom  != null) devPayload.hero_zoom = snap.zoom;
+        const pos = fmtPos(snap.posX, snap.posY);
+        if (pos) devPayload.hero_position = pos;
+        if (snap.textX != null) devPayload.hero_text_x = snap.textX;
+        if (snap.textY != null) devPayload.hero_text_y = snap.textY;
+        if (Object.keys(devPayload).length > 1) {
+          await API(`/admin/api/pages/${encodeURIComponent(slug)}/device-override`, { method: 'PUT', body: JSON.stringify(devPayload) });
+          if (!_deviceOverrides[slug]) _deviceOverrides[slug] = {tablet: null, mobile: null};
+          _deviceOverrides[slug][dbDev] = {
+            hero_zoom: snap.zoom != null ? snap.zoom : 1.0,
+            hero_position: pos || '50% 50%',
+            hero_text_x: snap.textX != null ? snap.textX : 0,
+            hero_text_y: snap.textY != null ? snap.textY : 0,
+          };
+          if (currentSlug === slug) _applyDeviceOverride(_currentDevice, slug);
+          _savedSomething = true;
+        }
+      } else {
+        // PC — save position/zoom/text to global
+        const payload = {};
+        if (snap.zoom  != null) payload.hero_zoom = snap.zoom;
+        const pos = fmtPos(snap.posX, snap.posY);
+        if (pos) payload.hero_position = pos;
+        if (snap.textX != null) payload.hero_text_x = snap.textX;
+        if (snap.textY != null) payload.hero_text_y = snap.textY;
+        if (Object.keys(payload).length) {
+          await API(`/admin/api/pages/${slug}`, { method: 'PUT', body: JSON.stringify(payload) });
+          const pg = pages.find(p => p.slug === slug);
+          if (pg) {
+            if (snap.zoom  != null) pg.hero_zoom = snap.zoom;
+            if (pos) pg.hero_position = pos;
+            if (snap.textX != null) pg.hero_text_x = snap.textX;
+            if (snap.textY != null) pg.hero_text_y = snap.textY;
+          }
+          _savedSomething = true;
+        }
+      }
+
+      if (_savedSomething && currentSlug === slug) {
         editStatus.textContent = 'Saved ✓';
         editStatus.className = 'edit-status ready';
         _heroTouched = false;
-      }
-      // Use snapshot values — never read globals here, they belong to the new page now
-      const pg = pages.find(p => p.slug === slug);
-      if (pg) {
-        if (snap.image) pg.hero_image = snap.image;
-        if (snap.zoom  != null) pg.hero_zoom = snap.zoom;
-        if (payload.hero_position) pg.hero_position = payload.hero_position;
-        if (snap.textX != null) pg.hero_text_x = snap.textX;
-        if (snap.textY != null) pg.hero_text_y = snap.textY;
       }
     } catch(e) {
       if (currentSlug === slug) {
