@@ -2471,10 +2471,24 @@
   scaleFrame();
   window.addEventListener('resize', scaleFrame);
 
-  // [PX] Re-run scaleFrame after iframe content loads so proxy height matches actual content
+  // [PX] Re-run scaleFrame repeatedly after iframe loads until height stabilizes
   siteFrame.addEventListener('load', function() {
-    setTimeout(scaleFrame, 100); // small delay to let content render
-    setTimeout(scaleFrame, 500); // second pass for lazy-loaded content
+    var _lastH = 0;
+    var _checks = 0;
+    function _pollHeight() {
+      _checks++;
+      if (_checks > 20) return; // stop after 10 seconds
+      try {
+        var sh = siteFrame.contentDocument && siteFrame.contentDocument.documentElement
+          ? siteFrame.contentDocument.documentElement.scrollHeight : 0;
+        if (sh > 0 && sh !== _lastH) {
+          _lastH = sh;
+          scaleFrame();
+        }
+      } catch(e) {}
+      setTimeout(_pollHeight, 500);
+    }
+    setTimeout(_pollHeight, 100);
   });
 
   // Init
