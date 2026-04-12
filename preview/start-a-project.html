@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Start a Project — Ridgecrest Designs</title>
+  <meta name="description" content="Start your luxury custom home or remodel project with Ridgecrest Designs. Submit a project inquiry or schedule a consultation. Serving Pleasanton, Danville, Walnut Creek, Lafayette, and the East Bay." />
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=block" rel="stylesheet" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Start a Project — Ridgecrest Designs" />
+  <meta property="og:description" content="Start your luxury custom home or remodel project with Ridgecrest Designs." />
+  <meta property="og:image" content="/assets/images/og-image.jpg" />
+
+  <style>
+    .sap-hero {
+      position: relative;
+      height: 40vh;
+      min-height: 280px;
+      max-height: 450px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      overflow: hidden;
+    }
+    .sap-hero__bg {
+      position: absolute;
+      inset: 0;
+      background-image: url('/assets/images-opt/upload_1775024274_hf_20260401_045706_052755bb-79f2-442d-8198-61d922625b11.webp');
+      background-size: cover;
+      background-position: 25.6% 40%;
+      z-index: 0;
+    }
+    .sap-hero__overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 1;
+    }
+    .sap-hero__content {
+      position: relative;
+      z-index: 2;
+      padding: 0 var(--space-md);
+    }
+    .sap-hero__eyebrow {
+      font-family: var(--font-sans);
+      font-size: 0.68rem;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--slate-light);
+      margin-bottom: 0.75rem;
+    }
+    .sap-hero__title {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 400;
+      color: #fff;
+      line-height: 1.15;
+      margin: 0;
+    }
+    .sap-hero__title em {
+      font-style: italic;
+    }
+    .sap-hero__sub {
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      font-weight: 300;
+      color: rgba(255,255,255,0.75);
+      margin-top: 0.75rem;
+    }
+    .sap-frame-wrap {
+      background: var(--white, #FAFAF8);
+      padding: 0;
+    }
+    .sap-frame-wrap iframe {
+      width: 100%;
+      min-height: 800px;
+      height: calc(100vh - 40vh - 80px);
+      border: none;
+      display: block;
+    }
+    @media (max-width: 767px) {
+      .sap-hero {
+        height: 30vh;
+        min-height: 200px;
+      }
+      .sap-frame-wrap iframe {
+        min-height: 700px;
+        height: calc(100vh - 30vh);
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="nav nav--scrolled" id="nav">
+    <a href="index.html" class="nav__logo">
+      <img src="/assets/images/logo.png" alt="Ridgecrest Designs" class="nav__logo-img" style="height:28px;margin-right:10px;vertical-align:middle;" onerror="this.style.display='none'" />
+      RIDGECREST DESIGNS
+    </a>
+    <button class="nav__toggle" id="navToggle" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav__links" id="navLinks">
+      <li><a href="about.html">About</a></li>
+      <li><a href="process.html">Process</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="portfolio.html">Portfolio</a></li>
+      <li><a href="/blog">The RD Edit</a></li>
+      <li><a href="team.html">Team</a></li>
+      <li><a href="start-a-project.html" class="nav__cta">Start a Project</a></li>
+    </ul>
+  </nav>
+
+  <div class="sap-hero">
+    <div class="sap-hero__bg"></div>
+    <div class="sap-hero__overlay"></div>
+    <div class="sap-hero__content">
+      <p class="sap-hero__eyebrow">Start Your Project</p>
+      <h1 class="sap-hero__title">Let's build something<br><em>extraordinary.</em></h1>
+      <p class="sap-hero__sub">Tell us about your vision. We'll follow up within one business day.</p>
+    </div>
+  </div>
+
+  <div class="sap-frame-wrap">
+    <iframe
+      src="https://elevate-scheduling-6b2fdec8.base44.app/ProjectInquiryForm"
+      title="Project Inquiry Form"
+      loading="lazy"
+      allow="clipboard-write"
+    ></iframe>
+  </div>
+
+  <footer class="footer" style="background:var(--dark,#111);color:var(--mid,#9E9E8E);padding:3rem var(--space-md,2rem);text-align:center;font-size:0.8rem;">
+    <p>&copy; 2025 Ridgecrest Designs. All rights reserved.</p>
+    <p style="margin-top:0.5rem;"><a href="tel:9257842798" style="color:var(--slate-light,#80A4C8);text-decoration:none;">925-784-2798</a> · <a href="mailto:info@ridgecrestdesigns.com" style="color:var(--slate-light,#80A4C8);text-decoration:none;">info@ridgecrestdesigns.com</a></p>
+  </footer>
+
+  <script>
+    // Mobile nav toggle
+    var navToggle = document.getElementById('navToggle');
+    var navLinks = document.getElementById('navLinks');
+    if (navToggle && navLinks) {
+      navToggle.addEventListener('click', function() {
+        navLinks.classList.toggle('nav__links--open');
+      });
+    }
+  </script>
+</body>
+</html>
