@@ -3211,6 +3211,14 @@ def view(filename):
         else:
             content = _logo_script + content
 
+
+        # [PX] Inject favicon + apple-touch-icon if not already present
+        if b"favicon" not in content and b"</head>" in content:
+            _fav_tags = b"""
+  <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
+"""
+            content = content.replace(b"</head>", _fav_tags + b"</head>", 1)
         # Inject edit overlay when admin preview mode is active
         token = request.args.get('token', '')
         if request.args.get('admin_edit') == '1' and _valid_token(token):
