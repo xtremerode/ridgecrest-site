@@ -197,31 +197,36 @@
       }
 
       // When the user clicks inside the iframe, the parent window loses focus.
-      // Instantly collapse the iframe to MIN_H (no CSS transition) so that
-      // Tailwind's min-h-screen (100vh inside the iframe) resolves to MIN_H.
-      // If the user navigated Back, the true content height is now smaller than
-      // MIN_H's inflation cap, so Elevate's ResizeObserver fires with the real
-      // height. We then accept that message and smoothly expand to the correct size.
-      // For same-step clicks (e.g. form field focus), the content height exceeds
-      // MIN_H so ResizeObserver fires with the same step height and we restore it.
-      window.addEventListener('blur', function() {
-        locked = false;
-        clearTimeout(timer);
+      // We debounce the collapse by 200ms: if Elevate's ResizeObserver fires a
+      // natural resize message first (card click, field interaction, Next button),
+      // we cancel the collapse entirely — no jump. If no message arrives within
+      // 200ms (Back navigation holds height via min-h-screen so nothing fires),
+      // we collapse to MIN_H so 100vh inside resolves to a small value, allowing
+      // the body to shrink, then accept the resulting resize message.
+      var collapseTimer  = null;
+      var pendingCollapse = false;
 
-        // Disable CSS transition so the collapse is a snap (no downward animation)
+      function doCollapse() {
+        pendingCollapse = false;
         frame.style.transition = 'none';
         wrapper.style.transition = 'none';
         frame.style.height   = MIN_H + 'px';
         wrapper.style.height = MIN_H + 'px';
         currentH = MIN_H;
-
-        // Re-enable transition after two rAFs so the subsequent expansion is animated
         requestAnimationFrame(function() {
           requestAnimationFrame(function() {
             frame.style.transition = '';
             wrapper.style.transition = '';
           });
         });
+      }
+
+      window.addEventListener('blur', function() {
+        locked = false;
+        clearTimeout(timer);
+        clearTimeout(collapseTimer);
+        pendingCollapse = true;
+        collapseTimer = setTimeout(doCollapse, 200);
       });
 
       window.addEventListener('message', function(e) {
@@ -236,6 +241,13 @@
         if (e.data.type !== 'elevate-resize') return;
         var h = e.data.height;
         if (typeof h !== 'number' || h < 50) return;
+
+        // A natural resize arrived — cancel any pending collapse (no jump needed)
+        if (pendingCollapse) {
+          pendingCollapse = false;
+          clearTimeout(collapseTimer);
+        }
+
         if (locked) return;
         accept(h);
       });
