@@ -103,3 +103,24 @@ Claude: Read this file at the start of every session so you know what was change
 ### Backups
 - DB: /tmp/pre_px_bulk_fixes_db.sql
 - Images: preview/assets/images-opt/backup_pre_px_sharpen/
+
+---
+
+## 2026-04-12 ~10:15 AM PDT — Edit Mode Fixes (8 Bugs)
+**Git commit:** f71e822
+
+### preview_server.py (overlay templates)
+- Bug 1: Hero AI button changed from window.open(media.html) to postMessage(rd_open_render) — opens modal on current page
+- Bug 2: Hero back button uses history stack — pops previous, stops at original, hidden when empty
+- Bug 2: Card back button same history stack treatment
+- Bug 3: Forward click pushes current image to history before cycling
+- Bug 4: Gallery images now get Browse All and back button (were excluded by isGalleryItem guard)
+- Bug 5: <img> tag AI pill changed from window.open to postMessage
+
+### preview/js/main.js
+- Bug 7: Added _pickVariant/_swapBg (57 lines) — responsive background-image swap
+  Picks _480w/_960w/_1920w based on element width × devicePixelRatio
+  Runs on DOMContentLoaded and debounced resize
+
+### ridgecrest-agency/project_open_issues.md
+- Bug 8: Created tracking file for all known issues
