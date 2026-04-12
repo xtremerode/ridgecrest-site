@@ -170,14 +170,6 @@
     }
 
     // Auto-resize iframe via postMessage from Elevate Scheduling
-    //
-    // Elevate sends {type:'elevate-resize', height:N} on every ResizeObserver
-    // callback. Because min-h-screen on #root>div stretches to fill the iframe,
-    // scrollHeight grows whenever we make the iframe taller — feedback loop.
-    //
-    // Fix: after accepting a height, lock for 500ms. During lock, track only
-    // heights SMALLER than what we set (those indicate a real step change to
-    // shorter content). Ignore heights >= current (those are the echo).
     (function() {
       var frame = document.querySelector('.sap-frame iframe');
       var wrapper = document.querySelector('.sap-frame');
@@ -188,7 +180,6 @@
       var currentH = 0;
       var locked   = false;
       var timer    = null;
-      var shrinkTo = null; // tracks if content shrank during lock
 
       function setSize(h) {
         currentH = h;
@@ -198,37 +189,55 @@
 
       function accept(rawH) {
         var target = Math.max(rawH + PADDING, MIN_H);
+        if (target === currentH) return;
         setSize(target);
         locked = true;
-        shrinkTo = null;
         clearTimeout(timer);
-        timer = setTimeout(function() {
-          locked = false;
-          // If content shrank during lock (step change to shorter content), apply it
-          if (shrinkTo !== null) {
-            accept(shrinkTo);
-          }
-        }, 500);
+        timer = setTimeout(function() { locked = false; }, 500);
       }
 
-      window.addEventListener('message', function(e) {
-        if (!e.data || e.data.type !== 'elevate-resize') return;
-        var h = e.data.height;
-        if (typeof h !== 'number' || h < 50) return;
+      // When the user clicks inside the iframe, the parent window loses focus.
+      // Instantly collapse the iframe to MIN_H (no CSS transition) so that
+      // Tailwind's min-h-screen (100vh inside the iframe) resolves to MIN_H.
+      // If the user navigated Back, the true content height is now smaller than
+      // MIN_H's inflation cap, so Elevate's ResizeObserver fires with the real
+      // height. We then accept that message and smoothly expand to the correct size.
+      // For same-step clicks (e.g. form field focus), the content height exceeds
+      // MIN_H so ResizeObserver fires with the same step height and we restore it.
+      window.addEventListener('blur', function() {
+        locked = false;
+        clearTimeout(timer);
 
-        if (!locked) {
-          accept(h);
+        // Disable CSS transition so the collapse is a snap (no downward animation)
+        frame.style.transition = 'none';
+        wrapper.style.transition = 'none';
+        frame.style.height   = MIN_H + 'px';
+        wrapper.style.height = MIN_H + 'px';
+        currentH = MIN_H;
+
+        // Re-enable transition after two rAFs so the subsequent expansion is animated
+        requestAnimationFrame(function() {
+          requestAnimationFrame(function() {
+            frame.style.transition = '';
+            wrapper.style.transition = '';
+          });
+        });
+      });
+
+      window.addEventListener('message', function(e) {
+        if (!e.data || !e.data.type) return;
+
+        // api-request-start fires on auth checks — use it as an unlock signal only
+        if (e.data.type === 'api-request-start') {
+          locked = false;
           return;
         }
 
-        // During lock: only track if this height is SMALLER than current
-        // (means content genuinely shrank — e.g. went from Step 2 back to Step 1)
-        var target = Math.max(h + PADDING, MIN_H);
-        if (target < currentH - 10) {
-          // Content is shorter — record it for when lock expires
-          if (shrinkTo === null || h < shrinkTo) shrinkTo = h;
-        }
-        // Heights >= current are the feedback echo — ignore them
+        if (e.data.type !== 'elevate-resize') return;
+        var h = e.data.height;
+        if (typeof h !== 'number' || h < 50) return;
+        if (locked) return;
+        accept(h);
       });
     })();
   </script>
