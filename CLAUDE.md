@@ -325,3 +325,24 @@ Before editing ANY code, check the lock status:
 ### Feature-to-code mapping additions
 - Editing card/thumbnail background-image URLs → check seo-project-pages, seo-service-pages, frontend-css
 - Editing `_portfolio_thumb_src` or `_portfolio_img_src` → check server-render
+
+---
+
+## 21. Execution Mode Control — MANDATORY
+
+There are two modes: DISCUSSION and EXECUTION.
+
+### DISCUSSION MODE (default when Henry says "discuss", "don't do anything", "just verify", "plan only", "talk to me first")
+ALLOWED: Read files, SELECT queries, curl/wget to inspect pages, grep/find to search code
+FORBIDDEN: Any write operation — no UPDATE/INSERT/DELETE queries, no git add/commit, no file writes, no echo > file, no POST/PUT/PATCH API calls, no systemctl restart, no pip install, no npm install
+
+When in discussion mode, present findings and a numbered plan. Then stop and wait. Do NOT proceed until Henry explicitly says one of: "go ahead", "approved", "do it", "execute", "proceed".
+
+### EXECUTION MODE (only after Henry explicitly approves)
+All operations allowed per existing rules. Still follow Rule 17 (backup before changes).
+
+### How to check
+Before EVERY bash command that writes anything, ask yourself: "Did Henry explicitly approve execution?" If the answer is no, do not run the command. If you are unsure, ask Henry.
+
+### Violation
+If you execute in discussion mode, Henry will roll back your changes and you will have wasted both your time and his. Do not test this boundary.
