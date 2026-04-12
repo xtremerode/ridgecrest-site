@@ -516,6 +516,21 @@ def _ensure_page_hero_overrides_table(cur):
         )
     """)
 
+def _ensure_page_sections_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS page_sections (
+            id SERIAL PRIMARY KEY,
+            slug TEXT NOT NULL,
+            device TEXT NOT NULL,
+            section_id TEXT NOT NULL,
+            display_order INTEGER NOT NULL DEFAULT 0,
+            visible BOOLEAN NOT NULL DEFAULT true,
+            height_px INTEGER,
+            UNIQUE(slug, device, section_id),
+            CHECK (device IN ('desktop', 'tablet', 'mobile'))
+        )
+    """)
+
 def _ensure_undo_log_table(cur):
     cur.execute("""
         CREATE TABLE IF NOT EXISTS undo_log (
@@ -2547,6 +2562,106 @@ _EDIT_OVERLAY_TPL = """\
 </script>
 """
 
+_SECTION_RESIZE_TPL = """\
+<script id="rd-section-resize">
+(function() {{
+  var SLUG   = {slug_json};
+  var TOKEN  = {token_json};
+  var DEVICE = {device_json};
+  var SAVE_URL = '/admin/api/pages/' + encodeURIComponent(SLUG) + '/sections';
+
+  function makeHandle(section, sectionId) {{
+    var handle = document.createElement('div');
+    handle.style.cssText = 'position:absolute;left:0;right:0;bottom:0;height:8px;' +
+      'background:rgba(56,161,105,0.75);cursor:ns-resize;z-index:10000;' +
+      'display:flex;align-items:center;justify-content:center;' +
+      'font:bold 9px/1 monospace;color:#1a4731;user-select:none;' +
+      'box-sizing:border-box;border-top:2px solid rgba(56,161,105,1);';
+    handle.title = 'Drag to resize \u00b7 ' + sectionId;
+
+    var label = document.createElement('span');
+    label.style.cssText = 'pointer-events:none;letter-spacing:0.5px;';
+    label.textContent = Math.round(section.offsetHeight) + 'px';
+    handle.appendChild(label);
+
+    var dragging = false, startY = 0, startH = 0;
+
+    handle.addEventListener('mousedown', function(e) {{
+      e.preventDefault();
+      e.stopPropagation();
+      dragging = true;
+      startY = e.clientY;
+      var curH = section.offsetHeight;
+      section.style.height = curH + 'px';
+      section.style.minHeight = 'auto';
+      section.style.overflow = 'hidden';
+      startH = curH;
+
+      function onMove(ev) {{
+        if (!dragging) return;
+        var delta = ev.clientY - startY;
+        var newH = Math.max(50, startH + delta);
+        section.style.height = newH + 'px';
+        label.textContent = Math.round(newH) + 'px';
+      }}
+
+      function onUp() {{
+        if (!dragging) return;
+        dragging = false;
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        var finalH = Math.round(section.offsetHeight);
+        label.textContent = finalH + 'px';
+        fetch(SAVE_URL, {{
+          method: 'PUT',
+          headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
+          body: JSON.stringify({{device: DEVICE, section_id: sectionId, height_px: finalH}})
+        }}).then(function(r) {{ return r.json(); }}).then(function(res) {{
+          window.parent.postMessage({{
+            type: 'rd_section_resize',
+            slug: SLUG,
+            section_id: sectionId,
+            height_px: finalH,
+            ok: !!res.ok
+          }}, window.location.origin);
+        }}).catch(function() {{
+          window.parent.postMessage({{
+            type: 'rd_section_resize',
+            slug: SLUG,
+            section_id: sectionId,
+            height_px: finalH,
+            ok: false
+          }}, window.location.origin);
+        }});
+      }}
+
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    }});
+
+    return handle;
+  }}
+
+  function init() {{
+    var sections = document.querySelectorAll('section');
+    sections.forEach(function(sec) {{
+      var cls = sec.className ? sec.className.trim().split(/\\s+/)[0] : '';
+      if (!cls) return;
+      var pos = window.getComputedStyle(sec).position;
+      if (pos === 'static') sec.style.position = 'relative';
+      sec.appendChild(makeHandle(sec, cls));
+    }});
+  }}
+
+  if (document.readyState === 'loading') {{
+    document.addEventListener('DOMContentLoaded', init);
+  }} else {{
+    init();
+  }}
+}}());
+</script>
+"""
+
 # (live-reload removed — was causing compounding SSE connection loops)
 
 # ── WebP conversion helper ────────────────────────────────────────────────────
@@ -3263,6 +3378,17 @@ def view(filename):
                 content = content.replace(b'</body>', card_overlay + b'</body>', 1)
             else:
                 content += card_overlay
+            # Inject section resize drag handles
+            _sec_edit_device = view_device if view_device in ('tablet', 'mobile') else 'desktop'
+            section_resize = _SECTION_RESIZE_TPL.format(
+                slug_json=json.dumps(slug),
+                token_json=json.dumps(token),
+                device_json=json.dumps(_sec_edit_device)
+            ).encode('utf-8')
+            if b'</body>' in content:
+                content = content.replace(b'</body>', section_resize + b'</body>', 1)
+            else:
+                content += section_resize
 
     resp = Response(content, mimetype=mime)
     if mime and mime.startswith('image/'):
@@ -5637,6 +5763,7 @@ def admin_sections_get(slug):
         return jsonify({'sections': []})
     try:
         cur = conn.cursor()
+        _ensure_page_sections_table(cur)
         cur.execute(
             "SELECT section_id, height_px, display_order, visible FROM page_sections WHERE slug = %s AND device = %s ORDER BY display_order",
             (slug, device)
@@ -5674,6 +5801,7 @@ def admin_sections_put(slug):
         return jsonify({'error': 'no db'}), 503
     try:
         cur = conn.cursor()
+        _ensure_page_sections_table(cur)
         if height_px is not None:
             height_px = int(height_px)
             cur.execute("""

@@ -2147,6 +2147,22 @@
         });
       }, 600);
     }
+    if (d.type === 'rd_section_resize') {
+      if (d.slug !== currentSlug) return;
+      if (d.ok) {
+        editStatus.textContent = `Section \u201c${d.section_id}\u201d \u2192 ${d.height_px}px saved`;
+        editStatus.className = 'edit-status ready';
+        setTimeout(() => {
+          if (editStatus.textContent.includes('saved')) {
+            editStatus.textContent = 'Drag handles: resize any section  \u00b7  Images: click\u00b7scroll\u00b7drag';
+            editStatus.className = 'edit-status ready';
+          }
+        }, 2500);
+      } else {
+        editStatus.textContent = `Section resize save failed`;
+        editStatus.className = 'edit-status';
+      }
+    }
     if (d.type === 'rd_gallery_save') {
       // Block writes on locked pages — consistent with saveNow/scheduleSave
       if (currentPageLock === 'locked') {
