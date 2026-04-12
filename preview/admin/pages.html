@@ -643,11 +643,11 @@
         </button>
         <span class="edit-status" id="editStatus">Select a page</span>
         <button class="btn btn-sm" style="background:var(--surface-2,#1e2d3d);border:1px solid var(--border,#2a3748);color:var(--text,#e2e8f0)" onclick="openAutoPlace()">✦ AI Auto-Place</button>
-        <a href="http://147.182.242.54:8081/paste/" target="_blank"
+        <button id="pasteBtn"
            style="padding:6px 12px;font-size:12px;font-weight:600;border-radius:6px;
                   border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
-                  color:var(--text-muted,#94a3b8);text-decoration:none;white-space:nowrap;flex-shrink:0"
-           title="Open screenshot file sharing">📎 Paste here</a>
+                  color:var(--text-muted,#94a3b8);cursor:pointer;white-space:nowrap;flex-shrink:0"
+           title="Open screenshot/file sharing panel">📎 Paste here</button>
       </div>
     </div>
     <div class="editor-frame-wrap">
@@ -859,6 +859,24 @@
       <button id="rerenderUseBtn" onclick="rerenderUseVersion()" style="display:none;background:#16a34a;border:none;color:#fff;font-size:13px;padding:7px 18px;border-radius:6px;cursor:pointer;font-weight:600">✓ Use This Version</button>
       <span id="rerenderStatus" style="font-size:13px;color:var(--text-muted);width:100%;margin-top:4px"></span>
     </div>
+  </div>
+</div>
+
+<!-- ── Paste / File Share Modal ── -->
+<div id="pasteModal" style="display:none;position:fixed;inset:0;z-index:100000;
+     background:rgba(0,0,0,0.7);align-items:center;justify-content:center">
+  <div style="background:#0f1923;border:1px solid #2a3748;border-radius:10px;
+              width:min(600px,96vw);height:min(680px,90vh);display:flex;
+              flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.6)">
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                padding:12px 16px;border-bottom:1px solid #2a3748;flex-shrink:0">
+      <span style="font-size:14px;font-weight:600;color:#e2e8f0">📎 Paste &amp; Share Files</span>
+      <button id="pasteModalClose"
+        style="background:none;border:none;color:#94a3b8;font-size:20px;
+               cursor:pointer;padding:0 4px;line-height:1" title="Close">✕</button>
+    </div>
+    <iframe id="pasteFrame" src="" style="flex:1;border:none;width:100%;background:#fff"
+            allow="clipboard-read; clipboard-write"></iframe>
   </div>
 </div>
 
@@ -1675,6 +1693,21 @@
     // Show device toggle once a page is loaded
     _deviceToggle.style.display = 'flex';
   }
+
+  // ── Paste / file share panel ─────────────────────────────────────────────
+  const pasteBtn    = document.getElementById('pasteBtn');
+  const pasteModal  = document.getElementById('pasteModal');
+  const pasteFrame  = document.getElementById('pasteFrame');
+  const pasteClose  = document.getElementById('pasteModalClose');
+
+  pasteBtn.addEventListener('click', () => {
+    if (!pasteFrame.src || pasteFrame.src === window.location.href) {
+      pasteFrame.src = '/paste/';
+    }
+    pasteModal.style.display = 'flex';
+  });
+  pasteClose.addEventListener('click', () => { pasteModal.style.display = 'none'; });
+  pasteModal.addEventListener('click', (e) => { if (e.target === pasteModal) pasteModal.style.display = 'none'; });
 
   // ── Publish button ───────────────────────────────────────────────────────
   publishBtn.addEventListener('click', async () => {
