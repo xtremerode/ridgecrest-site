@@ -1393,6 +1393,29 @@
   const _COL_ACTIVE  = '#fff';
   const _COL_IDLE    = 'var(--text-muted,#94a3b8)';
 
+  // Inject or update the viewport-fix style inside the iframe to match the
+  // simulated device height (phone=844px, ipad=1024px, pc=admin browser height).
+  function _updateViewportFix() {
+    try {
+      const doc = siteFrame.contentDocument;
+      if (!doc) return;
+      const viewH = _currentDevice === 'phone' ? 844
+                  : _currentDevice === 'ipad'  ? 1024
+                  : PREVIEW_H;
+      const minPH = _currentDevice === 'phone' ? 420 : 500;
+      let s = doc.getElementById('rd-preview-viewport-fix');
+      if (!s) {
+        s = doc.createElement('style');
+        s.id = 'rd-preview-viewport-fix';
+        (doc.head || doc.documentElement).appendChild(s);
+      }
+      s.textContent = `.hero{height:${viewH}px!important;min-height:${viewH}px!important;}`
+        + `.project-hero{height:${Math.round(viewH*0.7)}px!important;min-height:${minPH}px!important;}`
+        + `.page-hero--service{min-height:${Math.round(viewH*0.6)}px!important;max-height:${Math.round(viewH*0.9)}px!important;}`
+        + `.post-hero--has-img{min-height:${Math.floor(viewH*0.6)}px!important;}`;
+    } catch(e) {}
+  }
+
   function setDevice(device) {
     _currentDevice = device;
     // Update button styles
@@ -1409,6 +1432,8 @@
     }
     // Width + scale handled entirely by scaleFrame()
     scaleFrame();
+    // Update hero height injection to match the new device's logical viewport
+    _updateViewportFix();
   }
   window.setDevice = setDevice; // expose for inline onclick handlers on the device toggle buttons
 
@@ -1714,15 +1739,7 @@
     // Without this, 100vh inside the iframe equals the iframe's declared height
     // which is taller than a real browser window, causing the hero to crop
     // the background image differently from the live page.
-    try {
-      const doc = siteFrame.contentDocument;
-      if (doc && !doc.getElementById('rd-preview-viewport-fix')) {
-        const s = doc.createElement('style');
-        s.id = 'rd-preview-viewport-fix';
-        s.textContent = `.hero{height:${PREVIEW_H}px!important;min-height:${PREVIEW_H}px!important;}.project-hero{height:${Math.round(PREVIEW_H*0.7)}px!important;min-height:500px!important;}.page-hero--service{min-height:${Math.round(PREVIEW_H*0.6)}px!important;max-height:${Math.round(PREVIEW_H*0.9)}px!important;}.post-hero--has-img{min-height:${Math.floor(PREVIEW_H*0.6)}px!important;}`;
-        (doc.head || doc.documentElement).appendChild(s);
-      }
-    } catch(e) {}
+    _updateViewportFix();
 
     // Resize iframe to actual page content (enables full-page scrolling)
     scaleFrame();
