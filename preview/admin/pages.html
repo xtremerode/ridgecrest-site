@@ -626,6 +626,12 @@
           <span id="devBadge" style="font-size:10px;color:var(--text-muted,#94a3b8);white-space:nowrap;display:none"></span>
           <button id="devResetBtn" title="Reset to global (remove device override)" style="display:none;padding:3px 7px;font-size:10px;border:1px solid var(--border,#2a3748);border-radius:4px;cursor:pointer;background:var(--surface-2,#1e2d3d);color:#f87171">Reset</button>
         </div>
+        <button id="publishBtn" title="Publish all staged edits to the live site"
+          style="padding:7px 16px;border-radius:6px;border:none;background:#16a34a;
+                 color:#fff;font-size:13px;font-weight:700;cursor:pointer;
+                 white-space:nowrap;transition:opacity .15s;flex-shrink:0">
+          Publish ↑
+        </button>
         <button class="btn-edit-mode" id="editModeBtn">
           <span class="edit-mode-dot"></span>
           Edit Mode
@@ -930,6 +936,7 @@
   let _deviceOverrides = {};
 
   // ── Elements ─────────────────────────────────────────────────────────────
+  const publishBtn   = document.getElementById('publishBtn');
   const pageSelect   = document.getElementById('pageSelect');
   const editModeBtn  = document.getElementById('editModeBtn');
   const saveTextBtn  = document.getElementById('saveTextBtn');
@@ -1562,8 +1569,10 @@
       const path = getPagePath(currentSlug);
       if (path) {
         const dbDev = _dbDevice(device);
-        const src = dbDev ? `/view/${path}?preview_device=${dbDev}` : `/view/${path}`;
-        if (siteFrame.src !== src && !siteFrame.src.endsWith(src)) {
+        const src = dbDev ? `/view/${path}?preview_device=${dbDev}&_stage=1` : `/view/${path}?_stage=1`;
+        // Strip _stage from comparison so we don't reload when already showing staging
+        const normalised = siteFrame.src.replace(/[?&]_stage=1/g, '').replace(/\?&/, '?').replace(/[?&]$/, '');
+        if (normalised !== src.replace(/[?&]_stage=1/g, '').replace(/\?&/, '?').replace(/[?&]$/, '')) {
           siteFrame.style.height = PREVIEW_H + 'px';
           siteFrame.src = src;
         }
@@ -1585,7 +1594,7 @@
       _applyDeviceOverride(_currentDevice, currentSlug);
       // Reload iframe to show global settings
       const path = getPagePath(currentSlug);
-      if (path) { siteFrame.style.height = PREVIEW_H + 'px'; siteFrame.src = `/view/${path}`; }
+      if (path) { siteFrame.style.height = PREVIEW_H + 'px'; siteFrame.src = `/view/${path}?_stage=1`; }
       editStatus.textContent = 'Device override removed — using global';
       editStatus.className = 'edit-status ready';
     } catch(e) {
@@ -1662,10 +1671,41 @@
     // then visibly shrinks when the viewport-fix style is injected on load.
     siteFrame.style.height = PREVIEW_H + 'px';
     const _dbDev = _dbDevice(_currentDevice);
-    siteFrame.src = _dbDev ? `/view/${path}?preview_device=${_dbDev}` : `/view/${path}`;
+    siteFrame.src = _dbDev ? `/view/${path}?preview_device=${_dbDev}&_stage=1` : `/view/${path}?_stage=1`;
     // Show device toggle once a page is loaded
     _deviceToggle.style.display = 'flex';
   }
+
+  // ── Publish button ───────────────────────────────────────────────────────
+  publishBtn.addEventListener('click', async () => {
+    if (!window.confirm('Publish all staged edits to the live site?\n\nVisitors accessing the site outside the admin panel will see these changes immediately.')) return;
+    publishBtn.disabled = true;
+    publishBtn.textContent = 'Publishing…';
+    editStatus.textContent = 'Publishing…';
+    editStatus.className = 'edit-status';
+    try {
+      const res = await API('/admin/api/pages/publish', { method: 'POST', body: JSON.stringify({ all: true }) });
+      if (res && res.ok) {
+        publishBtn.textContent = `Published ✓ (${res.count})`;
+        publishBtn.style.background = '#0f766e';
+        editStatus.textContent = `Published ${res.count} page${res.count !== 1 ? 's' : ''} to live site`;
+        editStatus.className = 'edit-status ready';
+        setTimeout(() => {
+          publishBtn.textContent = 'Publish ↑';
+          publishBtn.style.background = '#16a34a';
+          publishBtn.disabled = false;
+        }, 3000);
+      } else {
+        throw new Error((res && res.error) || 'unknown error');
+      }
+    } catch(e) {
+      publishBtn.textContent = 'Publish ↑';
+      publishBtn.style.background = '#16a34a';
+      publishBtn.disabled = false;
+      editStatus.textContent = `Publish failed: ${e.message}`;
+      editStatus.className = 'edit-status';
+    }
+  });
 
   // ── Lock toggle button ────────────────────────────────────────────────────
   pageLockBtn.addEventListener('click', async () => {

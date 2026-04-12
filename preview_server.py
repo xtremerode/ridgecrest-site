@@ -301,6 +301,88 @@ def _get_device_override(slug, device):
     except Exception:
         return None
 
+# ── Published snapshots: staging vs live publish workflow ────────────────────
+
+def _ensure_published_snapshots_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS published_snapshots (
+          slug              TEXT PRIMARY KEY,
+          hero_image        TEXT,
+          hero_position     TEXT NOT NULL DEFAULT '50%% 50%%',
+          hero_zoom         FLOAT NOT NULL DEFAULT 1.0,
+          hero_text_x       FLOAT NOT NULL DEFAULT 0,
+          hero_text_y       FLOAT NOT NULL DEFAULT 0,
+          sections_json     TEXT NOT NULL DEFAULT '[]',
+          cards_json        TEXT NOT NULL DEFAULT '[]',
+          hero_overrides_json TEXT NOT NULL DEFAULT '[]',
+          published_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+    """)
+    cur.connection.commit()
+
+def _get_published_snapshot(slug):
+    """Return published snapshot dict for slug, or None if never published."""
+    conn = _db_conn()
+    if not conn:
+        return None
+    try:
+        cur = conn.cursor()
+        _ensure_published_snapshots_table(cur)
+        cur.execute("SELECT * FROM published_snapshots WHERE slug = %s", (slug,))
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            return None
+        return dict(row)
+    except Exception:
+        return None
+
+def _snapshot_page(cur, slug):
+    """Snapshot current staging data for slug into published_snapshots."""
+    import json as _json
+    # Hero data
+    cur.execute("SELECT hero_image, hero_position, hero_zoom, hero_text_x, hero_text_y FROM pages WHERE slug = %s", (slug,))
+    page_row = cur.fetchone()
+    hero_image    = page_row['hero_image']    if page_row else None
+    hero_position = (page_row['hero_position'] or '50% 50%') if page_row else '50% 50%'
+    hero_zoom     = float(page_row['hero_zoom'] or 1.0)      if page_row else 1.0
+    hero_text_x   = float(page_row['hero_text_x'] or 0)      if page_row else 0.0
+    hero_text_y   = float(page_row['hero_text_y'] or 0)      if page_row else 0.0
+    # Section heights
+    cur.execute(
+        "SELECT section_id, device, height_px FROM page_sections WHERE slug = %s AND height_px IS NOT NULL",
+        (slug,))
+    sections = [dict(r) for r in cur.fetchall()]
+    # Card settings
+    cur.execute(
+        "SELECT card_id, mode, color, image, position, zoom FROM card_settings WHERE page_slug = %s",
+        (slug,))
+    cards = [dict(r) for r in cur.fetchall()]
+    # Hero overrides per device
+    cur.execute(
+        "SELECT device, hero_position, hero_zoom, hero_text_x, hero_text_y FROM page_hero_overrides WHERE slug = %s",
+        (slug,))
+    overrides = [dict(r) for r in cur.fetchall()]
+    cur.execute("""
+        INSERT INTO published_snapshots
+          (slug, hero_image, hero_position, hero_zoom, hero_text_x, hero_text_y,
+           sections_json, cards_json, hero_overrides_json, published_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        ON CONFLICT (slug) DO UPDATE SET
+          hero_image          = EXCLUDED.hero_image,
+          hero_position       = EXCLUDED.hero_position,
+          hero_zoom           = EXCLUDED.hero_zoom,
+          hero_text_x         = EXCLUDED.hero_text_x,
+          hero_text_y         = EXCLUDED.hero_text_y,
+          sections_json       = EXCLUDED.sections_json,
+          cards_json          = EXCLUDED.cards_json,
+          hero_overrides_json = EXCLUDED.hero_overrides_json,
+          published_at        = NOW()
+    """, (
+        slug, hero_image, hero_position, hero_zoom, hero_text_x, hero_text_y,
+        _json.dumps(sections), _json.dumps(cards), _json.dumps(overrides)
+    ))
+
 # ── Card settings: DB-backed color/image mode per card ───────────────────────
 
 def _ensure_card_settings_table(cur):
@@ -701,22 +783,29 @@ def _safe_js(value) -> str:
 
 _SECTION_HEIGHT_SKIP = {'footer'}  # footer uses auto height — never override with px
 
-def _apply_section_heights(content: bytes, slug: str, device: str) -> bytes:
+def _apply_section_heights(content: bytes, slug: str, device: str, preloaded_rows=None) -> bytes:
     """Inject inline height styles on <section> elements based on DB overrides.
-    Skips hero and footer sections — their heights are controlled by CSS (100vh / auto)."""
-    if not HAS_DB:
-        return content
-    conn = _db_conn()
-    if not conn:
+    Skips hero and footer sections — their heights are controlled by CSS (100vh / auto).
+    Pass preloaded_rows to skip the DB query (used when serving published snapshots)."""
+    if preloaded_rows is not None:
+        rows = [r for r in preloaded_rows if r.get('device') == device and r.get('height_px')]
+    elif HAS_DB:
+        conn = _db_conn()
+        if not conn:
+            return content
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT section_id, height_px FROM page_sections WHERE slug = %s AND device = %s AND height_px IS NOT NULL",
+                (slug, device)
+            )
+            rows = cur.fetchall()
+            conn.close()
+        except Exception:
+            return content
+    else:
         return content
     try:
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT section_id, height_px FROM page_sections WHERE slug = %s AND device = %s AND height_px IS NOT NULL",
-            (slug, device)
-        )
-        rows = cur.fetchall()
-        conn.close()
         if not rows:
             return content
         text = content.decode('utf-8', errors='replace')
@@ -3344,26 +3433,57 @@ def view(filename):
         if slug in ('', 'index'):
             slug = 'home'
 
-        # Apply DB hero image + position/zoom if stored
-        if HAS_DB:
-            hero, hero_pos, hero_zoom, hero_tx, hero_ty = _get_page_data(slug)
-            # Detect device: admin preview passes ?preview_device=; live site uses UA
-            _preview_dev = request.args.get('preview_device', '').strip().lower()
-            if _preview_dev in ('tablet', 'mobile'):
-                view_device = _preview_dev
+        # Detect device: admin preview passes ?preview_device=; live site uses UA
+        _preview_dev = request.args.get('preview_device', '').strip().lower()
+        if _preview_dev in ('tablet', 'mobile'):
+            view_device = _preview_dev
+        else:
+            _ua = request.headers.get('User-Agent', '').lower()
+            if 'ipad' in _ua or ('tablet' in _ua and 'mobile' not in _ua):
+                view_device = 'tablet'
+            elif any(x in _ua for x in ['mobile', 'android', 'iphone', 'ipod']):
+                view_device = 'mobile'
             else:
-                _ua = request.headers.get('User-Agent', '').lower()
-                if 'ipad' in _ua or ('tablet' in _ua and 'mobile' not in _ua):
-                    view_device = 'tablet'
-                elif any(x in _ua for x in ['mobile', 'android', 'iphone', 'ipod']):
-                    view_device = 'mobile'
-                else:
-                    view_device = None
-            # Apply device-specific override on top of global if one exists
-            if view_device:
-                _ov = _get_device_override(slug, view_device)
-                if _ov:
-                    hero_pos, hero_zoom, hero_tx, hero_ty = _ov
+                view_device = None
+
+        # Staging vs published: admin preview passes ?_stage=1; live site does not.
+        # If live (no _stage) and a published snapshot exists, use it.
+        # Otherwise fall back to staging data (current DB values).
+        _is_staging = request.args.get('_stage') == '1'
+        _snap = None if _is_staging else _get_published_snapshot(slug)
+
+        if HAS_DB:
+            if _snap:
+                # ── Serve published snapshot data ─────────────────────────────
+                import json as _json
+                hero      = _snap.get('hero_image')
+                hero_pos  = _snap.get('hero_position') or '50% 50%'
+                hero_zoom = float(_snap.get('hero_zoom') or 1.0)
+                hero_tx   = float(_snap.get('hero_text_x') or 0)
+                hero_ty   = float(_snap.get('hero_text_y') or 0)
+                # Apply device override from snapshot
+                if view_device:
+                    for _ov in (_json.loads(_snap.get('hero_overrides_json') or '[]')):
+                        if _ov.get('device') == view_device:
+                            hero_pos  = _ov.get('hero_position') or hero_pos
+                            hero_zoom = float(_ov.get('hero_zoom') or hero_zoom)
+                            hero_tx   = float(_ov.get('hero_text_x') or hero_tx)
+                            hero_ty   = float(_ov.get('hero_text_y') or hero_ty)
+                            break
+                _snap_cards    = _json.loads(_snap.get('cards_json') or '[]')
+                _snap_sections = _json.loads(_snap.get('sections_json') or '[]')
+            else:
+                # ── Serve staging (live DB) data ──────────────────────────────
+                hero, hero_pos, hero_zoom, hero_tx, hero_ty = _get_page_data(slug)
+                # Apply device-specific override on top of global if one exists
+                if view_device:
+                    _ov = _get_device_override(slug, view_device)
+                    if _ov:
+                        hero_pos, hero_zoom, hero_tx, hero_ty = _ov
+                _snap_cards    = None  # will call _get_card_settings below
+                _snap_sections = None  # will query DB below
+
+            # Apply DB hero image + position/zoom if stored
             if hero:
                 content = _apply_hero_to_html(content, hero, hero_pos, hero_zoom)
             elif hero_zoom > 1.001 or any(
@@ -3393,15 +3513,15 @@ def view(filename):
 
         # Apply card settings (color/image mode per card)
         if HAS_DB:
-            cards = _get_card_settings(slug)
+            cards = _snap_cards if _snap_cards is not None else _get_card_settings(slug)
             if cards:
                 content = _apply_cards_to_html(content, cards)
-
 
         # [PX] Apply per-device section heights
         if HAS_DB:
             _sec_device = view_device if view_device in ("tablet", "mobile") else "desktop"
-            content = _apply_section_heights(content, slug, _sec_device)
+            content = _apply_section_heights(content, slug, _sec_device,
+                                             preloaded_rows=_snap_sections)
         # Inject site logo URL so main.js can prepend it to nav text
         # Prefer SVG for crisp rendering at any size; fall back to PNG
         _logo_svg  = os.path.join(PREVIEW_DIR, 'assets', 'images', 'logo.svg')
@@ -5972,6 +6092,61 @@ def admin_sections_put(slug):
         return jsonify({'ok': True, 'slug': slug, 'device': device, 'section_id': section_id, 'height_px': height_px})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/admin/api/pages/publish', methods=['POST'])
+def admin_pages_publish():
+    """Publish current staging data to live site.
+    Body: {"slugs": ["home","about",...]} to publish specific pages,
+          {"all": true} to publish every page in the pages table."""
+    auth = _require_admin()
+    if auth: return auth
+    data = request.get_json(silent=True) or {}
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'no db'}), 503
+    try:
+        cur = conn.cursor()
+        _ensure_published_snapshots_table(cur)
+        if data.get('all'):
+            cur.execute("SELECT slug FROM pages")
+            slugs = [r['slug'] for r in cur.fetchall()]
+        else:
+            slugs = data.get('slugs') or []
+            if not slugs:
+                return jsonify({'error': 'provide slugs or all:true'}), 400
+        published = []
+        for slug in slugs:
+            _snapshot_page(cur, slug)
+            published.append(slug)
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True, 'published': published, 'count': len(published)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/pages/publish/status', methods=['GET'])
+def admin_pages_publish_status():
+    """Return publish status (last published_at) for all or a specific slug."""
+    auth = _require_admin()
+    if auth: return auth
+    slug = request.args.get('slug', '').strip()
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'snapshots': []})
+    try:
+        cur = conn.cursor()
+        _ensure_published_snapshots_table(cur)
+        if slug:
+            cur.execute("SELECT slug, published_at FROM published_snapshots WHERE slug = %s", (slug,))
+        else:
+            cur.execute("SELECT slug, published_at FROM published_snapshots ORDER BY published_at DESC")
+        rows = cur.fetchall()
+        conn.close()
+        return jsonify({'snapshots': [{'slug': r['slug'], 'published_at': r['published_at'].isoformat() if r['published_at'] else None} for r in rows]})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/admin/api/pages/create', methods=['POST'])
 def admin_pages_create():
