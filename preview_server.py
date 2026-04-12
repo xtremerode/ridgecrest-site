@@ -2614,22 +2614,42 @@ _SECTION_RESIZE_TPL = """\
 
   document.addEventListener('pointercancel', function(e) {{
     if (!_drag || e.pointerId !== _drag.pointerId) return;
-    // Restore original height on cancel
     _drag.section.style.height = _drag.startH + 'px';
     _drag.label.textContent    = _drag.startH + 'px';
     _drag = null;
   }});
+
+  // Helpers to suspend/restore pointer-events on any image overlays within a section.
+  // The hero section has a full-cover ov (z-index:9990) from _EDIT_OVERLAY_TPL that can
+  // intercept pointer events even when the resize handle has z-index:10000.
+  // Suspending the overlay while hovering/dragging the handle guarantees events reach it.
+  function _suspendOverlays(sec) {{
+    sec.querySelectorAll('[data-rd-overlay]').forEach(function(ov) {{
+      if (!ov.hasAttribute('data-rd-pe-saved')) {{
+        ov.setAttribute('data-rd-pe-saved', ov.style.pointerEvents || '');
+        ov.style.pointerEvents = 'none';
+      }}
+    }});
+  }}
+  function _restoreOverlays(sec) {{
+    sec.querySelectorAll('[data-rd-overlay]').forEach(function(ov) {{
+      if (ov.hasAttribute('data-rd-pe-saved')) {{
+        ov.style.pointerEvents = ov.getAttribute('data-rd-pe-saved');
+        ov.removeAttribute('data-rd-pe-saved');
+      }}
+    }});
+  }}
 
   function makeHandle(section, sectionId) {{
     var handle = document.createElement('div');
     handle.setAttribute('data-rd-section-handle', sectionId);
     handle.style.cssText =
       'position:absolute;left:0;right:0;bottom:0;height:12px;' +
-      'background:rgba(56,161,105,0.8);cursor:ns-resize;z-index:10000;' +
+      'background:rgba(56,161,105,0.8);cursor:ns-resize;z-index:99999;' +
       'display:flex;align-items:center;justify-content:center;' +
       'font:bold 9px/1 monospace;color:#1a4731;user-select:none;' +
       'box-sizing:border-box;border-top:2px solid rgba(56,161,105,1);' +
-      'touch-action:none;';
+      'touch-action:none;pointer-events:auto;';
     handle.title = 'Drag to resize \u00b7 ' + sectionId;
 
     var label = document.createElement('span');
@@ -2679,6 +2699,13 @@ _SECTION_RESIZE_TPL = """\
         sec.style.position = 'relative';
       }}
       sec.appendChild(makeHandle(sec, cls));
+      // Clip any full-cover image overlays so they don't extend into the
+      // bottom 14px where the resize handle lives. Without this the overlay
+      // (z-index:9990, pointer-events:auto) intercepts all pointer events
+      // before they can reach the handle (z-index:99999).
+      sec.querySelectorAll('[data-rd-overlay="hero"]').forEach(function(ov) {{
+        ov.style.bottom = '14px';
+      }});
     }});
   }}
 
