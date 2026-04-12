@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Logo Upload — Mockup</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0d14; --surface: #111520; --surface-2: #171d2e;
+      --border: #1e2640; --border-2: #2a3354;
+      --text: #e2e8f0; --text-2: #94a3b8; --text-3: #475569;
+      --accent: #4f46e5; --accent-lt: #6366f1;
+      --gold: #c8b89a; --green: #22c55e; --red: #ef4444;
+      --radius: 8px; --radius-lg: 12px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg); color: var(--text);
+      font-size: 14px; line-height: 1.5;
+      display: flex; align-items: flex-start; justify-content: center;
+      min-height: 100vh; padding: 40px 24px;
+    }
+    .wrapper { width: 100%; max-width: 760px; display: flex; flex-direction: column; gap: 20px; }
+
+    /* ── Breadcrumb label ── */
+    .context-label {
+      font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--text-3); display: flex; align-items: center; gap: 6px;
+    }
+    .context-label span { color: var(--text-2); }
+
+    /* ── Card ── */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+    }
+    .card-title { font-size: 14px; font-weight: 600; color: var(--text); }
+    .card-sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+    .card-body { padding: 20px; }
+
+    /* ── Logo preview area ── */
+    .logo-preview-area {
+      display: flex; align-items: center; gap: 20px;
+      padding: 20px; background: var(--surface-2);
+      border: 1px dashed var(--border-2); border-radius: var(--radius);
+      margin-bottom: 16px;
+    }
+    .logo-placeholder {
+      width: 180px; height: 60px; flex-shrink: 0;
+      background: var(--bg); border: 1px solid var(--border-2);
+      border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    }
+    .logo-placeholder-text {
+      font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--text-3); font-weight: 500;
+    }
+    .logo-meta { flex: 1; }
+    .logo-meta-title { font-size: 13px; color: var(--text-2); margin-bottom: 4px; }
+    .logo-meta-hint { font-size: 12px; color: var(--text-3); }
+
+    /* ── State B: logo uploaded ── */
+    .logo-img-preview {
+      width: 180px; height: 60px; flex-shrink: 0;
+      background: var(--bg); border: 1px solid var(--border-2); border-radius: 6px;
+      display: flex; align-items: center; justify-content: center; overflow: hidden;
+    }
+    .logo-img-preview img { max-width: 160px; max-height: 52px; object-fit: contain; }
+
+    /* ── Actions row ── */
+    .logo-actions { display: flex; gap: 10px; align-items: center; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: var(--radius);
+      font-size: 13px; font-weight: 500; border: none; cursor: pointer;
+      transition: 0.15s ease;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-lt); }
+    .btn-ghost {
+      background: transparent; color: var(--text-2);
+      border: 1px solid var(--border-2);
+    }
+    .btn-ghost:hover { background: var(--surface-2); color: var(--text); }
+    .btn-ghost.disabled { opacity: 0.38; pointer-events: none; }
+    .btn-danger-ghost {
+      background: transparent; color: var(--red);
+      border: 1px solid rgba(239,68,68,0.25);
+    }
+    .btn-danger-ghost:hover { background: rgba(239,68,68,0.08); }
+
+    /* ── Hint text ── */
+    .hint { font-size: 12px; color: var(--text-3); margin-top: 10px; }
+    .hint strong { color: var(--text-2); }
+
+    /* ── Nav preview ── */
+    .nav-preview-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+    .nav-preview-label {
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+      font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--text-3); font-weight: 500;
+    }
+    .nav-sim {
+      background: #0d1a22; padding: 0 28px; height: 66px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-sim-logo-text {
+      font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase;
+      color: #fff; font-weight: 500; font-family: -apple-system, sans-serif;
+    }
+    .nav-sim-logo-img img {
+      max-height: 38px; max-width: 180px; object-fit: contain;
+    }
+    .nav-sim-links { display: flex; gap: 20px; }
+    .nav-sim-links span { font-size: 12px; color: rgba(255,255,255,0.6); }
+    .nav-sim-cta {
+      font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+      border: 1px solid rgba(255,255,255,0.4); color: #fff;
+      padding: 6px 14px; border-radius: 4px;
+    }
+
+    /* ── Toggle ── */
+    .state-toggle {
+      display: flex; gap: 8px; margin-bottom: 20px;
+    }
+    .toggle-btn {
+      font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+      padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border-2);
+      background: transparent; color: var(--text-3); cursor: pointer;
+    }
+    .toggle-btn.active { background: var(--surface-2); color: var(--text); border-color: var(--text-3); }
+
+    /* ── Section divider ── */
+    .section-title {
+      font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--text-3); font-weight: 600; margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- Context -->
+  <div class="context-label">Settings → General → <span>Brand Assets</span></div>
+
+  <!-- State toggle -->
+  <div class="state-toggle">
+    <button class="toggle-btn active" onclick="setState('empty')">State A — No logo uploaded</button>
+    <button class="toggle-btn" onclick="setState('uploaded')">State B — Logo uploaded</button>
+  </div>
+
+  <!-- ── STATE A: No logo ── -->
+  <div id="stateA">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Brand Assets</div>
+          <div class="card-sub">Logo displayed to the left of "Ridgecrest Designs" text in the nav bar</div>
+        </div>
+      </div>
+      <div class="card-body">
+
+        <div class="logo-preview-area">
+          <div class="logo-placeholder">
+            <span class="logo-placeholder-text">Ridgecrest Designs</span>
+          </div>
+          <div class="logo-meta">
+            <div class="logo-meta-title">No logo uploaded</div>
+            <div class="logo-meta-hint">The nav currently shows your business name as text. Upload a logo and it will appear to the left of "Ridgecrest Designs".</div>
+          </div>
+        </div>
+
+        <div class="logo-actions">
+          <button class="btn btn-primary">⬆ Upload Logo</button>
+          <button class="btn btn-ghost disabled">✕ Remove Logo</button>
+        </div>
+
+        <p class="hint">Accepted formats: <strong>PNG, SVG, WebP</strong> &nbsp;·&nbsp; Max size: <strong>2 MB</strong> &nbsp;·&nbsp; Recommended height: <strong>36–48 px</strong></p>
+
+      </div>
+    </div>
+
+    <!-- Nav preview — State A -->
+    <div class="nav-preview-card">
+      <div class="nav-preview-label">Nav bar preview — text only (current)</div>
+      <div class="nav-sim">
+        <div class="nav-sim-logo-text">Ridgecrest Designs</div>
+        <div class="nav-sim-links">
+          <span>About</span><span>Process</span><span>Portfolio</span><span>Services</span>
+          <span class="nav-sim-cta">Start a Project</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STATE B: Logo uploaded ── -->
+  <div id="stateB" style="display:none; flex-direction:column; gap:20px;">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Brand Assets</div>
+          <div class="card-sub">Logo displayed to the left of "Ridgecrest Designs" text in the nav bar</div>
+        </div>
+      </div>
+      <div class="card-body">
+
+        <div class="logo-preview-area">
+          <div class="logo-img-preview">
+            <!-- Simulated logo using styled text to represent an actual uploaded image -->
+            <div style="font-size:13px;letter-spacing:0.18em;text-transform:uppercase;color:#c8b89a;font-weight:500;font-family:Georgia,serif;">
+              ◈ Ridgecrest
+            </div>
+          </div>
+          <div class="logo-meta">
+            <div class="logo-meta-title">logo.png &nbsp;<span style="color:var(--green);font-size:11px;">● Active</span></div>
+            <div class="logo-meta-hint">Uploaded Apr 5, 2026 &nbsp;·&nbsp; 42 KB &nbsp;·&nbsp; Showing left of nav text on all 105 pages</div>
+          </div>
+        </div>
+
+        <div class="logo-actions">
+          <button class="btn btn-primary">⬆ Replace Logo</button>
+          <button class="btn btn-danger-ghost">✕ Remove Logo</button>
+        </div>
+
+        <p class="hint">Accepted formats: <strong>PNG, SVG, WebP</strong> &nbsp;·&nbsp; Max size: <strong>2 MB</strong> &nbsp;·&nbsp; Recommended height: <strong>36–48 px</strong></p>
+
+      </div>
+    </div>
+
+    <!-- Nav preview — State B -->
+    <div class="nav-preview-card">
+      <div class="nav-preview-label">Nav bar preview — logo + text</div>
+      <div class="nav-sim">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <!-- Logo image placeholder -->
+          <div style="width:38px;height:38px;background:rgba(200,184,154,0.12);border:1px solid rgba(200,184,154,0.3);border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <div style="font-size:16px;color:#c8b89a;">◈</div>
+          </div>
+          <!-- Text stays as-is -->
+          <div class="nav-sim-logo-text">Ridgecrest Designs</div>
+        </div>
+        <div class="nav-sim-links">
+          <span>About</span><span>Process</span><span>Portfolio</span><span>Services</span>
+          <span class="nav-sim-cta">Start a Project</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function setState(s) {
+    document.getElementById('stateA').style.display = s === 'empty' ? 'flex' : 'none';
+    document.getElementById('stateA').style.flexDirection = 'column';
+    document.getElementById('stateA').style.gap = '20px';
+    document.getElementById('stateB').style.display = s === 'uploaded' ? 'flex' : 'none';
+    document.querySelectorAll('.toggle-btn').forEach((b, i) => {
+      b.classList.toggle('active', (i === 0 && s === 'empty') || (i === 1 && s === 'uploaded'));
+    });
+  }
+  document.getElementById('stateA').style.display = 'flex';
+  document.getElementById('stateA').style.flexDirection = 'column';
+  document.getElementById('stateA').style.gap = '20px';
+</script>
+</body>
+</html>

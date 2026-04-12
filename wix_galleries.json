@@ -1,0 +1,1690 @@
+{
+  "sierra-mountain-ranch": {
+    "done": true,
+    "wixSlug": "sierramountainranch",
+    "title": "Sierra Mountain Ranch Complete Remodel | Ridgecrest Designs",
+    "images": [
+      {
+        "hash": "ff5b18_6f6dc7ef92684e7e8af496c4f83f06be_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 976,
+        "domH": 652
+      },
+      {
+        "hash": "ff5b18_d591e3f65da44f76bfd8088b70370caf_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 321,
+        "domH": 203
+      },
+      {
+        "hash": "ff5b18_29ec897c45d74caabd831b08f46ec1bc_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 322,
+        "domH": 414
+      },
+      {
+        "hash": "ff5b18_e4715d92a11c4c5682cb6b069075018a_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 321,
+        "domH": 213
+      },
+      {
+        "hash": "ff5b18_b67df4d5003d43ba8d6e8a160b23f2cd_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 321,
+        "domH": 482
+      },
+      {
+        "hash": "ff5b18_a363f7c834604c128cda653cf45e5367_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 321,
+        "domH": 481
+      },
+      {
+        "hash": "ff5b18_4f960eeba52c4a4c9ce82a2a55b52ec5_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 322,
+        "domH": 483
+      },
+      {
+        "hash": "ff5b18_574ad81d4b81481184c206a7be04578f_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 321,
+        "domH": 481
+      },
+      {
+        "hash": "ff5b18_e4aa7744fdb44b4f9637dfa469574648_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 321,
+        "domH": 481
+      },
+      {
+        "hash": "ff5b18_316eec2b39934fd7b0783b5c865f6f0c_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 322,
+        "domH": 215
+      },
+      {
+        "hash": "ff5b18_e27fd127d04f45f3a931f91210dabc07_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 322,
+        "domH": 215
+      },
+      {
+        "hash": "ff5b18_4516f51554374af3a122cd7ee3b5c06c_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 321,
+        "domH": 282
+      },
+      {
+        "hash": "ff5b18_0769ea7b226147ceb6eee9b632df5bae_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 321,
+        "domH": 482
+      },
+      {
+        "hash": "ff5b18_b73c2686fcf44f84a789d00e455f307b_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 322,
+        "domH": 215
+      },
+      {
+        "hash": "ff5b18_65d7e65ebe3942c38054df7a5eba4302_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 321,
+        "domH": 482
+      },
+      {
+        "hash": "ff5b18_75a9ba9c5a87418daf6d2b69c70f60ff_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 322,
+        "domH": 215
+      },
+      {
+        "hash": "ff5b18_a3caf294dc5e4be68b36f626e9c42ea2_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 321,
+        "domH": 481
+      },
+      {
+        "hash": "ff5b18_d0f8c15054d7404ab39b2e48dd2c4610_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 322,
+        "domH": 215
+      },
+      {
+        "hash": "ff5b18_e73241a2a89840e8b828d1a604830f17_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 321,
+        "domH": 482
+      },
+      {
+        "hash": "ff5b18_25b92e31b44346549995acfa378ad325_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 322,
+        "domH": 483
+      },
+      {
+        "hash": "ff5b18_037bd402192d4bd19879917e9f9dc7b1_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 321,
+        "domH": 215
+      },
+      {
+        "hash": "ff5b18_66c5153a1ec44adab9d8603f0eceec8f_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 321,
+        "domH": 491
+      },
+      {
+        "hash": "ff5b18_5843843f2d0141e987c0e96a1e68b6b1_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 321,
+        "domH": 214
+      },
+      {
+        "hash": "ff5b18_789d474d6d0149eea64b9629dc7a9d7b_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 322,
+        "domH": 215
+      },
+      {
+        "hash": "ff5b18_7c54ccfe90ad4065ae0f0aa063a629e4_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 321,
+        "domH": 482
+      },
+      {
+        "hash": "ff5b18_6a5a8b093a7d4ec1bfb1eddf7fe753b4_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 322,
+        "domH": 483
+      },
+      {
+        "hash": "ff5b18_1fbce4b2397a48f7991c87f8406ba67d_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      }
+    ],
+    "domCount": 26,
+    "sourceCount": 158
+  },
+  "pleasanton-custom": {
+    "done": true,
+    "wixSlug": "pleasantoncustomhome",
+    "title": "Pleasanton Custom Home | Ridgecrest Designs",
+    "images": [
+      {
+        "hash": "ff5b18_9820c1603a9c414d8cc8009784d1ca7c_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 978,
+        "domH": 648
+      },
+      {
+        "hash": "ff5b18_53f46b46f9094468addb44305dff0a55_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 160
+      },
+      {
+        "hash": "ff5b18_42db29ccfa3949e6ae1e773888bcac59_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 300
+      },
+      {
+        "hash": "ff5b18_8e8a0acd45874a41a17619c8f12ee4cc_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 300
+      },
+      {
+        "hash": "ff5b18_8f25d193b0a2414a89b864f14a54e442_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 239,
+        "domH": 299
+      },
+      {
+        "hash": "ff5b18_dd094f46b3f14424a266355c7bd4a7c0_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 300
+      },
+      {
+        "hash": "ff5b18_8b88af1e6d69497fb210d95ceab32ad6_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 239,
+        "domH": 299
+      },
+      {
+        "hash": "ff5b18_acf2d49760f546539ec1e543ee39e702_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 300
+      },
+      {
+        "hash": "ff5b18_1939fb8d8df2493a9c28bfc35dc8a9c3_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 160
+      },
+      {
+        "hash": "ff5b18_b2ea32008e8748c29e682596df620cf9_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 300
+      },
+      {
+        "hash": "ff5b18_8169ea986d9a426abe1ee95d8120e794_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 160
+      },
+      {
+        "hash": "ff5b18_094ff86fd81c4a47a3ee9d0554b0303e_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 239,
+        "domH": 159
+      },
+      {
+        "hash": "ff5b18_c4feea2667c647bba02523520c5ca48d_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 316
+      },
+      {
+        "hash": "ff5b18_236ae3c88608452fb5e63a8881ad1e46_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 300
+      },
+      {
+        "hash": "ff5b18_1239f1bef81a42ad83438ee930016733_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 239,
+        "domH": 299
+      },
+      {
+        "hash": "ff5b18_3864f91962544bb2abb00e69f079ba8e_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 300
+      },
+      {
+        "hash": "ff5b18_5734da78eec545329fe074dc71f86326_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 160
+      },
+      {
+        "hash": "ff5b18_1479b0c3a4fc4182b307f5214a2d25cd_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 300
+      },
+      {
+        "hash": "ff5b18_d30dfa95656540f18cc8cb06d7c673ad_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 239,
+        "domH": 319
+      },
+      {
+        "hash": "ff5b18_e04bfbab22294ca784254c5d6da8b89c_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 320
+      },
+      {
+        "hash": "ff5b18_a8c2aa57b915444dafebb604985e0621_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 300
+      },
+      {
+        "hash": "ff5b18_5032c1aca2484f22a7cb801306f1c2cf_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 300
+      },
+      {
+        "hash": "ff5b18_b927c23da6da4311b72d3c22d39a209d_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 239,
+        "domH": 299
+      },
+      {
+        "hash": "ff5b18_ef7e9248effd4b65bbf792589cec128a_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 300
+      },
+      {
+        "hash": "ff5b18_3d54d629081b4cffac259ea08ed0f552_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 160
+      },
+      {
+        "hash": "ff5b18_52079e7283d74abf8837e9acd2730309_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 300
+      },
+      {
+        "hash": "ff5b18_5b97bf4ab5144c2da7f3e3aa80fb8532_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 747,
+        "domH": 420
+      },
+      {
+        "hash": "ff5b18_0f8e248ff1424e8a9016fcac13a94cea_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 747,
+        "domH": 420
+      },
+      {
+        "hash": "ff5b18_689c82335590480bab8687093b788f39_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 747,
+        "domH": 420
+      },
+      {
+        "hash": "ff5b18_4dbbff9e350e432980cccfc598f0dc7f_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 747,
+        "domH": 420
+      },
+      {
+        "hash": "ff5b18_a74c7ef598444446bb8d03653c3328e8_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 747,
+        "domH": 420
+      },
+      {
+        "hash": "ff5b18_7afabe08804f4547850b618be2d91ae6_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 747,
+        "domH": 420
+      },
+      {
+        "hash": "ff5b18_ff725c980f7a43dcb69904fdbc47bd24_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 747,
+        "domH": 420
+      },
+      {
+        "hash": "ff5b18_9cd0d8a66b364c1ea15c032acb7da0cc_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 747,
+        "domH": 420
+      },
+      {
+        "hash": "ff5b18_3f1b7aa631894aa8b3345db56bc8fdc2_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 747,
+        "domH": 420
+      },
+      {
+        "hash": "ff5b18_68336ad7449c4a6bb9502b541afd244c_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_376077d7fb0e40f2b394154c6aed5771_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_a506a1b7c3094574919d609aaedf310e_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_9ddef3ad9b24428e8782634a3dd2a92d_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_8063b45cadc54b20a7d6eb9928d73e06_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_6b5fc44e62c548f88f43648494248b8d_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_b28412dbf897438591f8b93f12d53dcf_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_bff1a21d68894b1485619571dec937c1_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_166b3d9326fb475aa78e1c30e2f70208_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_dd853c2703794d2b930b3be2a8fc483f_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_1d319e46d16c42edb618f929d78be1ce_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_56709ef3ab734ab79dac77379f00eb78_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_3ea2da7dae7046758adcc27e54b5b865_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_ef9b9e4c9e8048c0b21b0d5ad19143b3_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_5e380d36f3d64940a665de8a281fe23f_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_f399ea12bfd842d48f6f1a70f5c199bc_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_ecc34a03656549caa7e8d6ee648480dc_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_ef43f9ef1b89406a8ed43208ece970c8_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_290d185c4a514099b505fa1baa0adcc7_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_1f525ab949e548f39a3a614b47579b62_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_8ae6f73e058844489a19f7cb714ddf51_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_5ab5e51647d5480687a20189d68a382e_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_b81ad19e857d4e99b57edf295d8732b7_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_a9a4054d937b4d2f87b68ae86f8e6505_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_ec34ac50f5ed421b8914a9ed0c9d168e_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      }
+    ],
+    "domCount": 36,
+    "sourceCount": 362
+  },
+  "sunol-homestead": {
+    "done": true,
+    "wixSlug": "sunolhomestead",
+    "title": "Sunol Homestead Luxury Home | Ridgecrest Designs",
+    "images": [
+      {
+        "hash": "ff5b18_5ad4349859fe4e728734e05bf49f85e3_mv2",
+        "ext": "webp",
+        "source": "dom",
+        "domW": 976,
+        "domH": 652
+      },
+      {
+        "hash": "ff5b18_5b8b92bdb42f488681d9bad5096f781a_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 240,
+        "domH": 333
+      },
+      {
+        "hash": "ff5b18_296b1e9ff5d14e128006c21217e3f3e9_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 180
+      },
+      {
+        "hash": "ff5b18_ab748d2b2e4047119ad34df519ba81ea_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 880,
+        "domH": 411
+      },
+      {
+        "hash": "ff5b18_46718a5e04de4b499d1eb8861d5b31fb_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 945,
+        "domH": 411
+      },
+      {
+        "hash": "ff5b18_017e7503e4ea4fe19c98e6a31e9f48d7_mv2",
+        "ext": "png",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      }
+    ],
+    "domCount": 5,
+    "sourceCount": 32
+  },
+  "danville-hilltop": {
+    "done": true,
+    "wixSlug": "danvillehilltophideaway",
+    "title": "Danville Hilltop Hideaway Remodel | Ridgecrest Designs",
+    "images": [
+      {
+        "hash": "ff5b18_598ba1466dbb45249778e2ea0e0b95e3_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 980,
+        "domH": 653
+      },
+      {
+        "hash": "ff5b18_c520c9ca384d4c3ebe02707d0c8f45ab_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 265
+      },
+      {
+        "hash": "ff5b18_b246a630ba864e2a8fe67d964745b9b5_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 160
+      },
+      {
+        "hash": "ff5b18_4a378f6899d24b5ba7bc7551ea53540a_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 239,
+        "domH": 394
+      },
+      {
+        "hash": "ff5b18_7e0f0e5602694ed280e46ec708e7b068_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 142
+      },
+      {
+        "hash": "ff5b18_63757c728db94733b4f60a7102c0f722_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 94
+      },
+      {
+        "hash": "ff5b18_487bdc0f0af642d9b49405d476c80c5e_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 160
+      },
+      {
+        "hash": "ff5b18_c0e8f9e9008c498eac5efafae3c46b04_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 748,
+        "domH": 421
+      },
+      {
+        "hash": "ff5b18_1ef4108f78534aa59c515d38946c4644_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 748,
+        "domH": 421
+      },
+      {
+        "hash": "ff5b18_7bdab37a61b24537af57e91ce2978f4c_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_b0f0c5eecc8d4f7ba7ae030a334d5f93_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_19b678ef0cf34b9ca705133688ea91b1_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_10521de8c90243f58322ebef9335a4c8_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_864272d4755d468096cd4e388a01a773_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_5ed3b0005abb494885a58ee0c4508248_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_b93571ff11674224b7489b5e425116ee_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      }
+    ],
+    "domCount": 10,
+    "sourceCount": 104
+  },
+  "napa-retreat": {
+    "done": true,
+    "wixSlug": "naparetreat",
+    "title": "Napa Retreat Luxury Home Remodel | Ridgecrest Designs",
+    "images": [
+      {
+        "hash": "ff5b18_38c7317e1d4b4773ab0a16ed48332f31_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 977,
+        "domH": 535
+      },
+      {
+        "hash": "ff5b18_938143f6f9374aa88d8ed87d5de5bb73_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 151
+      },
+      {
+        "hash": "ff5b18_e25234795a7a4ed08b1bea59751199a9_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 110
+      },
+      {
+        "hash": "ff5b18_0d88c8d60a794608ae52e386cb653c92_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 157
+      },
+      {
+        "hash": "ff5b18_e770197d24e4436aae7c1c05d9d07a62_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 239,
+        "domH": 179
+      },
+      {
+        "hash": "ff5b18_287252fbc1f0474c8c5448c350dcfad2_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 164
+      },
+      {
+        "hash": "ff5b18_672125820d5a46069583b4cc0f2a6335_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 195
+      },
+      {
+        "hash": "ff5b18_8d194ec65ece42e1a9a046dacdd67157_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 127
+      },
+      {
+        "hash": "ff5b18_2780ac2b8ec84080a5eca2658e4a8f27_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 239,
+        "domH": 462
+      },
+      {
+        "hash": "ff5b18_d21a6cfecad9421bb43dbd6d1a63828f_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 180
+      },
+      {
+        "hash": "ff5b18_831537efc37e4610adff9f8e982c8039_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 325
+      },
+      {
+        "hash": "ff5b18_bb1013e8034740828826f718ad2216d9_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 467
+      },
+      {
+        "hash": "ff5b18_76ec6d9dbc3b4d29ab02bc08c56cf7e5_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 467
+      },
+      {
+        "hash": "ff5b18_17b3952b932d497d8734d0ee1254a6b7_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 186,
+        "domH": 248
+      },
+      {
+        "hash": "ff5b18_8987814f88814d3aaf441bd83b524f9d_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 331,
+        "domH": 248
+      },
+      {
+        "hash": "ff5b18_5f782d175d304c39bd1a5a68ecd17837_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 331,
+        "domH": 248
+      },
+      {
+        "hash": "ff5b18_bcd726fa503f41e8ae32288d50273c8e_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 331,
+        "domH": 248
+      },
+      {
+        "hash": "ff5b18_8d75523812e941f2a37fafd4d1f65557_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_0b701547bc92489cbf3985cef0ed0275_mv2",
+        "ext": "png",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_3f272f8928964dc8a4ef4c4100ebcbb9_mv2",
+        "ext": "png",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_180583f962c742faaa90d6b0adda3528_mv2",
+        "ext": "png",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_41d97144818e40e09ddddd7357704009_mv2",
+        "ext": "png",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_a6a474bf0bef4095af1c07f5505da43f_mv2",
+        "ext": "png",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_deb303a4cdf1412291032c4e55be8128_mv2",
+        "ext": "png",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      }
+    ],
+    "domCount": 17,
+    "sourceCount": 113
+  },
+  "lafayette-luxury": {
+    "done": true,
+    "wixSlug": "lafayette-laid-back-luxury",
+    "title": "Laid-Back Luxury in Lafayette | Ridgecrest Designs",
+    "images": [
+      {
+        "hash": "ff5b18_94919d08fc9245fc849ac03c4ea2caaf_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 979,
+        "domH": 653
+      },
+      {
+        "hash": "ff5b18_c1e5fd8a13c34fa985b5b84f87a8f7d1_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 313
+      },
+      {
+        "hash": "ff5b18_bcab10ed365d4e7183fdfd58fa581372_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 300
+      },
+      {
+        "hash": "ff5b18_969f8423ceba4f5ab338f4ec820f8851_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 160
+      },
+      {
+        "hash": "ff5b18_b456a82df95e4427842a990d8e61660e_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 239,
+        "domH": 299
+      },
+      {
+        "hash": "ff5b18_2882dd1cc3314d3a9e205861b9fff3f7_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 300
+      },
+      {
+        "hash": "ff5b18_22620574256243ca8f197a3e9fe27ca1_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 239,
+        "domH": 245
+      },
+      {
+        "hash": "ff5b18_4c364cc11c9944fc83ece24b9c91498a_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 360
+      },
+      {
+        "hash": "ff5b18_46e606322d7d4ae3bc4cc744a6f688af_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 300
+      },
+      {
+        "hash": "ff5b18_dd972afe8737434c9014dcca1624d988_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 240,
+        "domH": 360
+      },
+      {
+        "hash": "ff5b18_c2a04c214cf44ddeb43c9d7c7b58ce47_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 239,
+        "domH": 229
+      },
+      {
+        "hash": "ff5b18_c1637bae333840e4a71cbdaac8405213_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 674,
+        "domH": 463
+      },
+      {
+        "hash": "ff5b18_8f94e57d36c84799bacb3aec32cd1418_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 944,
+        "domH": 463
+      },
+      {
+        "hash": "ff5b18_7f1d04c690b0453fbb22aaf1d443dc76_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 347,
+        "domH": 463
+      },
+      {
+        "hash": "ff5b18_4115fae529ce4974a6b6ead3ded507a9_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 617,
+        "domH": 463
+      },
+      {
+        "hash": "ff5b18_6ce3779e8542406db45d54ee9e8a9d33_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 617,
+        "domH": 463
+      }
+    ],
+    "domCount": 16,
+    "sourceCount": 98
+  },
+  "orinda-kitchen": {
+    "done": true,
+    "wixSlug": "orinda",
+    "title": "Orinda Urban Modern Kitchen | Ridgecrest Designs",
+    "images": [
+      {
+        "hash": "ff5b18_d741bf6a821b40e8b4730181bcf0fc48_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 976,
+        "domH": 652
+      },
+      {
+        "hash": "ff5b18_de2ed75da1a541abb0861b82d04e1135_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 240,
+        "domH": 139
+      },
+      {
+        "hash": "ff5b18_a69a1fba43ec4dd98ec66e582d5ec86f_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 240,
+        "domH": 158
+      },
+      {
+        "hash": "ff5b18_4b19847e3cf14ecfb78313bac274f651_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 240,
+        "domH": 147
+      },
+      {
+        "hash": "ff5b18_b2c6186a71644039b5e9854f48df0d7f_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 239,
+        "domH": 150
+      },
+      {
+        "hash": "ff5b18_23e5e93fc68647b6a7a0dd359c143088_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 240,
+        "domH": 158
+      },
+      {
+        "hash": "ff5b18_ad29115ec24b4bbaa33893ed164199cf_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 239,
+        "domH": 85
+      },
+      {
+        "hash": "ff5b18_fa8d30d31488413ca93cf28ed74c8e05_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 748,
+        "domH": 421
+      },
+      {
+        "hash": "ff5b18_c8f3843d541b4a9cbd5d0b7890f93880_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 748,
+        "domH": 421
+      },
+      {
+        "hash": "ff5b18_7d9860cd5e234283aebffeff9b4bfbc9_mv2",
+        "ext": "png",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_5ef00a1c27fa49929b6841b112dedb12_mv2",
+        "ext": "png",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      },
+      {
+        "hash": "ff5b18_b8e188bd228f4ea990fd6c1c7120140f_mv2",
+        "ext": "png",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      }
+    ],
+    "domCount": 10,
+    "sourceCount": 98
+  },
+  "danville-dream": {
+    "done": true,
+    "wixSlug": "danvilledreamhome",
+    "title": "Luxury Danville Dream Home Remodel | Ridgecrest Designs",
+    "images": [
+      {
+        "hash": "ff5b18_83cbc49d23a5436294574e1dd9db3819_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 855
+      },
+      {
+        "hash": "ff5b18_aac54aec732d47c7b4d53e34ae6aa5ff_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 622
+      },
+      {
+        "hash": "ff5b18_3c0cef18e48849089c5ed48614041900_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 916
+      },
+      {
+        "hash": "ff5b18_5135a6cf3a664817ae02184154c06024_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 650
+      },
+      {
+        "hash": "ff5b18_7e41713f38d54a9d925d14c4bb72b01b_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 887
+      },
+      {
+        "hash": "ff5b18_105d9435292548ff9f61e8cae0711f9f_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 582
+      },
+      {
+        "hash": "ff5b18_e5a7d0e7216249bfbb6fbebba64021a8_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 540
+      },
+      {
+        "hash": "ff5b18_cbf6c17a98f949e19d6969e9e377f278_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 726
+      },
+      {
+        "hash": "ff5b18_02bdae21cf9549b38aecd09306a4842c_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 1301
+      },
+      {
+        "hash": "ff5b18_1a145219498d4e75a79bbe13d3ab23ae_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 808
+      },
+      {
+        "hash": "ff5b18_f406990c34ad4a039524b10579cc5295_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 389
+      },
+      {
+        "hash": "ff5b18_56b178a8e1854af29fed0a75961a5a6f_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 1520
+      },
+      {
+        "hash": "ff5b18_a466dbb965e94f008c62bfb48a04ab21_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 740
+      },
+      {
+        "hash": "ff5b18_f9b4f2ba1f81409a86985fabcbbea3be_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 652
+      },
+      {
+        "hash": "ff5b18_2b1800ac28b247f98060b77e9034f227_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 506
+      },
+      {
+        "hash": "ff5b18_bd546d2e47244fdcbda2e0bf2e07c43d_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 338
+      }
+    ],
+    "domCount": 16,
+    "sourceCount": 101
+  },
+  "alamo-luxury": {
+    "done": true,
+    "wixSlug": "alamoluxury",
+    "title": "Alamo Luxury Remodel | Ridgecrest Designs",
+    "images": [
+      {
+        "hash": "ff5b18_39536b28ce0447b9a87797bb4c70ee51_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 974,
+        "domH": 922
+      },
+      {
+        "hash": "ff5b18_b3b82b5920dd48509b6b78c1a91dcaec_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 974,
+        "domH": 647
+      },
+      {
+        "hash": "ff5b18_2aaf8ea933cc4fcc9e59d23197e3b35f_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 974,
+        "domH": 1956
+      },
+      {
+        "hash": "ff5b18_d8789d39f2f54918b05ecc999eba639b_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 974,
+        "domH": 1472
+      },
+      {
+        "hash": "ff5b18_920a949ef5b541cc85ea6be49efebb96_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 974,
+        "domH": 652
+      },
+      {
+        "hash": "ff5b18_cd5a5fdbf7ed4b23b03a9a3e7533e051_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 974,
+        "domH": 654
+      },
+      {
+        "hash": "ff5b18_ef18abb4037848e3b75100bef53ef666_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 974,
+        "domH": 827
+      }
+    ],
+    "domCount": 7,
+    "sourceCount": 47
+  },
+  "lafayette-bistro": {
+    "done": true,
+    "wixSlug": "lafayette-modern-bistro",
+    "title": "Lafayette Modern Bistro Kitchen Remodel | Ridgecrest Designs",
+    "images": [
+      {
+        "hash": "ff5b18_76c5e504c9114ef09ad8233549a16b39_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 980,
+        "domH": 773
+      },
+      {
+        "hash": "ff5b18_1012816bc1d7431cbdba88c8a138d06d_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 980,
+        "domH": 574
+      },
+      {
+        "hash": "ff5b18_62872dfca32e4164a0aae5c292352ece_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 980,
+        "domH": 1086
+      },
+      {
+        "hash": "ff5b18_5d2794ad0a8c491484471454087410bb_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 980,
+        "domH": 588
+      },
+      {
+        "hash": "ff5b18_3e1808f4f0464106ae1905f8723d25d3_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 980,
+        "domH": 1470
+      },
+      {
+        "hash": "ff5b18_d7eb886d364544c1993777e2db5e8bb6_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      }
+    ],
+    "domCount": 5,
+    "sourceCount": 35
+  },
+  "san-ramon": {
+    "done": true,
+    "wixSlug": "sanramon",
+    "title": "Castro Valley Villa Remodel | Ridgecrest Designs",
+    "images": [
+      {
+        "hash": "ff5b18_6eed718eb2ab4ca0887717d1a39285ea_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 613
+      },
+      {
+        "hash": "ff5b18_b64b65b40c1f44e4a4f6b21baac8ed72_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 613
+      },
+      {
+        "hash": "ff5b18_708d458832504cbd94bd7cdd7913c664_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 657
+      }
+    ],
+    "domCount": 3,
+    "sourceCount": 23
+  },
+  "pleasanton-garage": {
+    "done": true,
+    "wixSlug": "pleasanton-garage-renovation",
+    "title": "Pleasanton Garage Renovation | Ridgecrest Designs",
+    "images": [
+      {
+        "hash": "ff5b18_dab676506e77455e942b02a857f21cc3_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 978,
+        "domH": 648
+      },
+      {
+        "hash": "ff5b18_f8bf8933487f45db825a713b4ea4c540_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 974,
+        "domH": 649
+      },
+      {
+        "hash": "ff5b18_042b3d66e8904b4188c0ec509b2595d6_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 485,
+        "domH": 647
+      },
+      {
+        "hash": "ff5b18_5f016abc7ce04830a7f65e61c2b4a3fa_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 484,
+        "domH": 645
+      }
+    ],
+    "domCount": 4,
+    "sourceCount": 26
+  },
+  "livermore-farmhouse-chic": {
+    "done": true,
+    "wixSlug": "livermorefarmhousechic",
+    "title": "Livermore Farmhouse Chic | Ridgecrest Designs",
+    "images": [
+      {
+        "hash": "ff5b18_e1ef86fee44b4c14b077ecbdb2ca10f5_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 1054
+      },
+      {
+        "hash": "ff5b18_73ddf9ebf03a4477926cbf2283271380_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 613
+      },
+      {
+        "hash": "ff5b18_50c83d3193bf45818fc0ba11ae615bed_mv2",
+        "ext": "png",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      }
+    ],
+    "domCount": 2,
+    "sourceCount": 17
+  },
+  "pleasanton-cottage-kitchen": {
+    "done": true,
+    "wixSlug": "pleasantoncottagekitchen",
+    "title": "Pleasanton Cottage Kitchen | Ridgecrest Designs",
+    "images": [
+      {
+        "hash": "ff5b18_f575a25ba7f14e1389d0ae63bb2d356f_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 654
+      },
+      {
+        "hash": "ff5b18_9a3cb5be52fb466ebd047a075c89ee74_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 643
+      },
+      {
+        "hash": "ff5b18_56956b7fa72d450998718343281c35e4_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 579
+      }
+    ],
+    "domCount": 3,
+    "sourceCount": 23
+  },
+  "san-ramon-eclectic-bath": {
+    "done": true,
+    "wixSlug": "san-ramon-eclectic-bath",
+    "title": "Eclectic Bathroom Remodel in San Ramon | Ridgecrest Designs",
+    "images": [
+      {
+        "hash": "ff5b18_7bb937306ca1481894944e9f7b7b64c4_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 633
+      },
+      {
+        "hash": "ff5b18_8fec027febcb4fdb9a1f34db0e462fac_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 980,
+        "domH": 1359
+      },
+      {
+        "hash": "ff5b18_fa07e12f600447eb9ef4801fa17bf8bc_mv2",
+        "ext": "png",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      }
+    ],
+    "domCount": 2,
+    "sourceCount": 17
+  },
+  "castro-valley-villa": {
+    "done": true,
+    "wixSlug": "castro-valley-villa",
+    "title": "Castro Valley Villa | Ridgecrest Designs",
+    "images": [
+      {
+        "hash": "ff5b18_fa64df3266cb4f5687726c7ab5ac76f7_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 980,
+        "domH": 500
+      },
+      {
+        "hash": "ff5b18_8534e71718a54408b57038ba0fc8c02f_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 980,
+        "domH": 653
+      },
+      {
+        "hash": "ff5b18_60cc1d030a0345f9842e564e4f3dbeae_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 980,
+        "domH": 653
+      },
+      {
+        "hash": "ff5b18_d7eb886d364544c1993777e2db5e8bb6_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      }
+    ],
+    "domCount": 3,
+    "sourceCount": 23
+  },
+  "lakeside-cozy-cabin": {
+    "done": true,
+    "wixSlug": "lakeside-cozy-cabin",
+    "title": "Lakeside Cozy Cabin | Ridgecrest Designs",
+    "images": [
+      {
+        "hash": "ff5b18_349218a966f148919fc38da254ca4619_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 976,
+        "domH": 652
+      },
+      {
+        "hash": "ff5b18_29f3aa1ef62549ecbc7c5dd6b4aac717_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 485,
+        "domH": 364
+      },
+      {
+        "hash": "ff5b18_c1bace39ccc64636b710dc307c31bb77_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 484,
+        "domH": 645
+      },
+      {
+        "hash": "ff5b18_a99b2d9dbfe04a39a3aee368c065c00c_mv2",
+        "ext": "jpg",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      }
+    ],
+    "domCount": 3,
+    "sourceCount": 20
+  },
+  "newark-minimal-kitchen": {
+    "done": true,
+    "wixSlug": "newarkminimalkitchen",
+    "title": "Newark Minimal Kitchen | Ridgecrest Designs",
+    "images": [
+      {
+        "hash": "ff5b18_0ab4862750bf42ac8c38304bf1a054ed_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 850,
+        "domH": 551
+      },
+      {
+        "hash": "ff5b18_f81286bb193b4eceade91c476d030da2_mv2",
+        "ext": "png",
+        "source": "dom",
+        "domW": 850,
+        "domH": 551
+      },
+      {
+        "hash": "ff5b18_f2d002a1b71342199e013a4389c24d40_mv2",
+        "ext": "jpg",
+        "source": "dom",
+        "domW": 850,
+        "domH": 551
+      },
+      {
+        "hash": "ff5b18_54560c45e21d46688e1c6ed98ed51d37_mv2",
+        "ext": "png",
+        "source": "source",
+        "domW": 0,
+        "domH": 0
+      }
+    ],
+    "domCount": 3,
+    "sourceCount": 9
+  }
+}

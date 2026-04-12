@@ -1,49 +1,13 @@
-# Environment & secrets
-.env
-*.env
-.env.*
-
-# Claude Code local settings (contains credentials)
-.claude/
-
-# Slack bot has its own repo
-slack_ai_bot/
-
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
 venv/
-.venv/
-env/
-*.egg-info/
-dist/
-build/
-.eggs/
-
-# Logs
+__pycache__/
+*.pyc
+node_modules/
+.env
 *.log
-orchestrator.log
-
-# Database
-*.db
-*.sqlite3
-
-# OS
-.DS_Store
-Thumbs.db
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# Misc
-*.docx
-*.png
-report.md
-
-# Images (large binary assets — not tracked in git)
-preview/assets/images/
-preview/assets/images-opt/
+chroma_db/
+slack_ai_bot/venv/
+slack_ai_bot/chroma_db/
+downloads/
+screenshots/
+*.backup*
+/var/backups/
