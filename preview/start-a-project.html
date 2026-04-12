@@ -170,21 +170,65 @@
     }
 
     // Auto-resize iframe via postMessage from Elevate Scheduling
+    //
+    // Elevate sends {type:'elevate-resize', height:N} on every ResizeObserver
+    // callback. Because min-h-screen on #root>div stretches to fill the iframe,
+    // scrollHeight grows whenever we make the iframe taller — feedback loop.
+    //
+    // Fix: after accepting a height, lock for 500ms. During lock, track only
+    // heights SMALLER than what we set (those indicate a real step change to
+    // shorter content). Ignore heights >= current (those are the echo).
     (function() {
       var frame = document.querySelector('.sap-frame iframe');
       var wrapper = document.querySelector('.sap-frame');
       if (!frame || !wrapper) return;
 
-      var PADDING = 40; // consistent bottom padding inside the card
-      var MIN_H   = 500; // never shorter than this
+      var PADDING = 40;
+      var MIN_H   = 500;
+      var currentH = 0;
+      var locked   = false;
+      var timer    = null;
+      var shrinkTo = null; // tracks if content shrank during lock
+
+      function setSize(h) {
+        currentH = h;
+        frame.style.height   = h + 'px';
+        wrapper.style.height = h + 'px';
+      }
+
+      function accept(rawH) {
+        var target = Math.max(rawH + PADDING, MIN_H);
+        setSize(target);
+        locked = true;
+        shrinkTo = null;
+        clearTimeout(timer);
+        timer = setTimeout(function() {
+          locked = false;
+          // If content shrank during lock (step change to shorter content), apply it
+          if (shrinkTo !== null) {
+            accept(shrinkTo);
+          }
+        }, 500);
+      }
 
       window.addEventListener('message', function(e) {
         if (!e.data || e.data.type !== 'elevate-resize') return;
         var h = e.data.height;
-        if (typeof h !== 'number' || h < 50) return; // ignore initial 0-height flash
+        if (typeof h !== 'number' || h < 50) return;
+
+        if (!locked) {
+          accept(h);
+          return;
+        }
+
+        // During lock: only track if this height is SMALLER than current
+        // (means content genuinely shrank — e.g. went from Step 2 back to Step 1)
         var target = Math.max(h + PADDING, MIN_H);
-        frame.style.height  = target + 'px';
-        wrapper.style.height = target + 'px';
+        if (target < currentH - 10) {
+          // Content is shorter — record it for when lock expires
+          if (shrinkTo === null || h < shrinkTo) shrinkTo = h;
+        }
+        // Heights >= current are the feedback echo — ignore them
       });
     })();
   </script>
