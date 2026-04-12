@@ -71,7 +71,7 @@
 
 /* [PX] Service card overlay - solid instead of gradient, 0.4 default, 0.3 on hover */
 .rd-card--image-mode::before {
-    background: rgba(0, 0, 0, 0.4) !important;
+    background: rgba(0, 0, 0, 0.5) !important;
 }
 .rd-card--image-mode:hover::before {
     background: rgba(0, 0, 0, 0.3) !important;
