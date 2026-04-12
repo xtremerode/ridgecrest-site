@@ -86,7 +86,9 @@
 
 /* [PX] Eyebrow color consistency — all eyebrows should be slate blue like the homepage */
 .project-hero__eyebrow,
-.page-hero__eyebrow {
+.page-hero__eyebrow,
+.page-hero--service .page-hero__eyebrow,
+.featured-home__eyebrow {
     color: var(--slate-light, #80A4C8) !important;
 }
 
