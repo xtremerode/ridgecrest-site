@@ -116,3 +116,16 @@
 .project-hero__title {
     font-weight: 400;
 }
+
+/* [PX] Portfolio featured cards — apply slate blue theme to location eyebrows */
+.portfolio-featured__loc {
+    color: var(--slate-light, #80A4C8) !important;
+}
+
+/* [PX] Portfolio featured card overlay — solid instead of gradient */
+.portfolio-featured__overlay {
+    background: rgba(0, 0, 0, 0.45) !important;
+}
+.portfolio-featured__card:hover .portfolio-featured__overlay {
+    background: rgba(0, 0, 0, 0.35) !important;
+}
