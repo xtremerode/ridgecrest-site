@@ -68,3 +68,24 @@ After every session, update `01_build_manual.md` with any new settings, fixes, o
 ## Rule 10: No Partial Work
 
 Do not hand Henry a partial solution and say "we'll fix it later." Every script must be complete, verified, and tested before delivery.
+
+---
+
+## Rule 11: End-to-End Verification Before Reporting Done
+
+NEVER tell Henry something is done until you complete ALL THREE verification steps:
+
+### Step 1: File on Disk
+Confirm the file exists at the expected path and contains the correct content. Read it back, don't assume.
+
+### Step 2: Browser URL Accessible
+For ANY file that the browser needs to load (CSS, JS, images, fonts), curl the EXACT URL the browser would use and confirm HTTP 200 with the correct file size. Do not assume a file is accessible because it exists on disk — the server routing may not match the URL.
+
+### Step 3: Rendered Page Shows the Effect
+Load the actual page and verify the change is visible. For CSS: confirm the rule appears in the rendered page's stylesheet. For images: confirm the image loads. For JS: confirm the script executes without errors.
+
+### Why This Rule Exists
+On April 12, 2026, overrides.css was added with the path /css/overrides.css. The file existed on disk. The link tag was injected into the HTML. But the server serves files under /view/css/, so /css/overrides.css returned 404. The browser could not load any of the CSS fixes. This was reported as done to Henry when nothing was actually working.
+
+### Violation
+If you skip any step and Henry discovers the change doesn't work, you have wasted his time and broken trust. Do not test this boundary.

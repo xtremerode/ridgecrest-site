@@ -346,3 +346,17 @@ Before EVERY bash command that writes anything, ask yourself: "Did Henry explici
 
 ### Violation
 If you execute in discussion mode, Henry will roll back your changes and you will have wasted both your time and his. Do not test this boundary.
+
+---
+
+## 22. End-to-End Verification — MANDATORY
+
+**NEVER report a change as done until ALL THREE steps pass.**
+
+1. **File on disk** — Confirm the file exists and has correct content. Read it back.
+2. **Browser URL** —  the exact URL the browser would use. Confirm HTTP 200 with correct content size. Do NOT assume a file at  is accessible at the same URL — the server routing may differ.
+3. **Rendered effect** — Load the actual page and verify the change is visible/functional.
+
+This applies to ALL changes: CSS, JS, images, HTML, API endpoints.
+
+**Origin:** April 12, 2026 — overrides.css was injected as  but the server serves files under . The file returned 404. All CSS fixes (overlays, eyebrow colors, font variables) were reported as done but were not loading. Henry discovered the failure.
