@@ -612,7 +612,7 @@
                  color:var(--text-muted,#94a3b8);cursor:not-allowed;white-space:nowrap;
                  transition:all .15s">↪ Redo</button>
         <button class="btn btn-sm" id="btnAddPage" onclick="openAddPageModal(null)" style="background:var(--surface-2,#1e2d3d);border:1px solid var(--border,#2a3748);color:var(--text,#e2e8f0)">+ Add Page</button>
-        <select id="pageSelect" title="Select page to edit"></select>
+        <select id="pageSelect" title="Select page to edit" style="max-width:180px"></select>
         <button class="btn-page-lock" id="pageLockBtn" data-lock="development" title="Page lock status — click to cycle" style="display:none">
           🔓 Dev
         </button>
@@ -629,8 +629,12 @@
         <button id="publishBtn" title="Publish all staged edits to the live site"
           style="padding:7px 16px;border-radius:6px;border:none;background:#16a34a;
                  color:#fff;font-size:13px;font-weight:700;cursor:pointer;
-                 white-space:nowrap;transition:opacity .15s;flex-shrink:0">
-          Publish ↑
+                 white-space:nowrap;transition:opacity .15s;flex-shrink:0;
+                 position:relative">
+          <span id="publishBtnText">Publish ↑</span>
+          <span id="publishDot" style="display:none;position:absolute;top:-3px;right:-3px;
+                width:9px;height:9px;background:#ef4444;border-radius:50%;
+                border:2px solid #16a34a"></span>
         </button>
         <button class="btn-edit-mode" id="editModeBtn">
           <span class="edit-mode-dot"></span>
@@ -642,7 +646,6 @@
           Save Text ✓
         </button>
         <span class="edit-status" id="editStatus">Select a page</span>
-        <button class="btn btn-sm" style="background:var(--surface-2,#1e2d3d);border:1px solid var(--border,#2a3748);color:var(--text,#e2e8f0)" onclick="openAutoPlace()">✦ AI Auto-Place</button>
         <button id="pasteBtn"
            style="padding:6px 12px;font-size:12px;font-weight:600;border-radius:6px;
                   border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
@@ -685,37 +688,6 @@
   </div>
 </div>
 
-<!-- AI Auto-Place Modal -->
-<div id="autoPlaceModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;align-items:center;justify-content:center">
-  <div style="background:var(--surface-2,#1e2d3d);border:1px solid var(--border,#2a3748);border-radius:12px;padding:24px;max-width:640px;width:92%;max-height:80vh;display:flex;flex-direction:column;gap:16px">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font-size:16px;font-weight:600;color:var(--text,#e2e8f0)">AI Auto-Place Images</div>
-      <button onclick="closeAutoPlace()" style="background:none;border:none;color:var(--text-3,#64748b);font-size:18px;cursor:pointer">✕</button>
-    </div>
-    <div style="font-size:13px;color:var(--text-2,#94a3b8)">Claude will review all <strong style="color:var(--text,#e2e8f0)">92+ page contexts</strong> and <strong style="color:var(--text,#e2e8f0)">labeled images</strong> and intelligently assign the best hero image to each page. You can review and override before applying.</div>
-    <div id="apStatus" style="font-size:13px;color:var(--text-3,#64748b)">Ready.</div>
-    <div style="height:6px;background:var(--surface-1,#0d1a22);border-radius:3px;overflow:hidden"><div id="apFill" style="height:100%;width:0%;background:var(--accent,#3b82f6);transition:width .3s"></div></div>
-
-    <!-- Proposal table (shown after dry run) -->
-    <div id="apProposalWrap" style="display:none;overflow-y:auto;max-height:320px">
-      <div style="font-size:12px;color:var(--text-3,#64748b);margin-bottom:8px" id="apProposalMeta"></div>
-      <table style="width:100%;border-collapse:collapse;font-size:12px" id="apTable">
-        <thead><tr style="color:var(--text-3,#64748b);border-bottom:1px solid var(--border,#2a3748)">
-          <th style="padding:6px 8px;text-align:left;font-weight:500">Page</th>
-          <th style="padding:6px 8px;text-align:left;font-weight:500">Proposed Image</th>
-          <th style="padding:6px 8px;text-align:left;font-weight:500">Accept?</th>
-        </tr></thead>
-        <tbody id="apTableBody"></tbody>
-      </table>
-    </div>
-
-    <div style="display:flex;gap:8px;flex-wrap:wrap" id="apActions">
-      <button class="btn btn-gold btn-sm" onclick="runAutoPlace(true)" id="apRunBtn">✦ Generate Proposals</button>
-      <button class="btn btn-sm" style="background:var(--surface-2,#1e2d3d);border:1px solid var(--border,#2a3748);color:var(--text,#e2e8f0);display:none" onclick="applyAutoPlace()" id="apApplyBtn">Apply Selected →</button>
-      <button class="btn btn-sm" style="background:var(--surface-2,#1e2d3d);border:1px solid var(--border,#2a3748);color:var(--text,#e2e8f0)" onclick="closeAutoPlace()">Cancel</button>
-    </div>
-  </div>
-</div>
 
 <!-- ── Lightbox (shared with Media Library) ──────────────────────────────── -->
 <div id="lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:99999;align-items:center;justify-content:center;flex-direction:column" onclick="if(event.target===this)closeLightbox()">
@@ -862,22 +834,17 @@
   </div>
 </div>
 
-<!-- ── Paste / File Share Modal ── -->
-<div id="pasteModal" style="display:none;position:fixed;inset:0;z-index:100000;
-     background:rgba(0,0,0,0.7);align-items:center;justify-content:center">
-  <div style="background:#0f1923;border:1px solid #2a3748;border-radius:10px;
-              width:min(600px,96vw);height:min(680px,90vh);display:flex;
-              flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.6)">
-    <div style="display:flex;align-items:center;justify-content:space-between;
-                padding:12px 16px;border-bottom:1px solid #2a3748;flex-shrink:0">
-      <span style="font-size:14px;font-weight:600;color:#e2e8f0">📎 Paste &amp; Share Files</span>
-      <button id="pasteModalClose"
-        style="background:none;border:none;color:#94a3b8;font-size:20px;
-               cursor:pointer;padding:0 4px;line-height:1" title="Close">✕</button>
-    </div>
-    <iframe id="pasteFrame" src="" style="flex:1;border:none;width:100%;background:#fff"
-            allow="clipboard-read; clipboard-write"></iframe>
-  </div>
+<!-- ── Paste confirm toast (no modal needed) ── -->
+<div id="pasteConfirm" style="display:none;position:fixed;bottom:24px;right:24px;
+     z-index:100000;background:#0f1923;border:1px solid #2a3748;border-radius:8px;
+     padding:10px 14px;font-size:12px;color:#e2e8f0;box-shadow:0 4px 20px rgba(0,0,0,0.5);
+     gap:8px;align-items:center;max-width:340px">
+  <span id="pasteConfirmText"></span>
+  <a id="pasteConfirmLink" href="#" target="_blank"
+     style="color:#60a5fa;white-space:nowrap;text-decoration:underline">Open ↗</a>
+  <button id="pasteConfirmClose"
+     style="background:none;border:none;color:#64748b;font-size:16px;cursor:pointer;
+            padding:0 2px;line-height:1;margin-left:4px">✕</button>
 </div>
 
 <!-- ── Add Page Modal ── -->
@@ -1694,37 +1661,81 @@
     _deviceToggle.style.display = 'flex';
   }
 
-  // ── Paste / file share panel ─────────────────────────────────────────────
-  const pasteBtn    = document.getElementById('pasteBtn');
-  const pasteModal  = document.getElementById('pasteModal');
-  const pasteFrame  = document.getElementById('pasteFrame');
-  const pasteClose  = document.getElementById('pasteModalClose');
+  // ── Paste — click to activate, then Ctrl+V to capture ───────────────────
+  const pasteBtn         = document.getElementById('pasteBtn');
+  const pasteConfirm     = document.getElementById('pasteConfirm');
+  const pasteConfirmText = document.getElementById('pasteConfirmText');
+  const pasteConfirmLink = document.getElementById('pasteConfirmLink');
+  const pasteConfirmClose= document.getElementById('pasteConfirmClose');
+  let _pasteActive = false;
 
-  pasteBtn.addEventListener('click', () => {
-    if (!pasteFrame.src || pasteFrame.src === window.location.href) {
-      pasteFrame.src = '/paste/';
+  function _setPasteActive(on) {
+    _pasteActive = on;
+    pasteBtn.style.background = on ? 'var(--accent,#3b82f6)' : 'var(--surface-2,#1e2d3d)';
+    pasteBtn.style.color      = on ? '#fff' : 'var(--text-muted,#94a3b8)';
+    pasteBtn.title = on ? 'Ready — press Ctrl+V to paste' : 'Click to activate paste mode';
+  }
+
+  pasteBtn.addEventListener('click', () => { _setPasteActive(!_pasteActive); });
+
+  document.addEventListener('paste', async (e) => {
+    if (!_pasteActive) return;
+    const items = Array.from(e.clipboardData.items || []);
+    const imgItem = items.find(i => i.type.startsWith('image/'));
+    if (!imgItem) return;
+    e.preventDefault();
+    _setPasteActive(false);
+    pasteConfirmText.textContent = 'Uploading…';
+    pasteConfirm.style.display = 'flex';
+    try {
+      const blob = imgItem.getAsFile();
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const res = await fetch('/paste/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: reader.result })
+        });
+        const data = await res.json();
+        if (data.filename) {
+          const url = `/paste/download/${encodeURIComponent(data.filename)}`;
+          pasteConfirmText.textContent = `Saved: ${data.filename}`;
+          pasteConfirmLink.href = url;
+          pasteConfirmLink.style.display = '';
+        } else {
+          pasteConfirmText.textContent = 'Upload failed';
+          pasteConfirmLink.style.display = 'none';
+        }
+      };
+      reader.readAsDataURL(blob);
+    } catch(err) {
+      pasteConfirmText.textContent = 'Upload failed';
+      pasteConfirmLink.style.display = 'none';
     }
-    pasteModal.style.display = 'flex';
   });
-  pasteClose.addEventListener('click', () => { pasteModal.style.display = 'none'; });
-  pasteModal.addEventListener('click', (e) => { if (e.target === pasteModal) pasteModal.style.display = 'none'; });
+
+  pasteConfirmClose.addEventListener('click', () => { pasteConfirm.style.display = 'none'; });
 
   // ── Publish button ───────────────────────────────────────────────────────
+  const publishBtnText = document.getElementById('publishBtnText');
+  const publishDot     = document.getElementById('publishDot');
+
   publishBtn.addEventListener('click', async () => {
     if (!window.confirm('Publish all staged edits to the live site?\n\nVisitors accessing the site outside the admin panel will see these changes immediately.')) return;
     publishBtn.disabled = true;
-    publishBtn.textContent = 'Publishing…';
+    publishBtnText.textContent = 'Publishing…';
     editStatus.textContent = 'Publishing…';
     editStatus.className = 'edit-status';
     try {
       const res = await API('/admin/api/pages/publish', { method: 'POST', body: JSON.stringify({ all: true }) });
       if (res && res.ok) {
-        publishBtn.textContent = `Published ✓ (${res.count})`;
+        publishBtnText.textContent = `Published ✓ (${res.count})`;
         publishBtn.style.background = '#0f766e';
+        publishDot.style.display = 'none';
         editStatus.textContent = `Published ${res.count} page${res.count !== 1 ? 's' : ''} to live site`;
         editStatus.className = 'edit-status ready';
         setTimeout(() => {
-          publishBtn.textContent = 'Publish ↑';
+          publishBtnText.textContent = 'Publish ↑';
           publishBtn.style.background = '#16a34a';
           publishBtn.disabled = false;
         }, 3000);
@@ -1732,13 +1743,30 @@
         throw new Error((res && res.error) || 'unknown error');
       }
     } catch(e) {
-      publishBtn.textContent = 'Publish ↑';
+      publishBtnText.textContent = 'Publish ↑';
       publishBtn.style.background = '#16a34a';
       publishBtn.disabled = false;
       editStatus.textContent = `Publish failed: ${e.message}`;
       editStatus.className = 'edit-status';
     }
   });
+
+  // ── Publish dot — poll for unpublished changes every 30s ─────────────────
+  async function _checkUnpublished() {
+    try {
+      const res = await fetch('/admin/api/pages/publish/status');
+      const data = await res.json();
+      if (data.has_unpublished) {
+        publishDot.style.display = '';
+        publishBtn.title = 'Unpublished edits exist — click to publish';
+      } else {
+        publishDot.style.display = 'none';
+        publishBtn.title = 'Publish all staged edits to the live site';
+      }
+    } catch(e) {}
+  }
+  _checkUnpublished();
+  setInterval(_checkUnpublished, 30000);
 
   // ── Lock toggle button ────────────────────────────────────────────────────
   pageLockBtn.addEventListener('click', async () => {
@@ -1900,7 +1928,7 @@
       iframeDoc.querySelectorAll('[data-rd-section-handle]').forEach(el => el.remove());
       _clearSecHandles();
       _removeTextEdit();
-      editStatus.textContent = 'Viewing — enable Edit Mode to swap images or edit text';
+      editStatus.textContent = '';
     } else {
       editStatus.textContent = 'Loading edit overlay…';
       try {
@@ -2017,7 +2045,7 @@
       _resetTextEditState();
       toggleEditOverlay();
     } else {
-      editStatus.textContent = 'Viewing — enable Edit Mode to swap images or edit text';
+      editStatus.textContent = '';
     }
   });
 
@@ -2630,12 +2658,15 @@
       siteFrame.style.transform       = `scale(${scale})`;
       // Proxy drives scroll: visual height = iframe content height × scale
       frameScrollProxy.style.height = Math.ceil(iframeH * scale) + 'px';
+      frameWrap.style.overflowY      = 'auto';
     } else {
-      // Mobile/tablet: render at true device width, no scaling, centered in panel
+      // Mobile/tablet: render at true device width, no scaling, centered in panel.
+      // No outer scroll — the iframe fills the panel exactly and the page scrolls internally.
       siteFrame.style.left           = '50%';
       siteFrame.style.transformOrigin = 'top center';
       siteFrame.style.transform       = 'translateX(-50%)';
-      frameScrollProxy.style.height  = iframeH + 'px';
+      frameScrollProxy.style.height  = '0';
+      frameWrap.style.overflowY      = 'hidden';
     }
   }
 
@@ -2678,23 +2709,9 @@
 </script>
 
 <script>
-// ── AI Auto-Place (outside IIFE — uses global Admin) ─────────────────────────
-let _apProposals = [];  // [{slug, filename, hero_path, accepted: true}]
-
-function openAutoPlace() {
-  document.getElementById('autoPlaceModal').style.display = 'flex';
-  document.getElementById('apStatus').textContent = 'Ready. Press "Generate Proposals" to start.';
-  document.getElementById('apFill').style.width = '0%';
-  document.getElementById('apProposalWrap').style.display = 'none';
-  document.getElementById('apApplyBtn').style.display = 'none';
-  document.getElementById('apRunBtn').style.display = '';
-  _apProposals = [];
-}
-
-function closeAutoPlace() {
-  document.getElementById('autoPlaceModal').style.display = 'none';
-}
-
+// ── AI Auto-Place removed ─────────────────────────────────────────────────────
+function openAutoPlace() {}
+function closeAutoPlace() {}
 async function runAutoPlace(dryRun = true) {
   const runBtn  = document.getElementById('apRunBtn');
   const status  = document.getElementById('apStatus');

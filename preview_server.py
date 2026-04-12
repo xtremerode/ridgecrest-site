@@ -6127,13 +6127,13 @@ def admin_pages_publish():
 
 @app.route('/admin/api/pages/publish/status', methods=['GET'])
 def admin_pages_publish_status():
-    """Return publish status (last published_at) for all or a specific slug."""
+    """Return publish status and whether unpublished staging changes exist."""
     auth = _require_admin()
     if auth: return auth
     slug = request.args.get('slug', '').strip()
     conn = _db_conn()
     if not conn:
-        return jsonify({'snapshots': []})
+        return jsonify({'snapshots': [], 'has_unpublished': False})
     try:
         cur = conn.cursor()
         _ensure_published_snapshots_table(cur)
@@ -6142,8 +6142,37 @@ def admin_pages_publish_status():
         else:
             cur.execute("SELECT slug, published_at FROM published_snapshots ORDER BY published_at DESC")
         rows = cur.fetchall()
+
+        # Determine if any staging data is newer than the oldest snapshot
+        has_unpublished = False
+        try:
+            cur.execute("SELECT MAX(updated_at) AS t FROM pages")
+            r = cur.fetchone()
+            latest_stage = r['t'] if r and r['t'] else None
+
+            cur.execute("SELECT MAX(updated_at) AS t FROM card_settings")
+            r = cur.fetchone()
+            latest_card = r['t'] if r and r['t'] else None
+
+            cur.execute("SELECT MIN(published_at) AS t FROM published_snapshots")
+            r = cur.fetchone()
+            oldest_pub = r['t'] if r and r['t'] else None
+
+            # Unpublished if any staging update is newer than oldest published snapshot,
+            # or if there are no snapshots at all and staging data exists
+            if oldest_pub is None:
+                has_unpublished = bool(latest_stage or latest_card)
+            else:
+                latest = max(t for t in [latest_stage, latest_card] if t) if any([latest_stage, latest_card]) else None
+                has_unpublished = bool(latest and latest > oldest_pub)
+        except Exception:
+            pass
+
         conn.close()
-        return jsonify({'snapshots': [{'slug': r['slug'], 'published_at': r['published_at'].isoformat() if r['published_at'] else None} for r in rows]})
+        return jsonify({
+            'snapshots': [{'slug': r['slug'], 'published_at': r['published_at'].isoformat() if r['published_at'] else None} for r in rows],
+            'has_unpublished': has_unpublished
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
