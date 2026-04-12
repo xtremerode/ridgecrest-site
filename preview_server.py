@@ -2572,6 +2572,7 @@ _SECTION_RESIZE_TPL = """\
 
   function makeHandle(section, sectionId) {{
     var handle = document.createElement('div');
+    handle.setAttribute('data-rd-section-handle', sectionId);
     handle.style.cssText = 'position:absolute;left:0;right:0;bottom:0;height:8px;' +
       'background:rgba(56,161,105,0.75);cursor:ns-resize;z-index:10000;' +
       'display:flex;align-items:center;justify-content:center;' +
@@ -6200,11 +6201,14 @@ def admin_card_update(slug, card_id):
 
 @app.route('/admin/api/overlay-scripts')
 def admin_overlay_scripts():
-    """Return the edit overlay JS (both templates) formatted with slug/token."""
+    """Return the edit overlay JS (both templates + section resize) formatted with slug/token/device."""
     auth = _require_admin()
     if auth: return auth
     slug = request.args.get('slug', '')
     token = request.args.get('token', '')
+    device = request.args.get('device', 'desktop').strip().lower()
+    if device not in ('desktop', 'tablet', 'mobile'):
+        device = 'desktop'
     if not _valid_token(token):
         return jsonify({'error': 'unauthorized'}), 401
 
@@ -6217,7 +6221,10 @@ def admin_overlay_scripts():
         slug_json=json.dumps(slug), token_json=json.dumps(token))
     edit_js = strip_script(_EDIT_OVERLAY_TPL).format(
         slug_json=json.dumps(slug), token_json=json.dumps(token))
-    return card_js + '\n' + edit_js, 200, {
+    section_js = strip_script(_SECTION_RESIZE_TPL).format(
+        slug_json=json.dumps(slug), token_json=json.dumps(token),
+        device_json=json.dumps(device))
+    return card_js + '\n' + edit_js + '\n' + section_js, 200, {
         'Content-Type': 'application/javascript',
         'Cache-Control': 'no-store'
     }

@@ -1767,15 +1767,20 @@
       iframeDoc.querySelectorAll('[data-rd-overlay]').forEach(el => el.remove());
       const s1 = iframeDoc.getElementById('rd-edit-overlay');
       const s2 = iframeDoc.getElementById('rd-card-edit-overlay');
+      const s3 = iframeDoc.getElementById('rd-section-resize');
       if (s1) s1.remove();
       if (s2) s2.remove();
+      if (s3) s3.remove();
+      // Also remove the injected handle divs themselves
+      iframeDoc.querySelectorAll('[data-rd-section-handle]').forEach(el => el.remove());
       // Remove text editing
       _removeTextEdit();
       editStatus.textContent = 'Viewing — enable Edit Mode to swap images or edit text';
     } else {
       editStatus.textContent = 'Loading edit overlay…';
       try {
-        const resp = await fetch(`/admin/api/overlay-scripts?slug=${encodeURIComponent(currentSlug)}&token=${encodeURIComponent(TOKEN)}&_=${Date.now()}`, {
+        const _sectionDev = _currentDevice === 'ipad' ? 'tablet' : _currentDevice === 'phone' ? 'mobile' : 'desktop';
+        const resp = await fetch(`/admin/api/overlay-scripts?slug=${encodeURIComponent(currentSlug)}&token=${encodeURIComponent(TOKEN)}&device=${_sectionDev}&_=${Date.now()}`, {
           headers: { 'X-Admin-Token': TOKEN, 'Cache-Control': 'no-cache' }
         });
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
