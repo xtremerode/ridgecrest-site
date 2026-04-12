@@ -4085,15 +4085,27 @@ def _render_project_page(p):
             gallery_items += f'      <div class="gallery-section-label">{_SECTION_LABELS[itype]}</div>\n'
             _seen_sections.add(itype)
 
-        # Embed intrinsic width/height so browser reserves correct space before image loads.
-        # This eliminates CSS masonry layout shift (CLS) during page load.
-        basename = os.path.basename(src)
-        dims = _IMG_DIMS.get(basename)
+        # Thumbnail: use _480w variant for fast grid loading; data-src keeps full-res for lightbox.
+        # srcset serves _960w for retina/larger viewports. Falls back to full-res if _480w missing.
+        base_src  = src  # full-res — stays in data-src for lightbox
+        thumb_480 = src.replace('.webp', '_480w.webp')
+        thumb_960 = src.replace('.webp', '_960w.webp')
+        thumb_480_path = os.path.join(_OPT_DIR, os.path.basename(thumb_480))
+        thumb_960_path = os.path.join(_OPT_DIR, os.path.basename(thumb_960))
+        img_src   = thumb_480 if os.path.isfile(thumb_480_path) else base_src
+        srcset_parts = []
+        if os.path.isfile(thumb_480_path): srcset_parts.append(f'{thumb_480} 480w')
+        if os.path.isfile(thumb_960_path): srcset_parts.append(f'{thumb_960} 960w')
+        srcset_parts.append(f'{base_src} 2000w')
+        srcset_attr = f' srcset="{", ".join(srcset_parts)}" sizes="(max-width:480px) 100vw, (max-width:767px) calc(50vw - 6px), calc(33vw - 8px)"'
+        # Use _480w dims for width/height so browser reserves the correct space
+        thumb_basename = os.path.basename(img_src)
+        dims = _IMG_DIMS.get(thumb_basename) or _IMG_DIMS.get(os.path.basename(base_src))
         dim_attrs = f' width="{dims[0]}" height="{dims[1]}"' if dims else ''
         gallery_items += (
-            f'      <div class="gallery-item" data-card-id="{card_id}" data-src="{src}"'
+            f'      <div class="gallery-item" data-card-id="{card_id}" data-src="{base_src}"'
             f' data-image-type="{itype}" data-gallery-hash="{gh}">\n'
-            f'        <img src="{src}"{dim_attrs} alt="{name} \u2014 photo {i}" loading="lazy" />\n'
+            f'        <img src="{img_src}"{srcset_attr}{dim_attrs} alt="{name} \u2014 photo {i}" loading="lazy" decoding="async" />\n'
             f'        <div class="gallery-item__overlay"><span class="gallery-item__zoom">+</span></div>\n'
             f'      </div>\n'
         )
