@@ -942,61 +942,6 @@
   const pickerTabs   = document.getElementById('pickerTabs');
   const pickerSearch = document.getElementById('pickerSearch');
   const pickerUse    = document.getElementById('pickerUse');
-  const secDragOverlay = document.getElementById('secDragOverlay');
-
-  // ── Cross-frame section drag state ───────────────────────────────────────
-  let _secDrag = null;  // { sectionId, startY, startH } when drag active
-
-  function _secDragScale() {
-    // Return the CSS scale currently applied to siteFrame
-    return _currentDevice === 'pc'
-      ? (frameWrap.clientWidth || PREVIEW_W) / PREVIEW_W
-      : 1;
-  }
-
-  secDragOverlay.addEventListener('pointermove', (e) => {
-    if (!_secDrag) return;
-    // First move initializes startY (mouse was on handle when pointerdown fired in iframe)
-    if (_secDrag.startY === null) {
-      _secDrag.startY = e.clientY;
-      return;
-    }
-    const delta = (e.clientY - _secDrag.startY) / _secDragScale();
-    if (siteFrame.contentWindow) {
-      siteFrame.contentWindow.postMessage({
-        type: 'rd_section_drag_update',
-        section_id: _secDrag.sectionId,
-        delta: Math.round(delta)
-      }, window.location.origin);
-    }
-  });
-
-  function _secDragCommit() {
-    if (!_secDrag) return;
-    const sectionId = _secDrag.sectionId;
-    _secDrag = null;
-    secDragOverlay.style.display = 'none';
-    if (siteFrame.contentWindow) {
-      siteFrame.contentWindow.postMessage({
-        type: 'rd_section_drag_commit',
-        section_id: sectionId
-      }, window.location.origin);
-    }
-  }
-
-  secDragOverlay.addEventListener('pointerup', _secDragCommit);
-  secDragOverlay.addEventListener('pointercancel', () => {
-    if (!_secDrag) return;
-    const sectionId = _secDrag.sectionId;
-    _secDrag = null;
-    secDragOverlay.style.display = 'none';
-    if (siteFrame.contentWindow) {
-      siteFrame.contentWindow.postMessage({
-        type: 'rd_section_drag_cancel',
-        section_id: sectionId
-      }, window.location.origin);
-    }
-  });
   const pickerSelectedLabel = document.getElementById('pickerSelectedLabel');
   let pickerActiveTab = 'all';
 
@@ -2211,10 +2156,7 @@
       }, 600);
     }
     if (d.type === 'rd_section_drag_start') {
-      // Iframe handle was grabbed — parent takes over all pointer events.
-      // startY is initialized on the first pointermove event on the overlay.
-      _secDrag = { sectionId: d.section_id, startY: null, startH: d.start_h };
-      secDragOverlay.style.display = 'block';
+      // Status bar feedback while dragging (drag is handled entirely in iframe)
       editStatus.textContent = `Dragging \u201c${d.section_id}\u201d \u2014 release to save`;
       editStatus.className = 'edit-status';
     }

@@ -2575,11 +2575,9 @@ _SECTION_RESIZE_TPL = """\
   var DEVICE   = {device_json};
   var SAVE_URL = '/admin/api/pages/' + encodeURIComponent(SLUG) + '/sections';
 
-  // Active drag state
-  var _dragSectionId = null;
-  var _dragSection   = null;
-  var _dragStartH    = 0;
-  var _dragLabel     = null;
+  // Active drag state — one drag at a time
+  var _drag = null;
+  // {{ pointerId, sectionId, section, label, startY, startH }}
 
   function saveHeight(sectionId, finalH) {{
     fetch(SAVE_URL, {{
@@ -2594,6 +2592,33 @@ _SECTION_RESIZE_TPL = """\
         section_id:sectionId, height_px:finalH, ok:false}}, window.location.origin);
     }});
   }}
+
+  // Document-level listeners: receive events even when pointer leaves the handle
+  // element or exits the iframe's visual bounds (pointer capture keeps them coming).
+  document.addEventListener('pointermove', function(e) {{
+    if (!_drag || e.pointerId !== _drag.pointerId) return;
+    e.preventDefault();
+    var newH = Math.max(50, _drag.startH + (e.clientY - _drag.startY));
+    _drag.section.style.height = Math.round(newH) + 'px';
+    _drag.label.textContent    = Math.round(newH) + 'px';
+  }}, {{passive: false}});
+
+  document.addEventListener('pointerup', function(e) {{
+    if (!_drag || e.pointerId !== _drag.pointerId) return;
+    document.documentElement.releasePointerCapture(e.pointerId);
+    var finalH = Math.round(_drag.section.offsetHeight);
+    _drag.label.textContent = finalH + 'px';
+    saveHeight(_drag.sectionId, finalH);
+    _drag = null;
+  }});
+
+  document.addEventListener('pointercancel', function(e) {{
+    if (!_drag || e.pointerId !== _drag.pointerId) return;
+    // Restore original height on cancel
+    _drag.section.style.height = _drag.startH + 'px';
+    _drag.label.textContent    = _drag.startH + 'px';
+    _drag = null;
+  }});
 
   function makeHandle(section, sectionId) {{
     var handle = document.createElement('div');
@@ -2612,63 +2637,36 @@ _SECTION_RESIZE_TPL = """\
     label.textContent = Math.round(section.offsetHeight) + 'px';
     handle.appendChild(label);
 
-    // Cross-frame drag: pointerdown notifies parent to own all pointer events.
-    // Parent sends rd_section_drag_update (delta) and rd_section_drag_commit.
     handle.addEventListener('pointerdown', function(e) {{
       e.preventDefault();
       e.stopPropagation();
-      _dragSectionId = sectionId;
-      _dragSection   = section;
-      _dragStartH    = Math.round(section.offsetHeight);
-      _dragLabel     = label;
-      section.style.height    = _dragStartH + 'px';
+      var startH = Math.round(section.offsetHeight);
+      section.style.height    = startH + 'px';
       section.style.minHeight = 'auto';
       section.style.overflow  = 'hidden';
-      // Tell parent to take over pointer capture
+      // Capture to document.documentElement — widest element in this browsing
+      // context, keeps pointer events flowing here even if pointer exits the
+      // iframe's visual bounds in the parent frame.
+      document.documentElement.setPointerCapture(e.pointerId);
+      _drag = {{
+        pointerId: e.pointerId,
+        sectionId: sectionId,
+        section:   section,
+        label:     label,
+        startY:    e.clientY,
+        startH:    startH
+      }};
+      // Notify parent for status bar only
       window.parent.postMessage({{
         type: 'rd_section_drag_start',
         slug: SLUG,
         section_id: sectionId,
-        start_h: _dragStartH
+        start_h: startH
       }}, window.location.origin);
     }});
 
     return handle;
   }}
-
-  // Listen for drag updates from parent frame
-  window.addEventListener('message', function(evt) {{
-    if (evt.source !== window.parent) return;
-    var d = evt.data;
-    if (!d || !d.type) return;
-
-    if (d.type === 'rd_section_drag_update') {{
-      if (!_dragSection || d.section_id !== _dragSectionId) return;
-      var newH = Math.max(50, _dragStartH + d.delta);
-      _dragSection.style.height = Math.round(newH) + 'px';
-      if (_dragLabel) _dragLabel.textContent = Math.round(newH) + 'px';
-    }}
-
-    if (d.type === 'rd_section_drag_commit') {{
-      if (!_dragSection || d.section_id !== _dragSectionId) return;
-      var finalH = Math.round(_dragSection.offsetHeight);
-      if (_dragLabel) _dragLabel.textContent = finalH + 'px';
-      saveHeight(_dragSectionId, finalH);
-      _dragSectionId = null;
-      _dragSection   = null;
-      _dragLabel     = null;
-    }}
-
-    if (d.type === 'rd_section_drag_cancel') {{
-      if (_dragSection && d.section_id === _dragSectionId) {{
-        _dragSection.style.height = _dragStartH + 'px';
-        if (_dragLabel) _dragLabel.textContent = _dragStartH + 'px';
-      }}
-      _dragSectionId = null;
-      _dragSection   = null;
-      _dragLabel     = null;
-    }}
-  }});
 
   // Footer uses auto height and should never be pixel-overridden
   var SKIP_SECTIONS = {{'footer': true}};
