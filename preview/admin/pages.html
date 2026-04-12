@@ -945,6 +945,170 @@
   const pickerSelectedLabel = document.getElementById('pickerSelectedLabel');
   let pickerActiveTab = 'all';
 
+  // ── Section resize handles (parent-frame) ───────────────────────────────
+  // Handles live in the PARENT frame, positioned over the iframe via position:fixed.
+  // This completely avoids cross-frame pointer event limitations — the parent
+  // has direct same-origin access to the iframe DOM for reading positions and
+  // setting heights.
+
+  const _secHandleContainer = document.createElement('div');
+  _secHandleContainer.id = 'secHandleContainer';
+  _secHandleContainer.style.cssText = 'position:fixed;top:0;left:0;pointer-events:none;z-index:9998;';
+  document.body.appendChild(_secHandleContainer);
+
+  const _SKIP_SEC = new Set(['footer']);
+  let _secHandleEls   = []; // [{handleEl, labelEl, sec, sectionId}]
+  let _secDragState   = null; // active drag
+
+  function _secScale() {
+    const fw = document.querySelector('.editor-frame-wrap');
+    return _currentDevice === 'pc' ? (fw ? fw.clientWidth / PREVIEW_W : 1) : 1;
+  }
+
+  function _secDevW() {
+    return _currentDevice === 'ipad' ? 768 : _currentDevice === 'phone' ? 390 : PREVIEW_W;
+  }
+
+  function _repositionSecHandles() {
+    if (!_secHandleEls.length) return;
+    const fw   = document.querySelector('.editor-frame-wrap');
+    if (!fw) return;
+    const fwBCR   = fw.getBoundingClientRect();
+    const scale   = _secScale();
+    const devW    = _secDevW();
+    const fwScroll = fw.scrollTop;
+
+    let hLeft = fwBCR.left;
+    let hWidth = fwBCR.width;
+    if (_currentDevice !== 'pc') {
+      hWidth = devW;
+      hLeft  = fwBCR.left + (fwBCR.width - devW) / 2;
+    }
+
+    _secHandleEls.forEach(({ handleEl, labelEl, sec }) => {
+      const visualBottom = fwBCR.top + (sec.offsetTop + sec.offsetHeight) * scale - 2 * fwScroll;
+      const inView = visualBottom > fwBCR.top + 4 && visualBottom < fwBCR.bottom + 4;
+      handleEl.style.display = inView ? 'flex' : 'none';
+      if (inView) {
+        handleEl.style.top    = (visualBottom - 12) + 'px';
+        handleEl.style.left   = hLeft + 'px';
+        handleEl.style.width  = hWidth + 'px';
+      }
+      labelEl.textContent = Math.round(sec.offsetHeight) + 'px';
+    });
+  }
+
+  function _buildSecHandles() {
+    _clearSecHandles();
+    if (!editMode) return;
+    try {
+      const doc = siteFrame.contentDocument;
+      if (!doc || !doc.body) return;
+      doc.querySelectorAll('section').forEach(sec => {
+        const cls = sec.className ? sec.className.trim().split(/\s+/)[0] : '';
+        if (!cls || _SKIP_SEC.has(cls)) return;
+        // Ensure section is position:relative so it doesn't shift visually
+        try {
+          if (doc.defaultView.getComputedStyle(sec).position === 'static') {
+            sec.style.position = 'relative';
+          }
+        } catch(e) {}
+
+        const handle = document.createElement('div');
+        handle.dataset.sectionId = cls;
+        handle.style.cssText =
+          'position:fixed;height:12px;pointer-events:all;cursor:ns-resize;' +
+          'background:rgba(56,161,105,0.85);' +
+          'display:flex;align-items:center;justify-content:center;' +
+          'font:bold 9px/1 monospace;color:#1a4731;user-select:none;' +
+          'box-sizing:border-box;border-top:2px solid rgba(56,161,105,1);z-index:9998;';
+        handle.title = 'Drag to resize \u00b7 ' + cls;
+
+        const label = document.createElement('span');
+        label.style.cssText = 'pointer-events:none;letter-spacing:0.5px;';
+        label.textContent = Math.round(sec.offsetHeight) + 'px';
+        handle.appendChild(label);
+
+        // All pointer events happen in the parent frame — no cross-frame issues
+        handle.addEventListener('pointerdown', (e) => {
+          e.preventDefault();
+          handle.setPointerCapture(e.pointerId);
+          const startH = Math.round(sec.offsetHeight);
+          sec.style.height    = startH + 'px';
+          sec.style.minHeight = 'auto';
+          sec.style.overflow  = 'hidden';
+          _secDragState = { sec, sectionId: cls, startY: e.clientY, startH, labelEl: label };
+          editStatus.textContent = `Dragging \u201c${cls}\u201d \u2014 release to save`;
+          editStatus.className = 'edit-status';
+        });
+
+        handle.addEventListener('pointermove', (e) => {
+          if (!_secDragState || _secDragState.sec !== sec) return;
+          const delta = (e.clientY - _secDragState.startY) / _secScale();
+          const newH  = Math.max(50, _secDragState.startH + delta);
+          sec.style.height = Math.round(newH) + 'px';
+          _repositionSecHandles();
+        });
+
+        handle.addEventListener('pointerup', () => {
+          if (!_secDragState || _secDragState.sec !== sec) return;
+          const finalH  = Math.round(sec.offsetHeight);
+          const sId     = _secDragState.sectionId;
+          _secDragState = null;
+          _repositionSecHandles();
+          _saveSecHeight(sId, finalH);
+        });
+
+        handle.addEventListener('pointercancel', () => {
+          if (_secDragState && _secDragState.sec === sec) {
+            sec.style.height = _secDragState.startH + 'px';
+            _secDragState    = null;
+            _repositionSecHandles();
+          }
+        });
+
+        _secHandleContainer.appendChild(handle);
+        _secHandleEls.push({ handleEl: handle, labelEl: label, sec, sectionId: cls });
+      });
+      _repositionSecHandles();
+    } catch(e) { console.warn('_buildSecHandles:', e); }
+  }
+
+  function _clearSecHandles() {
+    _secHandleContainer.innerHTML = '';
+    _secHandleEls  = [];
+    _secDragState  = null;
+  }
+
+  async function _saveSecHeight(sId, finalH) {
+    const device = _currentDevice === 'ipad' ? 'tablet'
+                 : _currentDevice === 'phone' ? 'mobile'
+                 : 'desktop';
+    try {
+      editStatus.textContent = `Saving \u201c${sId}\u201d \u2192 ${finalH}px\u2026`;
+      const res  = await fetch(
+        `/admin/api/pages/${encodeURIComponent(currentSlug)}/sections`,
+        { method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Token': TOKEN },
+          body: JSON.stringify({ device, section_id: sId, height_px: finalH }) }
+      );
+      const data = await res.json();
+      editStatus.textContent = data.ok
+        ? `Section \u201c${sId}\u201d \u2192 ${finalH}px saved`
+        : 'Section resize save failed';
+      editStatus.className = 'edit-status ready';
+      setTimeout(() => {
+        if (editStatus.textContent.includes('saved')) {
+          editStatus.textContent = 'Drag handles: resize any section  \u00b7  Images: click\u00b7scroll\u00b7drag';
+          editStatus.className = 'edit-status ready';
+        }
+      }, 2500);
+    } catch(e) {
+      editStatus.textContent = 'Section resize save failed';
+      editStatus.className = 'edit-status';
+    }
+  }
+
   // ── Init ─────────────────────────────────────────────────────────────────
   async function init() {
     try {
@@ -1568,6 +1732,8 @@
     // Persist so browser refresh restores the same page without flashing the tree
     try { sessionStorage.setItem('rd_last_slug', slug); } catch(e) {}
     syncTreeActive(slug);
+    // Clear section handles — siteFrame.load will rebuild after new page loads
+    _clearSecHandles();
     // Keep edit mode when switching pages — siteFrame.load will re-inject overlay
     _resetTextEditState();
     pendingImage = null; pendingZoom = null; pendingPosX = null; pendingPosY = null;
@@ -1774,9 +1940,8 @@
       if (s1) s1.remove();
       if (s2) s2.remove();
       if (s3) s3.remove();
-      // Also remove the injected handle divs themselves
       iframeDoc.querySelectorAll('[data-rd-section-handle]').forEach(el => el.remove());
-      // Remove text editing
+      _clearSecHandles();
       _removeTextEdit();
       editStatus.textContent = 'Viewing — enable Edit Mode to swap images or edit text';
     } else {
@@ -1791,9 +1956,9 @@
         const script = iframeDoc.createElement('script');
         script.textContent = js;
         iframeDoc.body.appendChild(script);
-        // Also inject text editing
         _injectTextEdit(iframeDoc);
-        editStatus.textContent = 'Images: click·scroll·drag  ·  Text: click any text to edit';
+        _buildSecHandles();
+        editStatus.textContent = 'Drag handles: resize any section  \u00b7  Images: click\u00b7scroll\u00b7drag';
         editStatus.className = 'edit-status ready';
         const imgs = allImages.length ? allImages : await API('/admin/api/pages/images').then(r => { allImages = r; return r; });
         siteFrame.contentWindow.postMessage({ type: 'rd_set_pool', images: imgs.map(i => i.hero_path) }, window.location.origin);
@@ -2513,10 +2678,11 @@
         : 1;
       siteFrame.contentWindow.scrollTo(0, frameWrap.scrollTop / scale);
     } catch(e) {}
+    _repositionSecHandles();
   });
 
   scaleFrame();
-  window.addEventListener('resize', scaleFrame);
+  window.addEventListener('resize', () => { scaleFrame(); _repositionSecHandles(); });
 
   // [PX] Watch iframe content for size changes (images loading, DOM changes)
   var _frameObs = null;
