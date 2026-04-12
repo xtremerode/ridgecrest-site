@@ -699,7 +699,7 @@ def _safe_js(value) -> str:
     Escapes </ to prevent </script> tag breakout."""
     return json.dumps(value).replace("</", r"<\/")
 
-_SECTION_HEIGHT_SKIP = {'hero', 'footer'}  # full-viewport/full-page sections — never override height
+_SECTION_HEIGHT_SKIP = {'footer'}  # footer uses auto height — never override with px
 
 def _apply_section_heights(content: bytes, slug: str, device: str) -> bytes:
     """Inject inline height styles on <section> elements based on DB overrides.
@@ -2645,8 +2645,8 @@ _SECTION_RESIZE_TPL = """\
     return handle;
   }}
 
-  // These sections use CSS-controlled heights (100vh / auto) and must never be pixel-overridden
-  var SKIP_SECTIONS = {{'hero': true, 'footer': true}};
+  // Footer uses auto height and should never be pixel-overridden
+  var SKIP_SECTIONS = {{'footer': true}};
 
   function init() {{
     document.querySelectorAll('section').forEach(function(sec) {{
