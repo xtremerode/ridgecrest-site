@@ -948,6 +948,14 @@
       }
       populatePageSelect(pages);
       buildTree(pages);
+      // Restore last-viewed page on browser refresh — no page-tree flash
+      try {
+        const lastSlug = sessionStorage.getItem('rd_last_slug');
+        if (lastSlug && pages.find(p => p.slug === lastSlug)) {
+          pageSelect.value = lastSlug;
+          loadPage(lastSlug);
+        }
+      } catch(e) {}
     } catch(e) {
       editStatus.textContent = 'Error loading pages';
       document.getElementById('pageTree').innerHTML =
@@ -1457,6 +1465,8 @@
       }
     }
     currentSlug = slug;
+    // Persist so browser refresh restores the same page without flashing the tree
+    try { sessionStorage.setItem('rd_last_slug', slug); } catch(e) {}
     syncTreeActive(slug);
     // Keep edit mode when switching pages — siteFrame.load will re-inject overlay
     _resetTextEditState();
