@@ -302,3 +302,26 @@ Before editing ANY code, check the lock status:
 
 ### What caused the April 12 code loss
 `git checkout HEAD -- <files>` was used to "revert" code to match an April 10 DB restore point. But git HEAD was April 4 — 6 days of code improvements that were never committed were permanently overwritten. The fix: commit after every session so git HEAD is always current.
+
+---
+
+## 20. Image Serving Rules — THREE-TIER SYSTEM (MANDATORY)
+
+**Never use the base file for display. It exists only as a source for the lightbox.**
+
+| Use | Variant | Why |
+|---|---|---|
+| Project page hero (`project-hero__img`) | `_mv2_1920w.webp` | Hero is ~1440px wide; base file (5000-6000px) causes GPU downscale artifacts |
+| Service/blog page hero | `_mv2_1920w.webp` | Same reason |
+| Card/thumbnail backgrounds (`proj-card__img`, `portfolio-featured__img`, `portfolio-item__bg`, `portfolio-card__img`, `gallery-item__img`, `featured-home__img`) | `_mv2_960w.webp` | Cards are 350-720px; base file at 15:1 downscale causes moiré on fine patterns (wire mesh, grilles, tile) |
+| Lightbox / `data-src` / srcset full-res slot | `_mv2.webp` (base) | Full resolution needed for zoomed viewing |
+| `<img srcset>` smallest slot | `_mv2_480w.webp` | Correct |
+
+### Server-side
+- Card thumbnails: use `_portfolio_thumb_src(hash, ext)` — returns `_960w`, falls back to base
+- Hero backgrounds: use `portfolio_projects.hero_img` (already updated to `_1920w` for all 18 projects)
+- Do NOT use `_portfolio_img_src()` for card backgrounds — it returns the base file
+
+### Feature-to-code mapping additions
+- Editing card/thumbnail background-image URLs → check seo-project-pages, seo-service-pages, frontend-css
+- Editing `_portfolio_thumb_src` or `_portfolio_img_src` → check server-render

@@ -3817,7 +3817,10 @@ _SEED_PROJECTS = [
 ]
 
 def _portfolio_img_src(hash_mv2, ext='jpg', active_versions=None):
-    """Local WebP if available (respecting active_version), else Wix CDN."""
+    """Local WebP if available (respecting active_version), else Wix CDN.
+    Returns the BASE file — appropriate for lightbox/full-res display only.
+    For card/thumbnail backgrounds use _portfolio_thumb_src() to avoid moiré artifacts.
+    """
     webp = os.path.join(_OPT_DIR, f'{hash_mv2}.webp')
     if os.path.isfile(webp):
         base_fname = f'{hash_mv2}.webp'
@@ -3826,6 +3829,20 @@ def _portfolio_img_src(hash_mv2, ext='jpg', active_versions=None):
         return f'/assets/images-opt/{hash_mv2}.webp'
     return (f'https://static.wixstatic.com/media/{hash_mv2.replace("_mv2","~mv2")}'
             f'.{ext}/v1/fill/w_1920,h_1280,q_90,enc_avif,qual_90')
+
+def _portfolio_thumb_src(hash_mv2, ext='jpg'):
+    """Return the _960w variant for card/thumbnail backgrounds.
+    IMPORTANT: Always use this (not _portfolio_img_src) for any CSS background-image
+    on cards, thumbnails, or gallery-item__img divs. Using the base file causes
+    severe moiré/aliasing artifacts on fine-detail images (wire mesh, grilles, tile)
+    due to extreme browser downscale ratios (up to 15:1).
+    Falls back to base file only if _960w does not exist.
+    """
+    webp_960 = os.path.join(_OPT_DIR, f'{hash_mv2}_960w.webp')
+    if os.path.isfile(webp_960):
+        return f'/assets/images-opt/{hash_mv2}_960w.webp'
+    # Fallback: base file (should not happen if optimize_images.py ran correctly)
+    return _portfolio_img_src(hash_mv2, ext)
 
 def _ensure_portfolio_table():
     if not HAS_DB: return

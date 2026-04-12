@@ -638,22 +638,22 @@ p { line-height: 1.8; }
 }
 /* Portfolio card images — real project photos from Wix CDN */
 .portfolio-card__img--1 {
-  background-image: url('/assets/images-opt/ff5b18_c520c9ca384d4c3ebe02707d0c8f45ab_mv2.webp');
+  background-image: url('/assets/images-opt/ff5b18_c520c9ca384d4c3ebe02707d0c8f45ab_mv2_960w.webp');
   background-size: cover; background-position: center;
   background-color: #1a2a35;
 }
 .portfolio-card__img--2 {
-  background-image: url('/assets/images-opt/ff5b18_b246a630ba864e2a8fe67d964745b9b5_mv2.webp');
+  background-image: url('/assets/images-opt/ff5b18_b246a630ba864e2a8fe67d964745b9b5_mv2_960w.webp');
   background-size: cover; background-position: center;
   background-color: #2a2520;
 }
 .portfolio-card__img--3 {
-  background-image: url('/assets/images-opt/ff5b18_75a9ba9c5a87418daf6d2b69c70f60ff_mv2.webp');
+  background-image: url('/assets/images-opt/ff5b18_75a9ba9c5a87418daf6d2b69c70f60ff_mv2_960w.webp');
   background-size: cover; background-position: center;
   background-color: #1e2830;
 }
 .portfolio-card__img--4 {
-  background-image: url('/assets/images-opt/ff5b18_7e0f0e5602694ed280e46ec708e7b068_mv2.webp');
+  background-image: url('/assets/images-opt/ff5b18_7e0f0e5602694ed280e46ec708e7b068_mv2_960w.webp');
   background-size: cover; background-position: center;
   background-color: #28221c;
 }
@@ -1014,32 +1014,32 @@ p { line-height: 1.8; }
 
 /* Portfolio item images — one unique image per project */
 .portfolio-item__bg--1 {
-  background-image: url('/assets/images-opt/ff5b18_3c0cef18e48849089c5ed48614041900_mv2.webp');
+  background-image: url('/assets/images-opt/ff5b18_3c0cef18e48849089c5ed48614041900_mv2_960w.webp');
   background-size: cover; background-position: center;
   background-color: #1a2a35;
 }
 .portfolio-item__bg--2 {
-  background-image: url('/assets/images-opt/ff5b18_c520c9ca384d4c3ebe02707d0c8f45ab_mv2.webp');
+  background-image: url('/assets/images-opt/ff5b18_c520c9ca384d4c3ebe02707d0c8f45ab_mv2_960w.webp');
   background-size: cover; background-position: center;
   background-color: #2a2520;
 }
 .portfolio-item__bg--3 {
-  background-image: url('/assets/images-opt/ff5b18_9820c1603a9c414d8cc8009784d1ca7c_mv2.webp');
+  background-image: url('/assets/images-opt/ff5b18_9820c1603a9c414d8cc8009784d1ca7c_mv2_960w.webp');
   background-size: cover; background-position: center;
   background-color: #1e2830;
 }
 .portfolio-item__bg--4 {
-  background-image: url('/assets/images-opt/ff5b18_39536b28ce0447b9a87797bb4c70ee51_mv2.webp');
+  background-image: url('/assets/images-opt/ff5b18_39536b28ce0447b9a87797bb4c70ee51_mv2_960w.webp');
   background-size: cover; background-position: center;
   background-color: #28221c;
 }
 .portfolio-item__bg--5 {
-  background-image: url('/assets/images-opt/ff5b18_d7eb886d364544c1993777e2db5e8bb6_mv2.webp');
+  background-image: url('/assets/images-opt/ff5b18_d7eb886d364544c1993777e2db5e8bb6_mv2_960w.webp');
   background-size: cover; background-position: center;
   background-color: #1c2228;
 }
 .portfolio-item__bg--6 {
-  background-image: url('/assets/images-opt/ff5b18_94919d08fc9245fc849ac03c4ea2caaf_mv2.webp');
+  background-image: url('/assets/images-opt/ff5b18_94919d08fc9245fc849ac03c4ea2caaf_mv2_960w.webp');
   background-size: cover; background-position: center;
   background-color: #241e1a;
 }
@@ -1677,29 +1677,29 @@ p { line-height: 1.8; }
 
 /* Portfolio item unique image classes 7-9 */
 .portfolio-item__bg--7 {
-  background-image: url('/assets/images-opt/ff5b18_6eed718eb2ab4ca0887717d1a39285ea_mv2.webp');
+  background-image: url('/assets/images-opt/ff5b18_6eed718eb2ab4ca0887717d1a39285ea_mv2_960w.webp');
   background-size: cover; background-position: center;
   background-color: #1c2228;
 }
 .portfolio-item__bg--8 {
-  background-image: url('/assets/images-opt/ff5b18_d741bf6a821b40e8b4730181bcf0fc48_mv2.webp');
+  background-image: url('/assets/images-opt/ff5b18_d741bf6a821b40e8b4730181bcf0fc48_mv2_960w.webp');
   background-size: cover; background-position: center;
   background-color: #241e1a;
 }
 .portfolio-item__bg--9 {
-  background-image: url('/assets/images-opt/ff5b18_296b1e9ff5d14e128006c21217e3f3e9_mv2.webp');
+  background-image: url('/assets/images-opt/ff5b18_296b1e9ff5d14e128006c21217e3f3e9_mv2_960w.webp');
   background-size: cover; background-position: center;
   background-color: #1a2a35;
 }
 
 /* Portfolio card unique images 2 & 4 on homepage */
 .portfolio-card__img--2 {
-  background-image: url('/assets/images-opt/ff5b18_d7eb886d364544c1993777e2db5e8bb6_mv2.webp');
+  background-image: url('/assets/images-opt/ff5b18_d7eb886d364544c1993777e2db5e8bb6_mv2_960w.webp');
   background-size: cover; background-position: center;
   background-color: #2a2520;
 }
 .portfolio-card__img--4 {
-  background-image: url('/assets/images-opt/ff5b18_39536b28ce0447b9a87797bb4c70ee51_mv2.webp');
+  background-image: url('/assets/images-opt/ff5b18_39536b28ce0447b9a87797bb4c70ee51_mv2_960w.webp');
   background-size: cover; background-position: center;
   background-color: #28221c;
 }
