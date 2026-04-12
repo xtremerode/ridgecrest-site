@@ -76,3 +76,41 @@
 .rd-card--image-mode:hover::before {
     background: rgba(0, 0, 0, 0.3) !important;
 }
+
+/* [PX] Fix undefined CSS variables */
+:root {
+    --font-body: 'Jost', 'Helvetica Neue', Arial, sans-serif;
+    --font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+    --gold: #C8B89A;
+}
+
+/* [PX] Eyebrow color consistency — all eyebrows should be slate blue like the homepage */
+.project-hero__eyebrow,
+.page-hero__eyebrow {
+    color: var(--slate-light, #80A4C8) !important;
+}
+
+/* [PX] Dark overlay on photo-backed page heroes — matches homepage hero readability */
+.page-hero--service::before,
+.page-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 0;
+    pointer-events: none;
+}
+.page-hero--service,
+.page-hero {
+    position: relative;
+}
+.page-hero--service > *,
+.page-hero > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* [PX] Project hero title weight — match homepage at 400 (was 300) */
+.project-hero__title {
+    font-weight: 400;
+}
