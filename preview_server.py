@@ -3134,7 +3134,7 @@ def view(filename):
         # Inject overrides.css after main.css (approved CSS changes — never touch main.css directly)
         _overrides_path = os.path.join(PREVIEW_DIR, 'css', 'overrides.css')
         if os.path.isfile(_overrides_path) and b'overrides.css' not in content:
-            _override_link = b'\n  <link rel="stylesheet" href="/css/overrides.css" />'
+            _override_link = b'\n  <link rel="stylesheet" href="/view/css/overrides.css?v=20260412" />'
             if b'</head>' in content:
                 content = content.replace(b'</head>', _override_link + b'\n</head>', 1)
     if mime and 'html' in mime and not filename.startswith('admin/'):
