@@ -945,75 +945,80 @@
   const pickerSelectedLabel = document.getElementById('pickerSelectedLabel');
   let pickerActiveTab = 'all';
 
-  // ── Section resize handles (parent-frame) ───────────────────────────────
-  // Handles live in the PARENT frame, positioned over the iframe via position:fixed.
-  // This completely avoids cross-frame pointer event limitations — the parent
-  // has direct same-origin access to the iframe DOM for reading positions and
-  // setting heights.
-
-  const _secHandleContainer = document.createElement('div');
-  _secHandleContainer.id = 'secHandleContainer';
-  _secHandleContainer.style.cssText = 'position:fixed;top:0;left:0;pointer-events:none;z-index:9998;';
-  document.body.appendChild(_secHandleContainer);
+  // ── Section resize handles (parent-frame, inside editor-frame-wrap) ────────
+  // Handles are position:absolute inside editor-frame-wrap — they scroll
+  // naturally with the frame-wrap content. No viewport math. No cross-frame
+  // pointer events. Direct DOM access to iframe sections (same-origin).
 
   const _SKIP_SEC = new Set(['footer']);
-  let _secHandleEls   = []; // [{handleEl, labelEl, sec, sectionId}]
-  let _secDragState   = null; // active drag
+  let _secHandleEls = [];  // [{handleEl, labelEl, sec, sectionId}]
+  let _secDragState = null;
+  let _secHandleBar = null; // container inside editor-frame-wrap
 
   function _secScale() {
     const fw = document.querySelector('.editor-frame-wrap');
-    return _currentDevice === 'pc' ? (fw ? fw.clientWidth / PREVIEW_W : 1) : 1;
+    if (!fw || !fw.clientWidth) return 1;
+    return _currentDevice === 'pc' ? fw.clientWidth / PREVIEW_W : 1;
   }
 
   function _secDevW() {
     return _currentDevice === 'ipad' ? 768 : _currentDevice === 'phone' ? 390 : PREVIEW_W;
   }
 
+  // Walk offsetParent chain to get document-relative top inside iframe
+  function _secDocTop(el) {
+    let top = 0;
+    try {
+      const body = siteFrame.contentDocument.body;
+      let e = el;
+      while (e && e !== body) {
+        top += e.offsetTop || 0;
+        e = e.offsetParent;
+      }
+    } catch(ex) {}
+    return top;
+  }
+
+  function _placeHandle(handleEl, docTop, sec, scale, fw) {
+    // The iframe is position:absolute;top:0 and stays visually pinned in the
+    // editor-frame-wrap viewport — it does NOT scroll with the container.
+    // The page scrolling is simulated by contentWindow.scrollTo(0, fw.scrollTop/scale).
+    // So to find where the section bottom appears in the viewport, we subtract
+    // the iframe's current scroll offset from the document-absolute position.
+    const iframeScrollTop = fw.scrollTop / scale;
+    const rawTop = (docTop + sec.offsetHeight - iframeScrollTop) * scale - 12;
+    const devW   = _secDevW();
+
+    if (_currentDevice === 'pc') {
+      handleEl.style.left  = '0';
+      handleEl.style.right = '0';
+      handleEl.style.width = '';
+    } else {
+      const hW = devW + 'px';
+      const hL = ((fw.clientWidth - devW) / 2) + 'px';
+      handleEl.style.left  = hL;
+      handleEl.style.right = '';
+      handleEl.style.width = hW;
+    }
+
+    // Clamp to visible viewport [0, fw.clientHeight-12]
+    const clampedTop = Math.max(0, Math.min(rawTop, fw.clientHeight - 12));
+    // During drag: always clamp (keep handle in viewport so user doesn't lose it)
+    // Outside drag: only clamp if section is partially visible
+    if (_secDragState && _secDragState.sec === sec) {
+      handleEl.style.top = clampedTop + 'px';
+    } else {
+      handleEl.style.top = rawTop + 'px';
+    }
+  }
+
   function _repositionSecHandles() {
     if (!_secHandleEls.length) return;
     const fw = document.querySelector('.editor-frame-wrap');
     if (!fw) return;
-    const fwBCR = fw.getBoundingClientRect();
     const scale = _secScale();
-    const devW  = _secDevW();
-
-    // iframe's visual top in parent viewport (accounts for frame-wrap scroll)
-    const iframeTop = siteFrame.getBoundingClientRect().top;
-
-    let hLeft = fwBCR.left;
-    let hWidth = fwBCR.width;
-    if (_currentDevice !== 'pc') {
-      hWidth = devW;
-      hLeft  = fwBCR.left + (fwBCR.width - devW) / 2;
-    }
-
-    _secHandleEls.forEach(({ handleEl, labelEl, sec }) => {
-      // sec.getBoundingClientRect() gives position in iframe's viewport coords
-      let secBottom;
-      try { secBottom = sec.getBoundingClientRect().bottom; } catch(e) { return; }
-
-      // Convert to parent viewport coordinates
-      const visualBottom = iframeTop + secBottom * scale;
-
-      const isDragging = _secDragState && _secDragState.sec === sec;
-
-      if (isDragging) {
-        // Keep handle visible during drag — clamp to frame-wrap bounds
-        const clampedTop = Math.min(fwBCR.bottom - 6, Math.max(fwBCR.top + 6, visualBottom - 12));
-        handleEl.style.display = 'flex';
-        handleEl.style.top     = clampedTop + 'px';
-        handleEl.style.left    = hLeft + 'px';
-        handleEl.style.width   = hWidth + 'px';
-      } else {
-        // Show only when section bottom is within the visible frame-wrap area
-        const inView = visualBottom > fwBCR.top + 4 && visualBottom < fwBCR.bottom + 4;
-        handleEl.style.display = inView ? 'flex' : 'none';
-        if (inView) {
-          handleEl.style.top   = (visualBottom - 12) + 'px';
-          handleEl.style.left  = hLeft + 'px';
-          handleEl.style.width = hWidth + 'px';
-        }
-      }
+    _secHandleEls.forEach(({ handleEl, labelEl, sec, docTop }) => {
+      _placeHandle(handleEl, docTop, sec, scale, fw);
       labelEl.textContent = Math.round(sec.offsetHeight) + 'px';
     });
   }
@@ -1021,27 +1026,39 @@
   function _buildSecHandles() {
     _clearSecHandles();
     if (!editMode) return;
+    const fw = document.querySelector('.editor-frame-wrap');
+    if (!fw) return;
+
+    // Create/reuse container bar inside frame-wrap
+    _secHandleBar = fw.querySelector('#secHandleBar');
+    if (!_secHandleBar) {
+      _secHandleBar = document.createElement('div');
+      _secHandleBar.id = 'secHandleBar';
+      _secHandleBar.style.cssText =
+        'position:absolute;top:0;left:0;right:0;height:0;overflow:visible;' +
+        'pointer-events:none;z-index:10;';
+      fw.appendChild(_secHandleBar);
+    }
+
     try {
       const doc = siteFrame.contentDocument;
       if (!doc || !doc.body) return;
+      const scale = _secScale();
+
       doc.querySelectorAll('section').forEach(sec => {
         const cls = sec.className ? sec.className.trim().split(/\s+/)[0] : '';
         if (!cls || _SKIP_SEC.has(cls)) return;
-        // Ensure section is position:relative so it doesn't shift visually
-        try {
-          if (doc.defaultView.getComputedStyle(sec).position === 'static') {
-            sec.style.position = 'relative';
-          }
-        } catch(e) {}
+
+        const docTop = _secDocTop(sec);
 
         const handle = document.createElement('div');
         handle.dataset.sectionId = cls;
         handle.style.cssText =
-          'position:fixed;height:12px;pointer-events:all;cursor:ns-resize;' +
+          'position:absolute;height:12px;pointer-events:all;cursor:ns-resize;' +
           'background:rgba(56,161,105,0.85);' +
           'display:flex;align-items:center;justify-content:center;' +
           'font:bold 9px/1 monospace;color:#1a4731;user-select:none;' +
-          'box-sizing:border-box;border-top:2px solid rgba(56,161,105,1);z-index:9998;';
+          'box-sizing:border-box;border-top:2px solid rgba(56,161,105,1);z-index:10;';
         handle.title = 'Drag to resize \u00b7 ' + cls;
 
         const label = document.createElement('span');
@@ -1049,7 +1066,6 @@
         label.textContent = Math.round(sec.offsetHeight) + 'px';
         handle.appendChild(label);
 
-        // All pointer events happen in the parent frame — no cross-frame issues
         handle.addEventListener('pointerdown', (e) => {
           e.preventDefault();
           handle.setPointerCapture(e.pointerId);
@@ -1057,25 +1073,27 @@
           sec.style.height    = startH + 'px';
           sec.style.minHeight = 'auto';
           sec.style.overflow  = 'hidden';
-          _secDragState = { sec, sectionId: cls, startY: e.clientY, startH, labelEl: label };
+          _secDragState = { sec, sectionId: cls, startY: e.clientY, startH, labelEl: label, docTop };
           editStatus.textContent = `Dragging \u201c${cls}\u201d \u2014 release to save`;
           editStatus.className = 'edit-status';
         });
 
         handle.addEventListener('pointermove', (e) => {
           if (!_secDragState || _secDragState.sec !== sec) return;
-          const delta = (e.clientY - _secDragState.startY) / _secScale();
-          const newH  = Math.max(50, _secDragState.startH + delta);
+          const s    = _secScale();
+          const newH = Math.max(50, _secDragState.startH + (e.clientY - _secDragState.startY) / s);
           sec.style.height = Math.round(newH) + 'px';
-          _repositionSecHandles();
+          label.textContent = Math.round(newH) + 'px';
+          const fw2 = document.querySelector('.editor-frame-wrap');
+          if (fw2) _placeHandle(handle, docTop, sec, s, fw2);
         });
 
         handle.addEventListener('pointerup', () => {
           if (!_secDragState || _secDragState.sec !== sec) return;
-          const finalH  = Math.round(sec.offsetHeight);
-          const sId     = _secDragState.sectionId;
+          const finalH = Math.round(sec.offsetHeight);
+          const sId    = _secDragState.sectionId;
           _secDragState = null;
-          try { scaleFrame(); } catch(e) {}  // update scroll proxy for new content height
+          try { scaleFrame(); } catch(ex) {}
           _repositionSecHandles();
           _saveSecHeight(sId, finalH);
         });
@@ -1088,17 +1106,17 @@
           }
         });
 
-        _secHandleContainer.appendChild(handle);
-        _secHandleEls.push({ handleEl: handle, labelEl: label, sec, sectionId: cls });
+        _secHandleBar.appendChild(handle);
+        _placeHandle(handle, docTop, sec, scale, fw);
+        _secHandleEls.push({ handleEl: handle, labelEl: label, sec, sectionId: cls, docTop });
       });
-      _repositionSecHandles();
     } catch(e) { console.warn('_buildSecHandles:', e); }
   }
 
   function _clearSecHandles() {
-    _secHandleContainer.innerHTML = '';
-    _secHandleEls  = [];
-    _secDragState  = null;
+    if (_secHandleBar) _secHandleBar.innerHTML = '';
+    _secHandleEls = [];
+    _secDragState = null;
   }
 
   async function _saveSecHeight(sId, finalH) {
