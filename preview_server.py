@@ -848,6 +848,8 @@ _CARD_EDIT_OVERLAY_TPL = """\
   var imagePool = [];
   var saveTimers = {{}};
   var cardIndices = {{}}; // cardId → current index in imagePool (bidirectional navigation)
+  var cardHistory = {{}}; // [PX] cardId → history array for back button
+  var cardOriginals = {{}}; // [PX] cardId → original image before edits
   var cardRefreshPill = {{}}; // cardId → refreshPill() fn (for rd_set_card_image handler)
   var _tmBioMap = {{}}; // memberId (string) → bio text, for team card saveCard intercept
 
@@ -1111,9 +1113,10 @@ _CARD_EDIT_OVERLAY_TPL = """\
     cardRefreshPill[cardId] = refreshPill;
     if (!isGalleryItem) pill.appendChild(colorBtn);
     if (!isGalleryItem) pill.appendChild(imgBtn);
-    if (!isGalleryItem) pill.appendChild(browseCardBtn);
+    pill.appendChild(browseCardBtn); // [PX] available for all including gallery
     if (!isGalleryItem) pill.appendChild(rotateBtn);
-    if (!isGalleryItem) pill.appendChild(cardBackBtn);
+    pill.appendChild(cardBackBtn); // [PX] available for all including gallery
+    cardBackBtn.style.display = 'none'; // [PX] start hidden, show on forward cycle
     pill.appendChild(renderBtn);
 
     // Gallery items: type badge (cycles Untagged → Project → Render → Before → Construction → Untagged)
@@ -1380,6 +1383,9 @@ _CARD_EDIT_OVERLAY_TPL = """\
         state.mode = 'image';
         if (!state.image && imagePool.length) {{ state.image = imagePool[0]; cardIndices[cardId] = 0; }}
         else if (state.image) cardIndices[cardId] = findPoolIndex(state.image);
+        // [PX] Record original image and initialize history
+        if (!cardOriginals[cardId] && state.image) cardOriginals[cardId] = state.image;
+        if (!cardHistory[cardId]) cardHistory[cardId] = [];
         applyStyle(el, state); refreshPill();
         saveCard(cardId, state);
       }}
@@ -1396,10 +1402,12 @@ _CARD_EDIT_OVERLAY_TPL = """\
         applyStyle(el, state);
         saveCard(cardId, state);
       }} else if (isGalleryItem || state.mode === 'image') {{
-        if (!imagePool.length) return;
-        if (cardIndices[cardId] == null) cardIndices[cardId] = findPoolIndex(state.image);
-        cardIndices[cardId] = (cardIndices[cardId] - 1 + imagePool.length) % imagePool.length;
-        state.image = imagePool[cardIndices[cardId]];
+        // [PX] Pop from history instead of cycling backward
+        if (!cardHistory[cardId] || !cardHistory[cardId].length) return;
+        state.image = cardHistory[cardId].pop();
+        var pos = imagePool.indexOf(state.image);
+        if (pos >= 0) cardIndices[cardId] = pos;
+        if (!cardHistory[cardId].length) cardBackBtn.style.display = 'none';
         applyStyle(el, state);
         saveCard(cardId, state);
       }}
@@ -1528,6 +1536,10 @@ _CARD_EDIT_OVERLAY_TPL = """\
         saveCard(cardId, state);
       }} else if (state.mode === 'image') {{
         if (!imagePool.length) return;
+        // [PX] Push current to history before changing
+        if (!cardHistory[cardId]) cardHistory[cardId] = [];
+        if (state.image) cardHistory[cardId].push(state.image);
+        cardBackBtn.style.display = ''; // [PX] show back button
         if (cardIndices[cardId] == null) cardIndices[cardId] = findPoolIndex(state.image);
         cardIndices[cardId] = (cardIndices[cardId] + 1) % imagePool.length;
         state.image = imagePool[cardIndices[cardId]];
@@ -1623,7 +1635,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
       }});
       btn.addEventListener('click', function(e) {{
         e.stopPropagation(); e.preventDefault();
-        window.open('/view/admin/media.html?rerender=' + encodeURIComponent(base), '_blank');
+        window.parent.postMessage({{type:'rd_open_render', cardId:null, filename:base}}, window.location.origin);
       }});
       container.appendChild(btn);
     }});
@@ -2006,6 +2018,8 @@ _EDIT_OVERLAY_TPL = """\
   var editables = [];
   var imagePool = [];
   var cycleIndices = [];
+  var imageHistory = [];   // [PX] per-element history stack for back button
+  var originalImages = []; // [PX] original image per element before edits
   var _transformAckTimer = null;
 
   // Initial transform from server-injected vars
@@ -2118,7 +2132,7 @@ _EDIT_OVERLAY_TPL = """\
     rotateBtn.style.cssText = 'background:rgba(0,0,0,.72);color:#fff;border:none;font-family:system-ui,sans-serif;font-size:12px;font-weight:700;padding:5px 11px;border-radius:4px;cursor:pointer;white-space:nowrap;pointer-events:auto';
     var backBtn = document.createElement('button');
     backBtn.textContent = '\u2190 Back';
-    backBtn.style.cssText = 'background:rgba(0,0,0,.72);color:#fff;border:none;font-family:system-ui,sans-serif;font-size:12px;font-weight:700;padding:5px 11px;border-radius:4px;cursor:pointer;white-space:nowrap;pointer-events:auto';
+    backBtn.style.cssText = 'background:rgba(0,0,0,.72);color:#fff;border:none;font-family:system-ui,sans-serif;font-size:12px;font-weight:700;padding:5px 11px;border-radius:4px;cursor:pointer;white-space:nowrap;pointer-events:auto;display:none';
     var zoomLabel = document.createElement('span');
     zoomLabel.style.cssText = 'background:rgba(0,0,0,.78);color:#f59e0b;font-family:system-ui,sans-serif;font-size:11px;font-weight:700;padding:4px 9px;border-radius:4px;white-space:nowrap;display:none';
     badge.appendChild(browseBtn);
@@ -2221,7 +2235,7 @@ _EDIT_OVERLAY_TPL = """\
       var f = url.split('?')[0].split('/').pop();
       var base = f.replace(/_ai_\d+\.webp$/, '.webp');
       if (!base) return;
-      window.open('/view/admin/media.html?rerender=' + encodeURIComponent(base) + '&page_slug=' + encodeURIComponent(SLUG) + '&context=hero', '_blank');
+      window.parent.postMessage({{type:'rd_open_render', cardId:null, filename:base}}, window.location.origin);
     }});
     badge.appendChild(heroRenderBtn);
 
@@ -2285,15 +2299,17 @@ _EDIT_OVERLAY_TPL = """\
 
     backBtn.addEventListener('click', function(e) {{
       e.stopPropagation();
-      if (!imagePool.length) return;
-      var cur = cycleIndices[idx] == null ? 0 : cycleIndices[idx];
-      cycleIndices[idx] = (cur - 1 + imagePool.length) % imagePool.length;
-      var newImg = imagePool[cycleIndices[idx]];
-      editables[idx].el.style.backgroundImage = "url('" + newImg + "')";
-      editables[idx].url = newImg;
+      // [PX] Pop from history instead of cycling backward
+      if (!imageHistory[idx] || !imageHistory[idx].length) return;
+      var prevImg = imageHistory[idx].pop();
+      editables[idx].el.style.backgroundImage = "url('" + prevImg + "')";
+      editables[idx].url = prevImg;
+      var pos = imagePool.indexOf(prevImg);
+      if (pos >= 0) cycleIndices[idx] = pos;
+      if (!imageHistory[idx].length) backBtn.style.display = 'none'; // [PX] hide when at original
       window.parent.postMessage({{
         type: 'rd_image_cycled', slug: SLUG,
-        elementIndex: idx, newImage: newImg
+        elementIndex: idx, newImage: prevImg
       }}, '*');
     }});
 
@@ -2374,6 +2390,8 @@ _EDIT_OVERLAY_TPL = """\
       e.preventDefault();
       e.stopPropagation();
       if (!imagePool.length) return;
+      imageHistory[idx].push(editables[idx].url); // [PX] push current to history
+      backBtn.style.display = ''; // [PX] show back button
       cycleIndices[idx] = ((cycleIndices[idx] == null ? -1 : cycleIndices[idx]) + 1) % imagePool.length;
       var newImg = imagePool[cycleIndices[idx]];
       editables[idx].el.style.backgroundImage = "url('" + newImg + "')";
@@ -2491,6 +2509,8 @@ _EDIT_OVERLAY_TPL = """\
       var idx = editables.length;
       editables.push({{ el: el, url: imgUrl, zoom: _initZoom, posX: _initPosX, posY: _initPosY }});
       cycleIndices.push(null);
+      imageHistory.push([]);    // [PX] empty history for this element
+      originalImages.push(imgUrl); // [PX] record starting image
       buildOverlay(el, idx, imgUrl);
     }});
 

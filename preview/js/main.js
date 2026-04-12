@@ -143,3 +143,60 @@ document.querySelectorAll('.service-card, .step, .portfolio-card, .portfolio-ite
     observer.observe(el);
   }
 });
+
+// ── [PX] Responsive background-image swap ────────────────────────────────────
+// Picks _480w / _960w / _1920w variant based on element width × device pixel ratio.
+// Runs on DOMContentLoaded and on resize. Only targets elements with background-image
+// pointing to /assets/images-opt/ that have responsive variants on disk.
+(function() {
+  'use strict';
+  var SUFFIXES = ['_1920w', '_960w', '_480w'];
+  var BASE_RE = /\/assets\/images-opt\/([^'")\s?]+)\.webp/;
+
+  function _pickVariant(el) {
+    var bg = el.style.backgroundImage || '';
+    var match = bg.match(BASE_RE);
+    if (!match) return;
+    var fullName = match[1];
+
+    // Strip any existing width suffix to get the base name
+    var baseName = fullName.replace(/_(480|960|1920|201)w$/, '');
+    // Don't process if already has the right suffix for this size
+    var elWidth = el.offsetWidth * (window.devicePixelRatio || 1);
+
+    var suffix = '_1920w'; // default
+    if (elWidth <= 500) suffix = '_480w';
+    else if (elWidth <= 1000) suffix = '_960w';
+
+    var newName = baseName + suffix;
+    if (newName === fullName) return; // already correct
+
+    var newUrl = '/assets/images-opt/' + newName + '.webp';
+    el.style.backgroundImage = bg.replace(
+      /\/assets\/images-opt\/[^'")\s?]+\.webp/,
+      newUrl
+    );
+  }
+
+  function _swapAll() {
+    document.querySelectorAll('[style]').forEach(function(el) {
+      if (el.style.backgroundImage && el.style.backgroundImage.indexOf('/assets/images-opt/') >= 0) {
+        _pickVariant(el);
+      }
+    });
+  }
+
+  // Run on load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _swapAll);
+  } else {
+    _swapAll();
+  }
+
+  // Run on resize (debounced)
+  var _resizeTimer;
+  window.addEventListener('resize', function() {
+    clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(_swapAll, 300);
+  });
+})();
