@@ -123,11 +123,8 @@
     <div class="sap-bg"></div>
     <div class="sap-bg-overlay"></div>
 
-    <nav class="nav" id="nav" style="position:fixed;top:0;left:0;right:0;z-index:10;background:rgba(0,0,0,0.4);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);">
-      <a href="index.html" class="nav__logo">
-        <img src="/assets/images/logo.png" alt="Ridgecrest Designs" class="nav__logo-img" style="height:28px;margin-right:10px;vertical-align:middle;" onerror="this.style.display='none'" />
-        RIDGECREST DESIGNS
-      </a>
+    <nav class="nav" id="nav">
+      <a href="index.html" class="nav__logo">RIDGECREST DESIGNS</a>
       <button class="nav__toggle" id="navToggle" aria-label="Menu">
         <span></span><span></span><span></span>
       </button>
@@ -159,16 +156,8 @@
     </div>
   </div>
 
+  <script src="js/main.js"></script>
   <script>
-    // Mobile nav toggle
-    var navToggle = document.getElementById('navToggle');
-    var navLinks = document.getElementById('navLinks');
-    if (navToggle && navLinks) {
-      navToggle.addEventListener('click', function() {
-        navLinks.classList.toggle('nav__links--open');
-      });
-    }
-
     // Auto-resize iframe via postMessage from Elevate Scheduling
     (function() {
       var frame = document.querySelector('.sap-frame iframe');
