@@ -77,6 +77,8 @@
       color: rgba(255,255,255,0.7);
       margin-top: 0.5rem;
     }
+
+    /* Desktop: floating card */
     .sap-frame {
       width: 100%;
       max-width: 780px;
@@ -94,16 +96,25 @@
       border: none;
       display: block;
     }
-    @media (max-width: 767px) {
+
+    /* Tablet + Mobile: full width, tall iframe, page scrolls */
+    @media (max-width: 1024px) {
       .sap-content {
-        padding: 90px 12px 30px;
+        padding: 80px 0 0;
+      }
+      .sap-header {
+        padding: 0 16px;
       }
       .sap-frame {
-        border-radius: 8px;
-        min-height: 500px;
+        border-radius: 0;
+        max-width: 100%;
+        box-shadow: none;
+        min-height: auto;
+        flex: none;
       }
       .sap-frame iframe {
-        min-height: 500px;
+        min-height: 1200px;
+        height: 1200px;
       }
     }
   </style>
@@ -150,11 +161,26 @@
   </div>
 
   <script>
+    // Mobile nav toggle
     var navToggle = document.getElementById('navToggle');
     var navLinks = document.getElementById('navLinks');
     if (navToggle && navLinks) {
       navToggle.addEventListener('click', function() {
         navLinks.classList.toggle('nav__links--open');
+      });
+    }
+
+    // Cross-origin iframe: set tall enough height so page scrolls, not iframe
+    var sapFrame = document.querySelector('.sap-frame iframe');
+    if (sapFrame) {
+      sapFrame.addEventListener('load', function() {
+        try {
+          var h = sapFrame.contentDocument.body.scrollHeight;
+          if (h > 100) sapFrame.style.height = h + 'px';
+        } catch(e) {
+          // Cross-origin — can't read height, use generous fixed height
+          sapFrame.style.height = '1200px';
+        }
       });
     }
   </script>
