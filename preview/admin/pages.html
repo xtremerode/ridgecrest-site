@@ -945,15 +945,16 @@
   const pickerSelectedLabel = document.getElementById('pickerSelectedLabel');
   let pickerActiveTab = 'all';
 
-  // ── Section resize handles (parent-frame, inside editor-frame-wrap) ────────
-  // Handles are position:absolute inside editor-frame-wrap — they scroll
-  // naturally with the frame-wrap content. No viewport math. No cross-frame
-  // pointer events. Direct DOM access to iframe sections (same-origin).
+  // ── Section resize handles (position:fixed, viewport-relative) ────────────
+  // Handles are position:fixed on document.body. Positioned using
+  // getBoundingClientRect — no scroll-coordinate ambiguity. The iframe stays
+  // visually at the top of editor-frame-wrap; its content scrolls via
+  // contentWindow.scrollTo. We account for that scroll explicitly:
+  //   viewportY = fwBCR.top + (docTop + secH - fw.scrollTop/scale) * scale
 
   const _SKIP_SEC = new Set(['footer']);
-  let _secHandleEls = [];  // [{handleEl, labelEl, sec, sectionId}]
+  let _secHandleEls = [];   // [{handleEl, labelEl, sec, sectionId, docTop}]
   let _secDragState = null;
-  let _secHandleBar = null; // container inside editor-frame-wrap
 
   function _secScale() {
     const fw = document.querySelector('.editor-frame-wrap');
@@ -965,50 +966,41 @@
     return _currentDevice === 'ipad' ? 768 : _currentDevice === 'phone' ? 390 : PREVIEW_W;
   }
 
-  // Walk offsetParent chain to get document-relative top inside iframe
   function _secDocTop(el) {
     let top = 0;
     try {
       const body = siteFrame.contentDocument.body;
       let e = el;
-      while (e && e !== body) {
-        top += e.offsetTop || 0;
-        e = e.offsetParent;
-      }
+      while (e && e !== body) { top += e.offsetTop || 0; e = e.offsetParent; }
     } catch(ex) {}
     return top;
   }
 
-  function _placeHandle(handleEl, docTop, sec, scale, fw) {
-    // The iframe is position:absolute;top:0 and stays visually pinned in the
-    // editor-frame-wrap viewport — it does NOT scroll with the container.
-    // The page scrolling is simulated by contentWindow.scrollTo(0, fw.scrollTop/scale).
-    // So to find where the section bottom appears in the viewport, we subtract
-    // the iframe's current scroll offset from the document-absolute position.
-    const iframeScrollTop = fw.scrollTop / scale;
-    const rawTop = (docTop + sec.offsetHeight - iframeScrollTop) * scale - 12;
-    const devW   = _secDevW();
-
+  function _placeHandle(handleEl, docTop, sec, fw) {
+    const scale        = _secScale();
+    const fwBCR        = fw.getBoundingClientRect();
+    const iframeST     = fw.scrollTop / scale;
+    // Where does the section bottom appear in viewport coordinates?
+    const secBotVY     = fwBCR.top + (docTop + sec.offsetHeight - iframeST) * scale;
+    // Only show if section bottom is inside the panel (±4px tolerance)
+    const isDragging   = _secDragState && _secDragState.sec === sec;
+    const inPanel      = secBotVY >= fwBCR.top + 4 && secBotVY <= fwBCR.bottom + 4;
+    if (!inPanel && !isDragging) { handleEl.style.display = 'none'; return; }
+    handleEl.style.display = 'flex';
+    // During drag: clamp so the handle never leaves the panel
+    const clampedBotVY = isDragging
+      ? Math.max(fwBCR.top + 20, Math.min(secBotVY, fwBCR.bottom))
+      : secBotVY;
+    handleEl.style.top = (clampedBotVY - 12) + 'px';
+    const devW = _secDevW();
     if (_currentDevice === 'pc') {
-      handleEl.style.left  = '0';
-      handleEl.style.right = '0';
+      handleEl.style.left  = fwBCR.left + 'px';
+      handleEl.style.right = (document.documentElement.clientWidth - fwBCR.right) + 'px';
       handleEl.style.width = '';
     } else {
-      const hW = devW + 'px';
-      const hL = ((fw.clientWidth - devW) / 2) + 'px';
-      handleEl.style.left  = hL;
+      handleEl.style.left  = (fwBCR.left + (fw.clientWidth - devW) / 2) + 'px';
       handleEl.style.right = '';
-      handleEl.style.width = hW;
-    }
-
-    // Clamp to visible viewport [0, fw.clientHeight-12]
-    const clampedTop = Math.max(0, Math.min(rawTop, fw.clientHeight - 12));
-    // During drag: always clamp (keep handle in viewport so user doesn't lose it)
-    // Outside drag: only clamp if section is partially visible
-    if (_secDragState && _secDragState.sec === sec) {
-      handleEl.style.top = clampedTop + 'px';
-    } else {
-      handleEl.style.top = rawTop + 'px';
+      handleEl.style.width = devW + 'px';
     }
   }
 
@@ -1016,9 +1008,8 @@
     if (!_secHandleEls.length) return;
     const fw = document.querySelector('.editor-frame-wrap');
     if (!fw) return;
-    const scale = _secScale();
     _secHandleEls.forEach(({ handleEl, labelEl, sec, docTop }) => {
-      _placeHandle(handleEl, docTop, sec, scale, fw);
+      _placeHandle(handleEl, docTop, sec, fw);
       labelEl.textContent = Math.round(sec.offsetHeight) + 'px';
     });
   }
@@ -1028,37 +1019,23 @@
     if (!editMode) return;
     const fw = document.querySelector('.editor-frame-wrap');
     if (!fw) return;
-
-    // Create/reuse container bar inside frame-wrap
-    _secHandleBar = fw.querySelector('#secHandleBar');
-    if (!_secHandleBar) {
-      _secHandleBar = document.createElement('div');
-      _secHandleBar.id = 'secHandleBar';
-      _secHandleBar.style.cssText =
-        'position:absolute;top:0;left:0;right:0;height:0;overflow:visible;' +
-        'pointer-events:none;z-index:10;';
-      fw.appendChild(_secHandleBar);
-    }
-
     try {
       const doc = siteFrame.contentDocument;
       if (!doc || !doc.body) return;
-      const scale = _secScale();
 
       doc.querySelectorAll('section').forEach(sec => {
         const cls = sec.className ? sec.className.trim().split(/\s+/)[0] : '';
         if (!cls || _SKIP_SEC.has(cls)) return;
-
         const docTop = _secDocTop(sec);
 
         const handle = document.createElement('div');
         handle.dataset.sectionId = cls;
         handle.style.cssText =
-          'position:absolute;height:12px;pointer-events:all;cursor:ns-resize;' +
-          'background:rgba(56,161,105,0.85);' +
-          'display:flex;align-items:center;justify-content:center;' +
-          'font:bold 9px/1 monospace;color:#1a4731;user-select:none;' +
-          'box-sizing:border-box;border-top:2px solid rgba(56,161,105,1);z-index:10;';
+          'position:fixed;height:12px;pointer-events:all;cursor:ns-resize;' +
+          'background:rgba(56,161,105,0.9);display:flex;align-items:center;' +
+          'justify-content:center;font:bold 9px/1 monospace;color:#1a4731;' +
+          'user-select:none;box-sizing:border-box;' +
+          'border-top:2px solid #38a169;z-index:9999;';
         handle.title = 'Drag to resize \u00b7 ' + cls;
 
         const label = document.createElement('span');
@@ -1085,7 +1062,7 @@
           sec.style.height = Math.round(newH) + 'px';
           label.textContent = Math.round(newH) + 'px';
           const fw2 = document.querySelector('.editor-frame-wrap');
-          if (fw2) _placeHandle(handle, docTop, sec, s, fw2);
+          if (fw2) _placeHandle(handle, docTop, sec, fw2);
         });
 
         handle.addEventListener('pointerup', () => {
@@ -1106,15 +1083,15 @@
           }
         });
 
-        _secHandleBar.appendChild(handle);
-        _placeHandle(handle, docTop, sec, scale, fw);
+        document.body.appendChild(handle);
+        _placeHandle(handle, docTop, sec, fw);
         _secHandleEls.push({ handleEl: handle, labelEl: label, sec, sectionId: cls, docTop });
       });
     } catch(e) { console.warn('_buildSecHandles:', e); }
   }
 
   function _clearSecHandles() {
-    if (_secHandleBar) _secHandleBar.innerHTML = '';
+    _secHandleEls.forEach(({ handleEl }) => { try { document.body.removeChild(handleEl); } catch(ex) {} });
     _secHandleEls = [];
     _secDragState = null;
   }
