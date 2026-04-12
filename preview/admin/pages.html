@@ -2439,8 +2439,16 @@
     // Compute full content height — used only for frameScrollProxy (outer scroll depth)
     let iframeH = PREVIEW_H;
     try {
-      const sh = siteFrame.contentDocument?.documentElement?.scrollHeight || PREVIEW_H;
-      iframeH = Math.max(sh, PREVIEW_H);
+      var _doc = siteFrame.contentDocument;
+      var _body = _doc && _doc.body;
+      var _html = _doc && _doc.documentElement;
+      if (_body && _html) {
+        iframeH = Math.max(
+          _body.scrollHeight || 0, _html.scrollHeight || 0,
+          _body.offsetHeight || 0, _html.offsetHeight || 0,
+          PREVIEW_H
+        );
+      }
     } catch(e) {}
 
     if (_currentDevice === 'pc') {
@@ -2476,6 +2484,20 @@
 
   scaleFrame();
   window.addEventListener('resize', scaleFrame);
+
+  // [PX] Watch iframe content for size changes (images loading, DOM changes)
+  var _frameObs = null;
+  siteFrame.addEventListener('load', function() {
+    scaleFrame();
+    if (_frameObs) { _frameObs.disconnect(); _frameObs = null; }
+    try {
+      var _iBody = siteFrame.contentDocument.body;
+      if (_iBody && typeof MutationObserver !== 'undefined') {
+        _frameObs = new MutationObserver(scaleFrame);
+        _frameObs.observe(_iBody, { childList: true, subtree: true, attributes: true });
+      }
+    } catch(e) {}
+  });
 
   // Init
   init();
