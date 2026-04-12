@@ -209,6 +209,8 @@ p { line-height: 1.8; }
   max-width: 140px;
   object-fit: contain;
   flex-shrink: 0;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
 }
 
 .nav__links {

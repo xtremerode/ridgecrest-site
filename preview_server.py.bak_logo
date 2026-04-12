@@ -3221,15 +3221,8 @@ def view(filename):
             _sec_device = view_device if view_device in ("tablet", "mobile") else "desktop"
             content = _apply_section_heights(content, slug, _sec_device)
         # Inject site logo URL so main.js can prepend it to nav text
-        # Prefer SVG for crisp rendering at any size; fall back to PNG
-        _logo_svg  = os.path.join(PREVIEW_DIR, 'assets', 'images', 'logo.svg')
-        _logo_png  = os.path.join(PREVIEW_DIR, 'assets', 'images', 'logo.png')
-        if os.path.isfile(_logo_svg):
-            _logo_url = '/assets/images/logo.svg'
-        elif os.path.isfile(_logo_png):
-            _logo_url = '/assets/images/logo.png'
-        else:
-            _logo_url = None
+        _logo_path = os.path.join(PREVIEW_DIR, 'assets', 'images', 'logo.png')
+        _logo_url   = '/assets/images/logo.png' if os.path.isfile(_logo_path) else None
         _logo_script = (
             f'<script>window.__RD_LOGO_URL={_safe_js(_logo_url)};</script>'
         ).encode('utf-8')

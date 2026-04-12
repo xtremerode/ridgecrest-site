@@ -124,3 +124,29 @@ Claude: Read this file at the start of every session so you know what was change
 
 ### ridgecrest-agency/project_open_issues.md
 - Bug 8: Created tracking file for all known issues
+
+## [PX] Logo SVG Conversion — April 12, 2026 (Session 2)
+
+### Problem
+Logo PNG (402x402, 5KB) rendered blurry at 36px nav height due to browser downscaling artifacts on the raster image.
+
+### Root Cause
+- Raster PNG with antialiased edges gets softened when browser downscales 402px to 36px
+- The 5KB file size for a 402x402 image indicates heavy compression, degrading detail
+- Chrome's default bilinear interpolation blurs fine lines at small rendering sizes
+
+### Fix Applied
+1. **Converted logo from PNG to SVG** using potrace tracing — vector paths render crisp at any size
+2. **Updated preview_server.py** to prefer logo.svg over logo.png (with PNG fallback)
+3. **Added CSS image-rendering: crisp-edges** to .nav__logo-img as belt-and-suspenders
+4. Original PNG kept as fallback
+
+### Files Changed
+- NEW:  (972 bytes, white fill, vector paths)
+- MODIFIED:  — logo injection prefers SVG
+- MODIFIED:  — added image-rendering to .nav__logo-img
+
+### Verification
+- Rule 22 all 3 steps passed
+- SVG renders crisp on homepage, about, custom-homes (all tested)
+- All pages inject  via window.__RD_LOGO_URL
