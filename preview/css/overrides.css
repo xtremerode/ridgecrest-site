@@ -1,9 +1,9 @@
 /*
  * overrides.css — approved CSS overrides for Ridgecrest Designs
- * Loaded after main.css on every page. Never edit main.css directly.
- * Use the CSS Staging Preview in the admin panel to test, then approve.
+ * Loaded after main.css on every page. Never edit main.css directly
+ * for layout-only responsive adjustments. Theme changes belong in source files.
  *
- * Last rebuilt: 2026-04-12 (restored from session notes after April 4 git revert)
+ * Last rebuilt: 2026-04-12 (cleaned by PX — theme rules moved to source files)
  */
 
 /* ── Nav dark overlay (pre-scroll) ──────────────────────────────────────────
@@ -63,69 +63,12 @@
   }
 }
 
-/* [PX] Service card image quality - prevent browser stair-stepping on background-image downscale */
+/* ── Image rendering hint ─────────────────────────────────────────────────────
+   Tells browser to use highest quality downscaling for card background images.
+   Prevents stair-stepping artifacts on fine detail images.
+   Added: 2026-04-12
+*/
 .service-card {
-    image-rendering: -webkit-optimize-contrast;
-    image-rendering: high-quality;
-}
-
-/* [PX] Service card overlay - solid instead of gradient, 0.4 default, 0.3 on hover */
-.rd-card--image-mode::before {
-    background: rgba(0, 0, 0, 0.5) !important;
-}
-.rd-card--image-mode:hover::before {
-    background: rgba(0, 0, 0, 0.3) !important;
-}
-
-/* [PX] Fix undefined CSS variables */
-:root {
-    --font-body: 'Jost', 'Helvetica Neue', Arial, sans-serif;
-    --font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
-    --gold: #C8B89A;
-}
-
-/* [PX] Eyebrow color consistency — all eyebrows should be slate blue like the homepage */
-.project-hero__eyebrow,
-.page-hero__eyebrow,
-.page-hero--service .page-hero__eyebrow,
-.featured-home__eyebrow {
-    color: var(--slate-light, #80A4C8) !important;
-}
-
-/* [PX] Dark overlay on photo-backed page heroes — matches homepage hero readability */
-.page-hero--service::before,
-.page-hero::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.45);
-    z-index: 0;
-    pointer-events: none;
-}
-.page-hero--service,
-.page-hero {
-    position: relative;
-}
-.page-hero--service > *,
-.page-hero > * {
-    position: relative;
-    z-index: 1;
-}
-
-/* [PX] Project hero title weight — match homepage at 400 (was 300) */
-.project-hero__title {
-    font-weight: 400;
-}
-
-/* [PX] Portfolio featured cards — apply slate blue theme to location eyebrows */
-.portfolio-featured__loc {
-    color: var(--slate-light, #80A4C8) !important;
-}
-
-/* [PX] Portfolio featured card overlay — solid instead of gradient */
-.portfolio-featured__overlay {
-    background: rgba(0, 0, 0, 0.45) !important;
-}
-.portfolio-featured__card:hover .portfolio-featured__overlay {
-    background: rgba(0, 0, 0, 0.35) !important;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: high-quality;
 }

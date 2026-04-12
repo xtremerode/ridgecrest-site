@@ -28,6 +28,9 @@ button { cursor: pointer; border: none; background: none; }
 
   --font-display: 'Cormorant Garamond', Georgia, serif;
   --font-sans:    'Jost', 'Helvetica Neue', Arial, sans-serif;
+  --font-body:    "Jost", "Helvetica Neue", Arial, sans-serif;
+  --font-serif:   "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --gold:         #C8B89A;
 
   --space-xs:  0.5rem;
   --space-sm:  1rem;
@@ -391,13 +394,13 @@ p { line-height: 1.8; }
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,1.0) 0%, rgba(0,0,0,0.65) 40%, rgba(0,0,0,0.15) 70%, transparent 100%);
+  background: rgba(0, 0, 0, 0.5);
   z-index: 0;
   pointer-events: none;
   transition: background 0.3s ease;
 }
 .rd-card--image-mode:hover::before {
-  background: linear-gradient(to top, rgba(0,0,0,1.0) 0%, rgba(0,0,0,0.75) 40%, rgba(0,0,0,0.2) 70%, transparent 100%);
+  background: rgba(0, 0, 0, 0.3);
 }
 .rd-card--image-mode > * {
   position: relative;
@@ -1422,18 +1425,19 @@ p { line-height: 1.8; }
 .project-hero__left { flex: 1; min-width: 0; }
 .project-hero__right { flex-shrink: 0; padding-bottom: 0.25rem; }
 .project-hero__eyebrow {
+  /* [PX] slate blue to match homepage theme */
   font-family: var(--font-body);
   font-size: 0.68rem;
   font-weight: 500;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.7);
+  color: var(--slate-light);
   margin-bottom: 0.5rem;
 }
 .project-hero__title {
   font-family: var(--font-display);
   font-size: clamp(2rem, 5vw, 3.8rem);
-  font-weight: 300;
+  font-weight: 400;
   color: #fff;
   line-height: 1.1;
   margin-bottom: 0.75rem;
