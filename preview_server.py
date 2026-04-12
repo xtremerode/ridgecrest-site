@@ -2421,7 +2421,7 @@ _EDIT_OVERLAY_TPL = """\
 
 # ── WebP conversion helper ────────────────────────────────────────────────────
 
-def _to_webp(src_path: str, quality: int = 82) -> str:
+def _to_webp(src_path: str, quality: int = 92) -> str:
     """Convert an image file to WebP in-place (replaces original).
     Returns the new file path (same dir, .webp extension).
     If already WebP or conversion fails, returns src_path unchanged."""
@@ -5767,7 +5767,7 @@ def admin_image_rotate():
     script = (
         'import sys; from PIL import Image\n'
         'for p in sys.argv[1:]:\n'
-        '  img=Image.open(p); img.rotate(-' + str(degrees) + ', expand=True).save(p,"WEBP",quality=85)\n'
+        '  img=Image.open(p); img.rotate(-' + str(degrees) + ', expand=True).save(p,"WEBP",quality=92)\n'
     )
     _env = os.environ.copy()
     _env.pop('VIRTUAL_ENV', None)
@@ -5877,7 +5877,7 @@ if not result_bytes:
 
 # Save base WebP at original dimensions
 img_result = Image.open(io.BytesIO(result_bytes)).convert('RGB')
-img_result.save(out_path, 'WEBP', quality=88)
+img_result.save(out_path, 'WEBP', quality=92)
 
 # Generate responsive sizes
 sizes = [('_1920w', 1920), ('_960w', 960), ('_480w', 480), ('_201w', 201)]
@@ -5889,7 +5889,7 @@ for suffix, w in sizes:
         resized = img_result.resize((w, h), Image.LANCZOS)
     else:
         resized = img_result
-    resized.save(base_out + suffix + '.webp', 'WEBP', quality=85)
+    resized.save(base_out + suffix + '.webp', 'WEBP', quality=92)
 
 print('OK:' + out_path)
 """
@@ -6494,7 +6494,7 @@ with Image.open(src_path) as img:
         if abs(b_m-1)>0.001: b = b.point(lut(b_m))
         img = Image.merge('RGB', (r, g, b))
 
-    img.save(out_path, 'WEBP', quality=88)
+    img.save(out_path, 'WEBP', quality=92)
 
     # Responsive variants: update existing ones (in-place) or create all (new version)
     base_stem = out_path[:-5]
@@ -6503,7 +6503,7 @@ with Image.open(src_path) as img:
         if create_version or os.path.isfile(rp):
             copy = img.copy()
             if copy.width > w: copy = copy.resize((w, int(copy.height*w/copy.width)), Image.LANCZOS)
-            copy.save(rp, 'WEBP', quality=85)
+            copy.save(rp, 'WEBP', quality=92)
 
 print('OK')
 """
