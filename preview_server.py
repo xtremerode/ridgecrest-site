@@ -2565,19 +2565,35 @@ _EDIT_OVERLAY_TPL = """\
 _SECTION_RESIZE_TPL = """\
 <script id="rd-section-resize">
 (function() {{
-  var SLUG   = {slug_json};
-  var TOKEN  = {token_json};
-  var DEVICE = {device_json};
+  var SLUG     = {slug_json};
+  var TOKEN    = {token_json};
+  var DEVICE   = {device_json};
   var SAVE_URL = '/admin/api/pages/' + encodeURIComponent(SLUG) + '/sections';
+
+  function saveHeight(sectionId, finalH) {{
+    fetch(SAVE_URL, {{
+      method: 'PUT',
+      headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
+      body: JSON.stringify({{device: DEVICE, section_id: sectionId, height_px: finalH}})
+    }}).then(function(r) {{ return r.json(); }}).then(function(res) {{
+      window.parent.postMessage({{type:'rd_section_resize', slug:SLUG,
+        section_id:sectionId, height_px:finalH, ok:!!res.ok}}, window.location.origin);
+    }}).catch(function() {{
+      window.parent.postMessage({{type:'rd_section_resize', slug:SLUG,
+        section_id:sectionId, height_px:finalH, ok:false}}, window.location.origin);
+    }});
+  }}
 
   function makeHandle(section, sectionId) {{
     var handle = document.createElement('div');
     handle.setAttribute('data-rd-section-handle', sectionId);
-    handle.style.cssText = 'position:absolute;left:0;right:0;bottom:0;height:8px;' +
-      'background:rgba(56,161,105,0.75);cursor:ns-resize;z-index:10000;' +
+    handle.style.cssText =
+      'position:absolute;left:0;right:0;bottom:0;height:12px;' +
+      'background:rgba(56,161,105,0.8);cursor:ns-resize;z-index:10000;' +
       'display:flex;align-items:center;justify-content:center;' +
       'font:bold 9px/1 monospace;color:#1a4731;user-select:none;' +
-      'box-sizing:border-box;border-top:2px solid rgba(56,161,105,1);';
+      'box-sizing:border-box;border-top:2px solid rgba(56,161,105,1);' +
+      'touch-action:none;';
     handle.title = 'Drag to resize \u00b7 ' + sectionId;
 
     var label = document.createElement('span');
@@ -2587,69 +2603,50 @@ _SECTION_RESIZE_TPL = """\
 
     var dragging = false, startY = 0, startH = 0;
 
-    handle.addEventListener('mousedown', function(e) {{
+    // Use Pointer Events + setPointerCapture so drag keeps firing even when
+    // the pointer leaves the iframe bounds during a drag gesture.
+    handle.addEventListener('pointerdown', function(e) {{
       e.preventDefault();
       e.stopPropagation();
+      handle.setPointerCapture(e.pointerId);
       dragging = true;
       startY = e.clientY;
-      var curH = section.offsetHeight;
-      section.style.height = curH + 'px';
+      startH = section.offsetHeight;
+      section.style.height = startH + 'px';
       section.style.minHeight = 'auto';
       section.style.overflow = 'hidden';
-      startH = curH;
+    }});
 
-      function onMove(ev) {{
-        if (!dragging) return;
-        var delta = ev.clientY - startY;
-        var newH = Math.max(50, startH + delta);
-        section.style.height = newH + 'px';
-        label.textContent = Math.round(newH) + 'px';
-      }}
+    handle.addEventListener('pointermove', function(e) {{
+      if (!dragging) return;
+      e.preventDefault();
+      var newH = Math.max(50, startH + (e.clientY - startY));
+      section.style.height = Math.round(newH) + 'px';
+      label.textContent = Math.round(newH) + 'px';
+    }});
 
-      function onUp() {{
-        if (!dragging) return;
-        dragging = false;
-        window.removeEventListener('mousemove', onMove);
-        window.removeEventListener('mouseup', onUp);
-        var finalH = Math.round(section.offsetHeight);
-        label.textContent = finalH + 'px';
-        fetch(SAVE_URL, {{
-          method: 'PUT',
-          headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
-          body: JSON.stringify({{device: DEVICE, section_id: sectionId, height_px: finalH}})
-        }}).then(function(r) {{ return r.json(); }}).then(function(res) {{
-          window.parent.postMessage({{
-            type: 'rd_section_resize',
-            slug: SLUG,
-            section_id: sectionId,
-            height_px: finalH,
-            ok: !!res.ok
-          }}, window.location.origin);
-        }}).catch(function() {{
-          window.parent.postMessage({{
-            type: 'rd_section_resize',
-            slug: SLUG,
-            section_id: sectionId,
-            height_px: finalH,
-            ok: false
-          }}, window.location.origin);
-        }});
-      }}
+    handle.addEventListener('pointerup', function(e) {{
+      if (!dragging) return;
+      dragging = false;
+      var finalH = Math.round(section.offsetHeight);
+      label.textContent = finalH + 'px';
+      saveHeight(sectionId, finalH);
+    }});
 
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener('mouseup', onUp);
+    handle.addEventListener('pointercancel', function() {{
+      dragging = false;
     }});
 
     return handle;
   }}
 
   function init() {{
-    var sections = document.querySelectorAll('section');
-    sections.forEach(function(sec) {{
+    document.querySelectorAll('section').forEach(function(sec) {{
       var cls = sec.className ? sec.className.trim().split(/\\s+/)[0] : '';
       if (!cls) return;
-      var pos = window.getComputedStyle(sec).position;
-      if (pos === 'static') sec.style.position = 'relative';
+      if (window.getComputedStyle(sec).position === 'static') {{
+        sec.style.position = 'relative';
+      }}
       sec.appendChild(makeHandle(sec, cls));
     }});
   }}
