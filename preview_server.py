@@ -2598,6 +2598,7 @@ _SECTION_RESIZE_TPL = """\
   document.addEventListener('pointermove', function(e) {{
     if (!_drag || e.pointerId !== _drag.pointerId) return;
     e.preventDefault();
+    _drag.handle.style.background = 'rgba(59,130,246,0.9)'; // BLUE = move firing
     var newH = Math.max(50, _drag.startH + (e.clientY - _drag.startY));
     _drag.section.style.height = Math.round(newH) + 'px';
     _drag.label.textContent    = Math.round(newH) + 'px';
@@ -2607,6 +2608,7 @@ _SECTION_RESIZE_TPL = """\
     if (!_drag || e.pointerId !== _drag.pointerId) return;
     document.documentElement.releasePointerCapture(e.pointerId);
     var finalH = Math.round(_drag.section.offsetHeight);
+    _drag.handle.style.background = 'rgba(56,161,105,0.8)'; // restore GREEN
     _drag.label.textContent = finalH + 'px';
     saveHeight(_drag.sectionId, finalH);
     _drag = null;
@@ -2614,6 +2616,7 @@ _SECTION_RESIZE_TPL = """\
 
   document.addEventListener('pointercancel', function(e) {{
     if (!_drag || e.pointerId !== _drag.pointerId) return;
+    _drag.handle.style.background = 'rgba(239,68,68,0.9)'; // RED = cancelled
     _drag.section.style.height = _drag.startH + 'px';
     _drag.label.textContent    = _drag.startH + 'px';
     _drag = null;
@@ -2664,6 +2667,7 @@ _SECTION_RESIZE_TPL = """\
       section.style.height    = startH + 'px';
       section.style.minHeight = 'auto';
       section.style.overflow  = 'hidden';
+      handle.style.background = 'rgba(239,68,68,0.9)'; // RED = pointerdown fired
       // Capture to document.documentElement — widest element in this browsing
       // context, keeps pointer events flowing here even if pointer exits the
       // iframe's visual bounds in the parent frame.
@@ -2672,6 +2676,7 @@ _SECTION_RESIZE_TPL = """\
         pointerId: e.pointerId,
         sectionId: sectionId,
         section:   section,
+        handle:    handle,
         label:     label,
         startY:    e.clientY,
         startH:    startH
@@ -10040,6 +10045,26 @@ except Exception as _gt_err:
 
 # Backfill file_hashes for existing images (non-blocking background thread)
 threading.Thread(target=_backfill_file_hashes, daemon=True).start()
+
+# ── Screenshot upload server (port 8080) ─────────────────────────────────────
+# Spawned as a root subprocess so it survives preview-server restarts.
+# Port check prevents duplicates when the admin triggers a hot-restart.
+def _start_screenshot_server():
+    try:
+        result = subprocess.run(['ss', '-tlnp'], capture_output=True, text=True)
+        if ':8080' in result.stdout:
+            return  # already listening — don't spawn a second copy
+        log = open('/var/log/screenshot_upload.log', 'a')
+        subprocess.Popen(
+            [sys.executable, 'server.py'],
+            cwd=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'screenshot_upload'),
+            stdout=log,
+            stderr=log,
+        )
+    except Exception as _ss_err:
+        print(f'[screenshot_upload] Failed to start: {_ss_err}')
+
+threading.Thread(target=_start_screenshot_server, daemon=True).start()
 
 # ─────────────────────────────────────────────────────────────────────────────
 

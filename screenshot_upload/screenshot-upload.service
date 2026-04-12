@@ -1,0 +1,16 @@
+[Unit]
+Description=Ridgecrest Screenshot Upload Server (port 8080)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/claudeuser/agent/screenshot_upload
+ExecStart=/home/claudeuser/agent/venv/bin/python server.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/screenshot_upload.log
+StandardError=append:/var/log/screenshot_upload.log
+
+[Install]
+WantedBy=multi-user.target
