@@ -65,3 +65,41 @@ Claude: Read this file at the start of every session so you know what was change
 - Ad schedule expanded to 7 days with bid adjustments
 - Removed Martinez (94553) from geo targeting
 - Removed Custom Home Builder campaign
+
+---
+
+## 2026-04-12 ~8:45 AM PDT — Bulk Site-Wide Fixes
+**Git commit:** 4a952bf
+**Branch:** ridgecrest-audit
+
+### CRITICAL: overrides.css path fix
+- Changed injection from relative  to absolute 
+- 74 service pages now correctly load overrides (nav overlay, hero height, image quality)
+
+### CRITICAL: Page hero overlay
+- Added dark overlay (rgba 0,0,0,0.45) via ::before on .page-hero and .page-hero--service
+- Text now readable on Custom Homes, Whole House, Kitchen, Bathroom + all 74 service pages
+
+### CRITICAL: 62 card_settings updated to _960w
+- All gallery cards across project pages now use _960w variants
+- Eliminates moiré/stair-stepping on all card backgrounds site-wide
+
+### CRITICAL: 776 gallery image refs fixed (24 pages)
+- Replaced base-file references with _1920w variants
+- Estimated page weight reduction: ~500MB total across all gallery pages
+- Pages fixed: all 18 project pages + portfolio + allprojects + 4 service pages
+
+### HIGH: Eyebrow color unified
+- .project-hero__eyebrow and .page-hero__eyebrow now use var(--slate-light, #80A4C8)
+- All 93 pages with non-homepage eyebrows now match the slate blue theme
+
+### HIGH: Undefined CSS variables
+- Added --font-body, --font-serif, --gold to :root in overrides.css
+- Fixed 5 references that were falling back to browser defaults
+
+### HIGH: Missing responsive variant
+- Generated _201w for ff5b18_238b56fc1f4249de936b8f5175e89dba_mv2 (sierra-mountain-ranch)
+
+### Backups
+- DB: /tmp/pre_px_bulk_fixes_db.sql
+- Images: preview/assets/images-opt/backup_pre_px_sharpen/
