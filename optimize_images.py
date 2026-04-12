@@ -18,7 +18,7 @@ OPT_DIR     = Path("/home/claudeuser/agent/preview/assets/images-opt")
 PREVIEW_DIR = Path("/home/claudeuser/agent/preview")
 CSS_DIR     = PREVIEW_DIR / "css"
 
-QUALITY = 85
+QUALITY = 92
 
 OPT_DIR.mkdir(parents=True, exist_ok=True)
 
