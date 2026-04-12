@@ -63,10 +63,10 @@
           ↩ Nothing to undo
         </button>
         <button class="btn btn-sm btn--delete" id="deleteSelectedBtn" style="display:none" onclick="confirmDeleteSelected()">✕ Delete Selected (<span id="deleteCount">0</span>)</button>
-        <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border)" onclick="startScan()" id="scanBtn">⟳ Scan Live Site</button>
-        <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border)" onclick="startLabelAll(false)" id="labelBtn">✦ Label All</button>
-        <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border)" onclick="startLabelAll(true)" id="relabelBtn">↺ Re-label All</button>
-        <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border)" onclick="syncFromGalleries()" id="syncGalleryBtn">⟳ Sync Galleries</button>
+        <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border);color:#e2e8f0" onclick="startScan()" id="scanBtn">⟳ Scan Live Site</button>
+        <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border);color:#e2e8f0" onclick="startLabelAll(false)" id="labelBtn">✦ Label All</button>
+        <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border);color:#e2e8f0" onclick="startLabelAll(true)" id="relabelBtn">↺ Re-label All</button>
+        <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border);color:#e2e8f0" onclick="syncFromGalleries()" id="syncGalleryBtn">⟳ Sync Galleries</button>
         <button class="btn btn-gold btn-sm" onclick="document.getElementById('uploadInput').click()">+ Upload</button>
         <input type="file" id="uploadInput" accept="image/*" multiple style="display:none" onchange="handleUpload(this.files)" />
         <a href="http://147.182.242.54:8080/" target="_blank"
@@ -208,8 +208,7 @@
           </select>
         </div>
         <div class="label-popover__actions">
-          <button class="btn btn-sm btn-gold" onclick="saveLabelDropdown()">Save</button>
-          <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border)" onclick="closeLabelDropdown()">Cancel</button>
+          <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border);color:#e2e8f0" onclick="closeLabelDropdown()">Cancel</button>
         </div>
       </div>
 
@@ -1124,21 +1123,27 @@ async function executeDelete() {
 let _lpFilename        = null;
 let _lpLabelEl         = null;
 let _lpGallerySlug     = null;  // gallery_project_slug for the current item (or null)
+let _lpOrigProject     = '';    // values at open-time, for dirty detection
+let _lpOrigRoom        = '';
+let _lpOrigGalleryType = '';
 
 function openLabelDropdown(evt, labelEl, filename, currentProject, currentRoom, gallerySlug, currentGalleryType) {
   evt.stopPropagation();
-  _lpFilename    = filename;
-  _lpLabelEl     = labelEl;
-  _lpGallerySlug = gallerySlug || null;
+  _lpFilename        = filename;
+  _lpLabelEl         = labelEl;
+  _lpGallerySlug     = gallerySlug || null;
+  _lpOrigProject     = currentProject || '';
+  _lpOrigRoom        = currentRoom    || '';
+  _lpOrigGalleryType = currentGalleryType || '';
 
   // Set current values — options are pre-baked in HTML
-  document.getElementById('lpProject').value = currentProject || '';
-  document.getElementById('lpRoom').value    = currentRoom    || '';
+  document.getElementById('lpProject').value = _lpOrigProject;
+  document.getElementById('lpRoom').value    = _lpOrigRoom;
 
   // Gallery section type — only shown for images that belong to a gallery
   const galleryTypeRow = document.getElementById('lpGalleryTypeRow');
   if (gallerySlug) {
-    document.getElementById('lpGalleryType').value = currentGalleryType || '';
+    document.getElementById('lpGalleryType').value = _lpOrigGalleryType;
     galleryTypeRow.style.display = '';
   } else {
     galleryTypeRow.style.display = 'none';
@@ -1154,22 +1159,38 @@ function openLabelDropdown(evt, labelEl, filename, currentProject, currentRoom, 
   setTimeout(() => document.addEventListener('click', closeLabelOnOutside), 0);
 }
 
+function _lpIsDirty() {
+  if (!_lpFilename) return false;
+  const project     = document.getElementById('lpProject').value;
+  const room        = document.getElementById('lpRoom').value;
+  const galleryType = _lpGallerySlug ? document.getElementById('lpGalleryType').value : _lpOrigGalleryType;
+  return project !== _lpOrigProject || room !== _lpOrigRoom || galleryType !== _lpOrigGalleryType;
+}
+
 function closeLabelOnOutside(e) {
   const pop = document.getElementById('labelPopover');
   if (!pop.contains(e.target)) {
-    closeLabelDropdown();
+    if (_lpIsDirty()) {
+      saveLabelDropdown();  // auto-save on click-outside only if something changed
+    } else {
+      closeLabelDropdown();
+    }
   }
 }
 
 function closeLabelDropdown() {
   document.getElementById('labelPopover').style.display = 'none';
   document.removeEventListener('click', closeLabelOnOutside);
-  _lpFilename    = null;
-  _lpLabelEl     = null;
-  _lpGallerySlug = null;
+  _lpFilename        = null;
+  _lpLabelEl         = null;
+  _lpGallerySlug     = null;
+  _lpOrigProject     = '';
+  _lpOrigRoom        = '';
+  _lpOrigGalleryType = '';
 }
 
 async function saveLabelDropdown() {
+  if (!_lpFilename) return;  // guard: popover already closed or never opened
   const project      = document.getElementById('lpProject').value;
   const room         = document.getElementById('lpRoom').value;
   const galleryType  = _lpGallerySlug ? document.getElementById('lpGalleryType').value : null;
