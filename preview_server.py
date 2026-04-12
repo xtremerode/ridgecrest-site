@@ -3433,6 +3433,13 @@ def root_redirect():
     return redirect('/view/index.html')
 
 
+@app.route('/book')
+def book_redirect():
+    """Redirect legacy /book links to the project inquiry page."""
+    from flask import redirect
+    return redirect('/view/start-a-project.html', code=302)
+
+
 @app.route('/migrate.bat')
 def serve_migration_bat():
     """Windows batch file — double-click to run the full migration."""
