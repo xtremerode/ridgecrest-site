@@ -681,8 +681,46 @@ def _apply_cards_to_html(content: bytes, cards: list) -> bytes:
 
 def _safe_js(value) -> str:
     """JSON-encode a value for inline <script> injection.
-    Escapes </ to prevent </script> tag breakout (CVE-class: stored XSS via script injection)."""
-    return json.dumps(value).replace('</', r'<\/')
+    Escapes </ to prevent </script> tag breakout."""
+    return json.dumps(value).replace("</", r"<\/")
+
+def _apply_section_heights(content: bytes, slug: str, device: str) -> bytes:
+    """Inject inline height styles on <section> elements based on DB overrides."""
+    if not HAS_DB:
+        return content
+    conn = _db_conn()
+    if not conn:
+        return content
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT section_id, height_px FROM page_sections WHERE slug = %s AND device = %s AND height_px IS NOT NULL",
+            (slug, device)
+        )
+        rows = cur.fetchall()
+        conn.close()
+        if not rows:
+            return content
+        text = content.decode('utf-8', errors='replace')
+        for row in rows:
+            sid = row['section_id']
+            hpx = int(row['height_px'])
+            pattern = re.compile(
+                r'(<section\s+class="' + re.escape(sid) + r'[^"]*")',
+                re.IGNORECASE
+            )
+            match = pattern.search(text)
+            if match:
+                tag = match.group(0)
+                style_str = 'height:' + str(hpx) + 'px;overflow:hidden;min-height:auto!important'
+                if 'style="' not in tag:
+                    new_tag = tag + ' style="' + style_str + '"'
+                else:
+                    new_tag = tag.replace('style="', 'style="' + style_str + ';')
+                text = text.replace(tag, new_tag, 1)
+        return text.encode('utf-8')
+    except Exception:
+        return content
 
 
 def _apply_hero_to_html(content: bytes, hero_path: str,
@@ -3157,6 +3195,11 @@ def view(filename):
             if cards:
                 content = _apply_cards_to_html(content, cards)
 
+
+        # [PX] Apply per-device section heights
+        if HAS_DB:
+            _sec_device = view_device if view_device in ("tablet", "mobile") else "desktop"
+            content = _apply_section_heights(content, slug, _sec_device)
         # Inject site logo URL so main.js can prepend it to nav text
         _logo_path = os.path.join(PREVIEW_DIR, 'assets', 'images', 'logo.png')
         _logo_url   = '/assets/images/logo.png' if os.path.isfile(_logo_path) else None
@@ -5544,6 +5587,75 @@ def admin_device_override_delete(slug, device):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+
+@app.route('/admin/api/pages/<path:slug>/sections', methods=['GET'])
+def admin_sections_get(slug):
+    """Return section heights for a page + device."""
+    auth = _require_admin()
+    if auth: return auth
+    device = request.args.get('device', 'desktop').strip().lower()
+    if device not in ('desktop', 'tablet', 'mobile'):
+        return jsonify({'error': 'device must be desktop, tablet, or mobile'}), 400
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'sections': []})
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT section_id, height_px, display_order, visible FROM page_sections WHERE slug = %s AND device = %s ORDER BY display_order",
+            (slug, device)
+        )
+        rows = cur.fetchall()
+        conn.close()
+        sections = []
+        for row in rows:
+            sections.append({
+                'section_id': row['section_id'],
+                'height_px': row['height_px'],
+                'display_order': row['display_order'],
+                'visible': row['visible'],
+            })
+        return jsonify({'sections': sections, 'slug': slug, 'device': device})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/pages/<path:slug>/sections', methods=['PUT'])
+def admin_sections_put(slug):
+    """Update height_px for a specific section on a page+device."""
+    auth = _require_admin()
+    if auth: return auth
+    data = request.get_json(silent=True) or {}
+    device = data.get('device', 'desktop').strip().lower()
+    section_id = data.get('section_id', '').strip()
+    height_px = data.get('height_px')
+    if device not in ('desktop', 'tablet', 'mobile'):
+        return jsonify({'error': 'device must be desktop, tablet, or mobile'}), 400
+    if not section_id:
+        return jsonify({'error': 'section_id required'}), 400
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'no db'}), 503
+    try:
+        cur = conn.cursor()
+        if height_px is not None:
+            height_px = int(height_px)
+            cur.execute("""
+                INSERT INTO page_sections (slug, device, section_id, display_order, visible, height_px)
+                VALUES (%s, %s, %s, 0, true, %s)
+                ON CONFLICT (slug, device, section_id) DO UPDATE SET height_px = %s
+            """, (slug, device, section_id, height_px, height_px))
+        else:
+            cur.execute(
+                "UPDATE page_sections SET height_px = NULL WHERE slug = %s AND device = %s AND section_id = %s",
+                (slug, device, section_id)
+            )
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True, 'slug': slug, 'device': device, 'section_id': section_id, 'height_px': height_px})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/admin/api/pages/create', methods=['POST'])
 def admin_pages_create():
