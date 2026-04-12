@@ -613,6 +613,12 @@
         <button class="btn-page-lock" id="pageLockBtn" data-lock="development" title="Page lock status — click to cycle" style="display:none">
           🔓 Dev
         </button>
+        <!-- Device preview toggle -->
+        <div id="deviceToggle" style="display:none;gap:2px;border:1px solid var(--border,#2a3748);border-radius:6px;overflow:hidden;flex-shrink:0">
+          <button id="devBtnPc"    onclick="setDevice('pc')"    title="Desktop preview"  style="padding:5px 10px;font-size:11px;border:none;cursor:pointer;background:var(--accent,#3b82f6);color:#fff">PC</button>
+          <button id="devBtnIpad" onclick="setDevice('ipad')"  title="iPad preview (768px)" style="padding:5px 10px;font-size:11px;border:none;cursor:pointer;background:var(--surface-2,#1e2d3d);color:var(--text-muted,#94a3b8)">iPad</button>
+          <button id="devBtnPhone" onclick="setDevice('phone')" title="Phone preview (390px)" style="padding:5px 10px;font-size:11px;border:none;cursor:pointer;background:var(--surface-2,#1e2d3d);color:var(--text-muted,#94a3b8)">Phone</button>
+        </div>
         <button class="btn-edit-mode" id="editModeBtn">
           <span class="edit-mode-dot"></span>
           Edit Mode
@@ -624,6 +630,11 @@
         </button>
         <span class="edit-status" id="editStatus">Select a page</span>
         <button class="btn btn-sm" style="background:var(--surface-2,#1e2d3d);border:1px solid var(--border,#2a3748);color:var(--text,#e2e8f0)" onclick="openAutoPlace()">✦ AI Auto-Place</button>
+        <a href="http://147.182.242.54:8080/" target="_blank"
+           style="padding:6px 12px;font-size:12px;font-weight:600;border-radius:6px;
+                  border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
+                  color:var(--text-muted,#94a3b8);text-decoration:none;white-space:nowrap;flex-shrink:0"
+           title="Open screenshot file sharing">📎 Paste here</a>
       </div>
     </div>
     <div class="editor-frame-wrap">
@@ -1368,6 +1379,38 @@
     }
   }
 
+  // ── Device preview toggle ─────────────────────────────────────────────────
+  let _currentDevice = 'pc';
+  const _deviceToggle = document.getElementById('deviceToggle');
+  const _devBtnPc    = document.getElementById('devBtnPc');
+  const _devBtnIpad  = document.getElementById('devBtnIpad');
+  const _devBtnPhone = document.getElementById('devBtnPhone');
+  const _ACCENT      = 'var(--accent,#3b82f6)';
+  const _SURF2       = 'var(--surface-2,#1e2d3d)';
+  const _COL_ACTIVE  = '#fff';
+  const _COL_IDLE    = 'var(--text-muted,#94a3b8)';
+
+  function setDevice(device) {
+    _currentDevice = device;
+    // Update button styles
+    [['pc', _devBtnPc], ['ipad', _devBtnIpad], ['phone', _devBtnPhone]].forEach(([d, btn]) => {
+      btn.style.background = d === device ? _ACCENT : _SURF2;
+      btn.style.color      = d === device ? _COL_ACTIVE : _COL_IDLE;
+    });
+    // Resize iframe wrapper to simulate device width
+    const wrap = document.querySelector('.editor-frame-wrap');
+    if (device === 'pc') {
+      siteFrame.style.width  = '';
+      siteFrame.style.margin = '';
+      if (wrap) { wrap.style.alignItems = ''; wrap.style.background = ''; }
+    } else {
+      const w = device === 'ipad' ? 768 : 390;
+      siteFrame.style.width  = w + 'px';
+      siteFrame.style.margin = '0 auto';
+      if (wrap) { wrap.style.alignItems = 'flex-start'; wrap.style.background = 'var(--surface-1,#0f1923)'; }
+    }
+  }
+
   function loadPage(slug) {
     if (!slug) return;
     // Save any in-progress hero/image edits on the current page before switching.
@@ -1426,6 +1469,8 @@
     // then visibly shrinks when the viewport-fix style is injected on load.
     siteFrame.style.height = PREVIEW_H + 'px';
     siteFrame.src = `/view/${path}`;
+    // Show device toggle once a page is loaded
+    _deviceToggle.style.display = 'flex';
   }
 
   // ── Lock toggle button ────────────────────────────────────────────────────

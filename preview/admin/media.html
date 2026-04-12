@@ -69,6 +69,11 @@
         <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border)" onclick="syncFromGalleries()" id="syncGalleryBtn">⟳ Sync Galleries</button>
         <button class="btn btn-gold btn-sm" onclick="document.getElementById('uploadInput').click()">+ Upload</button>
         <input type="file" id="uploadInput" accept="image/*" multiple style="display:none" onchange="handleUpload(this.files)" />
+        <a href="http://147.182.242.54:8080/" target="_blank"
+           style="padding:6px 12px;font-size:12px;font-weight:600;border-radius:6px;
+                  border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
+                  color:var(--text-muted,#94a3b8);text-decoration:none;white-space:nowrap;flex-shrink:0"
+           title="Open screenshot file sharing">📎 Paste here</a>
       </div>
     </div>
 
@@ -192,13 +197,14 @@
             </optgroup>
           </select>
         </div>
-        <div class="label-popover__row">
-          <label class="label-popover__lbl">Image Type</label>
-          <select id="lpType" class="label-popover__sel">
-            <option value="">— No Type —</option>
-            <option value="Render">Render</option>
-            <option value="Before">Before</option>
-            <option value="After">After</option>
+        <div class="label-popover__row" id="lpGalleryTypeRow" style="display:none">
+          <label class="label-popover__lbl">Gallery Section</label>
+          <select id="lpGalleryType" class="label-popover__sel">
+            <option value="">— Default (Project) —</option>
+            <option value="project">Project</option>
+            <option value="render">Render</option>
+            <option value="before">Before</option>
+            <option value="construction">Construction</option>
           </select>
         </div>
         <div class="label-popover__actions">
@@ -606,7 +612,7 @@ function appendMediaBatch(grid, filteredItems) {
         </div>
       </div>
       <div class="media-card__name" title="${escHtml(name)}">${escHtml(name.substring(0,28))}${name.length>28?'…':''}</div>
-      <div class="media-card__label ${displayLabel ? '' : 'media-card__label--empty'}" onclick="openLabelDropdown(event,this,'${escHtml(name)}','${escHtml(project)}','${escHtml(room)}','${escHtml(image_type)}')" title="Click to set project, room &amp; type">${escHtml(displayLabel) || '<span style="opacity:.45">+ add label</span>'}</div>`;
+      <div class="media-card__label ${displayLabel ? '' : 'media-card__label--empty'}" onclick="openLabelDropdown(event,this,'${escHtml(name)}','${escHtml(project)}','${escHtml(room)}','${escHtml(item.gallery_project_slug||'')}','${escHtml(item.gallery_image_type||'')}')" title="Click to set project, room &amp; gallery type">${escHtml(displayLabel) || '<span style="opacity:.45">+ add label</span>'}</div>`;
     grid.appendChild(card);
   });
   _mediaRenderedCount += batch.length;
@@ -1115,18 +1121,28 @@ async function executeDelete() {
 // Project / Room / Type options are baked directly into the HTML <select> elements above.
 // No need for JS arrays — openLabelDropdown just sets .value on the pre-populated selects.
 
-let _lpFilename = null;
-let _lpLabelEl  = null;
+let _lpFilename        = null;
+let _lpLabelEl         = null;
+let _lpGallerySlug     = null;  // gallery_project_slug for the current item (or null)
 
-function openLabelDropdown(evt, labelEl, filename, currentProject, currentRoom, currentType) {
+function openLabelDropdown(evt, labelEl, filename, currentProject, currentRoom, gallerySlug, currentGalleryType) {
   evt.stopPropagation();
-  _lpFilename = filename;
-  _lpLabelEl  = labelEl;
+  _lpFilename    = filename;
+  _lpLabelEl     = labelEl;
+  _lpGallerySlug = gallerySlug || null;
 
   // Set current values — options are pre-baked in HTML
   document.getElementById('lpProject').value = currentProject || '';
   document.getElementById('lpRoom').value    = currentRoom    || '';
-  document.getElementById('lpType').value    = currentType    || '';
+
+  // Gallery section type — only shown for images that belong to a gallery
+  const galleryTypeRow = document.getElementById('lpGalleryTypeRow');
+  if (gallerySlug) {
+    document.getElementById('lpGalleryType').value = currentGalleryType || '';
+    galleryTypeRow.style.display = '';
+  } else {
+    galleryTypeRow.style.display = 'none';
+  }
 
   // Position near the label element
   const pop  = document.getElementById('labelPopover');
@@ -1148,34 +1164,47 @@ function closeLabelOnOutside(e) {
 function closeLabelDropdown() {
   document.getElementById('labelPopover').style.display = 'none';
   document.removeEventListener('click', closeLabelOnOutside);
-  _lpFilename = null;
-  _lpLabelEl  = null;
+  _lpFilename    = null;
+  _lpLabelEl     = null;
+  _lpGallerySlug = null;
 }
 
 async function saveLabelDropdown() {
-  const project    = document.getElementById('lpProject').value;
-  const room       = document.getElementById('lpRoom').value;
-  const image_type = document.getElementById('lpType').value;
-  const filename   = _lpFilename;
-  const labelEl    = _lpLabelEl;
+  const project      = document.getElementById('lpProject').value;
+  const room         = document.getElementById('lpRoom').value;
+  const galleryType  = _lpGallerySlug ? document.getElementById('lpGalleryType').value : null;
+  const filename     = _lpFilename;
+  const gallerySlug  = _lpGallerySlug;
+  const labelEl      = _lpLabelEl;
   closeLabelDropdown();
 
-  const parts = [project, room, image_type].filter(Boolean);
+  const parts = [project, room].filter(Boolean);
   let composed = parts.join(' ');
 
   try {
+    // Save project/room label
     const res = await fetch(`/admin/api/images/label/${encodeURIComponent(filename)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
-      body: JSON.stringify({ project, room, image_type })
+      body: JSON.stringify({ project, room })
     });
     const data = await res.json();
     const newLabel = data.label || composed;
     const item = _libraryItems.find(i => i.filename === filename);
-    if (item) { item.label = newLabel; item.project = project; item.room = room; item.image_type = image_type; }
+    if (item) { item.label = newLabel; item.project = project; item.room = room; }
     if (labelEl) {
       labelEl.innerHTML = newLabel ? escHtml(newLabel) : '<span style="opacity:.45">+ add label</span>';
       labelEl.classList.toggle('media-card__label--empty', !newLabel);
+    }
+
+    // Save gallery section type separately if this image belongs to a gallery
+    if (gallerySlug && galleryType !== null) {
+      await fetch(`/admin/api/gallery/${encodeURIComponent(gallerySlug)}/tag`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ filename, image_type: galleryType || null })
+      });
+      if (item) item.gallery_image_type = galleryType || null;
     }
   } catch(e) {
     Admin.toast('Failed to save label', 'error');
@@ -2379,7 +2408,7 @@ function _updateLibraryCard(baseFilename, activeVersion) {
         </div>
       </div>
       <div class="media-card__name" title="${escHtml(name)}">${escHtml(name.substring(0,28))}${name.length>28?'…':''}</div>
-      <div class="media-card__label ${displayLabel ? '' : 'media-card__label--empty'}" onclick="openLabelDropdown(event,this,'${escHtml(name)}','${escHtml(project)}','${escHtml(room)}','${escHtml(image_type)}')" title="Click to set project, room &amp; type">${escHtml(displayLabel) || '<span style="opacity:.45">+ add label</span>'}</div>`;
+      <div class="media-card__label ${displayLabel ? '' : 'media-card__label--empty'}" onclick="openLabelDropdown(event,this,'${escHtml(name)}','${escHtml(project)}','${escHtml(room)}','${escHtml(item.gallery_project_slug||'')}','${escHtml(item.gallery_image_type||'')}')" title="Click to set project, room &amp; gallery type">${escHtml(displayLabel) || '<span style="opacity:.45">+ add label</span>'}</div>`;
   }
 
   // 3. Refresh tab counts only — does NOT rebuild the grid
