@@ -72,10 +72,10 @@
       position: absolute;
       top: 0;
       left: 0;
-      width: 1440px;          /* always render at full desktop width */
+      /* width set by scaleFrame() — 1440px desktop, 768px iPad, 390px Phone */
       border: none;
       z-index: 1;
-      transform-origin: top left;
+      transform-origin: top left; /* overridden to top center for mobile */
     }
     #frameScrollProxy {
       width: 1px;
@@ -1397,18 +1397,15 @@
       btn.style.background = d === device ? _ACCENT : _SURF2;
       btn.style.color      = d === device ? _COL_ACTIVE : _COL_IDLE;
     });
-    // Resize iframe wrapper to simulate device width
+    // Background treatment — dark surround for mobile devices
     const wrap = document.querySelector('.editor-frame-wrap');
     if (device === 'pc') {
-      siteFrame.style.width  = '';
-      siteFrame.style.margin = '';
       if (wrap) { wrap.style.alignItems = ''; wrap.style.background = ''; }
     } else {
-      const w = device === 'ipad' ? 768 : 390;
-      siteFrame.style.width  = w + 'px';
-      siteFrame.style.margin = '0 auto';
       if (wrap) { wrap.style.alignItems = 'flex-start'; wrap.style.background = 'var(--surface-1,#0f1923)'; }
     }
+    // Width + scale handled entirely by scaleFrame()
+    scaleFrame();
   }
 
   function loadPage(slug) {
@@ -2244,9 +2241,10 @@
     }
   });
 
-  // ── Scaled desktop preview ───────────────────────────────────────────────
-  // The iframe always renders at 1440×900 (standard desktop) then is scaled
-  // down to fit the panel — so the preview matches what visitors actually see.
+  // ── Scaled / device-responsive preview ──────────────────────────────────
+  // PC:    iframe renders at 1440px, CSS-scaled down to fit the panel.
+  // iPad:  iframe renders at 768px (hits responsive breakpoints), shown 1:1, centered.
+  // Phone: iframe renders at 390px (hits mobile breakpoints), shown 1:1, centered.
   const PREVIEW_W = 1440;
   // Use the actual browser viewport height — matches 100vh on the live page tab.
   const PREVIEW_H = window.innerHeight;
@@ -2254,19 +2252,38 @@
   const frameScrollProxy = document.getElementById('frameScrollProxy');
 
   function scaleFrame() {
-    const w = frameWrap.clientWidth || PREVIEW_W;
-    const scale = w / PREVIEW_W;
-    siteFrame.style.transform = `scale(${scale})`;
-    // Set iframe height to full page content (minimum = one viewport-height for hero match)
+    // Determine native render width for current device
+    const devW = _currentDevice === 'ipad' ? 768
+               : _currentDevice === 'phone' ? 390
+               : PREVIEW_W;
+
+    // Set iframe width so responsive CSS breakpoints fire at the right size
+    siteFrame.style.width = devW + 'px';
+
+    // Compute height from page content
     let iframeH = PREVIEW_H;
     try {
       const sh = siteFrame.contentDocument?.documentElement?.scrollHeight || PREVIEW_H;
       iframeH = Math.max(sh, PREVIEW_H);
     } catch(e) {}
     siteFrame.style.height = iframeH + 'px';
-    // Drive the outer scroll container: proxy height = visual (scaled) content height.
-    // The absolutely-positioned iframe scrolls with the container as the user scrolls.
-    frameScrollProxy.style.height = Math.ceil(iframeH * scale) + 'px';
+
+    if (_currentDevice === 'pc') {
+      // Scale desktop view down to fit the panel — origin top-left
+      const panelW = frameWrap.clientWidth || PREVIEW_W;
+      const scale = panelW / PREVIEW_W;
+      siteFrame.style.left           = '0';
+      siteFrame.style.transformOrigin = 'top left';
+      siteFrame.style.transform       = `scale(${scale})`;
+      // Proxy drives scroll: visual height = iframe height × scale
+      frameScrollProxy.style.height = Math.ceil(iframeH * scale) + 'px';
+    } else {
+      // Mobile/tablet: render at true device width, no scaling, centered in panel
+      siteFrame.style.left           = '50%';
+      siteFrame.style.transformOrigin = 'top center';
+      siteFrame.style.transform       = 'translateX(-50%)';
+      frameScrollProxy.style.height  = iframeH + 'px';
+    }
   }
 
   scaleFrame();
