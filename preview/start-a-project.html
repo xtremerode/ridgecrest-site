@@ -86,15 +86,15 @@
       border-radius: 12px;
       box-shadow: 0 8px 60px rgba(0, 0, 0, 0.4);
       overflow: hidden;
-      flex: 1;
-      min-height: 600px;
+      flex: none;
+      transition: height 0.3s ease;
     }
     .sap-frame iframe {
       width: 100%;
-      height: 100%;
-      min-height: 600px;
+      height: 600px;
       border: none;
       display: block;
+      transition: height 0.3s ease;
     }
 
     /* Tablet + Mobile: full width, tall iframe, page scrolls */
@@ -113,8 +113,7 @@
         flex: none;
       }
       .sap-frame iframe {
-        min-height: 1200px;
-        height: 1200px;
+        height: 600px;
       }
     }
   </style>
@@ -170,19 +169,24 @@
       });
     }
 
-    // Cross-origin iframe: set tall enough height so page scrolls, not iframe
-    var sapFrame = document.querySelector('.sap-frame iframe');
-    if (sapFrame) {
-      sapFrame.addEventListener('load', function() {
-        try {
-          var h = sapFrame.contentDocument.body.scrollHeight;
-          if (h > 100) sapFrame.style.height = h + 'px';
-        } catch(e) {
-          // Cross-origin — can't read height, use generous fixed height
-          sapFrame.style.height = '1200px';
-        }
+    // Auto-resize iframe via postMessage from Elevate Scheduling
+    (function() {
+      var frame = document.querySelector('.sap-frame iframe');
+      var wrapper = document.querySelector('.sap-frame');
+      if (!frame || !wrapper) return;
+
+      var PADDING = 40; // consistent bottom padding inside the card
+      var MIN_H   = 500; // never shorter than this
+
+      window.addEventListener('message', function(e) {
+        if (!e.data || e.data.type !== 'elevate-resize') return;
+        var h = e.data.height;
+        if (typeof h !== 'number' || h < 50) return; // ignore initial 0-height flash
+        var target = Math.max(h + PADDING, MIN_H);
+        frame.style.height  = target + 'px';
+        wrapper.style.height = target + 'px';
       });
-    }
+    })();
   </script>
 </body>
 </html>
