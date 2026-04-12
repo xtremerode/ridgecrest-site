@@ -59,9 +59,11 @@
         <button id="undoBtn" disabled
           style="padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
                  border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
-                 color:var(--text-muted,#94a3b8);cursor:not-allowed;white-space:nowrap;transition:all .15s">
-          ↩ Nothing to undo
-        </button>
+                 color:var(--text-muted,#94a3b8);cursor:not-allowed;white-space:nowrap;transition:all .15s">↩ Undo</button>
+        <button id="redoBtn" disabled
+          style="padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
+                 border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
+                 color:var(--text-muted,#94a3b8);cursor:not-allowed;white-space:nowrap;transition:all .15s">↪ Redo</button>
         <button class="btn btn-sm btn--delete" id="deleteSelectedBtn" style="display:none" onclick="confirmDeleteSelected()">✕ Delete Selected (<span id="deleteCount">0</span>)</button>
         <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border);color:#e2e8f0" onclick="startScan()" id="scanBtn">⟳ Scan Live Site</button>
         <button class="btn btn-sm" style="background:var(--surface-2);border:1px solid var(--border);color:#e2e8f0" onclick="startLabelAll(false)" id="labelBtn">✦ Label All</button>

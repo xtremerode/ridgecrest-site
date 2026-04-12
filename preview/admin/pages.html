@@ -605,9 +605,12 @@
           style="padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
                  border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
                  color:var(--text-muted,#94a3b8);cursor:not-allowed;white-space:nowrap;
-                 transition:all .15s;display:flex;align-items:center;gap:6px">
-          ↩ Nothing to undo
-        </button>
+                 transition:all .15s">↩ Undo</button>
+        <button id="redoBtn" disabled
+          style="padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
+                 border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
+                 color:var(--text-muted,#94a3b8);cursor:not-allowed;white-space:nowrap;
+                 transition:all .15s">↪ Redo</button>
         <button class="btn btn-sm" id="btnAddPage" onclick="openAddPageModal(null)" style="background:var(--surface-2,#1e2d3d);border:1px solid var(--border,#2a3748);color:var(--text,#e2e8f0)">+ Add Page</button>
         <select id="pageSelect" title="Select page to edit"></select>
         <button class="btn-page-lock" id="pageLockBtn" data-lock="development" title="Page lock status — click to cycle" style="display:none">

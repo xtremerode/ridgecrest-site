@@ -482,31 +482,60 @@ def _ensure_undo_log_table(cur):
             description TEXT NOT NULL,
             operation TEXT NOT NULL,
             before_data JSONB NOT NULL,
+            after_data JSONB,
             page_slug TEXT,
             is_undone BOOLEAN DEFAULT FALSE,
             admin_context TEXT
         )
     """)
+    # Migration: add after_data column to existing tables
+    try:
+        cur.execute("ALTER TABLE undo_log ADD COLUMN IF NOT EXISTS after_data JSONB")
+    except Exception:
+        pass
 
-def _log_undo(operation: str, description: str, before_data: dict, page_slug: str = None, admin_context: str = None):
-    """Persist a reversible operation snapshot. Non-fatal if DB is unavailable."""
+def _log_undo(operation: str, description: str, before_data: dict,
+              page_slug: str = None, admin_context: str = None,
+              after_data: dict = None) -> int | None:
+    """Persist a reversible operation snapshot. Returns the new entry id, or None on failure."""
     if not HAS_DB:
+        return None
+    try:
+        conn = _db_conn()
+        if not conn:
+            return None
+        cur = conn.cursor()
+        _ensure_undo_log_table(cur)
+        cur.execute(
+            "INSERT INTO undo_log (operation, description, before_data, after_data, page_slug, admin_context) "
+            "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+            (operation, description, json.dumps(before_data),
+             json.dumps(after_data) if after_data is not None else None,
+             page_slug, admin_context)
+        )
+        row = cur.fetchone()
+        conn.commit()
+        conn.close()
+        return row['id'] if row else None
+    except Exception as _ue:
+        print(f'[undo] log error: {_ue}')
+        return None
+
+def _set_undo_after_data(entry_id, after_data: dict):
+    """Fill in after_data for an undo_log entry (called after the operation completes)."""
+    if not entry_id or not HAS_DB:
         return
     try:
         conn = _db_conn()
         if not conn:
             return
         cur = conn.cursor()
-        _ensure_undo_log_table(cur)
-        cur.execute(
-            "INSERT INTO undo_log (operation, description, before_data, page_slug, admin_context) "
-            "VALUES (%s, %s, %s, %s, %s)",
-            (operation, description, json.dumps(before_data), page_slug, admin_context)
-        )
+        cur.execute("UPDATE undo_log SET after_data = %s WHERE id = %s",
+                    (json.dumps(after_data), entry_id))
         conn.commit()
         conn.close()
     except Exception as _ue:
-        print(f'[undo] log error: {_ue}')
+        print(f'[undo] set_after_data error: {_ue}')
 
 def _run_db_migrations():
     """Run one-time DDL migrations using autocommit so they persist immediately."""
@@ -519,10 +548,11 @@ def _run_db_migrations():
         conn.autocommit = True
         cur = conn.cursor()
         cur.execute("ALTER TABLE undo_log ADD COLUMN IF NOT EXISTS admin_context TEXT")
+        cur.execute("ALTER TABLE undo_log ADD COLUMN IF NOT EXISTS after_data JSONB")
         cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS parent_slug TEXT")
         cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS show_in_nav BOOLEAN DEFAULT false")
         conn.close()
-        print('[db] migrations: undo_log.admin_context, pages.parent_slug, pages.show_in_nav ensured')
+        print('[db] migrations: undo_log.admin_context/after_data, pages.parent_slug/show_in_nav ensured')
     except Exception as e:
         print(f'[db] migration warning: {e}')
 
@@ -5603,9 +5633,9 @@ def admin_page_text_edits(slug):
         original_html = f.read()
 
     # Undo snapshot (stores full file so restore is always lossless)
-    _log_undo('page_text_edit', f'Text edit: {slug}',
-              {'slug': slug, 'file_path': fpath, 'original_html': original_html},
-              page_slug=slug, admin_context='pages')
+    _undo_entry_id = _log_undo('page_text_edit', f'Text edit: {slug}',
+                               {'slug': slug, 'file_path': fpath, 'original_html': original_html},
+                               page_slug=slug, admin_context='pages')
 
     # Parse and apply edits
     soup = _BS4(original_html, 'html.parser')
@@ -5631,8 +5661,12 @@ def admin_page_text_edits(slug):
         return jsonify({'ok': False, 'error': 'No matching elements found'}), 400
 
     # Write back
+    new_html_content = str(soup)
     with open(fpath, 'w', encoding='utf-8') as f:
-        f.write(str(soup))
+        f.write(new_html_content)
+
+    # Record after_data for redo
+    _set_undo_after_data(_undo_entry_id, {'slug': slug, 'file_path': fpath, 'new_html': new_html_content})
 
     # Update DB timestamp
     conn = _db_conn()
@@ -5689,7 +5723,10 @@ def admin_card_update(slug, card_id):
         _old_card = cur.fetchone()
         _old_state = dict(_old_card) if _old_card else None
         _log_undo('card_state', f'Card update: {slug} / {card_id}',
-                  {'slug': slug, 'card_id': card_id, 'old_state': _old_state}, slug, admin_context='pages')
+                  {'slug': slug, 'card_id': card_id, 'old_state': _old_state}, slug, admin_context='pages',
+                  after_data={'slug': slug, 'card_id': card_id,
+                              'new_state': {'mode': mode, 'color': color, 'image': image,
+                                            'position': position, 'zoom': zoom}})
         cur.execute("""
             INSERT INTO card_settings (page_slug, card_id, mode, color, image, position, zoom, updated_at)
             VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
@@ -8483,7 +8520,8 @@ def gallery_tag_image(slug):
         old_row = cur.fetchone()
         old_type = old_row['image_type'] if old_row else None
         _log_undo('gallery_tag', f'Tag: {slug} / {filename[:20]}… → {image_type or "untagged"}',
-                  {'slug': slug, 'filename': filename, 'old_type': old_type}, slug, admin_context='pages')
+                  {'slug': slug, 'filename': filename, 'old_type': old_type}, slug, admin_context='pages',
+                  after_data={'slug': slug, 'filename': filename, 'new_type': image_type})
         if image_type:
             cur.execute("""
                 INSERT INTO gallery_image_types (filename, image_type)
@@ -8647,7 +8685,8 @@ def gallery_remove_image(slug):
             return jsonify({'error': 'image not found in gallery'}), 404
         # Log undo before modifying (save full old gallery so removal is reversible)
         _log_undo('gallery_sort', f'Remove image: {slug} / {filename[:24]}…',
-                  {'slug': slug, 'old_gallery': gallery}, slug, admin_context='pages')
+                  {'slug': slug, 'old_gallery': gallery}, slug, admin_context='pages',
+                  after_data={'slug': slug, 'new_gallery': new_gallery})
         cur.execute(
             "UPDATE portfolio_projects SET gallery_json = %s WHERE slug = %s",
             (json.dumps(new_gallery), slug))
@@ -8739,9 +8778,9 @@ def gallery_auto_sort(slug):
         gallery = p['gallery']  # list of [hash, ext]
         if not gallery:
             return jsonify({'ok': True, 'sorted': 0})
-        # Log undo BEFORE sorting (save current order)
-        _log_undo('gallery_sort', f'Auto-Sort: {slug}',
-                  {'slug': slug, 'old_gallery': gallery}, slug, admin_context='pages')
+        # Log undo BEFORE sorting (save current order); capture entry_id for after_data
+        _sort_undo_id = _log_undo('gallery_sort', f'Auto-Sort: {slug}',
+                                  {'slug': slug, 'old_gallery': gallery}, slug, admin_context='pages')
         # Load types for all hashes
         hashes = [item[0] if isinstance(item, (list, tuple)) else item for item in gallery]
         _ensure_gallery_image_types_table(cur)
@@ -8759,6 +8798,7 @@ def gallery_auto_sort(slug):
             (new_gallery_json, slug))
         conn.commit()
         conn.close()
+        _set_undo_after_data(_sort_undo_id, {'slug': slug, 'new_gallery': sorted_gallery})
         # Regen page synchronously — ensures sorted HTML is on disk before
         # rd_sort_done triggers window.location.reload() in the client.
         p['gallery'] = sorted_gallery
@@ -8862,8 +8902,8 @@ def gallery_auto_tag(slug):
         cur.execute("SELECT filename, image_type FROM gallery_image_types WHERE filename = ANY(%s)", (hashes,))
         _old_types = {r['filename']: r['image_type'] for r in cur.fetchall()}
         conn.close()
-        _log_undo('gallery_auto_tag', f'Auto-Tag: {slug} ({len(hashes)} images)',
-                  {'slug': slug, 'old_types': _old_types}, slug, admin_context='pages')
+        _autotag_undo_id = _log_undo('gallery_auto_tag', f'Auto-Tag: {slug} ({len(hashes)} images)',
+                                     {'slug': slug, 'old_types': _old_types}, slug, admin_context='pages')
 
         # Classify each image — use ThreadPoolExecutor for parallel API calls
         from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -8899,6 +8939,7 @@ def gallery_auto_tag(slug):
                 _sync_image_gallery_label(h, slug, img_type, cur2)
             conn2.commit()
             conn2.close()
+        _set_undo_after_data(_autotag_undo_id, {'slug': slug, 'new_types': results})
 
         _render_project_page(p)
         counts = {}
@@ -9041,28 +9082,20 @@ def locks_check():
 
 @app.route('/admin/api/undo/status', methods=['GET'])
 def admin_undo_status():
-    """Return the description of the last undoable action for a given admin context, or nothing-to-undo."""
+    """Return the description of the last undoable action (global — no context filter)."""
     auth = _require_admin()
     if auth: return auth
-    context = (request.args.get('context') or request.headers.get('X-Admin-Context') or '').strip() or None
     conn = _db_conn()
     if not conn:
         return jsonify({'available': False, 'description': None})
     try:
         cur = conn.cursor()
         _ensure_undo_log_table(cur)
-        if context:
-            cur.execute("""
-                SELECT description, operation, page_slug
-                FROM undo_log WHERE is_undone = FALSE AND admin_context = %s
-                ORDER BY id DESC LIMIT 1
-            """, (context,))
-        else:
-            cur.execute("""
-                SELECT description, operation, page_slug
-                FROM undo_log WHERE is_undone = FALSE
-                ORDER BY id DESC LIMIT 1
-            """)
+        cur.execute("""
+            SELECT description, operation, page_slug
+            FROM undo_log WHERE is_undone = FALSE
+            ORDER BY id DESC LIMIT 1
+        """)
         row = cur.fetchone()
         conn.close()
         if row:
@@ -9076,29 +9109,20 @@ def admin_undo_status():
 
 @app.route('/admin/api/undo', methods=['POST'])
 def admin_undo():
-    """Apply the reverse of the last undoable operation for a given admin context and mark it done."""
+    """Apply the reverse of the last undoable operation (global — no context filter)."""
     auth = _require_admin()
     if auth: return auth
-    body = request.get_json(silent=True) or {}
-    context = (body.get('context') or request.headers.get('X-Admin-Context') or '').strip() or None
     conn = _db_conn()
     if not conn:
         return jsonify({'error': 'db unavailable'}), 500
     try:
         cur = conn.cursor()
         _ensure_undo_log_table(cur)
-        if context:
-            cur.execute("""
-                SELECT id, operation, description, before_data, page_slug
-                FROM undo_log WHERE is_undone = FALSE AND admin_context = %s
-                ORDER BY id DESC LIMIT 1
-            """, (context,))
-        else:
-            cur.execute("""
-                SELECT id, operation, description, before_data, page_slug
-                FROM undo_log WHERE is_undone = FALSE
-                ORDER BY id DESC LIMIT 1
-            """)
+        cur.execute("""
+            SELECT id, operation, description, before_data, page_slug
+            FROM undo_log WHERE is_undone = FALSE
+            ORDER BY id DESC LIMIT 1
+        """)
         row = cur.fetchone()
         if not row:
             conn.close()
@@ -9195,6 +9219,141 @@ def admin_undo():
                         _f.write(original_html)
 
         cur.execute("UPDATE undo_log SET is_undone = TRUE WHERE id = %s", (entry_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True, 'description': description, 'slug': page_slug})
+    except Exception as e:
+        try: conn.close()
+        except: pass
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/redo/status', methods=['GET'])
+def admin_redo_status():
+    """Return the description of the last redoable action (global — most recently undone entry with after_data)."""
+    auth = _require_admin()
+    if auth: return auth
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'available': False, 'description': None})
+    try:
+        cur = conn.cursor()
+        _ensure_undo_log_table(cur)
+        cur.execute("""
+            SELECT description, operation, page_slug
+            FROM undo_log WHERE is_undone = TRUE AND after_data IS NOT NULL
+            ORDER BY id DESC LIMIT 1
+        """)
+        row = cur.fetchone()
+        conn.close()
+        if row:
+            return jsonify({'available': True, 'description': row['description'], 'slug': row['page_slug']})
+        return jsonify({'available': False, 'description': None})
+    except Exception as e:
+        try: conn.close()
+        except: pass
+        return jsonify({'available': False, 'description': None})
+
+
+@app.route('/admin/api/redo', methods=['POST'])
+def admin_redo():
+    """Re-apply the most recently undone operation (global). Marks the entry as not-undone again."""
+    auth = _require_admin()
+    if auth: return auth
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'db unavailable'}), 500
+    try:
+        cur = conn.cursor()
+        _ensure_undo_log_table(cur)
+        cur.execute("""
+            SELECT id, operation, description, after_data, page_slug
+            FROM undo_log WHERE is_undone = TRUE AND after_data IS NOT NULL
+            ORDER BY id DESC LIMIT 1
+        """)
+        row = cur.fetchone()
+        if not row:
+            conn.close()
+            return jsonify({'ok': False, 'error': 'Nothing to redo'})
+
+        entry_id    = row['id']
+        operation   = row['operation']
+        description = row['description']
+        ad          = row['after_data']  # parsed as dict by psycopg2 JSONB
+        page_slug   = row['page_slug']
+
+        if operation == 'gallery_tag':
+            filename = ad['filename']
+            new_type = ad.get('new_type')
+            slug     = ad['slug']
+            _ensure_gallery_image_types_table(cur)
+            if new_type:
+                cur.execute("""
+                    INSERT INTO gallery_image_types (filename, image_type)
+                    VALUES (%s, %s)
+                    ON CONFLICT (filename) DO UPDATE SET image_type = EXCLUDED.image_type
+                """, (filename, new_type))
+            else:
+                cur.execute("DELETE FROM gallery_image_types WHERE filename = %s", (filename,))
+            cur.execute("SELECT * FROM portfolio_projects WHERE slug = %s", (slug,))
+            prow = cur.fetchone()
+            if prow:
+                _render_project_page(_portfolio_row_to_dict(prow))
+
+        elif operation == 'gallery_auto_tag':
+            slug      = ad['slug']
+            new_types = ad.get('new_types', {})
+            _ensure_gallery_image_types_table(cur)
+            for fname, nt in new_types.items():
+                if nt:
+                    cur.execute("""
+                        INSERT INTO gallery_image_types (filename, image_type)
+                        VALUES (%s, %s)
+                        ON CONFLICT (filename) DO UPDATE SET image_type = EXCLUDED.image_type
+                    """, (fname, nt))
+                else:
+                    cur.execute("DELETE FROM gallery_image_types WHERE filename = %s", (fname,))
+            cur.execute("SELECT * FROM portfolio_projects WHERE slug = %s", (slug,))
+            prow = cur.fetchone()
+            if prow:
+                _render_project_page(_portfolio_row_to_dict(prow))
+
+        elif operation == 'gallery_sort':
+            slug        = ad['slug']
+            new_gallery = ad['new_gallery']
+            cur.execute("UPDATE portfolio_projects SET gallery_json = %s WHERE slug = %s",
+                        (json.dumps(new_gallery), slug))
+            cur.execute("SELECT * FROM portfolio_projects WHERE slug = %s", (slug,))
+            prow = cur.fetchone()
+            if prow:
+                p = _portfolio_row_to_dict(prow)
+                p['gallery'] = new_gallery
+                _render_project_page(p)
+
+        elif operation == 'card_state':
+            slug      = ad['slug']
+            card_id   = ad['card_id']
+            new_state = ad.get('new_state') or {}
+            _ensure_card_settings_table(cur)
+            cur.execute("""
+                INSERT INTO card_settings (page_slug, card_id, mode, color, image, position, zoom, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+                ON CONFLICT (page_slug, card_id) DO UPDATE SET
+                    mode=EXCLUDED.mode, color=EXCLUDED.color, image=EXCLUDED.image,
+                    position=EXCLUDED.position, zoom=EXCLUDED.zoom, updated_at=NOW()
+            """, (slug, card_id, new_state.get('mode', 'color'), new_state.get('color', '#1C1C1C'),
+                  new_state.get('image'), new_state.get('position', '50% 50%'), new_state.get('zoom', 1.0)))
+
+        elif operation == 'page_text_edit':
+            file_path = ad.get('file_path')
+            new_html  = ad.get('new_html')
+            if file_path and new_html is not None:
+                real = os.path.realpath(file_path)
+                if real.startswith(os.path.realpath(PREVIEW_DIR)):
+                    with open(real, 'w', encoding='utf-8') as _f:
+                        _f.write(new_html)
+
+        cur.execute("UPDATE undo_log SET is_undone = FALSE WHERE id = %s", (entry_id,))
         conn.commit()
         conn.close()
         return jsonify({'ok': True, 'description': description, 'slug': page_slug})

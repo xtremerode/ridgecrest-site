@@ -67,9 +67,11 @@
         <button id="undoBtn" disabled
           style="padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
                  border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
-                 color:var(--text-muted,#94a3b8);cursor:not-allowed;white-space:nowrap;transition:all .15s">
-          ↩ Nothing to undo
-        </button>
+                 color:var(--text-muted,#94a3b8);cursor:not-allowed;white-space:nowrap;transition:all .15s">↩ Undo</button>
+        <button id="redoBtn" disabled
+          style="padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
+                 border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
+                 color:var(--text-muted,#94a3b8);cursor:not-allowed;white-space:nowrap;transition:all .15s">↪ Redo</button>
         <button class="btn btn-ghost btn-sm" onclick="switchView('table')">Table</button>
         <button class="btn btn-ghost btn-sm" onclick="switchView('kanban')">Pipeline</button>
         <button class="btn btn-gold btn-sm" onclick="Admin.openModal('addLeadModal')">+ Add Lead</button>

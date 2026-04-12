@@ -390,59 +390,114 @@ const Admin = (function() {
     initAI();
   }
 
-  // ── Undo button ──────────────────────────────────────────────
+  // ── Undo / Redo buttons ──────────────────────────────────────
   /**
-   * Wire up the #undoBtn for page-specific undo.
-   * Reads admin context from <body data-admin-context="...">.
+   * Wire up #undoBtn and #redoBtn (global stack — no context filtering).
+   * Button label is always just "↩ Undo" / "↪ Redo".
+   * Description shown as title tooltip on hover.
    * opts.onSuccess(data) — optional callback fired after a successful undo.
    * Returns a `refresh` function so callers can force a status poll.
    */
   function initUndoButton(opts) {
     opts = opts || {};
-    var btn = document.getElementById('undoBtn');
-    if (!btn) return function() {};
-    var ctx = (document.body && document.body.dataset.adminContext) || '';
+    var undoBtn = document.getElementById('undoBtn');
+    var redoBtn = document.getElementById('redoBtn');
+    var tok = getToken() || '';
 
-    function refresh() {
-      var url = '/admin/api/undo/status' + (ctx ? '?context=' + encodeURIComponent(ctx) : '');
-      fetch(url, { headers: { 'X-Admin-Token': getToken() || '', 'X-Admin-Context': ctx } })
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-          if (d.available) {
-            btn.textContent = '↩ Undo: ' + d.description;
-            btn.disabled = false;
-            btn.style.borderColor = '#92400e';
-            btn.style.color = '#f59e0b';
-            btn.style.cursor = 'pointer';
-          } else {
-            btn.textContent = '↩ Nothing to undo';
-            btn.disabled = true;
-            btn.style.borderColor = 'var(--border,#2a3748)';
-            btn.style.color = 'var(--text-muted,#94a3b8)';
-            btn.style.cursor = 'not-allowed';
-          }
-        }).catch(function() {});
+    function _applyUndoState(d) {
+      if (!undoBtn) return;
+      if (d.available) {
+        undoBtn.textContent = '↩ Undo';
+        undoBtn.title       = d.description || '';
+        undoBtn.disabled    = false;
+        undoBtn.style.borderColor = '#92400e';
+        undoBtn.style.color       = '#f59e0b';
+        undoBtn.style.cursor      = 'pointer';
+      } else {
+        undoBtn.textContent = '↩ Undo';
+        undoBtn.title       = '';
+        undoBtn.disabled    = true;
+        undoBtn.style.borderColor = 'var(--border,#2a3748)';
+        undoBtn.style.color       = 'var(--text-muted,#94a3b8)';
+        undoBtn.style.cursor      = 'not-allowed';
+      }
     }
 
-    btn.onclick = function() {
-      if (btn.disabled) return;
-      btn.textContent = '↩ Undoing…';
-      btn.disabled = true;
-      fetch('/admin/api/undo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': getToken() || '', 'X-Admin-Context': ctx },
-        body: JSON.stringify({ context: ctx })
-      }).then(function(r) { return r.json(); })
-        .then(function(d) {
-          if (d.ok) {
-            toast('Undone: ' + d.description, 'success');
-            if (opts.onSuccess) opts.onSuccess(d);
-          } else {
-            toast(d.error || 'Undo failed', 'error');
-          }
-          setTimeout(refresh, 400);
-        }).catch(function() { setTimeout(refresh, 400); });
-    };
+    function _applyRedoState(d) {
+      if (!redoBtn) return;
+      if (d.available) {
+        redoBtn.textContent = '↪ Redo';
+        redoBtn.title       = d.description || '';
+        redoBtn.disabled    = false;
+        redoBtn.style.borderColor = '#1e3a5f';
+        redoBtn.style.color       = '#60a5fa';
+        redoBtn.style.cursor      = 'pointer';
+      } else {
+        redoBtn.textContent = '↪ Redo';
+        redoBtn.title       = '';
+        redoBtn.disabled    = true;
+        redoBtn.style.borderColor = 'var(--border,#2a3748)';
+        redoBtn.style.color       = 'var(--text-muted,#94a3b8)';
+        redoBtn.style.cursor      = 'not-allowed';
+      }
+    }
+
+    function refresh() {
+      // Undo status — global (no context filter)
+      fetch('/admin/api/undo/status', { headers: { 'X-Admin-Token': tok } })
+        .then(function(r) { return r.json(); })
+        .then(_applyUndoState)
+        .catch(function() {});
+      // Redo status — global
+      fetch('/admin/api/redo/status', { headers: { 'X-Admin-Token': tok } })
+        .then(function(r) { return r.json(); })
+        .then(_applyRedoState)
+        .catch(function() {});
+    }
+
+    if (undoBtn) {
+      undoBtn.onclick = function() {
+        if (undoBtn.disabled) return;
+        undoBtn.textContent = '↩ Undo';
+        undoBtn.disabled = true;
+        fetch('/admin/api/undo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Token': tok },
+          body: JSON.stringify({})
+        }).then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d.ok) {
+              toast('Undone: ' + (d.description || ''), 'success');
+              if (opts.onSuccess) opts.onSuccess(d);
+            } else {
+              toast(d.error || 'Undo failed', 'error');
+            }
+            setTimeout(refresh, 400);
+          }).catch(function() { setTimeout(refresh, 400); });
+      };
+    }
+
+    if (redoBtn) {
+      redoBtn.onclick = function() {
+        if (redoBtn.disabled) return;
+        redoBtn.textContent = '↪ Redo';
+        redoBtn.disabled = true;
+        fetch('/admin/api/redo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Token': tok },
+          body: JSON.stringify({})
+        }).then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d.ok) {
+              toast('Redone: ' + (d.description || ''), 'success');
+              if (opts.onSuccess) opts.onSuccess(d);
+            } else {
+              toast(d.error || 'Redo failed', 'error');
+            }
+            setTimeout(refresh, 400);
+          }).catch(function() { setTimeout(refresh, 400); });
+      };
+    }
 
     refresh();
     return refresh;
