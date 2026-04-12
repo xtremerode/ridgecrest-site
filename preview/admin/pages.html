@@ -1002,12 +1002,19 @@
       }
       populatePageSelect(pages);
       buildTree(pages);
-      // Restore last-viewed page on browser refresh — no page-tree flash
+      // Restore last-viewed page on browser refresh — default to home.
+      // Hub pages like 'portfolio' and 'allprojects' load full-site gallery content
+      // which looks like the admin navigated away from the pages editor. Always
+      // start at 'home' for those, or when no last slug is stored.
       try {
-        const lastSlug = sessionStorage.getItem('rd_last_slug');
-        if (lastSlug && pages.find(p => p.slug === lastSlug)) {
-          pageSelect.value = lastSlug;
-          loadPage(lastSlug);
+        const _lastSlug = sessionStorage.getItem('rd_last_slug');
+        const _hubSlugs = new Set(['portfolio', 'allprojects']);
+        const _restore  = (_lastSlug && !_hubSlugs.has(_lastSlug) && pages.find(p => p.slug === _lastSlug))
+          ? _lastSlug
+          : 'home';
+        if (pages.find(p => p.slug === _restore)) {
+          pageSelect.value = _restore;
+          loadPage(_restore);
         }
       } catch(e) {}
     } catch(e) {

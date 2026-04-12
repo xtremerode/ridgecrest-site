@@ -2606,19 +2606,22 @@ _SECTION_RESIZE_TPL = """\
 
   document.addEventListener('pointerup', function(e) {{
     if (!_drag || e.pointerId !== _drag.pointerId) return;
-    document.documentElement.releasePointerCapture(e.pointerId);
+    try {{ _drag.handle.releasePointerCapture(e.pointerId); }} catch(ex) {{}}
     var finalH = Math.round(_drag.section.offsetHeight);
     _drag.handle.style.background = 'rgba(56,161,105,0.8)'; // restore GREEN
     _drag.label.textContent = finalH + 'px';
+    _restoreOverlays(_drag.section);
     saveHeight(_drag.sectionId, finalH);
     _drag = null;
   }});
 
   document.addEventListener('pointercancel', function(e) {{
     if (!_drag || e.pointerId !== _drag.pointerId) return;
+    try {{ _drag.handle.releasePointerCapture(e.pointerId); }} catch(ex) {{}}
     _drag.handle.style.background = 'rgba(239,68,68,0.9)'; // RED = cancelled
     _drag.section.style.height = _drag.startH + 'px';
     _drag.label.textContent    = _drag.startH + 'px';
+    _restoreOverlays(_drag.section);
     _drag = null;
   }});
 
@@ -2668,10 +2671,13 @@ _SECTION_RESIZE_TPL = """\
       section.style.minHeight = 'auto';
       section.style.overflow  = 'hidden';
       handle.style.background = 'rgba(239,68,68,0.9)'; // RED = pointerdown fired
-      // Capture to document.documentElement — widest element in this browsing
-      // context, keeps pointer events flowing here even if pointer exits the
-      // iframe's visual bounds in the parent frame.
-      document.documentElement.setPointerCapture(e.pointerId);
+      // Suspend overlays during drag so their pointer-events don't interfere.
+      _suspendOverlays(section);
+      // Capture pointer to the handle element — standard approach, works across
+      // all browsers including when the pointer exits the element during drag.
+      try {{ handle.setPointerCapture(e.pointerId); }} catch(ex) {{
+        console.error('[rd-resize] setPointerCapture failed:', ex);
+      }}
       _drag = {{
         pointerId: e.pointerId,
         sectionId: sectionId,
