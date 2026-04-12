@@ -62,3 +62,17 @@
     font-size: clamp(2rem, 8vw, 3rem);
   }
 }
+
+/* [PX] Service card image quality - prevent browser stair-stepping on background-image downscale */
+.service-card {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: high-quality;
+}
+
+/* [PX] Service card overlay - solid instead of gradient, 0.4 default, 0.3 on hover */
+.rd-card--image-mode::before {
+    background: rgba(0, 0, 0, 0.4) !important;
+}
+.rd-card--image-mode:hover::before {
+    background: rgba(0, 0, 0, 0.3) !important;
+}
