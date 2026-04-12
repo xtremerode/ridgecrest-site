@@ -699,8 +699,11 @@ def _safe_js(value) -> str:
     Escapes </ to prevent </script> tag breakout."""
     return json.dumps(value).replace("</", r"<\/")
 
+_SECTION_HEIGHT_SKIP = {'hero', 'footer'}  # full-viewport/full-page sections — never override height
+
 def _apply_section_heights(content: bytes, slug: str, device: str) -> bytes:
-    """Inject inline height styles on <section> elements based on DB overrides."""
+    """Inject inline height styles on <section> elements based on DB overrides.
+    Skips hero and footer sections — their heights are controlled by CSS (100vh / auto)."""
     if not HAS_DB:
         return content
     conn = _db_conn()
@@ -719,6 +722,8 @@ def _apply_section_heights(content: bytes, slug: str, device: str) -> bytes:
         text = content.decode('utf-8', errors='replace')
         for row in rows:
             sid = row['section_id']
+            if sid in _SECTION_HEIGHT_SKIP:
+                continue  # Never override hero/footer height via DB
             hpx = int(row['height_px'])
             pattern = re.compile(
                 r'(<section\s+class="' + re.escape(sid) + r'[^"]*")',
@@ -2640,10 +2645,13 @@ _SECTION_RESIZE_TPL = """\
     return handle;
   }}
 
+  // These sections use CSS-controlled heights (100vh / auto) and must never be pixel-overridden
+  var SKIP_SECTIONS = {{'hero': true, 'footer': true}};
+
   function init() {{
     document.querySelectorAll('section').forEach(function(sec) {{
       var cls = sec.className ? sec.className.trim().split(/\\s+/)[0] : '';
-      if (!cls) return;
+      if (!cls || SKIP_SECTIONS[cls]) return;
       if (window.getComputedStyle(sec).position === 'static') {{
         sec.style.position = 'relative';
       }}
