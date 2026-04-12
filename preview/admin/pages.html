@@ -971,12 +971,14 @@
 
   function _repositionSecHandles() {
     if (!_secHandleEls.length) return;
-    const fw   = document.querySelector('.editor-frame-wrap');
+    const fw = document.querySelector('.editor-frame-wrap');
     if (!fw) return;
-    const fwBCR   = fw.getBoundingClientRect();
-    const scale   = _secScale();
-    const devW    = _secDevW();
-    const fwScroll = fw.scrollTop;
+    const fwBCR = fw.getBoundingClientRect();
+    const scale = _secScale();
+    const devW  = _secDevW();
+
+    // iframe's visual top in parent viewport (accounts for frame-wrap scroll)
+    const iframeTop = siteFrame.getBoundingClientRect().top;
 
     let hLeft = fwBCR.left;
     let hWidth = fwBCR.width;
@@ -986,13 +988,31 @@
     }
 
     _secHandleEls.forEach(({ handleEl, labelEl, sec }) => {
-      const visualBottom = fwBCR.top + (sec.offsetTop + sec.offsetHeight) * scale - 2 * fwScroll;
-      const inView = visualBottom > fwBCR.top + 4 && visualBottom < fwBCR.bottom + 4;
-      handleEl.style.display = inView ? 'flex' : 'none';
-      if (inView) {
-        handleEl.style.top    = (visualBottom - 12) + 'px';
-        handleEl.style.left   = hLeft + 'px';
-        handleEl.style.width  = hWidth + 'px';
+      // sec.getBoundingClientRect() gives position in iframe's viewport coords
+      let secBottom;
+      try { secBottom = sec.getBoundingClientRect().bottom; } catch(e) { return; }
+
+      // Convert to parent viewport coordinates
+      const visualBottom = iframeTop + secBottom * scale;
+
+      const isDragging = _secDragState && _secDragState.sec === sec;
+
+      if (isDragging) {
+        // Keep handle visible during drag — clamp to frame-wrap bounds
+        const clampedTop = Math.min(fwBCR.bottom - 6, Math.max(fwBCR.top + 6, visualBottom - 12));
+        handleEl.style.display = 'flex';
+        handleEl.style.top     = clampedTop + 'px';
+        handleEl.style.left    = hLeft + 'px';
+        handleEl.style.width   = hWidth + 'px';
+      } else {
+        // Show only when section bottom is within the visible frame-wrap area
+        const inView = visualBottom > fwBCR.top + 4 && visualBottom < fwBCR.bottom + 4;
+        handleEl.style.display = inView ? 'flex' : 'none';
+        if (inView) {
+          handleEl.style.top   = (visualBottom - 12) + 'px';
+          handleEl.style.left  = hLeft + 'px';
+          handleEl.style.width = hWidth + 'px';
+        }
       }
       labelEl.textContent = Math.round(sec.offsetHeight) + 'px';
     });
@@ -1055,6 +1075,7 @@
           const finalH  = Math.round(sec.offsetHeight);
           const sId     = _secDragState.sectionId;
           _secDragState = null;
+          try { scaleFrame(); } catch(e) {}  // update scroll proxy for new content height
           _repositionSecHandles();
           _saveSecHeight(sId, finalH);
         });
