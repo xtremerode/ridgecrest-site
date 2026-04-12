@@ -1551,6 +1551,8 @@
     }
     // Width + scale handled entirely by scaleFrame()
     scaleFrame();
+    // Reset any desktop-drag override — each device uses its own logical viewport height
+    _heroHeightOverride = null;
     // Update hero height injection to match the new device's logical viewport
     _updateViewportFix();
     // Apply device override to pending values (uses cache — already loaded by loadPage)
