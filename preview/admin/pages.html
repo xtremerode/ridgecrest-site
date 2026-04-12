@@ -1467,9 +1467,10 @@
     try {
       const doc = siteFrame.contentDocument;
       if (!doc) return;
+      const _pcViewH = Math.round(frameWrap.clientHeight / ((frameWrap.clientWidth || PREVIEW_W) / PREVIEW_W));
       const viewH = _currentDevice === 'phone' ? 844
                   : _currentDevice === 'ipad'  ? 1024
-                  : PREVIEW_H;
+                  : _pcViewH;
       const minPH = _currentDevice === 'phone' ? 420 : 500;
       let s = doc.getElementById('rd-preview-viewport-fix');
       if (!s) {
@@ -2421,20 +2422,24 @@
   const frameScrollProxy = document.getElementById('frameScrollProxy');
 
   function scaleFrame() {
-    // Determine native render width for current device
-    const devW = _currentDevice === 'ipad' ? 768
-               : _currentDevice === 'phone' ? 390
-               : PREVIEW_W;
+    // Determine native render width and scale for current device
+    const devW  = _currentDevice === 'ipad' ? 768
+                : _currentDevice === 'phone' ? 390
+                : PREVIEW_W;
+    const scale = _currentDevice === 'pc'
+                ? (frameWrap.clientWidth || PREVIEW_W) / PREVIEW_W
+                : 1;
 
     // Set iframe width so responsive CSS breakpoints fire at the right size
     siteFrame.style.width = devW + 'px';
 
-    // IMPORTANT: siteFrame height must ALWAYS stay at PREVIEW_H — never scrollHeight.
-    // Setting height=scrollHeight makes 100vh and position:fixed inside the iframe
-    // reference the full page height instead of the visible viewport, which breaks
-    // the lightbox and any other fixed/vh-based UI. Outer scroll is synced to the
-    // iframe via contentWindow.scrollTo() in the scroll listener below.
-    siteFrame.style.height = PREVIEW_H + 'px';
+    // Iframe height: after CSS scaling the visual height must exactly fill the
+    // frame-wrap panel — no dark gap at the bottom.
+    // For PC (scale<1): element height = frameWrap.clientHeight / scale → visual = clientHeight
+    // For mobile/tablet (scale=1): element height = frameWrap.clientHeight → exact fill
+    // Never set to scrollHeight — that breaks 100vh and position:fixed (lightbox).
+    // _updateViewportFix() overrides hero vh independently.
+    siteFrame.style.height = Math.ceil(frameWrap.clientHeight / scale) + 'px';
 
     // Compute full content height — used only for frameScrollProxy (outer scroll depth)
     let iframeH = PREVIEW_H;
@@ -2453,8 +2458,6 @@
 
     if (_currentDevice === 'pc') {
       // Scale desktop view down to fit the panel — origin top-left
-      const panelW = frameWrap.clientWidth || PREVIEW_W;
-      const scale = panelW / PREVIEW_W;
       siteFrame.style.left           = '0';
       siteFrame.style.transformOrigin = 'top left';
       siteFrame.style.transform       = `scale(${scale})`;
@@ -2470,8 +2473,9 @@
   }
 
   // Sync outer panel scroll → iframe inner scroll.
-  // Since iframe stays at PREVIEW_H (not full scrollHeight), scrolling the outer
-  // panel must programmatically scroll the iframe content to match.
+  // Outer panel scroll → iframe inner scroll.
+  // The iframe element height is fixed (fills the panel visually); the proxy sets
+  // scroll depth. Each outer scroll pixel maps to 1/scale inner scroll pixels.
   frameWrap.addEventListener('scroll', function() {
     try {
       if (!siteFrame.contentWindow) return;
