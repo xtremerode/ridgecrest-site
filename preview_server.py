@@ -6256,9 +6256,10 @@ def admin_overlay_scripts():
         slug_json=json.dumps(slug), token_json=json.dumps(token))
     edit_js = strip_script(_EDIT_OVERLAY_TPL).format(
         slug_json=json.dumps(slug), token_json=json.dumps(token))
-    # Section resize handles are now rendered in the parent frame (pages.html)
-    # to avoid cross-frame pointer event limitations. No iframe-side JS needed.
-    return card_js + '\n' + edit_js, 200, {
+    section_js = strip_script(_SECTION_RESIZE_TPL).format(
+        slug_json=json.dumps(slug), token_json=json.dumps(token),
+        device_json=json.dumps(device))
+    return card_js + '\n' + edit_js + '\n' + section_js, 200, {
         'Content-Type': 'application/javascript',
         'Cache-Control': 'no-store'
     }

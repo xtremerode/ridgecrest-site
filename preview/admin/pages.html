@@ -945,155 +945,19 @@
   const pickerSelectedLabel = document.getElementById('pickerSelectedLabel');
   let pickerActiveTab = 'all';
 
-  // ── Section resize handles (position:fixed, viewport-relative) ────────────
-  // Handles are position:fixed on document.body. Positioned using
-  // getBoundingClientRect — no scroll-coordinate ambiguity. The iframe stays
-  // visually at the top of editor-frame-wrap; its content scrolls via
-  // contentWindow.scrollTo. We account for that scroll explicitly:
-  //   viewportY = fwBCR.top + (docTop + secH - fw.scrollTop/scale) * scale
+  // ── Section resize handles ───────────────────────────────────────────────────
+  // Handles are injected INTO the iframe by _SECTION_RESIZE_TPL (via overlay-scripts).
+  // position:absolute;bottom:0 on each section. document.documentElement.setPointerCapture
+  // keeps events flowing in the iframe even when pointer exits the visual bounds.
+  // These no-op stubs exist so toggleEditOverlay / loadPage callers don't break.
 
-  const _SKIP_SEC = new Set(['footer']);
-  let _secHandleEls = [];   // [{handleEl, labelEl, sec, sectionId, docTop}]
-  let _secDragState = null;
-
-  function _secScale() {
-    const fw = document.querySelector('.editor-frame-wrap');
-    if (!fw || !fw.clientWidth) return 1;
-    return _currentDevice === 'pc' ? fw.clientWidth / PREVIEW_W : 1;
-  }
-
-  function _secDevW() {
-    return _currentDevice === 'ipad' ? 768 : _currentDevice === 'phone' ? 390 : PREVIEW_W;
-  }
-
-  function _secDocTop(el) {
-    let top = 0;
-    try {
-      const body = siteFrame.contentDocument.body;
-      let e = el;
-      while (e && e !== body) { top += e.offsetTop || 0; e = e.offsetParent; }
-    } catch(ex) {}
-    return top;
-  }
-
-  function _placeHandle(handleEl, docTop, sec, fw) {
-    const scale        = _secScale();
-    const fwBCR        = fw.getBoundingClientRect();
-    const iframeST     = fw.scrollTop / scale;
-    // Where does the section bottom appear in viewport coordinates?
-    const secBotVY     = fwBCR.top + (docTop + sec.offsetHeight - iframeST) * scale;
-    // Only show if section bottom is inside the panel (±4px tolerance)
-    const isDragging   = _secDragState && _secDragState.sec === sec;
-    const inPanel      = secBotVY >= fwBCR.top + 4 && secBotVY <= fwBCR.bottom + 4;
-    if (!inPanel && !isDragging) { handleEl.style.display = 'none'; return; }
-    handleEl.style.display = 'flex';
-    // During drag: clamp so the handle never leaves the panel
-    const clampedBotVY = isDragging
-      ? Math.max(fwBCR.top + 20, Math.min(secBotVY, fwBCR.bottom))
-      : secBotVY;
-    handleEl.style.top = (clampedBotVY - 12) + 'px';
-    const devW = _secDevW();
-    if (_currentDevice === 'pc') {
-      handleEl.style.left  = fwBCR.left + 'px';
-      handleEl.style.right = (document.documentElement.clientWidth - fwBCR.right) + 'px';
-      handleEl.style.width = '';
-    } else {
-      handleEl.style.left  = (fwBCR.left + (fw.clientWidth - devW) / 2) + 'px';
-      handleEl.style.right = '';
-      handleEl.style.width = devW + 'px';
-    }
-  }
-
-  function _repositionSecHandles() {
-    if (!_secHandleEls.length) return;
-    const fw = document.querySelector('.editor-frame-wrap');
-    if (!fw) return;
-    _secHandleEls.forEach(({ handleEl, labelEl, sec, docTop }) => {
-      _placeHandle(handleEl, docTop, sec, fw);
-      labelEl.textContent = Math.round(sec.offsetHeight) + 'px';
-    });
-  }
-
-  function _buildSecHandles() {
-    _clearSecHandles();
-    if (!editMode) return;
-    const fw = document.querySelector('.editor-frame-wrap');
-    if (!fw) return;
+  function _repositionSecHandles() {}  // no-op: handles live in iframe, no parent reposition needed
+  function _buildSecHandles() {}       // no-op: section_js in overlay-scripts does the work
+  function _clearSecHandles() {        // remove any iframe-injected handles on page switch / edit-off
     try {
       const doc = siteFrame.contentDocument;
-      if (!doc || !doc.body) return;
-
-      doc.querySelectorAll('section').forEach(sec => {
-        const cls = sec.className ? sec.className.trim().split(/\s+/)[0] : '';
-        if (!cls || _SKIP_SEC.has(cls)) return;
-        const docTop = _secDocTop(sec);
-
-        const handle = document.createElement('div');
-        handle.dataset.sectionId = cls;
-        handle.style.cssText =
-          'position:fixed;height:12px;pointer-events:all;cursor:ns-resize;' +
-          'background:rgba(56,161,105,0.9);display:flex;align-items:center;' +
-          'justify-content:center;font:bold 9px/1 monospace;color:#1a4731;' +
-          'user-select:none;box-sizing:border-box;' +
-          'border-top:2px solid #38a169;z-index:9999;';
-        handle.title = 'Drag to resize \u00b7 ' + cls;
-
-        const label = document.createElement('span');
-        label.style.cssText = 'pointer-events:none;letter-spacing:0.5px;';
-        label.textContent = Math.round(sec.offsetHeight) + 'px';
-        handle.appendChild(label);
-
-        handle.addEventListener('pointerdown', (e) => {
-          e.preventDefault();
-          handle.setPointerCapture(e.pointerId);
-          const startH = Math.round(sec.offsetHeight);
-          sec.style.height    = startH + 'px';
-          sec.style.minHeight = 'auto';
-          sec.style.overflow  = 'hidden';
-          _secDragState = { sec, sectionId: cls, startY: e.clientY, startH, labelEl: label, docTop };
-          editStatus.textContent = `Dragging \u201c${cls}\u201d \u2014 release to save`;
-          editStatus.className = 'edit-status';
-        });
-
-        handle.addEventListener('pointermove', (e) => {
-          if (!_secDragState || _secDragState.sec !== sec) return;
-          const s    = _secScale();
-          const newH = Math.max(50, _secDragState.startH + (e.clientY - _secDragState.startY) / s);
-          sec.style.height = Math.round(newH) + 'px';
-          label.textContent = Math.round(newH) + 'px';
-          const fw2 = document.querySelector('.editor-frame-wrap');
-          if (fw2) _placeHandle(handle, docTop, sec, fw2);
-        });
-
-        handle.addEventListener('pointerup', () => {
-          if (!_secDragState || _secDragState.sec !== sec) return;
-          const finalH = Math.round(sec.offsetHeight);
-          const sId    = _secDragState.sectionId;
-          _secDragState = null;
-          try { scaleFrame(); } catch(ex) {}
-          _repositionSecHandles();
-          _saveSecHeight(sId, finalH);
-        });
-
-        handle.addEventListener('pointercancel', () => {
-          if (_secDragState && _secDragState.sec === sec) {
-            sec.style.height = _secDragState.startH + 'px';
-            _secDragState    = null;
-            _repositionSecHandles();
-          }
-        });
-
-        document.body.appendChild(handle);
-        _placeHandle(handle, docTop, sec, fw);
-        _secHandleEls.push({ handleEl: handle, labelEl: label, sec, sectionId: cls, docTop });
-      });
-    } catch(e) { console.warn('_buildSecHandles:', e); }
-  }
-
-  function _clearSecHandles() {
-    _secHandleEls.forEach(({ handleEl }) => { try { document.body.removeChild(handleEl); } catch(ex) {} });
-    _secHandleEls = [];
-    _secDragState = null;
+      if (doc) doc.querySelectorAll('[data-rd-section-handle]').forEach(el => el.remove());
+    } catch(e) {}
   }
 
   async function _saveSecHeight(sId, finalH) {
