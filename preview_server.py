@@ -3665,6 +3665,85 @@ def serve_screenshot(filename):
         return 'Not found', 404
     return send_file(path)
 
+# ── Screenshot paste proxy (/paste/* → port 8080 internally) ─────────────────
+# Port 8080 is blocked by the DigitalOcean cloud firewall externally.
+# These routes forward paste-tool traffic through the already-open port 8081.
+
+def _fwd_8080(path, method='GET', data=None, content_type=None):
+    """Forward a request to the screenshot server on 127.0.0.1:8080."""
+    import urllib.request as _ur, urllib.error as _ue
+    url = f'http://127.0.0.1:8080{path}'
+    hdrs = {}
+    if content_type:
+        hdrs['Content-Type'] = content_type
+    req = _ur.Request(url, data=data, headers=hdrs, method=method)
+    try:
+        with _ur.urlopen(req, timeout=15) as r:
+            body = r.read()
+            ct   = r.getheader('Content-Type', 'application/octet-stream')
+            return body, ct, r.status
+    except _ue.HTTPError as e:
+        return e.read(), e.headers.get('Content-Type', 'text/plain'), e.code
+    except Exception as ex:
+        return str(ex).encode(), 'text/plain', 502
+
+@app.route('/paste', methods=['GET'])
+@app.route('/paste/', methods=['GET'])
+def paste_index():
+    body, ct, status_code = _fwd_8080('/')
+    # Rewrite root-relative JS paths so they go through /paste/* on this server
+    body = (body
+        .replace(b'fetch("/list")',         b'fetch("/paste/list")')
+        .replace(b'fetch("/files")',        b'fetch("/paste/files")')
+        .replace(b'fetch("/upload",',       b'fetch("/paste/upload",')
+        .replace(b'fetch("/upload-file",',  b'fetch("/paste/upload-file",')
+        .replace(b'href="/download/',       b'href="/paste/download/')
+    )
+    from flask import Response as _Resp
+    return _Resp(body, status=status_code, mimetype=ct.split(';')[0].strip())
+
+@app.route('/paste/upload', methods=['POST'])
+def paste_upload():
+    from flask import Response as _Resp
+    body, ct, sc = _fwd_8080('/upload', method='POST',
+                              data=request.get_data(),
+                              content_type=request.content_type)
+    return _Resp(body, status=sc, mimetype=ct.split(';')[0].strip())
+
+@app.route('/paste/list', methods=['GET'])
+def paste_list():
+    from flask import Response as _Resp
+    body, ct, sc = _fwd_8080('/list')
+    return _Resp(body, status=sc, mimetype=ct.split(';')[0].strip())
+
+@app.route('/paste/files', methods=['GET'])
+def paste_files():
+    from flask import Response as _Resp
+    body, ct, sc = _fwd_8080('/files')
+    return _Resp(body, status=sc, mimetype=ct.split(';')[0].strip())
+
+@app.route('/paste/screenshot/<filename>', methods=['GET'])
+def paste_screenshot_proxy(filename):
+    from flask import Response as _Resp
+    body, ct, sc = _fwd_8080(f'/screenshot/{filename}')
+    return _Resp(body, status=sc, mimetype=ct.split(';')[0].strip())
+
+@app.route('/paste/download/<path:filename>', methods=['GET'])
+def paste_download(filename):
+    from flask import Response as _Resp
+    body, ct, sc = _fwd_8080(f'/download/{filename}')
+    resp = _Resp(body, status=sc, mimetype='application/octet-stream')
+    resp.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return resp
+
+@app.route('/paste/upload-file', methods=['POST'])
+def paste_upload_file():
+    from flask import Response as _Resp
+    body, ct, sc = _fwd_8080('/upload-file', method='POST',
+                              data=request.get_data(),
+                              content_type=request.content_type)
+    return _Resp(body, status=sc, mimetype=ct.split(';')[0].strip())
+
 @app.route('/admin/api/server/restart', methods=['POST'])
 def admin_server_restart():
     """Restart the preview server process (reloads all Python code from disk)."""
