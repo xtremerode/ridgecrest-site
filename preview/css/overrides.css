@@ -1,0 +1,64 @@
+/*
+ * overrides.css — approved CSS overrides for Ridgecrest Designs
+ * Loaded after main.css on every page. Never edit main.css directly.
+ * Use the CSS Staging Preview in the admin panel to test, then approve.
+ *
+ * Last rebuilt: 2026-04-12 (restored from session notes after April 4 git revert)
+ */
+
+/* ── Nav dark overlay (pre-scroll) ──────────────────────────────────────────
+   At rest (before scrolling), nav background is a dark translucent overlay
+   so hero text stays readable over light images.
+   Approved: 2026-04-08 — opacity 0.6 after testing 0.95 (too heavy) and 0.4 (too light)
+*/
+.nav:not(.nav--scrolled) {
+  background: rgba(0, 0, 0, 0.6);
+  padding: 1rem var(--space-md);
+}
+
+/* ── Mobile hero height + anchor ─────────────────────────────────────────────
+   Reduce hero height on tablet/phone so content below the fold is visible.
+   Hero text anchors to bottom (was vertically centered).
+   Approved: 2026-04-07
+*/
+@media (max-width: 1023px) {
+  .hero {
+    height: 88svh;
+  }
+  .hero__content {
+    align-items: flex-start;
+    justify-content: flex-end;
+    padding-bottom: 3rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .hero {
+    height: 85svh;
+  }
+}
+
+/* ── iPad breakpoint fix ─────────────────────────────────────────────────────
+   iPad is exactly 768px wide — use 767px so iPad gets desktop styles, not phone.
+   Approved: 2026-04-08
+*/
+@media (max-width: 767px) {
+  .nav__links {
+    display: none;
+    flex-direction: column;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.95);
+    padding: 1rem 0;
+  }
+
+  .nav__links.nav__links--open {
+    display: flex;
+  }
+
+  .hero__content h1 {
+    font-size: clamp(2rem, 8vw, 3rem);
+  }
+}

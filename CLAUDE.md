@@ -286,3 +286,19 @@ Before editing ANY code, check the lock status:
 - Editing logo API routes (`/admin/api/settings/logo`) → check server-routes
 - Editing main.js logo injection or nav logo code → check frontend-main
 - Editing settings.html admin UI → check server-routes, frontend-main
+
+---
+
+## 19. Git Commit Protocol — MANDATORY
+
+**Commit after every working feature. No exceptions.**
+
+### Rules
+1. **After every feature is tested and working** → immediately `git add` the changed files and commit.
+2. **Never end a session with uncommitted working code.** If the session ends, whatever is committed is recoverable; whatever is not committed is permanently lost if a revert is ever needed.
+3. **Before any revert or `git checkout HEAD`** → first `git stash` or commit the current working state. Never use `git checkout HEAD -- <files>` on files with untracked improvements.
+4. **Restore points restore DB + HTML only.** They do NOT restore Python, JS, or CSS. After restoring from a restore point, all code files remain at whatever git state they were — do not assume the restore point covers code.
+5. **When in doubt, commit.** A commit with a message like "WIP: partial feature" is recoverable. An overwrite is not.
+
+### What caused the April 12 code loss
+`git checkout HEAD -- <files>` was used to "revert" code to match an April 10 DB restore point. But git HEAD was April 4 — 6 days of code improvements that were never committed were permanently overwritten. The fix: commit after every session so git HEAD is always current.

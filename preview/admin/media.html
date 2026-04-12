@@ -508,21 +508,20 @@ function buildProjectTabs() {
   const tabsEl = document.getElementById('projectTabs');
   if (!tabsEl) return;
 
-  // Collect unique projects from loaded items (preserve order of first appearance)
+  // Collect unique project labels from loaded items (preserve order of first appearance).
+  // Gallery images have item.project = project name, so they appear here — no separate gallery section needed.
   const seen = new Set();
   const projects = [];
-  const gallerySeen = new Set();
-  const galleryProjects = [];
   let hasUnlabeled = false;
   const editedCount = _libraryItems.filter(i => i.has_renders).length;
   _libraryItems.forEach(item => {
-    if (item.gallery_project_slug && !gallerySeen.has(item.gallery_project_slug)) {
-      gallerySeen.add(item.gallery_project_slug);
-      galleryProjects.push(item.gallery_project_slug);
-    }
     if (!item.project) { hasUnlabeled = true; return; }
     if (!seen.has(item.project)) { seen.add(item.project); projects.push(item.project); }
   });
+
+  // If active filter no longer exists (e.g. after a tab removal), reset to 'all'
+  const validKeys = new Set(['all', '__edited__', '__unlabeled__', ...projects]);
+  if (!validKeys.has(_activeProjectFilter)) _activeProjectFilter = 'all';
 
   const tabs = [
     { key: 'all', label: `All (${_libraryItems.length})` },
@@ -531,22 +530,16 @@ function buildProjectTabs() {
     tabs.push({ key: '__edited__', label: `✦ Edited (${editedCount})`, edited: true });
   }
   tabs.push(...projects.map(p => ({ key: p, label: `${p} (${_libraryItems.filter(i => i.project === p).length})` })));
-  if (galleryProjects.length > 0) {
-    tabs.push({ key: '__gallery_divider__', label: '— Galleries —', divider: true });
-    tabs.push(...galleryProjects.map(s => ({ key: '__gal__' + s, label: `📁 ${s} (${_libraryItems.filter(i => i.gallery_project_slug === s).length})`, gallery: true })));
-  }
   if (hasUnlabeled) {
-    tabs.push({ key: '__unlabeled__', label: `Unlabeled (${_libraryItems.filter(i => !i.project && !i.gallery_project_slug).length})` });
+    tabs.push({ key: '__unlabeled__', label: `Unlabeled (${_libraryItems.filter(i => !i.project).length})` });
   }
 
   if (tabs.length <= 1) { tabsEl.style.display = 'none'; return; }
 
   tabsEl.innerHTML = tabs.map(t => {
-    if (t.divider) return `<span style="padding:0 8px;color:var(--text-muted,#64748b);font-size:11px;display:flex;align-items:center">${escHtml(t.label)}</span>`;
     const isActive = t.key === _activeProjectFilter;
     const editedStyle = t.edited ? 'color:var(--accent-purple,#c4b5fd)' : '';
-    const galleryStyle = t.gallery ? 'color:var(--accent,#3b82f6)' : '';
-    return `<button class="project-tab ${isActive ? 'project-tab--active' : ''}" onclick="setProjectFilter('${escHtml(t.key)}')" style="${editedStyle}${galleryStyle}">${escHtml(t.label)}</button>`;
+    return `<button class="project-tab ${isActive ? 'project-tab--active' : ''}" onclick="setProjectFilter('${escHtml(t.key)}')" style="${editedStyle}">${escHtml(t.label)}</button>`;
   }).join('');
   tabsEl.style.display = 'flex';
 }
@@ -558,13 +551,9 @@ function setProjectFilter(key) {
 }
 
 function _filteredItems() {
-  if (_activeProjectFilter === 'all')          return _libraryItems;
-  if (_activeProjectFilter === '__edited__')   return _libraryItems.filter(i => i.has_renders);
-  if (_activeProjectFilter === '__unlabeled__') return _libraryItems.filter(i => !i.project && !i.gallery_project_slug);
-  if (_activeProjectFilter.startsWith('__gal__')) {
-    const slug = _activeProjectFilter.slice(7);
-    return _libraryItems.filter(i => i.gallery_project_slug === slug);
-  }
+  if (_activeProjectFilter === 'all')           return _libraryItems;
+  if (_activeProjectFilter === '__edited__')    return _libraryItems.filter(i => i.has_renders);
+  if (_activeProjectFilter === '__unlabeled__') return _libraryItems.filter(i => !i.project);
   return _libraryItems.filter(i => i.project === _activeProjectFilter);
 }
 

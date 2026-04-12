@@ -3021,6 +3021,13 @@ def view(filename):
 
     # For non-admin HTML pages: apply DB hero image + optional edit overlay
     if mime and 'html' in mime and not filename.startswith('admin/'):
+        # Inject overrides.css after main.css (approved CSS changes — never touch main.css directly)
+        _overrides_path = os.path.join(PREVIEW_DIR, 'css', 'overrides.css')
+        if os.path.isfile(_overrides_path) and b'overrides.css' not in content:
+            _override_link = b'\n  <link rel="stylesheet" href="css/overrides.css" />'
+            if b'</head>' in content:
+                content = content.replace(b'</head>', _override_link + b'\n</head>', 1)
+    if mime and 'html' in mime and not filename.startswith('admin/'):
         slug = filename.replace('\\', '/').replace('.html', '')
         if slug in ('', 'index'):
             slug = 'home'
@@ -8418,6 +8425,36 @@ def gallery_projects():
         return jsonify([])
     with open(path) as f:
         return jsonify(json.load(f))
+
+@app.route('/admin/api/gallery/rerender-all', methods=['POST'])
+def gallery_rerender_all():
+    """Re-render all portfolio project pages. Used after bulk image changes."""
+    err = _require_admin()
+    if err: return err
+    if not HAS_DB:
+        return jsonify({'error': 'no db'}), 500
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'db connect failed'}), 500
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT * FROM portfolio_projects ORDER BY sort_order, id')
+        rows = cur.fetchall()
+        conn.close()
+    except Exception as e:
+        try: conn.close()
+        except: pass
+        return jsonify({'error': str(e)}), 500
+    rendered = []
+    errors = []
+    for row in rows:
+        p = _portfolio_row_to_dict(row)
+        try:
+            _render_project_page(p)
+            rendered.append(p['slug'])
+        except Exception as e:
+            errors.append({'slug': p['slug'], 'error': str(e)})
+    return jsonify({'ok': True, 'rendered': rendered, 'errors': errors})
 
 # ── Gallery image type tagging + auto-sort ────────────────────────────────────
 
