@@ -1409,7 +1409,10 @@
         s.id = 'rd-preview-viewport-fix';
         (doc.head || doc.documentElement).appendChild(s);
       }
-      s.textContent = `.hero{height:${viewH}px!important;min-height:${viewH}px!important;}`
+      // Hide iframe's own scrollbar — outer panel scroll drives iframe content via scrollTo().
+      // scrollbar-width:none hides without disabling programmatic scrollTo().
+      s.textContent = `html{scrollbar-width:none;}html::-webkit-scrollbar{display:none;}`
+        + `.hero{height:${viewH}px!important;min-height:${viewH}px!important;}`
         + `.project-hero{height:${Math.round(viewH*0.7)}px!important;min-height:${minPH}px!important;}`
         + `.page-hero--service{min-height:${Math.round(viewH*0.6)}px!important;max-height:${Math.round(viewH*0.9)}px!important;}`
         + `.post-hero--has-img{min-height:${Math.floor(viewH*0.6)}px!important;}`;
@@ -2281,13 +2284,19 @@
     // Set iframe width so responsive CSS breakpoints fire at the right size
     siteFrame.style.width = devW + 'px';
 
-    // Compute height from page content
+    // IMPORTANT: siteFrame height must ALWAYS stay at PREVIEW_H — never scrollHeight.
+    // Setting height=scrollHeight makes 100vh and position:fixed inside the iframe
+    // reference the full page height instead of the visible viewport, which breaks
+    // the lightbox and any other fixed/vh-based UI. Outer scroll is synced to the
+    // iframe via contentWindow.scrollTo() in the scroll listener below.
+    siteFrame.style.height = PREVIEW_H + 'px';
+
+    // Compute full content height — used only for frameScrollProxy (outer scroll depth)
     let iframeH = PREVIEW_H;
     try {
       const sh = siteFrame.contentDocument?.documentElement?.scrollHeight || PREVIEW_H;
       iframeH = Math.max(sh, PREVIEW_H);
     } catch(e) {}
-    siteFrame.style.height = iframeH + 'px';
 
     if (_currentDevice === 'pc') {
       // Scale desktop view down to fit the panel — origin top-left
@@ -2296,7 +2305,7 @@
       siteFrame.style.left           = '0';
       siteFrame.style.transformOrigin = 'top left';
       siteFrame.style.transform       = `scale(${scale})`;
-      // Proxy drives scroll: visual height = iframe height × scale
+      // Proxy drives scroll: visual height = iframe content height × scale
       frameScrollProxy.style.height = Math.ceil(iframeH * scale) + 'px';
     } else {
       // Mobile/tablet: render at true device width, no scaling, centered in panel
@@ -2306,6 +2315,19 @@
       frameScrollProxy.style.height  = iframeH + 'px';
     }
   }
+
+  // Sync outer panel scroll → iframe inner scroll.
+  // Since iframe stays at PREVIEW_H (not full scrollHeight), scrolling the outer
+  // panel must programmatically scroll the iframe content to match.
+  frameWrap.addEventListener('scroll', function() {
+    try {
+      if (!siteFrame.contentWindow) return;
+      const scale = _currentDevice === 'pc'
+        ? (frameWrap.clientWidth / PREVIEW_W)
+        : 1;
+      siteFrame.contentWindow.scrollTo(0, frameWrap.scrollTop / scale);
+    } catch(e) {}
+  });
 
   scaleFrame();
   window.addEventListener('resize', scaleFrame);
