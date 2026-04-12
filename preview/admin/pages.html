@@ -1002,21 +1002,9 @@
       }
       populatePageSelect(pages);
       buildTree(pages);
-      // Restore last-viewed page on browser refresh — default to home.
-      // Hub pages like 'portfolio' and 'allprojects' load full-site gallery content
-      // which looks like the admin navigated away from the pages editor. Always
-      // start at 'home' for those, or when no last slug is stored.
-      try {
-        const _lastSlug = sessionStorage.getItem('rd_last_slug');
-        const _hubSlugs = new Set(['portfolio', 'allprojects']);
-        const _restore  = (_lastSlug && !_hubSlugs.has(_lastSlug) && pages.find(p => p.slug === _lastSlug))
-          ? _lastSlug
-          : 'home';
-        if (pages.find(p => p.slug === _restore)) {
-          pageSelect.value = _restore;
-          loadPage(_restore);
-        }
-      } catch(e) {}
+      // Do NOT auto-load any page on entry — show the tree, let user select.
+      // Auto-loading was confusing (loaded portfolio or home unexpectedly).
+      sessionStorage.removeItem('rd_last_slug');
     } catch(e) {
       editStatus.textContent = 'Error loading pages';
       document.getElementById('pageTree').innerHTML =
@@ -1517,6 +1505,10 @@
 
   // Inject or update the viewport-fix style inside the iframe to match the
   // simulated device height (phone=844px, ipad=1024px, pc=admin browser height).
+  // heroHOverride: when set (px), use this for .hero height instead of viewport height.
+  // Used after a section drag to keep the hero at the user-dragged size.
+  let _heroHeightOverride = null;
+
   function _updateViewportFix() {
     try {
       const doc = siteFrame.contentDocument;
@@ -1525,6 +1517,7 @@
       const viewH = _currentDevice === 'phone' ? 844
                   : _currentDevice === 'ipad'  ? 1024
                   : _pcViewH;
+      const heroH = _heroHeightOverride != null ? _heroHeightOverride : viewH;
       const minPH = _currentDevice === 'phone' ? 420 : 500;
       let s = doc.getElementById('rd-preview-viewport-fix');
       if (!s) {
@@ -1535,7 +1528,7 @@
       // Hide iframe's own scrollbar — outer panel scroll drives iframe content via scrollTo().
       // scrollbar-width:none hides without disabling programmatic scrollTo().
       s.textContent = `html{scrollbar-width:none;}html::-webkit-scrollbar{display:none;}`
-        + `.hero{height:${viewH}px!important;min-height:${viewH}px!important;}`
+        + `.hero{height:${heroH}px!important;min-height:${heroH}px!important;}`
         + `.project-hero{height:${Math.round(viewH*0.7)}px!important;min-height:${minPH}px!important;}`
         + `.page-hero--service{min-height:${Math.round(viewH*0.6)}px!important;max-height:${Math.round(viewH*0.9)}px!important;}`
         + `.post-hero--has-img{min-height:${Math.floor(viewH*0.6)}px!important;}`;
@@ -1619,6 +1612,8 @@
     // Persist so browser refresh restores the same page without flashing the tree
     try { sessionStorage.setItem('rd_last_slug', slug); } catch(e) {}
     syncTreeActive(slug);
+    // Reset hero height override — new page uses its own CSS/DB height
+    _heroHeightOverride = null;
     // Clear section handles — siteFrame.load will rebuild after new page loads
     _clearSecHandles();
     // Keep edit mode when switching pages — siteFrame.load will re-inject overlay
@@ -2211,9 +2206,25 @@
       // Status bar feedback while dragging (drag is handled entirely in iframe)
       editStatus.textContent = `Dragging \u201c${d.section_id}\u201d \u2014 release to save`;
       editStatus.className = 'edit-status';
+      // Strip the !important height CSS for this section so the drag handler's
+      // inline style can take effect. Without this, _updateViewportFix's
+      // !important rule beats the inline style and the section won't resize visually.
+      try {
+        const doc = siteFrame.contentDocument;
+        const vpFix = doc && doc.getElementById('rd-preview-viewport-fix');
+        if (vpFix) {
+          const re = new RegExp(`\\.${d.section_id}\\{height:[^}]+\\}`);
+          vpFix.textContent = vpFix.textContent.replace(re, '');
+        }
+      } catch(e) {}
     }
     if (d.type === 'rd_section_resize') {
       if (d.slug !== currentSlug) return;
+      // After drag: update viewport fix to lock in the new height for this section
+      if (d.section_id === 'hero') {
+        _heroHeightOverride = d.height_px;
+      }
+      _updateViewportFix();
       if (d.ok) {
         editStatus.textContent = `Section \u201c${d.section_id}\u201d \u2192 ${d.height_px}px saved`;
         editStatus.className = 'edit-status ready';
