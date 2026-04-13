@@ -6,40 +6,39 @@
   <title>Pages — Ridgecrest Admin</title>
   <link rel="stylesheet" href="css/admin.css" />
   <style>
-    /* ── Responsive header override for pages editor ── */
-    /* admin.css fixes header at 56px; pages.html has many controls so we allow wrapping */
+    /* ── Header: single-row, no wrapping, fills available width ── */
     .header {
-      height: auto !important;
-      min-height: var(--header-h, 56px);
-      flex-wrap: wrap;
-      padding: 6px 16px !important;
-      gap: 6px !important;
-      align-content: center;
+      height: 56px !important;
+      min-height: 56px !important;
+      flex-wrap: nowrap !important;
+      padding: 0 12px !important;
+      gap: 5px !important;
+      align-items: center;
+      overflow: hidden;
     }
-    .header-title {
-      flex: 0 0 auto !important;
-      padding: 2px 0;
-    }
+    /* "Pages" title removed — page is visible in sidebar */
+    .header-title { display: none !important; }
     .header-actions {
       flex: 1;
       min-width: 0;
-      flex-wrap: wrap;
+      flex-wrap: nowrap !important;
       gap: 5px !important;
-      justify-content: flex-end;
+      align-items: center;
+      justify-content: flex-start;
     }
-    /* Shrink select to save space — still usable */
+    /* Page select: grows to fill leftover space, stays compact by default */
     .header-actions #pageSelect {
-      flex: 0 1 160px;
-      min-width: 80px;
-      max-width: 160px !important;
+      flex: 1 1 80px;
+      min-width: 60px;
+      max-width: 200px !important;
       width: auto !important;
     }
-    /* Compact button text */
-    .header-actions #undoBtn  { padding: 5px 10px !important; }
-    .header-actions #redoBtn  { padding: 5px 10px !important; }
-    .header-actions .btn-edit-mode { padding: 5px 12px; }
-    /* edit status: allow it to be a line-break point */
-    .header-actions .edit-status { flex: 1 1 100%; text-align: right; min-width: 0; }
+    /* Buttons stay compact, never wrap */
+    .header-actions #undoBtn     { flex-shrink: 0; padding: 5px 9px !important; }
+    .header-actions #redoBtn     { flex-shrink: 0; padding: 5px 9px !important; }
+    .header-actions .btn-edit-mode { flex-shrink: 0; padding: 5px 11px; }
+    /* Edit status: inline, not a full-width row-break */
+    .header-actions .edit-status { flex: 0 0 auto; }
 
     /* ── Visual Editor layout ── */
     .editor-toolbar {
@@ -132,16 +131,14 @@
     }
     .frame-loading.hidden { opacity: 0; pointer-events: none; }
     .frame-loading.has-tree { align-items: flex-start; justify-content: flex-start; padding: 0; }
-    /* Put page-select + controls into header-actions area */
+    /* Page select base style */
     .header-actions select {
       background: var(--surface-2, #1e2d3d);
       color: var(--text, #e2e8f0);
       border: 1px solid var(--border, #2a3748);
       border-radius: 6px;
-      padding: 5px 10px;
+      padding: 5px 8px;
       font-size: 13px;
-      max-width: 280px;
-      width: 280px;
     }
     .header-actions select:focus { outline: none; border-color: var(--accent, #3b82f6); }
 
@@ -634,7 +631,6 @@
   <!-- MAIN -->
   <div class="main" id="mainContent">
     <div class="header">
-      <div class="header-title">Pages</div>
       <div class="header-actions">
         <button id="undoBtn" disabled
           style="padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
