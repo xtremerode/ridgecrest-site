@@ -201,6 +201,7 @@ p { line-height: 1.8; }
   display: flex;
   align-items: center;
   gap: 10px;
+  white-space: nowrap;
 }
 .nav__logo-img {
   display: block;
@@ -233,6 +234,7 @@ p { line-height: 1.8; }
   border: 1px solid rgba(255,255,255,0.4);
   color: var(--white) !important;
   transition: var(--transition);
+  white-space: nowrap;
 }
 .nav__cta:hover { background: var(--slate) !important; border-color: var(--slate) !important; }
 
