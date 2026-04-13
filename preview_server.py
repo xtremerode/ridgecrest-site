@@ -3952,6 +3952,193 @@ def admin_logo_delete():
     return jsonify({'ok': True, 'note': 'no logo to remove'})
 
 
+# ── Google Ads OAuth ──────────────────────────────────────────────────────────
+
+@app.route('/admin/google-connect')
+def admin_google_connect():
+    """No-auth page: generates the Google OAuth URL and handles code exchange."""
+    client_id = os.getenv('GOOGLE_CLIENT_ID', '')
+    redirect_uri = 'http://127.0.0.1:8080'
+    scope = 'https://www.googleapis.com/auth/adwords'
+    import urllib.parse as _up
+    auth_url = (
+        'https://accounts.google.com/o/oauth2/v2/auth?'
+        + _up.urlencode({
+            'client_id':     client_id,
+            'redirect_uri':  redirect_uri,
+            'response_type': 'code',
+            'scope':         scope,
+            'access_type':   'offline',
+            'prompt':        'consent',
+        })
+    )
+    html = f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Google Ads — Reconnect</title>
+<style>
+  body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+       background:#0f172a;color:#e2e8f0;margin:0;display:flex;
+       align-items:center;justify-content:center;min-height:100vh;padding:20px;box-sizing:border-box}}
+  .card{{background:#1e293b;border:1px solid #334155;border-radius:12px;
+         padding:36px 40px;max-width:540px;width:100%}}
+  h1{{font-size:1.4rem;margin:0 0 8px;color:#f8fafc}}
+  p{{color:#94a3b8;margin:0 0 24px;font-size:.95rem;line-height:1.6}}
+  .step{{background:#0f172a;border-radius:8px;padding:16px 20px;margin-bottom:16px}}
+  .step-num{{color:#6366f1;font-weight:700;font-size:.8rem;text-transform:uppercase;
+             letter-spacing:.05em;margin-bottom:8px}}
+  a.btn{{display:inline-block;background:#6366f1;color:#fff;text-decoration:none;
+          padding:11px 24px;border-radius:8px;font-weight:600;font-size:.95rem}}
+  a.btn:hover{{background:#4f46e5}}
+  textarea{{width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;
+            color:#e2e8f0;border-radius:8px;padding:10px 14px;font-size:.9rem;
+            font-family:monospace;resize:vertical;min-height:72px;margin-top:8px}}
+  button{{background:#10b981;color:#fff;border:none;padding:11px 24px;border-radius:8px;
+          font-weight:600;font-size:.95rem;cursor:pointer;margin-top:12px}}
+  button:hover{{background:#059669}}
+  #status{{margin-top:16px;padding:14px;border-radius:8px;display:none;font-size:.9rem}}
+  .ok{{background:#064e3b;border:1px solid #10b981;color:#6ee7b7}}
+  .err{{background:#450a0a;border:1px solid #ef4444;color:#fca5a5}}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Google Ads — Reconnect</h1>
+  <p>The refresh token has expired. Follow the three steps below to reconnect.</p>
+
+  <div class="step">
+    <div class="step-num">Step 1 — Authorize</div>
+    <a class="btn" href="{auth_url}" target="_blank">Open Google Authorization →</a>
+  </div>
+
+  <div class="step">
+    <div class="step-num">Step 2 — Copy the redirect URL</div>
+    <p style="margin:0;font-size:.88rem;color:#94a3b8">
+      After approving, your browser will try to load
+      <code style="color:#a5b4fc">http://127.0.0.1:8080/?code=…</code> and show an error
+      (that's expected — nothing is listening there). Copy the <strong>full URL</strong>
+      from your browser's address bar.
+    </p>
+  </div>
+
+  <div class="step">
+    <div class="step-num">Step 3 — Paste &amp; Save</div>
+    <textarea id="redirect-url" placeholder="Paste the full redirect URL here (http://127.0.0.1:8080/?code=...)"></textarea>
+    <br>
+    <button id="exchange-btn">Save &amp; Connect</button>
+    <div id="status"></div>
+  </div>
+</div>
+<script>
+(function(){{
+  document.getElementById('exchange-btn').addEventListener('click', function() {{
+    var url = document.getElementById('redirect-url').value.trim();
+    var statusEl = document.getElementById('status');
+    if (!url) {{ statusEl.className='err'; statusEl.style.display='block'; statusEl.textContent='Please paste the redirect URL first.'; return; }}
+    statusEl.style.display='none';
+    fetch('/admin/api/settings/google-exchange', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{redirect_url: url}})
+    }})
+    .then(function(r){{ return r.json(); }})
+    .then(function(d){{
+      statusEl.style.display = 'block';
+      if (d.ok) {{
+        statusEl.className = 'ok';
+        statusEl.textContent = '✓ Connected! Google Ads refresh token saved. You can close this page.';
+      }} else {{
+        statusEl.className = 'err';
+        statusEl.textContent = 'Error: ' + (d.error || JSON.stringify(d));
+      }}
+    }})
+    .catch(function(e){{ statusEl.style.display='block'; statusEl.className='err'; statusEl.textContent='Network error: '+e; }});
+  }});
+}})();
+</script>
+</body>
+</html>"""
+    return html, 200, {'Content-Type': 'text/html'}
+
+
+@app.route('/admin/api/settings/google-status')
+def admin_google_status():
+    refresh_token = os.getenv('GOOGLE_REFRESH_TOKEN', '')
+    connected = bool(refresh_token and refresh_token not in ('', 'null', 'None'))
+    return jsonify({'connected': connected})
+
+
+@app.route('/admin/api/settings/google-exchange', methods=['POST'])
+def admin_google_exchange():
+    """Extract auth code from pasted redirect URL, exchange for refresh token, save to .env."""
+    import urllib.parse as _up
+    import urllib.request as _ur
+    import json as _json
+
+    data = request.get_json(force=True, silent=True) or {}
+    redirect_url = data.get('redirect_url', '').strip()
+    if not redirect_url:
+        return jsonify({'ok': False, 'error': 'redirect_url is required'}), 400
+
+    # Extract code from URL
+    try:
+        parsed = _up.urlparse(redirect_url)
+        params = _up.parse_qs(parsed.query)
+        code_list = params.get('code', [])
+        if not code_list:
+            return jsonify({'ok': False, 'error': 'No "code" parameter found in the URL. Make sure you copied the full redirect URL.'}), 400
+        code = code_list[0]
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'Could not parse URL: {e}'}), 400
+
+    # Exchange code for tokens
+    client_id     = os.getenv('GOOGLE_CLIENT_ID', '')
+    client_secret = os.getenv('GOOGLE_CLIENT_SECRET', '')
+    redirect_uri  = 'http://127.0.0.1:8080'
+
+    if not client_id or not client_secret:
+        return jsonify({'ok': False, 'error': 'GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET not set in .env'}), 500
+
+    token_data = _up.urlencode({
+        'code':          code,
+        'client_id':     client_id,
+        'client_secret': client_secret,
+        'redirect_uri':  redirect_uri,
+        'grant_type':    'authorization_code',
+    }).encode()
+
+    try:
+        req = _ur.Request(
+            'https://oauth2.googleapis.com/token',
+            data=token_data,
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
+            method='POST',
+        )
+        with _ur.urlopen(req, timeout=15) as resp:
+            token_resp = _json.loads(resp.read().decode())
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'Token exchange request failed: {e}'}), 500
+
+    if 'error' in token_resp:
+        return jsonify({'ok': False, 'error': token_resp.get('error_description', token_resp['error'])}), 400
+
+    refresh_token = token_resp.get('refresh_token', '')
+    if not refresh_token:
+        return jsonify({'ok': False, 'error': 'Google did not return a refresh_token. Try the auth URL again (make sure you accepted all permissions).'}), 400
+
+    # Save to .env
+    try:
+        _write_env_file({'GOOGLE_REFRESH_TOKEN': refresh_token})
+        # Reload into process env so google_sync picks it up immediately
+        os.environ['GOOGLE_REFRESH_TOKEN'] = refresh_token
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'Failed to save token: {e}'}), 500
+
+    return jsonify({'ok': True, 'message': 'Google Ads refresh token saved successfully'})
+
+
 @app.route('/admin/api/dashboard')
 def admin_dashboard():
     auth = _require_admin()
