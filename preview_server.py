@@ -3856,10 +3856,17 @@ def paste_screenshot_proxy(filename):
 
 @app.route('/paste/download/<path:filename>', methods=['GET'])
 def paste_download(filename):
+    # Serve directly from the local downloads folder first (port-8080 uses
+    # /root/agent/downloads which differs from /home/claudeuser/agent/downloads)
+    safe = os.path.basename(filename)
+    local_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloads', safe)
+    if os.path.isfile(local_path):
+        return send_file(local_path, as_attachment=True, download_name=safe)
+    # fallback: proxy to port 8080
     from flask import Response as _Resp
     body, ct, sc = _fwd_8080(f'/download/{filename}')
     resp = _Resp(body, status=sc, mimetype='application/octet-stream')
-    resp.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+    resp.headers['Content-Disposition'] = f'attachment; filename="{safe}"'
     return resp
 
 @app.route('/paste/upload-file', methods=['POST'])
