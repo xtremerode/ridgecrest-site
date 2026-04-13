@@ -632,17 +632,106 @@
   <div class="main" id="mainContent">
     <div class="header">
       <div class="header-actions">
-        <button id="undoBtn" disabled
-          style="padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
-                 border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
-                 color:var(--text-muted,#94a3b8);cursor:not-allowed;white-space:nowrap;
-                 transition:all .15s">↩ Undo</button>
-        <button id="redoBtn" disabled
-          style="padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
-                 border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
-                 color:var(--text-muted,#94a3b8);cursor:not-allowed;white-space:nowrap;
-                 transition:all .15s">↪ Redo</button>
-        <button class="btn btn-sm" id="btnAddPage" onclick="openAddPageModal(null)" style="background:var(--surface-2,#1e2d3d);border:1px solid var(--border,#2a3748);color:var(--text,#e2e8f0)">+ Add Page</button>
+
+        <!-- ── Secondary group: collapses into ⋯ menu when space is tight ── -->
+        <div id="toolbarSecondary" style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+          <button id="undoBtn" disabled
+            style="padding:6px 11px;font-size:12px;font-weight:600;border-radius:6px;
+                   border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
+                   color:var(--text-muted,#94a3b8);cursor:not-allowed;white-space:nowrap;
+                   transition:all .15s">↩ Undo</button>
+          <button id="redoBtn" disabled
+            style="padding:6px 11px;font-size:12px;font-weight:600;border-radius:6px;
+                   border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
+                   color:var(--text-muted,#94a3b8);cursor:not-allowed;white-space:nowrap;
+                   transition:all .15s">↪ Redo</button>
+          <button class="btn btn-sm" id="btnAddPage" onclick="openAddPageModal(null)"
+            style="background:var(--surface-2,#1e2d3d);border:1px solid var(--border,#2a3748);color:var(--text,#e2e8f0)">+ Add Page</button>
+          <!-- Paste tool: button → preview → done, all inline -->
+          <div id="pasteTool" style="display:flex;align-items:center;flex-shrink:0">
+            <button id="pasteBtn"
+               style="padding:6px 11px;font-size:12px;font-weight:600;border-radius:6px;
+                      border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
+                      color:var(--text-muted,#94a3b8);cursor:pointer;white-space:nowrap"
+               title="Click to activate, then Ctrl+V to paste">📎 Paste here</button>
+            <!-- Preview state: shown after paste, before upload -->
+            <div id="pastePreview" style="display:none;align-items:center;gap:5px;
+                 padding:3px 8px 3px 5px;background:var(--surface-2,#1e2d3d);
+                 border:1px solid var(--accent,#3b82f6);border-radius:6px;min-width:0">
+              <img id="pasteThumb" src="" alt=""
+                   style="height:28px;width:auto;max-width:48px;border-radius:3px;
+                          object-fit:cover;flex-shrink:0">
+              <span id="pasteFilename"
+                    style="font-size:11px;color:#e2e8f0;max-width:140px;overflow:hidden;
+                           text-overflow:ellipsis;white-space:nowrap"></span>
+              <span style="font-size:10px;color:#64748b;white-space:nowrap">↵</span>
+              <button id="pasteSendBtn"
+                      style="padding:3px 8px;font-size:11px;font-weight:700;border-radius:4px;
+                             border:none;background:#16a34a;color:#fff;cursor:pointer;
+                             white-space:nowrap;flex-shrink:0"
+                      title="Upload (or press Enter)">↑ Send</button>
+              <button id="pasteCancelBtn"
+                      style="background:none;border:none;color:#64748b;font-size:15px;
+                             cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0"
+                      title="Cancel">✕</button>
+            </div>
+            <!-- Done state: shown after successful upload -->
+            <div id="pasteDone" style="display:none;align-items:center;gap:5px;
+                 padding:3px 8px;background:var(--surface-2,#1e2d3d);
+                 border:1px solid #16a34a;border-radius:6px">
+              <span style="font-size:11px;color:#22c55e;flex-shrink:0">✓</span>
+              <span id="pasteDoneName"
+                    style="font-size:11px;color:#e2e8f0;max-width:150px;overflow:hidden;
+                           text-overflow:ellipsis;white-space:nowrap"></span>
+              <a id="pasteDoneLink" href="#" target="_blank"
+                 style="font-size:11px;color:#60a5fa;white-space:nowrap;
+                        text-decoration:underline;flex-shrink:0">Open ↗</a>
+              <button id="pasteDoneClose"
+                      style="background:none;border:none;color:#64748b;font-size:15px;
+                             cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0"
+                      title="Dismiss">✕</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Overflow button: sits left of primary, visible when secondary is hidden ── -->
+        <div id="toolbarOverflow" style="display:none;position:relative;flex-shrink:0">
+          <button id="toolbarMoreBtn"
+            style="padding:5px 9px;font-size:13px;font-weight:700;border-radius:6px;
+                   border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
+                   color:var(--text-muted,#94a3b8);cursor:pointer;line-height:1"
+            title="More actions">⋯</button>
+          <div id="toolbarMoreMenu"
+            style="display:none;position:absolute;top:calc(100% + 6px);left:0;
+                   background:#0f1923;border:1px solid var(--border,#2a3748);
+                   border-radius:8px;padding:6px;z-index:9999;
+                   box-shadow:0 4px 20px rgba(0,0,0,.5);
+                   min-width:160px;flex-direction:column;gap:4px">
+            <button class="tb-more-item" data-action="undo"
+              style="width:100%;text-align:left;padding:7px 10px;font-size:12px;
+                     font-weight:600;border-radius:5px;border:none;
+                     background:transparent;color:var(--text-muted,#94a3b8);
+                     cursor:pointer">↩ Undo</button>
+            <button class="tb-more-item" data-action="redo"
+              style="width:100%;text-align:left;padding:7px 10px;font-size:12px;
+                     font-weight:600;border-radius:5px;border:none;
+                     background:transparent;color:var(--text-muted,#94a3b8);
+                     cursor:pointer">↪ Redo</button>
+            <button class="tb-more-item" data-action="addpage"
+              style="width:100%;text-align:left;padding:7px 10px;font-size:12px;
+                     font-weight:600;border-radius:5px;border:none;
+                     background:transparent;color:var(--text,#e2e8f0);
+                     cursor:pointer">+ Add Page</button>
+            <hr style="border:none;border-top:1px solid var(--border,#2a3748);margin:2px 0">
+            <button class="tb-more-item" data-action="paste"
+              style="width:100%;text-align:left;padding:7px 10px;font-size:12px;
+                     font-weight:600;border-radius:5px;border:none;
+                     background:transparent;color:var(--text-muted,#94a3b8);
+                     cursor:pointer">📎 Paste here</button>
+          </div>
+        </div>
+
+        <!-- ── Primary group: always visible ── -->
         <select id="pageSelect" title="Select page to edit" style="max-width:180px"></select>
         <button class="btn-page-lock" id="pageLockBtn" data-lock="development" title="Page lock status — click to cycle" style="display:none">
           🔓 Dev
@@ -658,7 +747,7 @@
           <button id="devResetBtn" title="Reset to global (remove device override)" style="display:none;padding:3px 7px;font-size:10px;border:1px solid var(--border,#2a3748);border-radius:4px;cursor:pointer;background:var(--surface-2,#1e2d3d);color:#f87171">Reset</button>
         </div>
         <button id="publishBtn" title="Publish all staged edits to the live site"
-          style="padding:7px 16px;border-radius:6px;border:none;background:#16a34a;
+          style="padding:7px 14px;border-radius:6px;border:none;background:#16a34a;
                  color:#fff;font-size:13px;font-weight:700;cursor:pointer;
                  white-space:nowrap;transition:opacity .15s;flex-shrink:0;
                  position:relative">
@@ -667,61 +756,17 @@
                 width:9px;height:9px;background:#ef4444;border-radius:50%;
                 border:2px solid #16a34a"></span>
         </button>
-        <button class="btn-edit-mode" id="editModeBtn">
+        <button class="btn-edit-mode" id="editModeBtn" style="flex-shrink:0">
           <span class="edit-mode-dot"></span>
           Edit Mode
         </button>
-        <button id="saveTextBtn" style="display:none;padding:7px 16px;border-radius:6px;
+        <button id="saveTextBtn" style="display:none;padding:7px 14px;border-radius:6px;
           border:none;background:#16a34a;color:#fff;font-size:13px;font-weight:700;
-          cursor:pointer;white-space:nowrap;transition:opacity .15s" title="Save text changes to file">
+          cursor:pointer;white-space:nowrap;transition:opacity .15s;flex-shrink:0" title="Save text changes to file">
           Save Text ✓
         </button>
-        <span class="edit-status" id="editStatus">Select a page</span>
-        <!-- Paste tool: button → preview → done, all inline -->
-        <div id="pasteTool" style="display:flex;align-items:center;flex-shrink:0">
-          <button id="pasteBtn"
-             style="padding:6px 12px;font-size:12px;font-weight:600;border-radius:6px;
-                    border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
-                    color:var(--text-muted,#94a3b8);cursor:pointer;white-space:nowrap"
-             title="Click to activate, then Ctrl+V to paste">📎 Paste here</button>
-          <!-- Preview state: shown after paste, before upload -->
-          <div id="pastePreview" style="display:none;align-items:center;gap:5px;
-               padding:3px 8px 3px 5px;background:var(--surface-2,#1e2d3d);
-               border:1px solid var(--accent,#3b82f6);border-radius:6px;min-width:0">
-            <img id="pasteThumb" src="" alt=""
-                 style="height:28px;width:auto;max-width:48px;border-radius:3px;
-                        object-fit:cover;flex-shrink:0">
-            <span id="pasteFilename"
-                  style="font-size:11px;color:#e2e8f0;max-width:140px;overflow:hidden;
-                         text-overflow:ellipsis;white-space:nowrap"></span>
-            <span style="font-size:10px;color:#64748b;white-space:nowrap">↵</span>
-            <button id="pasteSendBtn"
-                    style="padding:3px 8px;font-size:11px;font-weight:700;border-radius:4px;
-                           border:none;background:#16a34a;color:#fff;cursor:pointer;
-                           white-space:nowrap;flex-shrink:0"
-                    title="Upload (or press Enter)">↑ Send</button>
-            <button id="pasteCancelBtn"
-                    style="background:none;border:none;color:#64748b;font-size:15px;
-                           cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0"
-                    title="Cancel">✕</button>
-          </div>
-          <!-- Done state: shown after successful upload -->
-          <div id="pasteDone" style="display:none;align-items:center;gap:5px;
-               padding:3px 8px;background:var(--surface-2,#1e2d3d);
-               border:1px solid #16a34a;border-radius:6px">
-            <span style="font-size:11px;color:#22c55e;flex-shrink:0">✓</span>
-            <span id="pasteDoneName"
-                  style="font-size:11px;color:#e2e8f0;max-width:150px;overflow:hidden;
-                         text-overflow:ellipsis;white-space:nowrap"></span>
-            <a id="pasteDoneLink" href="#" target="_blank"
-               style="font-size:11px;color:#60a5fa;white-space:nowrap;
-                      text-decoration:underline;flex-shrink:0">Open ↗</a>
-            <button id="pasteDoneClose"
-                    style="background:none;border:none;color:#64748b;font-size:15px;
-                           cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0"
-                    title="Dismiss">✕</button>
-          </div>
-        </div>
+        <span class="edit-status" id="editStatus"></span>
+
       </div>
     </div>
     <div class="editor-frame-wrap">
@@ -1871,6 +1916,65 @@
       _showBtn();
       pasteBtn.style.display = '';
     });
+  })();
+
+  // ── Toolbar overflow menu — collapses secondary actions when space is tight ─
+  (function() {
+    const secondary   = document.getElementById('toolbarSecondary');
+    const overflowWrap= document.getElementById('toolbarOverflow');
+    const moreBtn     = document.getElementById('toolbarMoreBtn');
+    const moreMenu    = document.getElementById('toolbarMoreMenu');
+    const headerActions = document.querySelector('.header-actions');
+
+    // Toggle menu open/close
+    moreBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const open = moreMenu.style.display === 'flex';
+      moreMenu.style.display = open ? 'none' : 'flex';
+    });
+    document.addEventListener('click', function() {
+      moreMenu.style.display = 'none';
+    });
+
+    // Overflow menu item actions — proxy to the real buttons
+    moreMenu.addEventListener('click', function(e) {
+      const btn = e.target.closest('.tb-more-item');
+      if (!btn) return;
+      moreMenu.style.display = 'none';
+      const action = btn.dataset.action;
+      if (action === 'undo')    document.getElementById('undoBtn').click();
+      else if (action === 'redo')    document.getElementById('redoBtn').click();
+      else if (action === 'addpage') openAddPageModal(null);
+      else if (action === 'paste')   document.getElementById('pasteBtn').click();
+    });
+
+    // Hover highlight for menu items
+    moreMenu.addEventListener('mouseover', function(e) {
+      const btn = e.target.closest('.tb-more-item');
+      if (btn) btn.style.background = 'var(--surface,#1a2332)';
+    });
+    moreMenu.addEventListener('mouseout', function(e) {
+      const btn = e.target.closest('.tb-more-item');
+      if (btn) btn.style.background = 'transparent';
+    });
+
+    // ResizeObserver: switch between full and compact layouts
+    var _compact = false;
+    function _applyLayout(compact) {
+      if (compact === _compact) return;
+      _compact = compact;
+      secondary.style.display    = compact ? 'none' : 'flex';
+      overflowWrap.style.display = compact ? '' : 'none';
+      if (!compact) moreMenu.style.display = 'none';
+    }
+
+    // Measure the natural width of the secondary group to know the threshold
+    // Use a fixed threshold: secondary group is ~230px wide when all buttons shown
+    var ro = new ResizeObserver(function(entries) {
+      var w = entries[0].contentRect.width;
+      _applyLayout(w < 420);
+    });
+    ro.observe(headerActions);
   })();
 
   // ── Publish button ───────────────────────────────────────────────────────
