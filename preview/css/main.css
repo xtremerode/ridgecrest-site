@@ -472,23 +472,34 @@ p { line-height: 1.8; }
   background: var(--charcoal);
   aspect-ratio: 4/5;
   display: flex;
-  align-items: flex-end;
-  padding: 3rem;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
   position: relative;
   overflow: hidden;
-}
-.diff__visual::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, #1a2530 0%, #0d1520 100%);
 }
 .diff__visual::after {
   content: '';
   position: absolute;
   top: 2rem; left: 2rem; right: 2rem; bottom: 2rem;
   border: 1px solid rgba(96,123,142,0.2);
+  z-index: 10;
+  pointer-events: none;
 }
+.diff__zone {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+/* One-panel mode: top zone fills full height */
+.diff__visual--one .diff__zone--top { flex: 1; }
+.diff__visual--one .diff__zone--bottom { display: none !important; }
+/* Two-panel mode: 50/50 split */
+.diff__visual--two .diff__zone--top { flex: 1; }
+.diff__visual--two .diff__zone--bottom { flex: 1; }
 
 .diff__visual-inner {
   position: relative;
