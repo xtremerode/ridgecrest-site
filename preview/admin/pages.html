@@ -1075,7 +1075,7 @@
       editStatus.className = 'edit-status ready';
       setTimeout(() => {
         if (editStatus.textContent.includes('saved')) {
-          editStatus.textContent = 'Drag handles: resize any section  \u00b7  Images: click\u00b7scroll\u00b7drag';
+          editStatus.textContent = '';
           editStatus.className = 'edit-status ready';
         }
       }, 2500);
@@ -2265,7 +2265,7 @@
         _injectTextEdit(iframeDoc);
         _buildSecHandles();
         _setupDiffPanelToggle(iframeDoc);
-        editStatus.textContent = 'Drag handles: resize any section  \u00b7  Images: click\u00b7scroll\u00b7drag';
+        editStatus.textContent = '';
         editStatus.className = 'edit-status ready';
         const imgs = allImages.length ? allImages : await API('/admin/api/pages/images').then(r => { allImages = r; return r; });
         siteFrame.contentWindow.postMessage({ type: 'rd_set_pool', images: imgs.map(i => i.hero_path) }, window.location.origin);
@@ -2309,7 +2309,7 @@
         cw.__rdTextEdits = {};
         textEditCount = 0;
         saveTextBtn.style.display = 'none';
-        editStatus.textContent = 'Text saved ✓  ·  Images: click·scroll·drag  ·  Text: click any text to edit';
+        editStatus.textContent = 'Text saved ✓';
         editStatus.className = 'edit-status ready';
         if (typeof window._rdRefreshUndo === 'function') window._rdRefreshUndo();
       } else {
@@ -2491,7 +2491,7 @@
     if (!siteFrame || e.source !== siteFrame.contentWindow) return;
     const d = e.data || {};
     if (d.type === 'rd_overlay_ready') {
-      editStatus.textContent = `Click: cycle  ·  Scroll: zoom  ·  Drag: pan  ·  Browse All to pick`;
+      editStatus.textContent = '';
       editStatus.className = 'edit-status ready';
       // Send image pool to iframe so it can cycle
       if (allImages.length) {
@@ -2570,13 +2570,13 @@
     }
     if (d.type === 'rd_text_mode') {
       if (d.active) {
-        editStatus.textContent = 'Text mode: click any text to edit  ·  Click ✓ Done on image to return';
+        editStatus.textContent = '';
         editStatus.className = 'edit-status ready';
       } else {
         // Returned to image mode
         const msg = textEditCount > 0
-          ? `${textEditCount} unsaved text change${textEditCount !== 1 ? 's' : ''}  ·  Images: click·scroll·drag`
-          : 'Images: click·scroll·drag  ·  Text: click any text to edit';
+          ? `${textEditCount} unsaved text change${textEditCount !== 1 ? 's' : ''}`
+          : '';
         editStatus.textContent = msg;
         editStatus.className = textEditCount > 0 ? 'edit-status' : 'edit-status ready';
       }
@@ -2663,7 +2663,7 @@
         editStatus.className = 'edit-status ready';
         setTimeout(() => {
           if (editStatus.textContent.includes('saved')) {
-            editStatus.textContent = 'Drag handles: resize any section  \u00b7  Images: click\u00b7scroll\u00b7drag';
+            editStatus.textContent = '';
             editStatus.className = 'edit-status ready';
           }
         }, 2500);
