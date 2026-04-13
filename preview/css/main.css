@@ -502,9 +502,14 @@ p { line-height: 1.8; }
 .diff__visual--two .diff__zone--bottom { flex: 1; }
 
 .diff__visual-inner {
-  position: relative;
-  z-index: 1;
-  width: 100%;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  padding: 2rem 2.5rem;
+  background: linear-gradient(to top, rgba(0,0,0,0.72) 0%, transparent 100%);
+  pointer-events: none;
 }
 .diff__quote {
   font-family: var(--font-display);
