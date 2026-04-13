@@ -217,11 +217,12 @@ p { line-height: 1.8; }
 .nav__links {
   display: flex;
   align-items: center;
-  gap: clamp(1.25rem, calc(12.5vw - 140px), 2.5rem);
+  gap: clamp(1.25rem, calc(4.8vw - 29px), 2.5rem);
 }
 .nav__links a {
   font-size: 0.7rem;
   font-weight: 400;
+  white-space: nowrap;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: rgba(255,255,255,0.75);
@@ -1314,8 +1315,8 @@ p { line-height: 1.8; }
 
 }
 
-/* ── Nav: switch to hamburger at 1280px so desktop nav never crowds ── */
-@media (max-width: 1280px) {
+/* ── Nav: switch to hamburger at 1024px so desktop nav never crowds ── */
+@media (max-width: 1024px) {
   .nav__toggle { display: flex; z-index: 300; }
   .nav__links {
     position: fixed;

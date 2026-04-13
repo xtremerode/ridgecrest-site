@@ -13,7 +13,7 @@
 */
 .nav:not(.nav--scrolled) {
   background: rgba(0, 0, 0, 0.6);
-  padding: 1rem var(--space-md);
+  padding: 1rem clamp(1rem, calc(10vw - 112px), 2rem);
 }
 
 /* ── Mobile hero height + anchor ─────────────────────────────────────────────
