@@ -677,11 +677,51 @@
           Save Text ✓
         </button>
         <span class="edit-status" id="editStatus">Select a page</span>
-        <button id="pasteBtn"
-           style="padding:6px 12px;font-size:12px;font-weight:600;border-radius:6px;
-                  border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
-                  color:var(--text-muted,#94a3b8);cursor:pointer;white-space:nowrap;flex-shrink:0"
-           title="Open screenshot/file sharing panel">📎 Paste here</button>
+        <!-- Paste tool: button → preview → done, all inline -->
+        <div id="pasteTool" style="display:flex;align-items:center;flex-shrink:0">
+          <button id="pasteBtn"
+             style="padding:6px 12px;font-size:12px;font-weight:600;border-radius:6px;
+                    border:1px solid var(--border,#2a3748);background:var(--surface-2,#1e2d3d);
+                    color:var(--text-muted,#94a3b8);cursor:pointer;white-space:nowrap"
+             title="Click to activate, then Ctrl+V to paste">📎 Paste here</button>
+          <!-- Preview state: shown after paste, before upload -->
+          <div id="pastePreview" style="display:none;align-items:center;gap:5px;
+               padding:3px 8px 3px 5px;background:var(--surface-2,#1e2d3d);
+               border:1px solid var(--accent,#3b82f6);border-radius:6px;min-width:0">
+            <img id="pasteThumb" src="" alt=""
+                 style="height:28px;width:auto;max-width:48px;border-radius:3px;
+                        object-fit:cover;flex-shrink:0">
+            <span id="pasteFilename"
+                  style="font-size:11px;color:#e2e8f0;max-width:140px;overflow:hidden;
+                         text-overflow:ellipsis;white-space:nowrap"></span>
+            <span style="font-size:10px;color:#64748b;white-space:nowrap">↵</span>
+            <button id="pasteSendBtn"
+                    style="padding:3px 8px;font-size:11px;font-weight:700;border-radius:4px;
+                           border:none;background:#16a34a;color:#fff;cursor:pointer;
+                           white-space:nowrap;flex-shrink:0"
+                    title="Upload (or press Enter)">↑ Send</button>
+            <button id="pasteCancelBtn"
+                    style="background:none;border:none;color:#64748b;font-size:15px;
+                           cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0"
+                    title="Cancel">✕</button>
+          </div>
+          <!-- Done state: shown after successful upload -->
+          <div id="pasteDone" style="display:none;align-items:center;gap:5px;
+               padding:3px 8px;background:var(--surface-2,#1e2d3d);
+               border:1px solid #16a34a;border-radius:6px">
+            <span style="font-size:11px;color:#22c55e;flex-shrink:0">✓</span>
+            <span id="pasteDoneName"
+                  style="font-size:11px;color:#e2e8f0;max-width:150px;overflow:hidden;
+                         text-overflow:ellipsis;white-space:nowrap"></span>
+            <a id="pasteDoneLink" href="#" target="_blank"
+               style="font-size:11px;color:#60a5fa;white-space:nowrap;
+                      text-decoration:underline;flex-shrink:0">Open ↗</a>
+            <button id="pasteDoneClose"
+                    style="background:none;border:none;color:#64748b;font-size:15px;
+                           cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0"
+                    title="Dismiss">✕</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="editor-frame-wrap">
@@ -865,18 +905,6 @@
   </div>
 </div>
 
-<!-- ── Paste confirm toast (no modal needed) ── -->
-<div id="pasteConfirm" style="display:none;position:fixed;bottom:24px;right:24px;
-     z-index:100000;background:#0f1923;border:1px solid #2a3748;border-radius:8px;
-     padding:10px 14px;font-size:12px;color:#e2e8f0;box-shadow:0 4px 20px rgba(0,0,0,0.5);
-     gap:8px;align-items:center;max-width:340px">
-  <span id="pasteConfirmText"></span>
-  <a id="pasteConfirmLink" href="#" target="_blank"
-     style="color:#60a5fa;white-space:nowrap;text-decoration:underline">Open ↗</a>
-  <button id="pasteConfirmClose"
-     style="background:none;border:none;color:#64748b;font-size:16px;cursor:pointer;
-            padding:0 2px;line-height:1;margin-left:4px">✕</button>
-</div>
 
 <!-- ── Add Page Modal ── -->
 <div class="add-page-backdrop" id="addPageBackdrop">
@@ -1711,60 +1739,139 @@
     _deviceToggle.style.display = 'flex';
   }
 
-  // ── Paste — click to activate, then Ctrl+V to capture ───────────────────
-  const pasteBtn         = document.getElementById('pasteBtn');
-  const pasteConfirm     = document.getElementById('pasteConfirm');
-  const pasteConfirmText = document.getElementById('pasteConfirmText');
-  const pasteConfirmLink = document.getElementById('pasteConfirmLink');
-  const pasteConfirmClose= document.getElementById('pasteConfirmClose');
-  let _pasteActive = false;
+  // ── Paste tool — click to activate → Ctrl+V previews inline → Enter to upload ─
+  (function() {
+    const pasteBtn      = document.getElementById('pasteBtn');
+    const pastePreview  = document.getElementById('pastePreview');
+    const pasteThumb    = document.getElementById('pasteThumb');
+    const pasteFilename = document.getElementById('pasteFilename');
+    const pasteSendBtn  = document.getElementById('pasteSendBtn');
+    const pasteCancelBtn= document.getElementById('pasteCancelBtn');
+    const pasteDone     = document.getElementById('pasteDone');
+    const pasteDoneName = document.getElementById('pasteDoneName');
+    const pasteDoneLink = document.getElementById('pasteDoneLink');
+    const pasteDoneClose= document.getElementById('pasteDoneClose');
 
-  function _setPasteActive(on) {
-    _pasteActive = on;
-    pasteBtn.style.background = on ? 'var(--accent,#3b82f6)' : 'var(--surface-2,#1e2d3d)';
-    pasteBtn.style.color      = on ? '#fff' : 'var(--text-muted,#94a3b8)';
-    pasteBtn.title = on ? 'Ready — press Ctrl+V to paste' : 'Click to activate paste mode';
-  }
+    let _active = false;      // waiting for Ctrl+V
+    let _pendingDataUrl = null; // captured image data URL, pending send
+    let _doneTimer = null;
 
-  pasteBtn.addEventListener('click', () => { _setPasteActive(!_pasteActive); });
+    function _showBtn() {
+      pasteBtn.style.display    = '';
+      pastePreview.style.display = 'none';
+      pasteDone.style.display   = 'none';
+      _active = false;
+      _pendingDataUrl = null;
+    }
 
-  document.addEventListener('paste', async (e) => {
-    if (!_pasteActive) return;
-    const items = Array.from(e.clipboardData.items || []);
-    const imgItem = items.find(i => i.type.startsWith('image/'));
-    if (!imgItem) return;
-    e.preventDefault();
-    _setPasteActive(false);
-    pasteConfirmText.textContent = 'Uploading…';
-    pasteConfirm.style.display = 'flex';
-    try {
+    function _setActive(on) {
+      _active = on;
+      pasteBtn.style.background = on ? 'var(--accent,#3b82f6)' : 'var(--surface-2,#1e2d3d)';
+      pasteBtn.style.color      = on ? '#fff' : 'var(--text-muted,#94a3b8)';
+      pasteBtn.title = on ? 'Ready — press Ctrl+V to paste' : 'Click to activate, then Ctrl+V to paste';
+    }
+
+    // Toggle active on click
+    pasteBtn.addEventListener('click', () => { _setActive(!_active); });
+
+    // Capture paste event
+    document.addEventListener('paste', function(e) {
+      if (!_active) return;
+      const items = Array.from(e.clipboardData.items || []);
+      const imgItem = items.find(i => i.type.startsWith('image/'));
+      if (!imgItem) return;
+      e.preventDefault();
+      _setActive(false);
+
       const blob = imgItem.getAsFile();
       const reader = new FileReader();
-      reader.onload = async () => {
+      reader.onload = function() {
+        _pendingDataUrl = reader.result;
+
+        // Generate a preview filename based on timestamp
+        const now = new Date();
+        const ts = now.getFullYear().toString() +
+          String(now.getMonth()+1).padStart(2,'0') +
+          String(now.getDate()).padStart(2,'0') + '_' +
+          String(now.getHours()).padStart(2,'0') +
+          String(now.getMinutes()).padStart(2,'0') +
+          String(now.getSeconds()).padStart(2,'0');
+        const ext = (imgItem.type === 'image/png') ? 'png' : 'jpg';
+        pasteFilename.textContent = `screenshot_${ts}.${ext}`;
+        pasteThumb.src = _pendingDataUrl;
+
+        // Show preview panel, hide button
+        pasteBtn.style.display   = 'none';
+        pastePreview.style.display = 'flex';
+        pasteDone.style.display  = 'none';
+      };
+      reader.readAsDataURL(blob);
+    });
+
+    async function _doUpload() {
+      if (!_pendingDataUrl) return;
+      const dataUrl = _pendingDataUrl;
+      _pendingDataUrl = null;
+
+      pasteSendBtn.disabled = true;
+      pasteSendBtn.textContent = '…';
+
+      try {
         const res = await fetch('/paste/upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: reader.result })
+          body: JSON.stringify({ image: dataUrl })
         });
         const data = await res.json();
+        pastePreview.style.display = 'none';
         if (data.filename) {
           const url = `/paste/download/${encodeURIComponent(data.filename)}`;
-          pasteConfirmText.textContent = `Saved: ${data.filename}`;
-          pasteConfirmLink.href = url;
-          pasteConfirmLink.style.display = '';
+          pasteDoneName.textContent = data.filename;
+          pasteDoneLink.href = url;
+          pasteDone.style.display = 'flex';
+          // Auto-dismiss after 8 seconds
+          clearTimeout(_doneTimer);
+          _doneTimer = setTimeout(_showBtn, 8000);
         } else {
-          pasteConfirmText.textContent = 'Upload failed';
-          pasteConfirmLink.style.display = 'none';
+          _showBtn();
         }
-      };
-      reader.readAsDataURL(blob);
-    } catch(err) {
-      pasteConfirmText.textContent = 'Upload failed';
-      pasteConfirmLink.style.display = 'none';
+      } catch(err) {
+        pastePreview.style.display = 'none';
+        _showBtn();
+      } finally {
+        pasteSendBtn.disabled = false;
+        pasteSendBtn.textContent = '↑ Send';
+      }
     }
-  });
 
-  pasteConfirmClose.addEventListener('click', () => { pasteConfirm.style.display = 'none'; });
+    // Send on button click
+    pasteSendBtn.addEventListener('click', _doUpload);
+
+    // Send on Enter key while preview is showing
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && _pendingDataUrl) {
+        e.preventDefault();
+        _doUpload();
+      }
+      if (e.key === 'Escape' && _pendingDataUrl) {
+        _showBtn();
+        pasteBtn.style.display = '';
+      }
+    });
+
+    // Cancel
+    pasteCancelBtn.addEventListener('click', function() {
+      _showBtn();
+      pasteBtn.style.display = '';
+    });
+
+    // Dismiss done
+    pasteDoneClose.addEventListener('click', function() {
+      clearTimeout(_doneTimer);
+      _showBtn();
+      pasteBtn.style.display = '';
+    });
+  })();
 
   // ── Publish button ───────────────────────────────────────────────────────
   const publishBtnText = document.getElementById('publishBtnText');
