@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Custom Home Builder Walnut Creek, CA — Ridgecrest Designs | Luxury Custom Homes</title>
+  <meta name="description" content="Luxury custom home builder in Walnut Creek, CA. Ridgecrest Designs builds custom homes from $5M–$10M with photo-realistic renders, integrated design-build, and flawless execution." />
+
+  <!-- ── SEO ──────────────────────────────────────────────────── -->
+  <link rel="canonical" href="https://www.ridgecrestdesigns.com/services/custom-home-builder-walnut-creek" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Ridgecrest Designs" />
+  <meta property="og:title" content="Custom Home Builder Walnut Creek, CA — Ridgecrest Designs | Luxury Custom Homes" />
+  <meta property="og:description" content="Luxury custom home builder in Walnut Creek, CA. Ridgecrest Designs builds custom homes from $5M–$10M with photo-realistic renders, integrated design-build, and flawless execution." />
+  <meta property="og:url" content="https://www.ridgecrestdesigns.com/services/custom-home-builder-walnut-creek" />
+  <meta property="og:image" content="/assets/images/ff5b18_9820c1603a9c414d8cc8009784d1ca7c_mv2.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Custom Home Builder Walnut Creek, CA — Ridgecrest Designs | Luxury Custom Homes" />
+  <meta name="twitter:description" content="Luxury custom home builder in Walnut Creek, CA. Ridgecrest Designs builds custom homes from $5M–$10M with photo-realistic renders, integrated design-build, and flawless execution." />
+  <meta name="twitter:image" content="/assets/images/ff5b18_9820c1603a9c414d8cc8009784d1ca7c_mv2.jpg" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": [
+        "LocalBusiness",
+        "HomeAndConstructionBusiness"
+    ],
+    "name": "Ridgecrest Designs",
+    "description": "Luxury custom home builder firm serving Walnut Creek, CA and the East Bay.",
+    "url": "https://www.ridgecrestdesigns.com",
+    "telephone": "+19257842798",
+    "email": "hello@ridgecrestdesigns.com",
+    "foundingDate": "2013",
+    "founder": {
+        "@type": "Person",
+        "name": "Tyler Ridgecrest"
+    },
+    "priceRange": "$5,000,000+",
+    "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "5502 Sunol Blvd Suite 100",
+        "addressLocality": "Pleasanton",
+        "addressRegion": "CA",
+        "postalCode": "94566",
+        "addressCountry": "US"
+    },
+    "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": 37.6624,
+        "longitude": -121.8747
+    },
+    "areaServed": {
+        "@type": "City",
+        "name": "Walnut Creek",
+        "containedInPlace": {
+            "@type": "State",
+            "name": "California"
+        }
+    },
+    "sameAs": [
+        "https://www.facebook.com/ridgecrestdesigns",
+        "https://www.instagram.com/ridgecrestdesigns",
+        "https://www.houzz.com/pro/ridgecrestdesigns"
+    ]
+}
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    "name": "Custom Home Builder in Walnut Creek, CA",
+    "description": "Luxury custom home builder in Walnut Creek, CA. Ridgecrest Designs builds custom homes from $5M–$10M with photo-realistic renders, integrated design-build, and flawless execution.",
+    "provider": {
+        "@type": "Organization",
+        "name": "Ridgecrest Designs",
+        "url": "https://www.ridgecrestdesigns.com"
+    },
+    "areaServed": {
+        "@type": "City",
+        "name": "Walnut Creek",
+        "containedInPlace": {
+            "@type": "State",
+            "name": "California"
+        }
+    },
+    "serviceType": "Custom Home Building",
+    "url": "https://www.ridgecrestdesigns.com/services/custom-home-builder-walnut-creek",
+    "breadcrumb": {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Home",
+                "item": "https://www.ridgecrestdesigns.com"
+            },
+            {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Services",
+                "item": "https://www.ridgecrestdesigns.com/services"
+            },
+            {
+                "@type": "ListItem",
+                "position": 3,
+                "name": "Custom Home Builder in Walnut Creek",
+                "item": "https://www.ridgecrestdesigns.com/services/custom-home-builder-walnut-creek"
+            }
+        ]
+    }
+}
+  </script>
+  <!-- ─────────────────────────────────────────────────────────── -->
+
+  <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/service-pages.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=block" rel="stylesheet" />
+</head>
+<body>
+
+  <nav class="nav nav--scrolled" id="nav">
+    <a href="../index.html" class="nav__logo">RIDGECREST DESIGNS</a>
+    <button class="nav__toggle" id="navToggle" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav__links" id="navLinks">
+      <li><a href="../about.html">About</a></li>
+      <li><a href="../process.html">Process</a></li>
+      <li><a href="../portfolio.html">Portfolio</a></li>
+      <li><a href="/blog">The RD Edit</a></li>
+      <li><a href="../team.html">Team</a></li>
+      <li><a href="/book" class="nav__cta">Start a Project</a></li>
+    </ul>
+  </nav>  <!-- PAGE HERO -->
+  <div class="page-hero page-hero--service" style="background-image:url('/assets/images-opt/ff5b18_9192e5d316c84e40b65fff6dbd4d0e36_mv2.webp')">
+    <p class="page-hero__eyebrow">Custom Home Design & Build · Walnut Creek, CA</p>
+    <h1 class="page-hero__title">Custom Home Builder in Walnut Creek</h1>
+    <p class="page-hero__sub">From vision and visualization through permitting and construction.</p>
+    <div class="page-hero__actions">
+      <a href="/book" class="btn btn--primary btn--lg">Start Your Project Inquiry</a>
+      <a href="../portfolio.html" class="btn btn--ghost">View Our Work</a>
+    </div>
+    <a href="../services.html" class="page-hero__back">← All Services</a>
+  </div>
+
+  <!-- INTRO -->
+  <section class="section section--accent">
+    <div class="container container--narrow">
+      <p class="section__label">Custom Home Builder · Walnut Creek, CA</p>
+      <h2 class="section__headline">Built for Walnut Creek.<br><em>Built without compromise.</em></h2>
+      <div class="service-intro-body">
+        <p>Building a custom home in Walnut Creek — where property values are high, expectations are higher, and the details matter at every level — requires a design-build firm with the depth to carry a project from raw land to finished home without losing accountability along the way. Ridgecrest Designs builds luxury custom homes for discerning homeowners who want a single, trusted partner managing design, engineering, permitting, and construction under one contract.</p>
+        <p>Walnut Creek is the urban heart of Contra Costa County — offering Broadway Plaza shopping, a thriving arts scene, and residential neighborhoods that range from hillside estates to beautifully updated mid-century homes. Walnut Creek homeowners are sophisticated and quality-driven — they want modern living that doesn't sacrifice warmth or character.</p>
+        <p>Our custom home projects range from $5,000,000 to $10,000,000 and begin with a design phase that includes photo-realistic renders of your home before a permit is filed. This is not a rendering tool — it is a decision-making tool. You will see your home in photographic detail, refine every room, adjust every material, and arrive at a design you're completely confident in before construction begins. That clarity is what makes a Ridgecrest custom home different.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHAT'S INCLUDED -->
+  <section class="section">
+    <div class="container">
+      <div class="service-included">
+        <div class="service-included__text">
+          <p class="section__label">Scope of Work</p>
+          <h2 class="section__headline">What's included in a<br><em>custom home builder with Ridgecrest</em></h2>
+          <p>Every project is different — but every Ridgecrest project includes full design-build management, photo-realistic renders before construction begins, and a single point of accountability from first meeting to final walkthrough.</p>
+          <p class="service-budget-note">Custom home projects with Ridgecrest Designs start at $5,000,000. We build for homeowners creating a long-term legacy residence — not a speculative flip.</p>
+        </div>
+        <div class="service-included__list">
+          <ul class="service-checklist">
+            <li>Site analysis and feasibility assessment</li>
+            <li>Full architectural design and space planning</li>
+            <li>Photo-realistic 3D renders of every exterior and interior space</li>
+            <li>Structural and civil engineering coordination</li>
+            <li>Full permitting management with Walnut Creek building department</li>
+            <li>Custom cabinetry, millwork, and finish specification</li>
+            <li>Mechanical, electrical, plumbing, and HVAC design</li>
+            <li>Landscape and hardscape coordination</li>
+            <li>Premium subcontractor selection and management</li>
+            <li>Active construction management through final certificate of occupancy</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+  
+
+  <!-- DIFFERENTIATORS -->
+  <section class="section section--dark">
+    <div class="container">
+      <p class="section__label">Why Ridgecrest Designs</p>
+      <h2 class="section__headline">What makes us different<br><em>in Walnut Creek</em></h2>
+      <div class="diff-grid">
+        <div class="diff-item">
+          <h3 class="diff-item__title">Photo-Realistic Renders</h3>
+          <p class="diff-item__body">Before we file a single permit, you'll see your finished custom home builder in photographic detail. Every material, every fixture, every finish — confirmed before construction begins.</p>
+        </div>
+        <div class="diff-item">
+          <h3 class="diff-item__title">Integrated Design-Build</h3>
+          <p class="diff-item__body">One firm manages design, engineering, permitting, and construction. No handoff. No finger-pointing. One contract, one point of accountability, zero coordination gaps.</p>
+        </div>
+        <div class="diff-item">
+          <h3 class="diff-item__title">Permitting Expertise</h3>
+          <p class="diff-item__body">We know Walnut Creek's permitting process. We manage every application, response, and inspection — so you never have to wonder where your project stands with the building department.</p>
+        </div>
+        <div class="diff-item">
+          <h3 class="diff-item__title">Premium Teams</h3>
+          <p class="diff-item__body">Our subcontractors are selected for quality, not cost. Every trade on a Ridgecrest project is held to the same standard: precise, accountable, and proud of the work they leave behind.</p>
+        </div>
+        <div class="diff-item">
+          <h3 class="diff-item__title">Limited Projects Per Year</h3>
+          <p class="diff-item__body">We take on a carefully limited number of projects to ensure every client receives our full attention. If you're considering a custom home builder in Walnut Creek, reach out early.</p>
+        </div>
+        <div class="diff-item">
+          <h3 class="diff-item__title">Established Since 2013</h3>
+          <p class="diff-item__body">Over a decade of luxury design-build projects across the East Bay. We know what it takes to deliver at this level — and we do it consistently.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SERVICE AREA -->
+  <section class="section section--accent">
+    <div class="container container--narrow" style="text-align:center">
+      <p class="section__label">Service Area</p>
+      <h2 class="section__headline">Serving Walnut Creek<br><em>and the surrounding East Bay</em></h2>
+      <p>Ridgecrest Designs serves Walnut Creek and the following communities: Rossmoor, Parkmead, Northgate, and the Lakewood area, as well as Danville, Lafayette, Alamo, Orinda, Walnut Creek, Pleasanton, San Ramon, Dublin, Moraga, Sunol, Rossmoor, and Diablo.</p>
+      <p style="margin-top:1.5rem">5502 Sunol Blvd Suite 100, Pleasanton CA 94566 · <a href="tel:9257842798">925-784-2798</a></p>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta section section--dark" style="background:var(--charcoal)">
+    <div class="container container--narrow cta__inner">
+      <h2 class="cta__headline">Ready to start your<br><em>custom home builder in Walnut Creek?</em></h2>
+      <p class="cta__sub">Submit a project inquiry and we'll follow up within one business day to discuss your vision, timeline, and budget.</p>
+      <a href="/book" class="btn btn--primary btn--lg">Submit a Project Inquiry</a>
+      <p class="cta__note">Or call <a href="tel:9257842798">925-784-2798</a></p>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div class="footer__brand">
+        <span class="footer__logo">RIDGECREST DESIGNS</span>
+        <p class="footer__tagline">Luxury Design-Build · Est. 2013</p>
+        <p class="footer__address">5502 Sunol Blvd, Suite 100<br>Pleasanton, CA 94566</p>
+        <p><a href="tel:9257842798">925-784-2798</a> · <a href="mailto:hello@ridgecrestdesigns.com">hello@ridgecrestdesigns.com</a></p>
+      </div>
+      <div class="footer__nav">
+        <div class="footer__col">
+          <p class="footer__col-head">Company</p>
+          <a href="../about.html">About</a>
+          <a href="../team.html">Team</a>
+          <a href="../process.html">Process</a>
+          <a href="../portfolio.html">Portfolio</a>
+        </div>
+        <div class="footer__col">
+          <p class="footer__col-head">Services</p>
+          <a href="../contact.html">Custom Homes</a>
+          <a href="../contact.html">Whole House Remodels</a>
+          <a href="../contact.html">Kitchen Remodels</a>
+          <a href="../contact.html">Bathroom Remodels</a>
+        </div>
+                <div class="footer__col">
+          <p class="footer__col-head">Service Areas</p>
+          <a href="alamo.html">Alamo</a>
+          <a href="danville.html">Danville</a>
+          <a href="diablo.html">Diablo</a>
+          <a href="dublin.html">Dublin</a>
+          <a href="lafayette.html">Lafayette</a>
+          <a href="moraga.html">Moraga</a>
+          <a href="orinda.html">Orinda</a>
+          <a href="pleasanton.html">Pleasanton</a>
+          <a href="rossmoor.html">Rossmoor</a>
+          <a href="san-ramon.html">San Ramon</a>
+          <a href="sunol.html">Sunol</a>
+          <a href="walnut-creek.html">Walnut Creek</a>
+        </div>
+        <div class="footer__col">
+          <p class="footer__col-head">Connect</p>
+          <a href="/book">Start a Project</a>
+          <a href="../contact.html">Contact Us</a>
+          <a href="/blog">The RD Edit</a>
+          <a href="https://www.instagram.com/ridgecrestdesigns" target="_blank" rel="noopener">Instagram</a>
+          <a href="https://www.facebook.com/ridgecrestdesigns" target="_blank" rel="noopener">Facebook</a>
+          <a href="https://www.houzz.com/pro/ridgecrestdesigns" target="_blank" rel="noopener">Houzz</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <div class="container">
+        <p>© 2026 Ridgecrest Designs. All rights reserved.</p>
+        <p>Licensed &amp; Insured · California Contractor · <a href="../sitemap.html">Site Map</a></p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="../js/main.js"></script>
+</body>
+</html>

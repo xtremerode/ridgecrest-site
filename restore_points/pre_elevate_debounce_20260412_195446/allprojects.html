@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>All Projects — Ridgecrest Designs | 18 Luxury Homes & Remodels</title>
+  <meta name="description" content="Browse all 18 Ridgecrest Designs projects — custom homes, whole house remodels, kitchen and bathroom renovations across the East Bay and Tri-Valley." />
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=block" rel="stylesheet" />
+  <link rel="canonical" href="https://www.ridgecrestdesigns.com/allprojects" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Ridgecrest Designs" />
+  <meta property="og:title" content="All Projects — Ridgecrest Designs | 18 Luxury Homes & Remodels" />
+  <meta property="og:description" content="Browse all 18 Ridgecrest Designs projects — custom homes, whole house remodels, kitchen and bathroom renovations across the East Bay and Tri-Valley." />
+  <meta property="og:url" content="https://www.ridgecrestdesigns.com/allprojects" />
+  <meta property="og:image" content="/assets/images-opt/ff5b18_6f6dc7ef92684e7e8af496c4f83f06be_mv2_1920w.webp" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="All Projects — Ridgecrest Designs | 18 Luxury Homes & Remodels" />
+  <meta name="twitter:description" content="Browse all 18 Ridgecrest Designs projects — custom homes, whole house remodels, kitchen and bathroom renovations across the East Bay and Tri-Valley." />
+  <meta name="twitter:image" content="/assets/images-opt/ff5b18_6f6dc7ef92684e7e8af496c4f83f06be_mv2_1920w.webp" />
+  <script type="application/ld+json">
+  {
+  "@context": "https://schema.org",
+  "@type": ["LocalBusiness","HomeAndConstructionBusiness"],
+  "name": "Ridgecrest Designs",
+  "description": "Luxury design-build firm specializing in custom homes and high-end remodels across Pleasanton, Danville, Walnut Creek, Lafayette, Orinda, Alamo, San Ramon and the East Bay.",
+  "url": "https://www.ridgecrestdesigns.com",
+  "telephone": "+19257842798",
+  "email": "info@ridgecrestdesigns.com",
+  "foundingDate": "2013",
+  "founder": {"@type":"Person","name":"Tyler Ridgecrest"},
+  "priceRange": "$$$$$",
+  "address": {"@type":"PostalAddress","streetAddress":"5502 Sunol Blvd Suite 100","addressLocality":"Pleasanton","addressRegion":"CA","postalCode":"94566","addressCountry":"US"},
+  "geo": {"@type":"GeoCoordinates","latitude":37.6624,"longitude":-121.8747},
+  "areaServed": [
+    {"@type":"City","name":"Pleasanton"},{"@type":"City","name":"Danville"},
+    {"@type":"City","name":"Walnut Creek"},{"@type":"City","name":"Lafayette"},
+    {"@type":"City","name":"Orinda"},{"@type":"City","name":"Alamo"},
+    {"@type":"City","name":"San Ramon"},{"@type":"City","name":"Sunol"}
+  ],
+  "sameAs": [
+    "https://www.facebook.com/ridgecrestdesigns",
+    "https://www.instagram.com/ridgecrestdesigns",
+    "https://www.houzz.com/pro/ridgecrestdesigns"
+  ]
+}
+  </script>
+  <style>
+    .allprojects-hero {
+      background: #111;
+      padding: 80px 24px 48px;
+      text-align: center;
+    }
+    .allprojects-hero__back {
+      display: inline-block;
+      font-family: var(--font-body);
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.5);
+      text-decoration: none;
+      margin-bottom: 24px;
+    }
+    .allprojects-hero__back:hover { color: rgba(255,255,255,0.8); }
+    .allprojects-hero h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 300;
+      color: #fff;
+      margin: 0 0 12px;
+    }
+    .allprojects-hero p {
+      font-family: var(--font-body);
+      font-size: 14px;
+      color: rgba(255,255,255,0.55);
+      letter-spacing: 0.04em;
+    }
+    .filter-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding: 32px 24px 0;
+      background: #111;
+    }
+    .filter-tab {
+      font-family: var(--font-body);
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.5);
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 2px;
+      padding: 8px 18px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .filter-tab:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
+    .filter-tab.active { color: #fff; border-color: #fff; background: rgba(255,255,255,0.08); }
+    .proj-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 3px;
+      background: #111;
+      padding: 3px 0 0;
+    }
+    .proj-card {
+      display: block;
+      text-decoration: none;
+      background: #1a1a1a;
+      overflow: hidden;
+      transition: opacity 0.3s;
+    }
+    .proj-card.hidden { display: none; }
+    .proj-card__img {
+      aspect-ratio: 4/3;
+      background-size: cover;
+      background-position: center;
+      transition: transform 0.5s ease;
+    }
+    .proj-card:hover .proj-card__img { transform: scale(1.04); }
+    .proj-card__body {
+      padding: 16px 18px 20px;
+    }
+    .proj-card__loc {
+      display: block;
+      font-family: var(--font-body);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.45);
+      margin-bottom: 6px;
+    }
+    .proj-card__name {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      font-weight: 400;
+      color: #fff;
+      margin: 0 0 10px;
+      line-height: 1.25;
+    }
+    .proj-card__meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .proj-card__type {
+      font-family: var(--font-body);
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+      letter-spacing: 0.06em;
+    }
+    .proj-card__year {
+      font-family: var(--font-body);
+      font-size: 11px;
+      color: rgba(255,255,255,0.25);
+    }
+    .proj-count {
+      text-align: center;
+      padding: 20px;
+      background: #111;
+      font-family: var(--font-body);
+      font-size: 12px;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 0.06em;
+    }
+    @media (max-width: 900px) { .proj-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 520px) { .proj-grid { grid-template-columns: 1fr; } }
+    .breadcrumb-back { display: none; }
+  </style>
+</head>
+<body>
+
+  <nav class="nav nav--scrolled" id="nav">
+    <a href="index.html" class="nav__logo">RIDGECREST DESIGNS</a>
+    <button class="nav__toggle" id="navToggle" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav__links" id="navLinks">
+      <li><a href="about.html">About</a></li>
+      <li><a href="process.html">Process</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="portfolio.html">Portfolio</a></li>
+      <li><a href="/blog">The RD Edit</a></li>
+      <li><a href="team.html">Team</a></li>
+      <li><a href="start-a-project.html" class="nav__cta">Start a Project</a></li>
+    </ul>
+  </nav>
+
+  <div class="allprojects-hero">
+    <a href="portfolio.html" class="allprojects-hero__back">← Back to Portfolio</a>
+    <h1>All Projects</h1>
+    <p>18 projects &mdash; custom homes, remodels, kitchens &amp; baths across the East Bay</p>
+  </div>
+
+  <div class="filter-tabs" id="filterTabs">
+    <button class="filter-tab active" data-filter="all">All (18)</button>
+    <button class="filter-tab" data-filter="custom-home">Custom Homes</button>
+    <button class="filter-tab" data-filter="whole-house">Whole House</button>
+    <button class="filter-tab" data-filter="kitchen-bath">Kitchen &amp; Bath</button>
+    <button class="filter-tab" data-filter="garage-specialty">Garage &amp; Specialty</button>
+  </div>
+
+  <div class="proj-count" id="projCount">Showing all 18 projects</div>
+
+  <section style="background:#111; padding-bottom: 3px;">
+    <div class="proj-grid" id="projGrid">
+        <a href="sierra-mountain-ranch.html" class="proj-card" data-filter="whole-house">
+          <div class="proj-card__img" style="background-image:url('/assets/images-opt/ff5b18_6f6dc7ef92684e7e8af496c4f83f06be_mv2_960w.webp')" role="img" aria-label="Sierra Mountain Ranch House"></div>
+          <div class="proj-card__body">
+            <span class="proj-card__loc">Sierra Mountains, CA</span>
+            <h3 class="proj-card__name">Sierra Mountain Ranch House</h3>
+            <div class="proj-card__meta">
+              <span class="proj-card__type">Luxury Mountain Remodel</span>
+              <span class="proj-card__year">2024</span>
+            </div>
+          </div>
+        </a>
+        <a href="pleasanton-custom.html" class="proj-card" data-filter="custom-home">
+          <div class="proj-card__img" style="background-image:url('/assets/images-opt/ff5b18_9820c1603a9c414d8cc8009784d1ca7c_mv2_960w.webp')" role="img" aria-label="Pleasanton Custom Home"></div>
+          <div class="proj-card__body">
+            <span class="proj-card__loc">Pleasanton, CA</span>
+            <h3 class="proj-card__name">Pleasanton Custom Home</h3>
+            <div class="proj-card__meta">
+              <span class="proj-card__type">New Custom Home</span>
+              <span class="proj-card__year">2020</span>
+            </div>
+          </div>
+        </a>
+        <a href="sunol-homestead.html" class="proj-card" data-filter="custom-home">
+          <div class="proj-card__img" style="background-image:url('/assets/images-opt/ff5b18_5ad4349859fe4e728734e05bf49f85e3_mv2_960w.webp')" role="img" aria-label="Sunol Homestead"></div>
+          <div class="proj-card__body">
+            <span class="proj-card__loc">Sunol, CA</span>
+            <h3 class="proj-card__name">Sunol Homestead</h3>
+            <div class="proj-card__meta">
+              <span class="proj-card__type">New Custom Home</span>
+              <span class="proj-card__year">2023</span>
+            </div>
+          </div>
+        </a>
+        <a href="danville-hilltop.html" class="proj-card" data-filter="kitchen-bath">
+          <div class="proj-card__img" style="background-image:url('/assets/images-opt/ff5b18_598ba1466dbb45249778e2ea0e0b95e3_mv2_960w.webp')" role="img" aria-label="Danville Hilltop Hideaway"></div>
+          <div class="proj-card__body">
+            <span class="proj-card__loc">Danville, CA</span>
+            <h3 class="proj-card__name">Danville Hilltop Hideaway</h3>
+            <div class="proj-card__meta">
+              <span class="proj-card__type">Kitchen Remodel</span>
+              <span class="proj-card__year">2020</span>
+            </div>
+          </div>
+        </a>
+        <a href="napa-retreat.html" class="proj-card" data-filter="whole-house">
+          <div class="proj-card__img" style="background-image:url('/assets/images-opt/ff5b18_38c7317e1d4b4773ab0a16ed48332f31_mv2_960w.webp')" role="img" aria-label="Napa Retreat"></div>
+          <div class="proj-card__body">
+            <span class="proj-card__loc">Napa, CA</span>
+            <h3 class="proj-card__name">Napa Retreat</h3>
+            <div class="proj-card__meta">
+              <span class="proj-card__type">Luxury Home Remodel</span>
+              <span class="proj-card__year">2020</span>
+            </div>
+          </div>
+        </a>
+        <a href="lafayette-luxury.html" class="proj-card" data-filter="whole-house">
+          <div class="proj-card__img" style="background-image:url('/assets/images-opt/ff5b18_94919d08fc9245fc849ac03c4ea2caaf_mv2_960w.webp')" role="img" aria-label="Lafayette Laid-Back Luxury"></div>
+          <div class="proj-card__body">
+            <span class="proj-card__loc">Lafayette, CA</span>
+            <h3 class="proj-card__name">Lafayette Laid-Back Luxury</h3>
+            <div class="proj-card__meta">
+              <span class="proj-card__type">Home Addition & Remodel</span>
+              <span class="proj-card__year">2022</span>
+            </div>
+          </div>
+        </a>
+        <a href="orinda-kitchen.html" class="proj-card" data-filter="kitchen-bath">
+          <div class="proj-card__img" style="background-image:url('/assets/images-opt/ff5b18_d741bf6a821b40e8b4730181bcf0fc48_mv2_960w.webp')" role="img" aria-label="Orinda Urban Modern Kitchen"></div>
+          <div class="proj-card__body">
+            <span class="proj-card__loc">Orinda, CA</span>
+            <h3 class="proj-card__name">Orinda Urban Modern Kitchen</h3>
+            <div class="proj-card__meta">
+              <span class="proj-card__type">Kitchen Remodel</span>
+              <span class="proj-card__year">2019</span>
+            </div>
+          </div>
+        </a>
+        <a href="danville-dream.html" class="proj-card" data-filter="whole-house">
+          <div class="proj-card__img" style="background-image:url('/assets/images-opt/ff5b18_83cbc49d23a5436294574e1dd9db3819_mv2_960w.webp')" role="img" aria-label="Danville Dream Home"></div>
+          <div class="proj-card__body">
+            <span class="proj-card__loc">Danville, CA</span>
+            <h3 class="proj-card__name">Danville Dream Home</h3>
+            <div class="proj-card__meta">
+              <span class="proj-card__type">Luxury Home Remodel</span>
+              <span class="proj-card__year">2024</span>
+            </div>
+          </div>
+        </a>
+        <a href="alamo-luxury.html" class="proj-card" data-filter="whole-house">
+          <div class="proj-card__img" style="background-image:url('/assets/images-opt/ff5b18_39536b28ce0447b9a87797bb4c70ee51_mv2_960w.webp')" role="img" aria-label="Alamo Luxury Remodel"></div>
+          <div class="proj-card__body">
+            <span class="proj-card__loc">Alamo, CA</span>
+            <h3 class="proj-card__name">Alamo Luxury Remodel</h3>
+            <div class="proj-card__meta">
+              <span class="proj-card__type">Luxury Home Remodel</span>
+              <span class="proj-card__year">2023</span>
+            </div>
+          </div>
+        </a>
+        <a href="lafayette-bistro.html" class="proj-card" data-filter="kitchen-bath">
+          <div class="proj-card__img" style="background-image:url('/assets/images-opt/ff5b18_76c5e504c9114ef09ad8233549a16b39_mv2_960w.webp')" role="img" aria-label="Lafayette Modern Bistro"></div>
+          <div class="proj-card__body">
+            <span class="proj-card__loc">Lafayette, CA</span>
+            <h3 class="proj-card__name">Lafayette Modern Bistro</h3>
+            <div class="proj-card__meta">
+              <span class="proj-card__type">Kitchen Remodel</span>
+              <span class="proj-card__year">2024</span>
+            </div>
+          </div>
+        </a>
+        <a href="san-ramon.html" class="proj-card" data-filter="kitchen-bath">
+          <div class="proj-card__img" style="background-image:url('/assets/images-opt/ff5b18_6eed718eb2ab4ca0887717d1a39285ea_mv2_960w.webp')" role="img" aria-label="San Ramon Transitional Kitchen"></div>
+          <div class="proj-card__body">
+            <span class="proj-card__loc">San Ramon, CA</span>
+            <h3 class="proj-card__name">San Ramon Transitional Kitchen</h3>
+            <div class="proj-card__meta">
+              <span class="proj-card__type">Kitchen Remodel</span>
+              <span class="proj-card__year">2024</span>
+            </div>
+          </div>
+        </a>
+        <a href="pleasanton-garage.html" class="proj-card" data-filter="garage-specialty">
+          <div class="proj-card__img" style="background-image:url('/assets/images-opt/ff5b18_042b3d66e8904b4188c0ec509b2595d6_mv2_960w.webp')" role="img" aria-label="Pleasanton Garage Renovation"></div>
+          <div class="proj-card__body">
+            <span class="proj-card__loc">Pleasanton, CA</span>
+            <h3 class="proj-card__name">Pleasanton Garage Renovation</h3>
+            <div class="proj-card__meta">
+              <span class="proj-card__type">Garage Remodel</span>
+              <span class="proj-card__year">2025</span>
+            </div>
+          </div>
+        </a>
+        <a href="livermore-farmhouse-chic.html" class="proj-card" data-filter="whole-house">
+          <div class="proj-card__img" style="background-image:url('/assets/images-opt/ff5b18_e1ef86fee44b4c14b077ecbdb2ca10f5_mv2_960w.webp')" role="img" aria-label="Livermore Farmhouse Chic"></div>
+          <div class="proj-card__body">
+            <span class="proj-card__loc">Livermore, CA</span>
+            <h3 class="proj-card__name">Livermore Farmhouse Chic</h3>
+            <div class="proj-card__meta">
+              <span class="proj-card__type">Home Remodel</span>
+              <span class="proj-card__year">2022</span>
+            </div>
+          </div>
+        </a>
+        <a href="pleasanton-cottage-kitchen.html" class="proj-card" data-filter="kitchen-bath">
+          <div class="proj-card__img" style="background-image:url('/assets/images-opt/ff5b18_f575a25ba7f14e1389d0ae63bb2d356f_mv2_960w.webp')" role="img" aria-label="Pleasanton Cottage Kitchen"></div>
+          <div class="proj-card__body">
+            <span class="proj-card__loc">Pleasanton, CA</span>
+            <h3 class="proj-card__name">Pleasanton Cottage Kitchen</h3>
+            <div class="proj-card__meta">
+              <span class="proj-card__type">Kitchen Remodel</span>
+              <span class="proj-card__year">2021</span>
+            </div>
+          </div>
+        </a>
+        <a href="san-ramon-eclectic-bath.html" class="proj-card" data-filter="kitchen-bath">
+          <div class="proj-card__img" style="background-image:url('/assets/images-opt/ff5b18_7bb937306ca1481894944e9f7b7b64c4_mv2_960w.webp')" role="img" aria-label="San Ramon Eclectic Bath"></div>
+          <div class="proj-card__body">
+            <span class="proj-card__loc">San Ramon, CA</span>
+            <h3 class="proj-card__name">San Ramon Eclectic Bath</h3>
+            <div class="proj-card__meta">
+              <span class="proj-card__type">Bathroom Remodel</span>
+              <span class="proj-card__year">2022</span>
+            </div>
+          </div>
+        </a>
+        <a href="castro-valley-villa.html" class="proj-card" data-filter="whole-house">
+          <div class="proj-card__img" style="background-image:url('/assets/images-opt/ff5b18_fa64df3266cb4f5687726c7ab5ac76f7_mv2_960w.webp')" role="img" aria-label="Castro Valley Villa"></div>
+          <div class="proj-card__body">
+            <span class="proj-card__loc">Castro Valley, CA</span>
+            <h3 class="proj-card__name">Castro Valley Villa</h3>
+            <div class="proj-card__meta">
+              <span class="proj-card__type">Home Remodel</span>
+              <span class="proj-card__year">2023</span>
+            </div>
+          </div>
+        </a>
+        <a href="lakeside-cozy-cabin.html" class="proj-card" data-filter="whole-house">
+          <div class="proj-card__img" style="background-image:url('/assets/images-opt/ff5b18_349218a966f148919fc38da254ca4619_mv2_960w.webp')" role="img" aria-label="Lakeside Cozy Cabin"></div>
+          <div class="proj-card__body">
+            <span class="proj-card__loc">Sierra Mountains, CA</span>
+            <h3 class="proj-card__name">Lakeside Cozy Cabin</h3>
+            <div class="proj-card__meta">
+              <span class="proj-card__type">Cabin Remodel</span>
+              <span class="proj-card__year">2025</span>
+            </div>
+          </div>
+        </a>
+        <a href="newark-minimal-kitchen.html" class="proj-card" data-filter="kitchen-bath">
+          <div class="proj-card__img" style="background-image:url('/assets/images-opt/ff5b18_0ab4862750bf42ac8c38304bf1a054ed_mv2_960w.webp')" role="img" aria-label="Newark Minimalist Kitchen"></div>
+          <div class="proj-card__body">
+            <span class="proj-card__loc">Newark, CA</span>
+            <h3 class="proj-card__name">Newark Minimalist Kitchen</h3>
+            <div class="proj-card__meta">
+              <span class="proj-card__type">Kitchen Remodel</span>
+              <span class="proj-card__year">2020</span>
+            </div>
+          </div>
+        </a>
+    </div>
+  </section>
+
+  <section class="cta section section--dark">
+    <div class="container container--narrow cta__inner">
+      <h2 class="cta__headline">Start your own<br><em>extraordinary project.</em></h2>
+      <p class="cta__sub">We take on a limited number of projects each year. Tell us about yours.</p>
+      <a href="start-a-project.html" class="btn btn--primary btn--lg">Submit a Project Inquiry</a>
+      <p class="cta__note">Or call <a href="tel:9257842798">925-784-2798</a></p>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div class="footer__brand">
+        <span class="footer__logo">RIDGECREST DESIGNS</span>
+        <p class="footer__tagline">Luxury Design-Build &middot; Est. 2013</p>
+        <p class="footer__tagline" style="font-style:italic; opacity:0.6">Experience the Ridgecrest difference.</p>
+        <p class="footer__address">5502 Sunol Blvd, Suite 100<br>Pleasanton, CA 94566</p>
+        <p><a href="tel:9257842798">925-784-2798</a> &middot; <a href="mailto:info@ridgecrestdesigns.com">info@ridgecrestdesigns.com</a></p>
+      </div>
+      <div class="footer__nav">
+        <div class="footer__col">
+          <p class="footer__col-head">Company</p>
+          <a href="about.html">About</a>
+          <a href="team.html">Team</a>
+          <a href="process.html">Process</a>
+          <a href="portfolio.html">Portfolio</a>
+        </div>
+        <div class="footer__col">
+          <p class="footer__col-head">Services</p>
+          <a href="services/custom-home-builder-danville.html">Custom Homes</a>
+          <a href="services/whole-house-remodel-danville.html">Whole House Remodels</a>
+          <a href="services/kitchen-remodel-danville.html">Kitchen Remodels</a>
+          <a href="services/bathroom-remodel-danville.html">Bathroom Remodels</a>
+        </div>
+        <div class="footer__col">
+          <p class="footer__col-head">Service Areas</p>
+          <a href="services/alamo.html">Alamo</a>
+          <a href="services/danville.html">Danville</a>
+          <a href="services/diablo.html">Diablo</a>
+          <a href="services/dublin.html">Dublin</a>
+          <a href="services/lafayette.html">Lafayette</a>
+          <a href="services/moraga.html">Moraga</a>
+          <a href="services/orinda.html">Orinda</a>
+          <a href="services/pleasanton.html">Pleasanton</a>
+          <a href="services/rossmoor.html">Rossmoor</a>
+          <a href="services/san-ramon.html">San Ramon</a>
+          <a href="services/sunol.html">Sunol</a>
+          <a href="services/walnut-creek.html">Walnut Creek</a>
+        </div>
+        <div class="footer__col">
+          <p class="footer__col-head">Connect</p>
+          <a href="start-a-project.html">Start a Project</a>
+          <a href="contact.html">Contact Us</a>
+          <a href="/blog">The RD Edit</a>
+          <a href="https://www.instagram.com/ridgecrestdesigns" target="_blank" rel="noopener">Instagram</a>
+          <a href="https://www.facebook.com/ridgecrestdesigns" target="_blank" rel="noopener">Facebook</a>
+          <a href="https://www.houzz.com/pro/ridgecrestdesigns" target="_blank" rel="noopener">Houzz</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <div class="container">
+        <p>&copy; 2026 Ridgecrest Designs. All rights reserved.</p>
+        <p>Licensed &amp; Insured &middot; California Contractor &middot; <a href="sitemap.html">Site Map</a></p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+  <script>
+    const tabs = document.querySelectorAll('.filter-tab');
+    const cards = document.querySelectorAll('.proj-card');
+    const countEl = document.getElementById('projCount');
+    const labels = {
+      'all': 'Showing all 18 projects',
+      'custom-home': 'Custom Homes',
+      'whole-house': 'Whole House Remodels',
+      'kitchen-bath': 'Kitchen & Bath',
+      'garage-specialty': 'Garage & Specialty'
+    };
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const filter = tab.dataset.filter;
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        let visible = 0;
+        cards.forEach(card => {
+          const show = filter === 'all' || card.dataset.filter === filter;
+          card.classList.toggle('hidden', !show);
+          if (show) visible++;
+        });
+        countEl.textContent = filter === 'all'
+          ? 'Showing all 18 projects'
+          : `Showing ${visible} project${visible !== 1 ? 's' : ''}: ${labels[filter] || filter}`;
+      });
+    });
+  </script>
+</body>
+</html>

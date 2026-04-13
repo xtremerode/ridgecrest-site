@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact Us — Ridgecrest Designs | Pleasanton CA</title>
+  <meta name="description" content="Send a general message to Ridgecrest Designs. For project inquiries, use our project inquiry form. Serving Pleasanton, Danville, Walnut Creek and the East Bay." />
+  <link rel="canonical" href="https://www.ridgecrestdesigns.com/contact" />
+  <meta property="og:title" content="Contact Us — Ridgecrest Designs" />
+  <meta property="og:url" content="https://www.ridgecrestdesigns.com/contact" />
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=block" rel="stylesheet" />
+  <style>
+    .contact-form-page {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 5rem 2rem 6rem;
+    }
+    .contact-form-page .section__label {
+      margin-bottom: 0.75rem;
+    }
+    .contact-form-page .section__headline {
+      margin-bottom: 1rem;
+    }
+    .contact-form-page .intro-note {
+      font-size: 0.9rem;
+      color: #666;
+      line-height: 1.75;
+      margin-bottom: 2.5rem;
+    }
+    .contact-form-page .intro-note a {
+      color: var(--charcoal);
+      text-decoration: underline;
+    }
+    .cf-field {
+      margin-bottom: 1.5rem;
+    }
+    .cf-field label {
+      display: block;
+      font-size: 0.68rem;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #555;
+      margin-bottom: 0.5rem;
+    }
+    .cf-field input,
+    .cf-field textarea {
+      width: 100%;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 0.75rem 1rem;
+      font-family: var(--font-sans);
+      font-size: 0.92rem;
+      color: var(--charcoal);
+      background: #fafafa;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .cf-field input:focus,
+    .cf-field textarea:focus {
+      border-color: var(--charcoal);
+      box-shadow: 0 0 0 2px rgba(28,28,28,0.08);
+      background: #fff;
+    }
+    .cf-field textarea {
+      min-height: 140px;
+      resize: vertical;
+    }
+    .cf-submit {
+      display: inline-block;
+      background: var(--charcoal);
+      color: var(--white);
+      border: none;
+      border-radius: 0;
+      padding: 1rem 2.5rem;
+      font-family: var(--font-sans);
+      font-size: 0.78rem;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 0.5rem;
+    }
+    .cf-submit:hover { background: #333; }
+    .cf-note {
+      font-size: 0.78rem;
+      color: #999;
+      margin-top: 1.5rem;
+      line-height: 1.65;
+    }
+    .cf-note a { color: #666; text-decoration: underline; }
+    .cf-success {
+      display: none;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 6px;
+      padding: 2rem;
+      text-align: center;
+      margin-top: 2rem;
+    }
+    .cf-success h3 {
+      font-family: var(--font-display);
+      font-size: 1.6rem;
+      font-weight: 300;
+      margin-bottom: 0.5rem;
+      color: var(--charcoal);
+    }
+    .cf-success p { font-size: 0.9rem; color: #555; }
+  </style>
+</head>
+<body>
+
+  <nav class="nav nav--scrolled" id="nav">
+    <a href="index.html" class="nav__logo">RIDGECREST DESIGNS</a>
+    <button class="nav__toggle" id="navToggle" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav__links" id="navLinks">
+      <li><a href="about.html">About</a></li>
+      <li><a href="process.html">Process</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="portfolio.html">Portfolio</a></li>
+      <li><a href="/blog">The RD Edit</a></li>
+      <li><a href="team.html">Team</a></li>
+      <li><a href="start-a-project.html" class="nav__cta">Start a Project</a></li>
+    </ul>
+  </nav>
+
+  <div class="page-hero page-hero--service">
+    <p class="page-hero__eyebrow">Get in Touch</p>
+    <h1 class="page-hero__title">We'd love to<br><em>hear from you.</em></h1>
+    <p class="page-hero__sub">For general questions and messages. For a new project, use our project inquiry form.</p>
+  </div>
+
+  <section class="section">
+    <div class="contact-form-page">
+      <p class="section__label">General Inquiry</p>
+      <h2 class="section__headline">Send us a message</h2>
+      <p class="intro-note">
+        Use this form for general questions, vendor inquiries, or anything else not related to a specific project.
+        If you're ready to start a custom home or remodel, please use our
+        <a href="start-a-project.html">project inquiry form</a>
+        or <a href="project-inquiry.html">visit our project page</a> instead.
+      </p>
+
+      <div id="cfSuccess" class="cf-success">
+        <h3>Message received.</h3>
+        <p>Thank you for reaching out. We'll be in touch within one business day.</p>
+      </div>
+
+      <form id="cfForm"
+            action="https://formsubmit.co/hello@ridgecrestdesigns.com"
+            method="POST">
+
+        <!-- FormSubmit config -->
+        <input type="hidden" name="_subject" value="New Contact Inquiry — Ridgecrest Designs" />
+        <input type="hidden" name="_captcha" value="false" />
+        <input type="hidden" name="_template" value="table" />
+        <input type="hidden" name="_next" value="https://www.ridgecrestdesigns.com/contact?sent=1" />
+        <!-- Honeypot spam protection -->
+        <input type="text" name="_honey" style="display:none" />
+
+        <div class="cf-field">
+          <label for="cfName">Full Name <span style="color:#c00">*</span></label>
+          <input type="text" id="cfName" name="name" required placeholder="Your name" autocomplete="name" />
+        </div>
+
+        <div class="cf-field">
+          <label for="cfEmail">Email Address <span style="color:#c00">*</span></label>
+          <input type="email" id="cfEmail" name="email" required placeholder="your@email.com" autocomplete="email" />
+        </div>
+
+        <div class="cf-field">
+          <label for="cfPhone">Phone Number <span style="color:#999;font-size:0.85em;text-transform:none;letter-spacing:0">(optional)</span></label>
+          <input type="tel" id="cfPhone" name="phone" placeholder="(925) 555-0100" autocomplete="tel" />
+        </div>
+
+        <div class="cf-field">
+          <label for="cfMessage">Message <span style="color:#c00">*</span></label>
+          <textarea id="cfMessage" name="message" required placeholder="How can we help?"></textarea>
+        </div>
+
+        <button type="submit" class="cf-submit">Send Message</button>
+
+        <p class="cf-note">
+          We respond to all inquiries within one business day.<br>
+          Or reach us directly: <a href="tel:9257842798">925-784-2798</a> ·
+          <a href="mailto:hello@ridgecrestdesigns.com">hello@ridgecrestdesigns.com</a>
+        </p>
+      </form>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div class="footer__brand">
+        <span class="footer__logo">RIDGECREST DESIGNS</span>
+        <p class="footer__tagline">Luxury Design-Build · Est. 2013</p>
+        <p class="footer__tagline" style="font-style:italic; opacity:0.6">Experience the Ridgecrest difference.</p>
+        <p class="footer__address">5502 Sunol Blvd, Suite 100<br>Pleasanton, CA 94566</p>
+        <p><a href="tel:9257842798">925-784-2798</a> · <a href="mailto:hello@ridgecrestdesigns.com">hello@ridgecrestdesigns.com</a></p>
+      </div>
+      <div class="footer__nav">
+        <div class="footer__col">
+          <p class="footer__col-head">Company</p>
+          <a href="about.html">About</a>
+          <a href="team.html">Team</a>
+          <a href="process.html">Process</a>
+          <a href="portfolio.html">Portfolio</a>
+        </div>
+        <div class="footer__col">
+          <p class="footer__col-head">Services</p>
+          <a href="services/custom-home-builder-danville.html">Custom Homes</a>
+          <a href="services/whole-house-remodel-danville.html">Whole House Remodels</a>
+          <a href="services/kitchen-remodel-danville.html">Kitchen Remodels</a>
+          <a href="services/bathroom-remodel-danville.html">Bathroom Remodels</a>
+        </div>
+        <div class="footer__col">
+          <p class="footer__col-head">Service Areas</p>
+          <a href="services/alamo.html">Alamo</a>
+          <a href="services/danville.html">Danville</a>
+          <a href="services/diablo.html">Diablo</a>
+          <a href="services/dublin.html">Dublin</a>
+          <a href="services/lafayette.html">Lafayette</a>
+          <a href="services/moraga.html">Moraga</a>
+          <a href="services/orinda.html">Orinda</a>
+          <a href="services/pleasanton.html">Pleasanton</a>
+          <a href="services/rossmoor.html">Rossmoor</a>
+          <a href="services/san-ramon.html">San Ramon</a>
+          <a href="services/sunol.html">Sunol</a>
+          <a href="services/walnut-creek.html">Walnut Creek</a>
+        </div>
+        <div class="footer__col">
+          <p class="footer__col-head">Connect</p>
+          <a href="start-a-project.html">Start a Project</a>
+          <a href="contact.html">Contact Us</a>
+          <a href="/blog">The RD Edit</a>
+          <a href="https://www.instagram.com/ridgecrestdesigns" target="_blank" rel="noopener">Instagram</a>
+          <a href="https://www.facebook.com/ridgecrestdesigns" target="_blank" rel="noopener">Facebook</a>
+          <a href="https://www.houzz.com/pro/ridgecrestdesigns" target="_blank" rel="noopener">Houzz</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <div class="container">
+        <p>© 2026 Ridgecrest Designs. All rights reserved.</p>
+        <p>Licensed &amp; Insured · California Contractor · <a href="sitemap.html">Site Map</a></p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+  <script>
+    // Show success message if redirected back with ?sent=1
+    (function() {
+      if (window.location.search.indexOf('sent=1') !== -1) {
+        var form = document.getElementById('cfForm');
+        var success = document.getElementById('cfSuccess');
+        if (form) form.style.display = 'none';
+        if (success) success.style.display = 'block';
+        // Clean URL
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

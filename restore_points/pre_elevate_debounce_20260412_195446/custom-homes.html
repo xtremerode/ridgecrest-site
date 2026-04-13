@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Custom Home Builder — Ridgecrest Designs | Luxury Custom Homes, East Bay CA</title>
+  <meta name="description" content="Ridgecrest Designs builds luxury custom homes from $5M–$10M+ across Pleasanton, Danville, Lafayette, Orinda, and the East Bay. Photo-realistic renders, integrated design-build, and flawless execution." />
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=block" rel="stylesheet" />
+
+  <!-- ── SEO ──────────────────────────────────────────────────── -->
+  <link rel="canonical" href="https://www.ridgecrestdesigns.com/custom-homes" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Ridgecrest Designs" />
+  <meta property="og:title" content="Custom Home Builder — Ridgecrest Designs | Luxury Custom Homes, East Bay CA" />
+  <meta property="og:description" content="Ridgecrest Designs builds luxury custom homes from $5M–$10M+ across Pleasanton, Danville, Lafayette, Orinda, and the East Bay. Photo-realistic renders, integrated design-build, and flawless execution." />
+  <meta property="og:url" content="https://www.ridgecrestdesigns.com/custom-homes" />
+  <meta property="og:image" content="/assets/images-opt/ff5b18_9820c1603a9c414d8cc8009784d1ca7c_mv2_1920w.webp" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Custom Home Builder — Ridgecrest Designs | Luxury Custom Homes, East Bay CA" />
+  <meta name="twitter:description" content="Ridgecrest Designs builds luxury custom homes from $5M–$10M+ across Pleasanton, Danville, Lafayette, Orinda, and the East Bay. Photo-realistic renders, integrated design-build, and flawless execution." />
+  <meta name="twitter:image" content="/assets/images-opt/ff5b18_9820c1603a9c414d8cc8009784d1ca7c_mv2_1920w.webp" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": ["LocalBusiness", "HomeAndConstructionBusiness"],
+    "name": "Ridgecrest Designs",
+    "description": "Luxury custom home builder serving Pleasanton, Danville, Lafayette, Orinda, Alamo, Walnut Creek, and the East Bay. Integrated design-build with photo-realistic renders.",
+    "url": "https://www.ridgecrestdesigns.com",
+    "telephone": "+19257842798",
+    "email": "info@ridgecrestdesigns.com",
+    "foundingDate": "2013",
+    "founder": { "@type": "Person", "name": "Tyler Ridgecrest" },
+    "priceRange": "$$$$$",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "5502 Sunol Blvd Suite 100",
+      "addressLocality": "Pleasanton",
+      "addressRegion": "CA",
+      "postalCode": "94566",
+      "addressCountry": "US"
+    },
+    "geo": { "@type": "GeoCoordinates", "latitude": 37.6624, "longitude": -121.8747 },
+    "areaServed": [
+      {"@type": "City", "name": "Pleasanton"},
+      {"@type": "City", "name": "Danville"},
+      {"@type": "City", "name": "Lafayette"},
+      {"@type": "City", "name": "Orinda"},
+      {"@type": "City", "name": "Alamo"},
+      {"@type": "City", "name": "Walnut Creek"},
+      {"@type": "City", "name": "San Ramon"},
+      {"@type": "City", "name": "Moraga"},
+      {"@type": "City", "name": "Sunol"}
+    ],
+    "sameAs": [
+      "https://www.facebook.com/ridgecrestdesigns",
+      "https://www.instagram.com/ridgecrestdesigns",
+      "https://www.houzz.com/pro/ridgecrestdesigns"
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    "name": "Custom Home Design-Build",
+    "provider": { "@type": "Organization", "name": "Ridgecrest Designs" },
+    "description": "Luxury custom home design and construction from $5M to $10M+. Integrated design-build delivery with photo-realistic renders, full engineering, permitting, and construction management.",
+    "areaServed": "East Bay, California",
+    "url": "https://www.ridgecrestdesigns.com/custom-homes",
+    "breadcrumb": {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.ridgecrestdesigns.com"},
+        {"@type": "ListItem", "position": 2, "name": "Services", "item": "https://www.ridgecrestdesigns.com/services"},
+        {"@type": "ListItem", "position": 3, "name": "Custom Homes", "item": "https://www.ridgecrestdesigns.com/custom-homes"}
+      ]
+    }
+  }
+  </script>
+  <!-- ─────────────────────────────────────────────────────── -->
+  <style>
+    /* ── Featured Custom Homes ── */
+    .featured-homes { padding-top: 0; padding-bottom: 0; }
+    .featured-homes__header {
+      padding: 5rem 0 3.5rem;
+      text-align: center;
+    }
+    .featured-home {
+      display: grid;
+      grid-template-columns: 55% 45%;
+      min-height: 520px;
+    }
+    .featured-home--flip {
+      grid-template-columns: 45% 55%;
+    }
+    .featured-home__img {
+      position: relative;
+      overflow: hidden;
+      background-size: cover;
+      background-position: center;
+    }
+    .featured-home--flip .featured-home__img {
+      order: 2;
+    }
+    .featured-home--flip .featured-home__content {
+      order: 1;
+    }
+    .featured-home__content {
+      background: var(--off-white);
+      padding: 4rem 4.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .featured-home--dark .featured-home__content {
+      background: var(--charcoal);
+    }
+    .featured-home__eyebrow {
+      font-family: var(--font-sans);
+      font-size: 0.65rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--slate);
+      margin-bottom: 1rem;
+    }
+    .featured-home--dark .featured-home__eyebrow { color: var(--slate-light); }
+    .featured-home__title {
+      font-family: var(--font-serif);
+      font-size: clamp(1.6rem, 2.5vw, 2.2rem);
+      font-weight: 400;
+      line-height: 1.2;
+      color: var(--charcoal);
+      margin-bottom: 1.2rem;
+    }
+    .featured-home--dark .featured-home__title { color: var(--off-white); }
+    .featured-home__body {
+      font-size: 0.9rem;
+      line-height: 1.8;
+      color: var(--slate);
+      margin-bottom: 1.8rem;
+      max-width: 38ch;
+    }
+    .featured-home--dark .featured-home__body { color: rgba(255,255,255,0.55); }
+    .featured-home__specs {
+      display: flex;
+      gap: 2rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+    .featured-home__spec {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .featured-home__spec-label {
+      font-family: var(--font-sans);
+      font-size: 0.6rem;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--slate);
+      opacity: 0.7;
+    }
+    .featured-home--dark .featured-home__spec-label { color: rgba(255,255,255,0.4); }
+    .featured-home__spec-val {
+      font-family: var(--font-sans);
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: var(--charcoal);
+    }
+    .featured-home--dark .featured-home__spec-val { color: var(--off-white); }
+    .featured-home__link {
+      font-family: var(--font-sans);
+      font-size: 0.68rem;
+      font-weight: 500;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--charcoal);
+      text-decoration: none;
+      transition: opacity 0.2s;
+      align-self: flex-start;
+    }
+    .featured-home__link:hover { opacity: 0.55; }
+    .featured-home--dark .featured-home__link { color: var(--off-white); }
+    @media (max-width: 800px) {
+      .featured-home,
+      .featured-home--flip { grid-template-columns: 1fr; min-height: auto; }
+      .featured-home__img { height: 280px; order: 0 !important; }
+      .featured-home--flip .featured-home__content { order: 0 !important; }
+      .featured-home__content { padding: 2.5rem 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="nav nav--scrolled" id="nav">
+    <a href="index.html" class="nav__logo">RIDGECREST DESIGNS</a>
+    <button class="nav__toggle" id="navToggle" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav__links" id="navLinks">
+      <li><a href="about.html">About</a></li>
+      <li><a href="process.html">Process</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="portfolio.html">Portfolio</a></li>
+      <li><a href="/blog">The RD Edit</a></li>
+      <li><a href="team.html">Team</a></li>
+      <li><a href="start-a-project.html" class="nav__cta">Start a Project</a></li>
+    </ul>
+  </nav>
+
+  <!-- HERO -->
+  <div class="page-hero page-hero--service" style="background-image:url('/assets/images-opt/ff5b18_9820c1603a9c414d8cc8009784d1ca7c_mv2_1920w.webp')">
+    <p class="page-hero__eyebrow">Custom Homes · East Bay, California</p>
+    <h1 class="page-hero__title">Built from vision.<br><em>Finished to perfection.</em></h1>
+    <p class="page-hero__sub">Luxury custom homes from $5M to $10M+. Photo-realistic renders, integrated design-build, and zero compromise from first concept to final walkthrough.</p>
+    <div class="page-hero__actions">
+      <a href="start-a-project.html" class="btn btn--primary btn--lg">Start Your Project Inquiry</a>
+    </div>
+  </div>
+
+  <!-- WHAT TO EXPECT -->
+  <section class="section section--accent">
+    <div class="container">
+      <div class="section__header">
+        <p class="section__label">What to Expect</p>
+        <h2 class="section__headline">Everything a custom home demands —<br><em>managed under one roof</em></h2>
+      </div>
+      <div class="about-values">
+        <div class="value-card">
+          <div class="value-card__icon">◇</div>
+          <div class="value-card__title">What We Bring</div>
+          <div class="value-card__desc">Over a decade of luxury custom home expertise across the East Bay. We bring deep knowledge of California permitting, structural engineering, architectural design, and high-specification construction — integrated into a single team with one point of accountability.</div>
+        </div>
+        <div class="value-card">
+          <div class="value-card__icon">◇</div>
+          <div class="value-card__title">What the Process Looks Like</div>
+          <div class="value-card__desc">We start with a focused consultation, move into full architectural design and photo-realistic 3D renders, then manage permitting, engineering, and construction without handoffs. Every phase is planned before the next begins. No surprises.</div>
+        </div>
+        <div class="value-card">
+          <div class="value-card__icon">◇</div>
+          <div class="value-card__title">What You Receive</div>
+          <div class="value-card__desc">A fully custom, architecturally designed luxury home built precisely to the renders you approved — delivered on schedule, on budget, with the craftsmanship and attention to detail that only a dedicated design-build firm can provide.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURED CUSTOM HOMES -->
+  <section class="featured-homes">
+
+    <div class="featured-homes__header container">
+      <p class="section__label">Featured Builds</p>
+      <h2 class="section__headline">Four homes. One standard.<br><em>Uncompromising.</em></h2>
+    </div>
+
+    <!-- 1: Pleasanton Custom Home — image left -->
+    <div class="featured-home">
+      <div class="featured-home__img" data-card-id="ch-featured-pleasanton"
+           style="background-image:url('/assets/images-opt/ff5b18_9820c1603a9c414d8cc8009784d1ca7c_mv2_960w.webp')"></div>
+      <div class="featured-home__content">
+        <p class="featured-home__eyebrow">Pleasanton, CA &middot; 2020 &middot; New Custom Home</p>
+        <h3 class="featured-home__title">Pleasanton Custom Home</h3>
+        <p class="featured-home__body">A 6,000 square-foot custom home designed from the ground up for a Pleasanton family seeking space, light, and a seamless indoor-outdoor connection. Every room was built around how the family actually lives — from the professional-grade kitchen to a secondary wing for extended family. Delivered on schedule, built precisely to the render.</p>
+        <div class="featured-home__specs">
+          <div class="featured-home__spec">
+            <span class="featured-home__spec-label">Size</span>
+            <span class="featured-home__spec-val">6,000 sq ft</span>
+          </div>
+          <div class="featured-home__spec">
+            <span class="featured-home__spec-label">Investment</span>
+            <span class="featured-home__spec-val">$3.5M</span>
+          </div>
+          <div class="featured-home__spec">
+            <span class="featured-home__spec-label">Scope</span>
+            <span class="featured-home__spec-val">Full Design-Build</span>
+          </div>
+        </div>
+        <a href="pleasanton-custom.html" class="featured-home__link">View Project &rarr;</a>
+      </div>
+    </div>
+
+    <!-- 2: Sunol Homestead — image right -->
+    <div class="featured-home featured-home--flip featured-home--dark">
+      <div class="featured-home__img" data-card-id="ch-featured-sunol"
+           style="background-image:url('/assets/images-opt/ff5b18_5ad4349859fe4e728734e05bf49f85e3_mv2_960w.webp')"></div>
+      <div class="featured-home__content">
+        <p class="featured-home__eyebrow">Sunol, CA &middot; 2023 &middot; New Custom Home</p>
+        <h3 class="featured-home__title">Sunol Homestead</h3>
+        <p class="featured-home__body">Nestled on a private parcel in Sunol, this custom homestead was designed to feel rooted in its landscape — warm materials, generous covered outdoor living, and a deep connection to the surrounding hills. The design process began with photo-realistic renders that captured the rural character the clients envisioned. The result is a home that looks like it belongs exactly where it stands.</p>
+        <div class="featured-home__specs">
+          <div class="featured-home__spec">
+            <span class="featured-home__spec-label">Location</span>
+            <span class="featured-home__spec-val">Sunol, CA</span>
+          </div>
+          <div class="featured-home__spec">
+            <span class="featured-home__spec-label">Completed</span>
+            <span class="featured-home__spec-val">2023</span>
+          </div>
+          <div class="featured-home__spec">
+            <span class="featured-home__spec-label">Scope</span>
+            <span class="featured-home__spec-val">Full Design-Build</span>
+          </div>
+        </div>
+        <a href="sunol-homestead.html" class="featured-home__link">View Project &rarr;</a>
+      </div>
+    </div>
+
+    <!-- 3: Sierra Mountain Ranch — image left -->
+    <div class="featured-home">
+      <div class="featured-home__img" data-card-id="ch-featured-sierra"
+           style="background-image:url('/assets/images-opt/ff5b18_6f6dc7ef92684e7e8af496c4f83f06be_mv2_960w.webp')"></div>
+      <div class="featured-home__content">
+        <p class="featured-home__eyebrow">Sierra Mountains, CA &middot; 2024 &middot; Luxury Home Remodel</p>
+        <h3 class="featured-home__title">Sierra Mountain Ranch House</h3>
+        <p class="featured-home__body">A complete whole-home transformation of an existing mountain property — taken down to the studs and rebuilt with a new architectural identity. The project required extensive structural re-engineering to open the interior while preserving panoramic views from the elevated site. Every finish, detail, and material was reviewed and approved in render before construction began.</p>
+        <div class="featured-home__specs">
+          <div class="featured-home__spec">
+            <span class="featured-home__spec-label">Investment</span>
+            <span class="featured-home__spec-val">$2.8M</span>
+          </div>
+          <div class="featured-home__spec">
+            <span class="featured-home__spec-label">Timeline</span>
+            <span class="featured-home__spec-val">18 months</span>
+          </div>
+          <div class="featured-home__spec">
+            <span class="featured-home__spec-label">Scope</span>
+            <span class="featured-home__spec-val">Design, Engineering, Build</span>
+          </div>
+        </div>
+        <a href="sierra-mountain-ranch.html" class="featured-home__link">View Project &rarr;</a>
+      </div>
+    </div>
+
+    <!-- 4: Napa Retreat — image right -->
+    <div class="featured-home featured-home--flip featured-home--dark">
+      <div class="featured-home__img" data-card-id="ch-featured-napa"
+           style="background-image:url('/assets/images-opt/ff5b18_38c7317e1d4b4773ab0a16ed48332f31_mv2_960w.webp')"></div>
+      <div class="featured-home__content">
+        <p class="featured-home__eyebrow">Napa, CA &middot; 2020 &middot; Luxury Home Remodel</p>
+        <h3 class="featured-home__title">Napa Retreat</h3>
+        <p class="featured-home__body">A high-specification luxury remodel in Napa's wine country, designed to maximize indoor-outdoor flow and take full advantage of the property's vineyard views. The scope required deep coordination between architectural design, local permitting, and specialized trade work across multiple phases. Clean lines, natural materials, and refined craftsmanship from entry to terrace.</p>
+        <div class="featured-home__specs">
+          <div class="featured-home__spec">
+            <span class="featured-home__spec-label">Location</span>
+            <span class="featured-home__spec-val">Napa, CA</span>
+          </div>
+          <div class="featured-home__spec">
+            <span class="featured-home__spec-label">Completed</span>
+            <span class="featured-home__spec-val">2020</span>
+          </div>
+          <div class="featured-home__spec">
+            <span class="featured-home__spec-label">Scope</span>
+            <span class="featured-home__spec-val">Full Home Remodel</span>
+          </div>
+        </div>
+        <a href="napa-retreat.html" class="featured-home__link">View Project &rarr;</a>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- PROCESS STEPS -->
+  <section class="section">
+    <div class="container">
+      <div class="section__header">
+        <p class="section__label">Our Process</p>
+        <h2 class="section__headline">Four stages. One team.<br><em>Zero gaps.</em></h2>
+      </div>
+      <div class="process-steps">
+        <div class="process-step">
+          <div class="process-step__num">1</div>
+          <div class="process-step__content">
+            <div class="process-step__title">Design</div>
+            <h3 class="process-step__headline">Architecture built around how you live</h3>
+            <p class="process-step__body">We begin with a deep consultation to understand your vision, your site, and how your family uses space. Our architectural team then develops custom floor plans, elevations, and structural drawings — designed specifically for your land, your lifestyle, and the surrounding community.</p>
+          </div>
+        </div>
+        <div class="process-step">
+          <div class="process-step__num">2</div>
+          <div class="process-step__content">
+            <div class="process-step__title">Render</div>
+            <h3 class="process-step__headline">See your home before we build it</h3>
+            <p class="process-step__body">Before a single permit is filed, you'll see your home in photo-realistic 3D detail. Every finish, fixture, and material choice is visualized with precision. We refine until the render matches your expectations exactly — then we lock it in. What you see is what we build.</p>
+          </div>
+        </div>
+        <div class="process-step">
+          <div class="process-step__num">3</div>
+          <div class="process-step__content">
+            <div class="process-step__title">Permit</div>
+            <h3 class="process-step__headline">California permitting managed end-to-end</h3>
+            <p class="process-step__body">Our in-house team prepares and submits all permit documentation, manages agency responses, and handles structural and engineering sign-off. We know California residential code, local jurisdictions, and HOA approval processes — eliminating delays that catch other builders off guard.</p>
+          </div>
+        </div>
+        <div class="process-step">
+          <div class="process-step__num">4</div>
+          <div class="process-step__content">
+            <div class="process-step__title">Build</div>
+            <h3 class="process-step__headline">Expert construction with active oversight</h3>
+            <p class="process-step__body">Construction begins with your dedicated project manager on-site throughout. We work with specialized trade teams whose work is measured by long-term performance, not just delivery-day appearance. You receive regular updates, milestone walkthroughs, and a final delivery that matches the render you approved.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INVESTMENT -->
+  <section class="section section--dark">
+    <div class="container">
+      <div class="diff__layout">
+        <div class="diff__visual">
+          <div class="diff__visual-inner">
+            <div class="diff__quote">&ldquo;The render is the promise. The build is the proof.&rdquo;</div>
+            <div class="diff__stats">
+              <div class="diff__stat">
+                <span class="diff__num">$5M+</span>
+                <span class="diff__lbl">Starting Investment</span>
+              </div>
+              <div class="diff__stat">
+                <span class="diff__num">12+</span>
+                <span class="diff__lbl">Years Building Luxury Homes</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="diff__content">
+          <p class="section__label">Investment</p>
+          <h2 class="section__headline">Custom homes starting<br><em>at $5,000,000</em></h2>
+          <p class="diff__body">A Ridgecrest custom home is a long-term investment in the way your family lives. Our projects typically range from $5M to $10M+, reflecting the scope, materials, and level of craft involved. We're not the right firm for modest builds — and we make no apology for that.</p>
+          <ul class="diff__list">
+            <li>
+              <div class="diff__icon">→</div>
+              <div>
+                <strong>Full Design-Build Management</strong>
+                <span>Architecture, engineering, permitting, and construction — one contract.</span>
+              </div>
+            </li>
+            <li>
+              <div class="diff__icon">→</div>
+              <div>
+                <strong>Photo-Realistic Renders Included</strong>
+                <span>Visual certainty before a permit is filed.</span>
+              </div>
+            </li>
+            <li>
+              <div class="diff__icon">→</div>
+              <div>
+                <strong>Dedicated Project Manager</strong>
+                <span>One point of contact. Complete accountability.</span>
+              </div>
+            </li>
+            <li>
+              <div class="diff__icon">→</div>
+              <div>
+                <strong>Limited Project Acceptance</strong>
+                <span>We take on fewer projects so each one gets the attention it deserves.</span>
+              </div>
+            </li>
+          </ul>
+          <a href="start-a-project.html" class="btn btn--primary" style="margin-top:1.5rem">Submit a Project Inquiry</a>
+          <p style="color:rgba(255,255,255,0.4); font-size:0.8rem; margin-top:0.8rem;">Or call <a href="tel:9257842798" style="color:rgba(255,255,255,0.6);">925-784-2798</a></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta section section--dark" style="padding-top:0">
+    <div class="container container--narrow cta__inner">
+      <h2 class="cta__headline">Ready to build<br><em>something extraordinary?</em></h2>
+      <p class="cta__sub">We accept a limited number of custom home projects each year. Tell us about your vision.</p>
+      <a href="start-a-project.html" class="btn btn--primary btn--lg">Submit a Project Inquiry</a>
+      <p class="cta__note">Or call <a href="tel:9257842798">925-784-2798</a></p>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div class="footer__brand">
+        <span class="footer__logo">RIDGECREST DESIGNS</span>
+        <p class="footer__tagline">Luxury Design-Build &middot; Est. 2013</p>
+        <p class="footer__tagline" style="font-style:italic; opacity:0.6">Experience the Ridgecrest difference.</p>
+        <p class="footer__address">5502 Sunol Blvd, Suite 100<br>Pleasanton, CA 94566</p>
+        <p><a href="tel:9257842798">925-784-2798</a> &middot; <a href="mailto:info@ridgecrestdesigns.com">info@ridgecrestdesigns.com</a></p>
+      </div>
+      <div class="footer__nav">
+        <div class="footer__col">
+          <p class="footer__col-head">Company</p>
+          <a href="about.html">About</a>
+          <a href="team.html">Team</a>
+          <a href="process.html">Process</a>
+          <a href="portfolio.html">Portfolio</a>
+        </div>
+        <div class="footer__col">
+          <p class="footer__col-head">Services</p>
+          <a href="custom-homes.html">Custom Homes</a>
+          <a href="whole-house-remodels.html">Whole House Remodels</a>
+          <a href="kitchen-remodels.html">Kitchen Remodels</a>
+          <a href="bathroom-remodels.html">Bathroom Remodels</a>
+        </div>
+                <div class="footer__col">
+          <p class="footer__col-head">Service Areas</p>
+          <a href="services/alamo.html">Alamo</a>
+          <a href="services/danville.html">Danville</a>
+          <a href="services/diablo.html">Diablo</a>
+          <a href="services/dublin.html">Dublin</a>
+          <a href="services/lafayette.html">Lafayette</a>
+          <a href="services/moraga.html">Moraga</a>
+          <a href="services/orinda.html">Orinda</a>
+          <a href="services/pleasanton.html">Pleasanton</a>
+          <a href="services/rossmoor.html">Rossmoor</a>
+          <a href="services/san-ramon.html">San Ramon</a>
+          <a href="services/sunol.html">Sunol</a>
+          <a href="services/walnut-creek.html">Walnut Creek</a>
+        </div>
+        <div class="footer__col">
+          <p class="footer__col-head">Connect</p>
+          <a href="start-a-project.html">Start a Project</a>
+          <a href="contact.html">Contact Us</a>
+          <a href="/blog">The RD Edit</a>
+          <a href="https://www.instagram.com/ridgecrestdesigns" target="_blank" rel="noopener">Instagram</a>
+          <a href="https://www.facebook.com/ridgecrestdesigns" target="_blank" rel="noopener">Facebook</a>
+          <a href="https://www.houzz.com/pro/ridgecrestdesigns" target="_blank" rel="noopener">Houzz</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <div class="container">
+        <p>&copy; 2026 Ridgecrest Designs. All rights reserved.</p>
+        <p>Licensed &amp; Insured &middot; California Contractor &middot; <a href="sitemap.html">Site Map</a></p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+  <script src="js/lightbox.js"></script>
+</body>
+</html>

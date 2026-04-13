@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Start a Project — Ridgecrest Designs</title>
+  <meta name="description" content="Start your luxury custom home or remodel project with Ridgecrest Designs. Submit a project inquiry or schedule a consultation. Serving Pleasanton, Danville, Walnut Creek, Lafayette, and the East Bay." />
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=block" rel="stylesheet" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Start a Project — Ridgecrest Designs" />
+  <meta property="og:description" content="Start your luxury custom home or remodel project with Ridgecrest Designs." />
+  <meta property="og:image" content="/assets/images/og-image.jpg" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+    .sap-page {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .sap-bg {
+      position: fixed;
+      inset: 0;
+      background-image: url('/assets/images-opt/upload_1775024274_hf_20260401_045706_052755bb-79f2-442d-8198-61d922625b11.webp');
+      background-size: cover;
+      background-position: 25.6% 40%;
+      z-index: 0;
+    }
+    .sap-bg-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 1;
+    }
+    .sap-content {
+      position: relative;
+      z-index: 2;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 120px 24px 60px;
+    }
+    .sap-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .sap-eyebrow {
+      font-family: var(--font-sans);
+      font-size: 0.68rem;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--slate-light, #80A4C8);
+      margin-bottom: 0.75rem;
+    }
+    .sap-title {
+      font-family: var(--font-display);
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 400;
+      color: #fff;
+      line-height: 1.15;
+      margin: 0;
+    }
+    .sap-title em { font-style: italic; }
+    .sap-sub {
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      font-weight: 300;
+      color: rgba(255,255,255,0.7);
+      margin-top: 0.5rem;
+    }
+
+    /* Desktop: floating card */
+    .sap-frame {
+      width: 100%;
+      max-width: 780px;
+      background: rgba(255, 255, 255, 0.97);
+      border-radius: 12px;
+      box-shadow: 0 8px 60px rgba(0, 0, 0, 0.4);
+      overflow: hidden;
+      flex: none;
+      transition: height 0.3s ease;
+    }
+    .sap-frame iframe {
+      width: 100%;
+      height: 600px;
+      border: none;
+      display: block;
+      transition: height 0.3s ease;
+    }
+
+    /* Tablet + Mobile: full width, tall iframe, page scrolls */
+    @media (max-width: 1024px) {
+      .sap-content {
+        padding: 80px 0 0;
+      }
+      .sap-header {
+        padding: 0 16px;
+      }
+      .sap-frame {
+        border-radius: 0;
+        max-width: 100%;
+        box-shadow: none;
+        min-height: auto;
+        flex: none;
+      }
+      .sap-frame iframe {
+        height: 600px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="sap-page">
+    <div class="sap-bg"></div>
+    <div class="sap-bg-overlay"></div>
+
+    <nav class="nav" id="nav" style="position:fixed;top:0;left:0;right:0;z-index:10;background:rgba(0,0,0,0.4);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);">
+      <a href="index.html" class="nav__logo">
+        <img src="/assets/images/logo.png" alt="Ridgecrest Designs" class="nav__logo-img" style="height:28px;margin-right:10px;vertical-align:middle;" onerror="this.style.display='none'" />
+        RIDGECREST DESIGNS
+      </a>
+      <button class="nav__toggle" id="navToggle" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav__links" id="navLinks">
+        <li><a href="about.html">About</a></li>
+        <li><a href="process.html">Process</a></li>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="portfolio.html">Portfolio</a></li>
+        <li><a href="/blog">The RD Edit</a></li>
+        <li><a href="team.html">Team</a></li>
+        <li><a href="start-a-project.html" class="nav__cta">Start a Project</a></li>
+      </ul>
+    </nav>
+
+    <div class="sap-content">
+      <div class="sap-header">
+        <p class="sap-eyebrow">Start Your Project</p>
+        <h1 class="sap-title">Let's build something <em>extraordinary.</em></h1>
+        <p class="sap-sub">Tell us about your vision. We'll follow up within one business day.</p>
+      </div>
+      <div class="sap-frame">
+        <iframe
+          src="https://elevate-scheduling-6b2fdec8.base44.app/ProjectInquiryForm"
+          title="Project Inquiry Form"
+          loading="lazy"
+          allow="clipboard-write"
+        ></iframe>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Mobile nav toggle
+    var navToggle = document.getElementById('navToggle');
+    var navLinks = document.getElementById('navLinks');
+    if (navToggle && navLinks) {
+      navToggle.addEventListener('click', function() {
+        navLinks.classList.toggle('nav__links--open');
+      });
+    }
+
+    // Auto-resize iframe via postMessage from Elevate Scheduling
+    (function() {
+      var frame = document.querySelector('.sap-frame iframe');
+      var wrapper = document.querySelector('.sap-frame');
+      if (!frame || !wrapper) return;
+
+      var PADDING = 40;
+      var MIN_H   = 500;
+      var currentH = 0;
+      var locked   = false;
+      var timer    = null;
+
+      function setSize(h) {
+        currentH = h;
+        frame.style.height   = h + 'px';
+        wrapper.style.height = h + 'px';
+      }
+
+      function accept(rawH) {
+        var target = Math.max(rawH + PADDING, MIN_H);
+        if (target === currentH) return;
+        setSize(target);
+        locked = true;
+        clearTimeout(timer);
+        timer = setTimeout(function() { locked = false; }, 500);
+      }
+
+      // When the user clicks inside the iframe, the parent window loses focus.
+      // Instantly collapse the iframe to MIN_H (no CSS transition) so that
+      // Tailwind's min-h-screen (100vh inside the iframe) resolves to MIN_H.
+      // If the user navigated Back, the true content height is now smaller than
+      // MIN_H's inflation cap, so Elevate's ResizeObserver fires with the real
+      // height. We then accept that message and smoothly expand to the correct size.
+      // For same-step clicks (e.g. form field focus), the content height exceeds
+      // MIN_H so ResizeObserver fires with the same step height and we restore it.
+      window.addEventListener('blur', function() {
+        locked = false;
+        clearTimeout(timer);
+
+        // Disable CSS transition so the collapse is a snap (no downward animation)
+        frame.style.transition = 'none';
+        wrapper.style.transition = 'none';
+        frame.style.height   = MIN_H + 'px';
+        wrapper.style.height = MIN_H + 'px';
+        currentH = MIN_H;
+
+        // Re-enable transition after two rAFs so the subsequent expansion is animated
+        requestAnimationFrame(function() {
+          requestAnimationFrame(function() {
+            frame.style.transition = '';
+            wrapper.style.transition = '';
+          });
+        });
+      });
+
+      window.addEventListener('message', function(e) {
+        if (!e.data || !e.data.type) return;
+
+        // api-request-start fires on auth checks — use it as an unlock signal only
+        if (e.data.type === 'api-request-start') {
+          locked = false;
+          return;
+        }
+
+        if (e.data.type !== 'elevate-resize') return;
+        var h = e.data.height;
+        if (typeof h !== 'number' || h < 50) return;
+        if (locked) return;
+        accept(h);
+      });
+    })();
+  </script>
+</body>
+</html>
