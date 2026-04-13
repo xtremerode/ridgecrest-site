@@ -6,6 +6,41 @@
   <title>Pages — Ridgecrest Admin</title>
   <link rel="stylesheet" href="css/admin.css" />
   <style>
+    /* ── Responsive header override for pages editor ── */
+    /* admin.css fixes header at 56px; pages.html has many controls so we allow wrapping */
+    .header {
+      height: auto !important;
+      min-height: var(--header-h, 56px);
+      flex-wrap: wrap;
+      padding: 6px 16px !important;
+      gap: 6px !important;
+      align-content: center;
+    }
+    .header-title {
+      flex: 0 0 auto !important;
+      padding: 2px 0;
+    }
+    .header-actions {
+      flex: 1;
+      min-width: 0;
+      flex-wrap: wrap;
+      gap: 5px !important;
+      justify-content: flex-end;
+    }
+    /* Shrink select to save space — still usable */
+    .header-actions #pageSelect {
+      flex: 0 1 160px;
+      min-width: 80px;
+      max-width: 160px !important;
+      width: auto !important;
+    }
+    /* Compact button text */
+    .header-actions #undoBtn  { padding: 5px 10px !important; }
+    .header-actions #redoBtn  { padding: 5px 10px !important; }
+    .header-actions .btn-edit-mode { padding: 5px 12px; }
+    /* edit status: allow it to be a line-break point */
+    .header-actions .edit-status { flex: 1 1 100%; text-align: right; min-width: 0; }
+
     /* ── Visual Editor layout ── */
     .editor-toolbar {
       display: flex;
@@ -1524,6 +1559,25 @@
         + `.project-hero{height:${Math.round(viewH*0.7)}px!important;min-height:${minPH}px!important;}`
         + `.page-hero--service{min-height:${Math.round(viewH*0.6)}px!important;max-height:${Math.round(viewH*0.9)}px!important;}`
         + `.post-hero--has-img{min-height:${Math.floor(viewH*0.6)}px!important;}`;
+
+      // ── Hero quality fix for phone/iPad preview ──────────────────────────
+      // main.js's responsive swap downgrades .hero__bg to _480w/_960w because the
+      // iframe element is narrow (390px phone). In the admin preview we always want
+      // the full-res _1920w version so the image looks correct.
+      if (_currentDevice === 'phone' || _currentDevice === 'ipad') {
+        const win = siteFrame.contentWindow;
+        const heroSrc = win && win.__RD_HERO;
+        if (heroSrc) {
+          const heroBg = doc.querySelector('.hero__bg');
+          if (heroBg) {
+            heroBg.style.backgroundImage = `url('${heroSrc}')`;
+            const zoom = (win.__RD_HERO_ZOOM != null) ? parseFloat(win.__RD_HERO_ZOOM) : 1.0;
+            const pos  = win.__RD_HERO_POSITION || '50% 50%';
+            heroBg.style.backgroundSize     = zoom > 1.001 ? Math.round(zoom * 100) + '%' : 'cover';
+            heroBg.style.backgroundPosition = pos;
+          }
+        }
+      }
     } catch(e) {}
   }
 
@@ -2038,6 +2092,14 @@
         }, true); // capture phase so it fires before the link's default action
       }
     } catch(e) {}
+
+    // Re-apply hero quality fix AFTER main.js's 300ms resize debounce fires.
+    // Sequence: load → _updateViewportFix sets _1920w → scaleFrame changes iframe
+    // CSS height → iframe resize event fires → main.js _swapAll (300ms debounce)
+    // reverts hero to _960w. Waiting 500ms ensures we run after that debounce.
+    if (_currentDevice !== 'pc') {
+      setTimeout(() => _updateViewportFix(), 500);
+    }
 
     frameLoading.classList.add('hidden');
     if (editMode) {
@@ -2686,7 +2748,16 @@
   });
 
   scaleFrame();
-  window.addEventListener('resize', () => { scaleFrame(); _repositionSecHandles(); });
+  var _heroFixTimer;
+  window.addEventListener('resize', () => {
+    scaleFrame();
+    _repositionSecHandles();
+    // Re-apply hero fix for mobile/tablet after resize-triggered _swapAll (300ms debounce)
+    if (_currentDevice !== 'pc') {
+      clearTimeout(_heroFixTimer);
+      _heroFixTimer = setTimeout(() => _updateViewportFix(), 500);
+    }
+  });
 
   // [PX] Watch iframe content for size changes (images loading, DOM changes)
   var _frameObs = null;
