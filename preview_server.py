@@ -3959,7 +3959,11 @@ def admin_google_connect():
     """No-auth page: generates the Google OAuth URL and handles code exchange."""
     client_id = os.getenv('GOOGLE_CLIENT_ID', '')
     redirect_uri = 'http://127.0.0.1:8080'
-    scope = 'https://www.googleapis.com/auth/adwords'
+    scope = ' '.join([
+        'https://www.googleapis.com/auth/adwords',
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/analytics.readonly',
+    ])
     import urllib.parse as _up
     auth_url = (
         'https://accounts.google.com/o/oauth2/v2/auth?'
@@ -8497,6 +8501,7 @@ _ENV_EDITABLE = {
     'CAMPAIGN_AUTOMATION_ENABLED','META_MANAGER_AUTO_APPLY','MSFT_MANAGER_AUTO_APPLY',
     'ALERT_EMAIL','ALERT_FROM','LANDING_PAGE_URL','META_API_VERSION',
     'META_ACCESS_TOKEN','GOOGLE_REFRESH_TOKEN','MICROSOFT_REFRESH_TOKEN',
+    'GOOGLE_SHEETS_ID',
 }
 
 
