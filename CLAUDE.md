@@ -360,3 +360,51 @@ If you execute in discussion mode, Henry will roll back your changes and you wil
 This applies to ALL changes: CSS, JS, images, HTML, API endpoints.
 
 **Origin:** April 12, 2026 — overrides.css was injected as  but the server serves files under . The file returned 404. All CSS fixes (overlays, eyebrow colors, font variables) were reported as done but were not loading. Henry discovered the failure.
+
+---
+
+## 23. Session Continuity — MANDATORY
+
+**Every new Claude Code session MUST begin by reading the full current state before doing anything else. No exceptions.**
+
+### Why This Rule Exists
+On April 14, 2026, Claude started a session with no recollection of the past several days of work — despite that work being fully documented on disk. The memory system only loaded an index last updated March 28. Claude had to be told to search the entire filesystem before it found the conversation logs and agency files. This wasted Henry's time and broke trust.
+
+### Step 1 — Read These Files at the Start of Every Session (in order)
+1. `ridgecrest-agency/CURRENT_STATUS.md` — exact current state of all campaigns
+2. `ridgecrest-agency/PX_CHANGE_LOG.md` — everything Perplexity changed outside Claude's context
+3. `ridgecrest-agency/project_open_issues.md` — known bugs and pending work
+4. `ridgecrest-agency/handoffs/` — find the most recently modified file and read it
+5. `ridgecrest-agency/agency_mode.txt` — which agent is active (RMA or PX)
+6. Most recent Claude conversation log: `ls -t /home/claudeuser/.claude/projects/-home-claudeuser-agent/*.jsonl | head -1`
+
+### Step 2 — Write a Session-Start Summary to Memory
+After reading the above, write (or overwrite) this file:
+`ridgecrest-agency/handoffs/ACTIVE_SESSION.md`
+
+Contents:
+- Date and time
+- What was read and what state was found
+- What is open/pending
+- What this session will focus on
+
+### Step 3 — Write a Session-End Handoff
+When Henry says "save", "done", or ends the session, write a handoff file:
+`ridgecrest-agency/handoffs/YYYY-MM-DD-claude-session.md`
+
+Contents:
+- What was done this session (bullet list)
+- What is pending or incomplete
+- What the next session should read first
+- Any decisions Henry made that future Claude must know
+
+### Step 4 — Update CURRENT_STATUS.md
+Before ending any session that changed campaign state, overwrite `ridgecrest-agency/CURRENT_STATUS.md` with the updated current state. Never append — always overwrite with the full current picture.
+
+### Enforcement
+This rule is self-enforcing: if Claude starts a session without reading these files and Henry notices, Claude has violated this rule. The handoff files exist precisely so this cannot happen.
+
+### Quick-Start Command (paste at session start if needed)
+```bash
+cat /home/claudeuser/agent/ridgecrest-agency/CURRENT_STATUS.md && cat /home/claudeuser/agent/ridgecrest-agency/agency_mode.txt && ls -t /home/claudeuser/agent/ridgecrest-agency/handoffs/*.md | head -3
+```
