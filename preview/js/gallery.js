@@ -83,6 +83,9 @@
     for (var i = 0; i < children.length; i++) {
       var child = children[i];
 
+      /* Skip hidden elements (filter active) */
+      if (child.style.display === 'none') continue;
+
       /* ── Section divider: equalize columns, place label, reset state ── */
       if (child.classList.contains('gallery-section-label')) {
         var maxH       = equalize();
@@ -152,7 +155,38 @@
     layoutAll();
   }
 
+  /* ── Gallery filter tabs ── */
+  function initFilters() {
+    var btns = document.querySelectorAll('.gallery-filter-btn');
+    if (!btns.length) return;
+    btns.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var filter = btn.getAttribute('data-filter');
+        /* Update active state */
+        btns.forEach(function(b) { b.classList.remove('gallery-filter-btn--active'); });
+        btn.classList.add('gallery-filter-btn--active');
+        /* Show/hide gallery items */
+        document.querySelectorAll('.gallery-item[data-src]').forEach(function(item) {
+          var t = item.getAttribute('data-image-type') || '';
+          item.style.display = (filter === 'all' || t === filter) ? '' : 'none';
+        });
+        /* Show section labels on All; hide when a single type is active (tab makes them redundant) */
+        document.querySelectorAll('.gallery-section-label').forEach(function(lbl) {
+          lbl.style.display = (filter === 'all') ? '' : 'none';
+        });
+        /* Re-layout masonry with updated visible set */
+        layoutAll();
+      });
+    });
+  }
+
   /* Expose for external callers (e.g. admin overlay after image delete) */
   window.GalleryEngine = window.GalleryEngine || {};
   window.GalleryEngine.layoutAll = layoutAll;
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initFilters);
+  } else {
+    initFilters();
+  }
 })();

@@ -61,6 +61,88 @@ def _load_img_dims():
 
 _load_img_dims()
 
+
+# ── Guardrail: shared dims helper + startup self-heal ─────────────────────────
+
+def _measure_and_cache_dims(*filenames):
+    """Measure image files and update the in-memory cache + img_dims.json on disk.
+    Accepts basenames or full paths. Missing or already-cached files are silently skipped.
+    Called after any image write so dims never fall out of sync with files on disk."""
+    opt_dir   = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+    dims_file = os.path.join(PREVIEW_DIR, 'assets', 'img_dims.json')
+    updated   = []
+    try:
+        from PIL import Image as _PILDim
+    except ImportError:
+        return
+    for fname in filenames:
+        basename = os.path.basename(fname)
+        if basename in _IMG_DIMS:
+            continue
+        path = fname if os.path.isabs(fname) else os.path.join(opt_dir, basename)
+        if not os.path.isfile(path):
+            continue
+        try:
+            with _PILDim.open(path) as img:
+                _IMG_DIMS[basename] = img.size
+                updated.append(basename)
+        except Exception:
+            pass
+    if updated:
+        try:
+            existing = {}
+            if os.path.isfile(dims_file):
+                with open(dims_file) as f:
+                    existing = json.load(f)
+            for k in updated:
+                existing[k] = list(_IMG_DIMS[k])
+            with open(dims_file, 'w') as f:
+                json.dump(existing, f, indent=2, sort_keys=True)
+        except Exception:
+            pass
+
+
+def _startup_dims_heal():
+    """Guardrail 1 — startup self-heal: scan images-opt/ for any .webp not in _IMG_DIMS.
+    Measures and caches them so the server always starts with complete dimension data.
+    Prevents gallery layout errors caused by images added after the last full rebuild."""
+    opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+    if not os.path.isdir(opt_dir):
+        return
+    missing = [f for f in os.listdir(opt_dir) if f.endswith('.webp') and f not in _IMG_DIMS]
+    if missing:
+        print(f'[dims] Healing {len(missing)} missing dimension(s) at startup...')
+        _measure_and_cache_dims(*[os.path.join(opt_dir, f) for f in missing])
+        print(f'[dims] Startup heal complete — {len(_IMG_DIMS)} total entries')
+
+_startup_dims_heal()
+
+
+def _gallery_integrity_check():
+    """Guardrail 4 — integrity check: report the state of image variants and dimension coverage.
+    Returns a dict; 'clean' is True only when zero images are missing dims or _480w variants."""
+    opt_dir  = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+    if not os.path.isdir(opt_dir):
+        return {'error': 'images-opt directory not found'}
+    all_webp  = [f for f in os.listdir(opt_dir) if f.endswith('.webp')]
+    all_set   = set(all_webp)
+    missing_dims = [f for f in all_webp if f not in _IMG_DIMS]
+    base_only = [f for f in all_webp
+                 if not any(s in f for s in ('_480w','_960w','_1920w','_201w'))]
+    base_missing_480 = [b for b in base_only
+                        if b.replace('.webp','_480w.webp') not in all_set]
+    return {
+        'total_webp':        len(all_webp),
+        'dims_cached':       len(_IMG_DIMS),
+        'missing_dims':      len(missing_dims),
+        'missing_dims_list': missing_dims[:20],
+        'base_files':        len(base_only),
+        'files_480w':        len([f for f in all_webp if '_480w' in f]),
+        'base_missing_480w': len(base_missing_480),
+        'base_missing_480w_list': base_missing_480[:20],
+        'clean': len(missing_dims) == 0 and len(base_missing_480) == 0,
+    }
+
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32))
 
@@ -175,6 +257,8 @@ def _ensure_pages_table(cur):
     # Idempotent: add zoom/position columns to existing tables
     cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS hero_position TEXT DEFAULT '50% 50%'")
     cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS hero_zoom FLOAT DEFAULT 1.0")
+    cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS hero_text_x FLOAT DEFAULT 0")
+    cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS hero_text_y FLOAT DEFAULT 0")
 
 def _seed_pages():
     """Scan all preview/ HTML files and seed the pages table (idempotent)."""
@@ -229,21 +313,31 @@ def _seed_pages():
             pass
 
 def _get_page_data(slug):
-    """Return (hero_path, hero_position, hero_zoom) for a page slug, resolving active version."""
+    """Return (hero_path, hero_position, hero_zoom, hero_text_x, hero_text_y) for a page slug."""
     conn = _db_conn()
     if not conn:
-        return None, '50% 50%', 1.0
+        return None, '50% 50%', 1.0, 0.0, 0.0
     try:
         cur = conn.cursor()
         _ensure_pages_table(cur)
-        cur.execute("SELECT hero_image, hero_position, hero_zoom FROM pages WHERE slug = %s", (slug,))
+        cur.execute("SELECT hero_image, hero_position, hero_zoom, hero_text_x, hero_text_y FROM pages WHERE slug = %s", (slug,))
         row = cur.fetchone()
         if not row or not row['hero_image']:
+            if row:
+                # Row exists but no image override — still return saved position/zoom/text
+                pos  = row['hero_position'] or '50% 50%'
+                zoom = float(row['hero_zoom'] or 1.0)
+                tx   = float(row['hero_text_x'] or 0)
+                ty   = float(row['hero_text_y'] or 0)
+                conn.close()
+                return None, pos, zoom, tx, ty
             conn.close()
-            return None, '50% 50%', 1.0
+            return None, '50% 50%', 1.0, 0.0, 0.0
         hero_path = row['hero_image']
         hero_pos  = row['hero_position'] or '50% 50%'
         hero_zoom = float(row['hero_zoom'] or 1.0)
+        tx        = float(row['hero_text_x'] or 0)
+        ty        = float(row['hero_text_y'] or 0)
         # Resolve active version: if image_labels has an active_version for this file, use it
         base_fname = hero_path.split('/')[-1]
         try:
@@ -258,9 +352,118 @@ def _get_page_data(slug):
         except Exception:
             pass
         conn.close()
-        return hero_path, hero_pos, hero_zoom
+        return hero_path, hero_pos, hero_zoom, tx, ty
     except Exception:
-        return None, '50% 50%', 1.0
+        return None, '50% 50%', 1.0, 0.0, 0.0
+
+def _get_device_override(slug, device):
+    """Return (pos, zoom, tx, ty) for a device override row, or None if none exists."""
+    if device not in ('tablet', 'mobile'):
+        return None
+    conn = _db_conn()
+    if not conn:
+        return None
+    try:
+        cur = conn.cursor()
+        _ensure_page_hero_overrides_table(cur)
+        cur.execute(
+            "SELECT hero_position, hero_zoom, hero_text_x, hero_text_y FROM page_hero_overrides WHERE slug = %s AND device = %s",
+            (slug, device)
+        )
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            return None
+        return (
+            row['hero_position'] or '50% 50%',
+            float(row['hero_zoom'] or 1.0),
+            float(row['hero_text_x'] or 0),
+            float(row['hero_text_y'] or 0),
+        )
+    except Exception:
+        return None
+
+# ── Published snapshots: staging vs live publish workflow ────────────────────
+
+def _ensure_published_snapshots_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS published_snapshots (
+          slug              TEXT PRIMARY KEY,
+          hero_image        TEXT,
+          hero_position     TEXT NOT NULL DEFAULT '50%% 50%%',
+          hero_zoom         FLOAT NOT NULL DEFAULT 1.0,
+          hero_text_x       FLOAT NOT NULL DEFAULT 0,
+          hero_text_y       FLOAT NOT NULL DEFAULT 0,
+          sections_json     TEXT NOT NULL DEFAULT '[]',
+          cards_json        TEXT NOT NULL DEFAULT '[]',
+          hero_overrides_json TEXT NOT NULL DEFAULT '[]',
+          published_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+    """)
+    cur.connection.commit()
+
+def _get_published_snapshot(slug):
+    """Return published snapshot dict for slug, or None if never published."""
+    conn = _db_conn()
+    if not conn:
+        return None
+    try:
+        cur = conn.cursor()
+        _ensure_published_snapshots_table(cur)
+        cur.execute("SELECT * FROM published_snapshots WHERE slug = %s", (slug,))
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            return None
+        return dict(row)
+    except Exception:
+        return None
+
+def _snapshot_page(cur, slug):
+    """Snapshot current staging data for slug into published_snapshots."""
+    import json as _json
+    # Hero data
+    cur.execute("SELECT hero_image, hero_position, hero_zoom, hero_text_x, hero_text_y FROM pages WHERE slug = %s", (slug,))
+    page_row = cur.fetchone()
+    hero_image    = page_row['hero_image']    if page_row else None
+    hero_position = (page_row['hero_position'] or '50% 50%') if page_row else '50% 50%'
+    hero_zoom     = float(page_row['hero_zoom'] or 1.0)      if page_row else 1.0
+    hero_text_x   = float(page_row['hero_text_x'] or 0)      if page_row else 0.0
+    hero_text_y   = float(page_row['hero_text_y'] or 0)      if page_row else 0.0
+    # Section heights
+    cur.execute(
+        "SELECT section_id, device, height_px FROM page_sections WHERE slug = %s AND height_px IS NOT NULL",
+        (slug,))
+    sections = [dict(r) for r in cur.fetchall()]
+    # Card settings
+    cur.execute(
+        "SELECT card_id, mode, color, image, position, zoom FROM card_settings WHERE page_slug = %s",
+        (slug,))
+    cards = [dict(r) for r in cur.fetchall()]
+    # Hero overrides per device
+    cur.execute(
+        "SELECT device, hero_position, hero_zoom, hero_text_x, hero_text_y FROM page_hero_overrides WHERE slug = %s",
+        (slug,))
+    overrides = [dict(r) for r in cur.fetchall()]
+    cur.execute("""
+        INSERT INTO published_snapshots
+          (slug, hero_image, hero_position, hero_zoom, hero_text_x, hero_text_y,
+           sections_json, cards_json, hero_overrides_json, published_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        ON CONFLICT (slug) DO UPDATE SET
+          hero_image          = EXCLUDED.hero_image,
+          hero_position       = EXCLUDED.hero_position,
+          hero_zoom           = EXCLUDED.hero_zoom,
+          hero_text_x         = EXCLUDED.hero_text_x,
+          hero_text_y         = EXCLUDED.hero_text_y,
+          sections_json       = EXCLUDED.sections_json,
+          cards_json          = EXCLUDED.cards_json,
+          hero_overrides_json = EXCLUDED.hero_overrides_json,
+          published_at        = NOW()
+    """, (
+        slug, hero_image, hero_position, hero_zoom, hero_text_x, hero_text_y,
+        _json.dumps(sections), _json.dumps(cards), _json.dumps(overrides)
+    ))
 
 # ── Card settings: DB-backed color/image mode per card ───────────────────────
 
@@ -287,6 +490,116 @@ def _ensure_gallery_image_types_table(cur):
             image_type TEXT
         )
     """)
+
+
+def _ensure_gallery_exclusions_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS gallery_exclusions (
+            id         SERIAL PRIMARY KEY,
+            slug       TEXT NOT NULL,
+            image_hash TEXT NOT NULL,
+            excluded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE(slug, image_hash)
+        )
+    """)
+
+
+def _ensure_file_hashes_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS file_hashes (
+            sha256   TEXT PRIMARY KEY,
+            filename TEXT NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+
+
+def _file_sha256(data: bytes) -> str:
+    import hashlib
+    return hashlib.sha256(data).hexdigest()
+
+
+def _dedup_incoming_bytes(raw: bytes, proposed_filename: str, cur) -> str | None:
+    """
+    Check whether `raw` bytes already exist in images-opt/.
+    Returns the existing canonical filename if a match is found (caller should skip saving),
+    or None if the content is new (caller should save normally).
+    Also registers the hash after saving — call with the final saved filename.
+    """
+    _ensure_file_hashes_table(cur)
+    h = _file_sha256(raw)
+    cur.execute("SELECT filename FROM file_hashes WHERE sha256 = %s", (h,))
+    row = cur.fetchone()
+    if row:
+        existing = row['filename'] if isinstance(row, dict) else row[0]
+        opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+        if os.path.isfile(os.path.join(opt_dir, existing)):
+            return existing  # duplicate found
+        # File was deleted — stale hash record, remove it and let caller save fresh
+        cur.execute("DELETE FROM file_hashes WHERE sha256 = %s", (h,))
+    return None  # content is new
+
+
+def _register_file_hash(raw: bytes, filename: str, cur):
+    """Insert a hash record for a newly saved file. Call after saving."""
+    _ensure_file_hashes_table(cur)
+    h = _file_sha256(raw)
+    cur.execute("""
+        INSERT INTO file_hashes (sha256, filename)
+        VALUES (%s, %s)
+        ON CONFLICT (sha256) DO NOTHING
+    """, (h, filename))
+
+
+def _backfill_file_hashes():
+    """Populate file_hashes for all existing images-opt/ base files not yet recorded.
+    Runs in a background thread at startup — non-blocking."""
+    import hashlib
+    opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+    if not os.path.isdir(opt_dir):
+        return
+    conn = _db_conn()
+    if not conn:
+        return
+    try:
+        cur = conn.cursor()
+        _ensure_file_hashes_table(cur)
+        # Get already-registered hashes
+        cur.execute("SELECT sha256 FROM file_hashes")
+        known = {r['sha256'] if isinstance(r, dict) else r[0] for r in cur.fetchall()}
+        added = 0
+        for fname in sorted(os.listdir(opt_dir)):
+            # Only hash base files (not responsive sizes, not AI renders)
+            if re.search(r'_\d+w\.webp$', fname):
+                continue
+            if re.search(r'_ai_\d+\.webp$', fname):
+                continue
+            ext = fname.rsplit('.', 1)[-1].lower()
+            if ext not in ('webp', 'jpg', 'jpeg', 'png'):
+                continue
+            fpath = os.path.join(opt_dir, fname)
+            try:
+                if os.path.getsize(fpath) < 100:
+                    continue
+                h = hashlib.sha256(open(fpath, 'rb').read()).hexdigest()
+                if h not in known:
+                    cur.execute("""
+                        INSERT INTO file_hashes (sha256, filename)
+                        VALUES (%s, %s)
+                        ON CONFLICT (sha256) DO NOTHING
+                    """, (h, fname))
+                    known.add(h)
+                    added += 1
+            except Exception:
+                pass
+        conn.commit()
+        if added:
+            print(f'[file_hashes] Backfilled {added} hashes for existing images')
+    except Exception as e:
+        print(f'[file_hashes] Backfill error: {e}')
+    finally:
+        try: conn.close()
+        except: pass
 
 
 def _ensure_feature_locks_table(cur):
@@ -352,6 +665,36 @@ def _ensure_page_locks_table(cur):
         )
     """)
 
+def _ensure_page_hero_overrides_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS page_hero_overrides (
+            id SERIAL PRIMARY KEY,
+            slug TEXT NOT NULL,
+            device TEXT NOT NULL,
+            hero_position TEXT DEFAULT '50% 50%',
+            hero_zoom FLOAT DEFAULT 1.0,
+            hero_text_x FLOAT DEFAULT 0,
+            hero_text_y FLOAT DEFAULT 0,
+            UNIQUE(slug, device),
+            CHECK (device IN ('tablet', 'mobile'))
+        )
+    """)
+
+def _ensure_page_sections_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS page_sections (
+            id SERIAL PRIMARY KEY,
+            slug TEXT NOT NULL,
+            device TEXT NOT NULL,
+            section_id TEXT NOT NULL,
+            display_order INTEGER NOT NULL DEFAULT 0,
+            visible BOOLEAN NOT NULL DEFAULT true,
+            height_px INTEGER,
+            UNIQUE(slug, device, section_id),
+            CHECK (device IN ('desktop', 'tablet', 'mobile'))
+        )
+    """)
+
 def _ensure_undo_log_table(cur):
     cur.execute("""
         CREATE TABLE IF NOT EXISTS undo_log (
@@ -360,31 +703,60 @@ def _ensure_undo_log_table(cur):
             description TEXT NOT NULL,
             operation TEXT NOT NULL,
             before_data JSONB NOT NULL,
+            after_data JSONB,
             page_slug TEXT,
             is_undone BOOLEAN DEFAULT FALSE,
             admin_context TEXT
         )
     """)
+    # Migration: add after_data column to existing tables
+    try:
+        cur.execute("ALTER TABLE undo_log ADD COLUMN IF NOT EXISTS after_data JSONB")
+    except Exception:
+        pass
 
-def _log_undo(operation: str, description: str, before_data: dict, page_slug: str = None, admin_context: str = None):
-    """Persist a reversible operation snapshot. Non-fatal if DB is unavailable."""
+def _log_undo(operation: str, description: str, before_data: dict,
+              page_slug: str = None, admin_context: str = None,
+              after_data: dict = None) -> int | None:
+    """Persist a reversible operation snapshot. Returns the new entry id, or None on failure."""
     if not HAS_DB:
+        return None
+    try:
+        conn = _db_conn()
+        if not conn:
+            return None
+        cur = conn.cursor()
+        _ensure_undo_log_table(cur)
+        cur.execute(
+            "INSERT INTO undo_log (operation, description, before_data, after_data, page_slug, admin_context) "
+            "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+            (operation, description, json.dumps(before_data),
+             json.dumps(after_data) if after_data is not None else None,
+             page_slug, admin_context)
+        )
+        row = cur.fetchone()
+        conn.commit()
+        conn.close()
+        return row['id'] if row else None
+    except Exception as _ue:
+        print(f'[undo] log error: {_ue}')
+        return None
+
+def _set_undo_after_data(entry_id, after_data: dict):
+    """Fill in after_data for an undo_log entry (called after the operation completes)."""
+    if not entry_id or not HAS_DB:
         return
     try:
         conn = _db_conn()
         if not conn:
             return
         cur = conn.cursor()
-        _ensure_undo_log_table(cur)
-        cur.execute(
-            "INSERT INTO undo_log (operation, description, before_data, page_slug, admin_context) "
-            "VALUES (%s, %s, %s, %s, %s)",
-            (operation, description, json.dumps(before_data), page_slug, admin_context)
-        )
+        cur.execute("UPDATE undo_log SET after_data = %s WHERE id = %s",
+                    (json.dumps(after_data), entry_id))
         conn.commit()
         conn.close()
     except Exception as _ue:
-        print(f'[undo] log error: {_ue}')
+        print(f'[undo] set_after_data error: {_ue}')
 
 def _run_db_migrations():
     """Run one-time DDL migrations using autocommit so they persist immediately."""
@@ -397,10 +769,11 @@ def _run_db_migrations():
         conn.autocommit = True
         cur = conn.cursor()
         cur.execute("ALTER TABLE undo_log ADD COLUMN IF NOT EXISTS admin_context TEXT")
+        cur.execute("ALTER TABLE undo_log ADD COLUMN IF NOT EXISTS after_data JSONB")
         cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS parent_slug TEXT")
         cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS show_in_nav BOOLEAN DEFAULT false")
         conn.close()
-        print('[db] migrations: undo_log.admin_context, pages.parent_slug, pages.show_in_nav ensured')
+        print('[db] migrations: undo_log.admin_context/after_data, pages.parent_slug/show_in_nav ensured')
     except Exception as e:
         print(f'[db] migration warning: {e}')
 
@@ -485,6 +858,62 @@ def _apply_cards_to_html(content: bytes, cards: list) -> bytes:
     return text.encode('utf-8')
 
 
+def _safe_js(value) -> str:
+    """JSON-encode a value for inline <script> injection.
+    Escapes </ to prevent </script> tag breakout."""
+    return json.dumps(value).replace("</", r"<\/")
+
+_SECTION_HEIGHT_SKIP = {'footer'}  # footer uses auto height — never override with px
+
+def _apply_section_heights(content: bytes, slug: str, device: str, preloaded_rows=None) -> bytes:
+    """Inject inline height styles on <section> elements based on DB overrides.
+    Skips hero and footer sections — their heights are controlled by CSS (100vh / auto).
+    Pass preloaded_rows to skip the DB query (used when serving published snapshots)."""
+    if preloaded_rows is not None:
+        rows = [r for r in preloaded_rows if r.get('device') == device and r.get('height_px')]
+    elif HAS_DB:
+        conn = _db_conn()
+        if not conn:
+            return content
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT section_id, height_px FROM page_sections WHERE slug = %s AND device = %s AND height_px IS NOT NULL",
+                (slug, device)
+            )
+            rows = cur.fetchall()
+            conn.close()
+        except Exception:
+            return content
+    else:
+        return content
+    try:
+        if not rows:
+            return content
+        text = content.decode('utf-8', errors='replace')
+        for row in rows:
+            sid = row['section_id']
+            if sid in _SECTION_HEIGHT_SKIP:
+                continue  # Never override hero/footer height via DB
+            hpx = int(row['height_px'])
+            pattern = re.compile(
+                r'(<section\s+class="' + re.escape(sid) + r'[^"]*")',
+                re.IGNORECASE
+            )
+            match = pattern.search(text)
+            if match:
+                tag = match.group(0)
+                style_str = 'height:' + str(hpx) + 'px;overflow:hidden;min-height:auto!important'
+                if 'style="' not in tag:
+                    new_tag = tag + ' style="' + style_str + '"'
+                else:
+                    new_tag = tag.replace('style="', 'style="' + style_str + ';')
+                text = text.replace(tag, new_tag, 1)
+        return text.encode('utf-8')
+    except Exception:
+        return content
+
+
 def _apply_hero_to_html(content: bytes, hero_path: str,
                          hero_position: str = '50% 50%', hero_zoom: float = 1.0) -> bytes:
     """Swap the first inline background-image URL in HTML with hero_path.
@@ -498,9 +927,9 @@ def _apply_hero_to_html(content: bytes, hero_path: str,
     )
     # Always inject script vars — main.js reads these for all hero types
     script = (
-        f'<script>window.__RD_HERO={json.dumps(hero_path)};'
-        f'window.__RD_HERO_POSITION={json.dumps(hero_position)};'
-        f'window.__RD_HERO_ZOOM={json.dumps(hero_zoom)};</script>'
+        f'<script>window.__RD_HERO={_safe_js(hero_path)};'
+        f'window.__RD_HERO_POSITION={_safe_js(hero_position)};'
+        f'window.__RD_HERO_ZOOM={_safe_js(hero_zoom)};</script>'
     )
     if '</head>' in new_text:
         new_text = new_text.replace('</head>', script + '</head>', 1)
@@ -610,6 +1039,8 @@ _CARD_EDIT_OVERLAY_TPL = """\
   var imagePool = [];
   var saveTimers = {{}};
   var cardIndices = {{}}; // cardId → current index in imagePool (bidirectional navigation)
+  var cardHistory = {{}}; // [PX] cardId → history array for back button
+  var cardOriginals = {{}}; // [PX] cardId → original image before edits
   var cardRefreshPill = {{}}; // cardId → refreshPill() fn (for rd_set_card_image handler)
   var _tmBioMap = {{}}; // memberId (string) → bio text, for team card saveCard intercept
 
@@ -748,7 +1179,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
         if (cardRefreshPill[d.cardId]) cardRefreshPill[d.cardId]();
         saveCard(d.cardId, s);
       }}
-      window.parent.postMessage({{type:'rd_pool_refresh'}}, '*');
+      window.parent.postMessage({{type:'rd_pool_refresh'}}, window.location.origin);
     }}
   }});
 
@@ -873,9 +1304,10 @@ _CARD_EDIT_OVERLAY_TPL = """\
     cardRefreshPill[cardId] = refreshPill;
     if (!isGalleryItem) pill.appendChild(colorBtn);
     if (!isGalleryItem) pill.appendChild(imgBtn);
-    if (!isGalleryItem) pill.appendChild(browseCardBtn);
+    pill.appendChild(browseCardBtn); // [PX] available for all including gallery
     if (!isGalleryItem) pill.appendChild(rotateBtn);
-    if (!isGalleryItem) pill.appendChild(cardBackBtn);
+    pill.appendChild(cardBackBtn); // [PX] available for all including gallery
+    cardBackBtn.style.display = 'none'; // [PX] start hidden, show on forward cycle
     pill.appendChild(renderBtn);
 
     // Gallery items: type badge (cycles Untagged → Project → Render → Before → Construction → Untagged)
@@ -885,6 +1317,14 @@ _CARD_EDIT_OVERLAY_TPL = """\
       var _typeCycle = ['project', 'render', 'before', 'construction', ''];
       var _typeLabels = {{'': 'Untagged', 'project': 'Project', 'render': 'Render', 'before': 'Before', 'construction': 'Construction'}};
       var _typeBg = {{'': 'rgba(0,0,0,.5)', 'project': '#16a34a', 'render': '#7c3aed', 'before': '#0369a1', 'construction': '#b45309'}};
+      // Derive slug from the page URL at action-time — more reliable than the injected
+      // SLUG variable which can be stale if the overlay was loaded while a different
+      // page was selected in the admin panel.
+      function _gallerySlug() {{
+        var p = window.location.pathname || '';
+        var s = p.replace(/^.*\/view\//, '').replace(/\.html.*$/, '');
+        return (s && s !== 'index') ? s : SLUG;
+      }}
 
       var typeBtn = document.createElement('button');
       typeBtn.textContent = _typeLabels[_imgType] || 'Untagged';
@@ -903,13 +1343,13 @@ _CARD_EDIT_OVERLAY_TPL = """\
         // sort reads old type from DB before the tag commit has finished.
         var _sb = document.getElementById('rd-sort-btn');
         if (_sb) {{ _sb.disabled = true; _sb.style.opacity = '0.5'; }}
-        fetch('/admin/api/gallery/' + encodeURIComponent(SLUG) + '/tag', {{
+        fetch('/admin/api/gallery/' + encodeURIComponent(_gallerySlug()) + '/tag', {{
           method: 'POST',
           headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
           body: JSON.stringify({{filename: _galleryHash, image_type: _imgType || null}})
         }}).then(function() {{
           // Notify parent to refresh undo button after a tag action
-          window.parent.postMessage({{type: 'rd_refresh_undo'}}, '*');
+          window.parent.postMessage({{type: 'rd_refresh_undo'}}, window.location.origin);
         }}).catch(function() {{}}).then(function() {{
           // Re-enable sort whether save succeeded or failed
           if (_sb) {{ _sb.disabled = false; _sb.style.opacity = '1'; }}
@@ -933,7 +1373,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
         // a stale gallery_json that still contains this image.
         var _sb2 = document.getElementById('rd-sort-btn');
         if (_sb2) {{ _sb2.disabled = true; _sb2.style.opacity = '0.5'; }}
-        fetch('/admin/api/gallery/' + encodeURIComponent(SLUG) + '/remove', {{
+        fetch('/admin/api/gallery/' + encodeURIComponent(_gallerySlug()) + '/remove', {{
           method: 'POST',
           headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
           body: JSON.stringify({{filename: _galleryHash}})
@@ -949,7 +1389,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
                 window.GalleryEngine.layoutAll();
               }}
               // Notify parent to refresh undo button without reloading the iframe
-              window.parent.postMessage({{type: 'rd_refresh_undo'}}, '*');
+              window.parent.postMessage({{type: 'rd_refresh_undo'}}, window.location.origin);
             }}, 220);
           }} else {{
             console.error('[RD] Delete failed:', d.error, '| hash:', _galleryHash, '| slug:', SLUG);
@@ -1097,7 +1537,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
       var f = imgPath.split('?')[0].split('/').pop();
       var base = f.replace(/_ai_\d+\.webp$/, '.webp');
       if (!base) return;
-      window.parent.postMessage({{type:'rd_open_render', cardId:cardId, filename:base}}, '*');
+      window.parent.postMessage({{type:'rd_open_render', cardId:cardId, filename:base}}, window.location.origin);
     }});
 
     rotateBtn.addEventListener('click', function(e) {{
@@ -1134,6 +1574,9 @@ _CARD_EDIT_OVERLAY_TPL = """\
         state.mode = 'image';
         if (!state.image && imagePool.length) {{ state.image = imagePool[0]; cardIndices[cardId] = 0; }}
         else if (state.image) cardIndices[cardId] = findPoolIndex(state.image);
+        // [PX] Record original image and initialize history
+        if (!cardOriginals[cardId] && state.image) cardOriginals[cardId] = state.image;
+        if (!cardHistory[cardId]) cardHistory[cardId] = [];
         applyStyle(el, state); refreshPill();
         saveCard(cardId, state);
       }}
@@ -1150,10 +1593,12 @@ _CARD_EDIT_OVERLAY_TPL = """\
         applyStyle(el, state);
         saveCard(cardId, state);
       }} else if (isGalleryItem || state.mode === 'image') {{
-        if (!imagePool.length) return;
-        if (cardIndices[cardId] == null) cardIndices[cardId] = findPoolIndex(state.image);
-        cardIndices[cardId] = (cardIndices[cardId] - 1 + imagePool.length) % imagePool.length;
-        state.image = imagePool[cardIndices[cardId]];
+        // [PX] Pop from history instead of cycling backward
+        if (!cardHistory[cardId] || !cardHistory[cardId].length) return;
+        state.image = cardHistory[cardId].pop();
+        var pos = imagePool.indexOf(state.image);
+        if (pos >= 0) cardIndices[cardId] = pos;
+        if (!cardHistory[cardId].length) cardBackBtn.style.display = 'none';
         applyStyle(el, state);
         saveCard(cardId, state);
       }}
@@ -1282,6 +1727,10 @@ _CARD_EDIT_OVERLAY_TPL = """\
         saveCard(cardId, state);
       }} else if (state.mode === 'image') {{
         if (!imagePool.length) return;
+        // [PX] Push current to history before changing
+        if (!cardHistory[cardId]) cardHistory[cardId] = [];
+        if (state.image) cardHistory[cardId].push(state.image);
+        cardBackBtn.style.display = ''; // [PX] show back button
         if (cardIndices[cardId] == null) cardIndices[cardId] = findPoolIndex(state.image);
         cardIndices[cardId] = (cardIndices[cardId] + 1) % imagePool.length;
         state.image = imagePool[cardIndices[cardId]];
@@ -1329,6 +1778,60 @@ _CARD_EDIT_OVERLAY_TPL = """\
     return wrap;
   }}
 
+  // ── Inject ✦ AI pill on <img> tags not already covered by a card or hero overlay ──
+  // Covers blog post images, team photos, and any other <img> not inside a [data-card-id].
+  // Background-image elements are already handled by _EDIT_OVERLAY_TPL (builds full hero badge).
+  function injectUncoveredImagePills() {{
+    var LOCAL_RE = /^\/assets\/images(?:-opt)?\//;
+    document.querySelectorAll('img').forEach(function(img) {{
+      var src = img.getAttribute('src') || '';
+      if (!LOCAL_RE.test(src)) return;
+      // Already covered by card overlay (gallery item inside data-card-id element)
+      if (img.closest('[data-card-id]')) return;
+      // Already covered by hero overlay (inside a hero element)
+      if (img.closest('[data-rd-overlay="hero"]')) return;
+      // Already injected
+      if (img.getAttribute('data-rd-ai-pill')) return;
+      img.setAttribute('data-rd-ai-pill', '1');
+
+      // Normalize filename: strip AI variant suffix to get base name
+      var f = src.split('?')[0].split('/').pop();
+      var base = f.replace(/_ai_\d+\.webp$/, '.webp');
+      if (!base) return;
+
+      // Append button to the img's parent container (which becomes the positioning context)
+      var container = img.parentElement || img;
+      if (window.getComputedStyle(container).position === 'static') {{
+        container.style.position = 'relative';
+      }}
+
+      var btn = document.createElement('button');
+      btn.textContent = '\u2728 AI';
+      btn.title = 'AI Re-render this image in the media library';
+      btn.style.cssText = [
+        'position:absolute', 'bottom:8px', 'right:8px', 'z-index:9991',
+        'padding:5px 10px', 'font-size:11px', 'font-weight:700',
+        'font-family:system-ui,sans-serif', 'border:none', 'cursor:pointer',
+        'line-height:1.4', 'white-space:nowrap',
+        'background:rgba(90,50,180,.8)', 'color:#fff', 'border-radius:4px',
+        'opacity:0', 'transition:opacity .15s', 'pointer-events:none',
+        'box-shadow:0 2px 8px rgba(0,0,0,.5)'
+      ].join(';');
+
+      container.addEventListener('mouseenter', function() {{
+        btn.style.opacity = '1'; btn.style.pointerEvents = 'auto';
+      }});
+      container.addEventListener('mouseleave', function() {{
+        btn.style.opacity = '0'; btn.style.pointerEvents = 'none';
+      }});
+      btn.addEventListener('click', function(e) {{
+        e.stopPropagation(); e.preventDefault();
+        window.parent.postMessage({{type:'rd_open_render', cardId:null, filename:base}}, window.location.origin);
+      }});
+      container.appendChild(btn);
+    }});
+  }}
+
   function init() {{
     document.querySelectorAll('[data-rd-overlay="card"]').forEach(function(n){{n.remove();}});
     loadImages();
@@ -1366,12 +1869,12 @@ _CARD_EDIT_OVERLAY_TPL = """\
       tagBtn.addEventListener('click', function() {{
         tagBtn.textContent = '\u2714 Tagging\u2026';
         tagBtn.disabled = true;
-        window.parent.postMessage({{type:'rd_auto_tag', slug:SLUG}}, '*');
+        window.parent.postMessage({{type:'rd_auto_tag', slug:SLUG}}, window.location.origin);
       }});
       sortBtn.addEventListener('click', function() {{
         sortBtn.textContent = '\u21c5 Sorting\u2026';
         sortBtn.disabled = true;
-        window.parent.postMessage({{type:'rd_auto_sort', slug:SLUG}}, '*');
+        window.parent.postMessage({{type:'rd_auto_sort', slug:SLUG}}, window.location.origin);
       }});
       window.addEventListener('message', function(ev) {{
         if (ev.data && ev.data.type === 'rd_sort_done') {{
@@ -1584,6 +2087,9 @@ _CARD_EDIT_OVERLAY_TPL = """\
         // ─────────────────────────────────────────────────────────────────────
       }}
     }}
+
+    // Second pass: cover any <img> tags not inside a [data-card-id] element
+    injectUncoveredImagePills();
   }}
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
@@ -1703,6 +2209,9 @@ _EDIT_OVERLAY_TPL = """\
   var editables = [];
   var imagePool = [];
   var cycleIndices = [];
+  var imageHistory = [];   // [PX] per-element history stack for back button
+  var originalImages = []; // [PX] original image per element before edits
+  var _transformAckTimer = null;
 
   // Initial transform from server-injected vars
   var _initZoom = (window.__RD_HERO_ZOOM != null ? parseFloat(window.__RD_HERO_ZOOM) : 1.0) || 1.0;
@@ -1741,7 +2250,7 @@ _EDIT_OVERLAY_TPL = """\
     }});
     // Show grab handles
     (window.__rdAllGrabBtns || []).forEach(function(btn) {{ btn.style.display = 'inline-block'; }});
-    window.parent.postMessage({{type: 'rd_text_mode', active: true}}, '*');
+    window.parent.postMessage({{type: 'rd_text_mode', active: true}}, window.location.origin);
   }};
 
   window.__rdExitTextMode = function() {{
@@ -1764,7 +2273,7 @@ _EDIT_OVERLAY_TPL = """\
     }});
     // Hide grab handles
     (window.__rdAllGrabBtns || []).forEach(function(btn) {{ btn.style.display = 'none'; }});
-    window.parent.postMessage({{type: 'rd_text_mode', active: false}}, '*');
+    window.parent.postMessage({{type: 'rd_text_mode', active: false}}, window.location.origin);
   }};
 
   // Escape key always exits text mode
@@ -1773,26 +2282,25 @@ _EDIT_OVERLAY_TPL = """\
   }});
 
 
-  var _transformSaveTimer = null;
   function notifyTransform(idx) {{
-    // Notify parent frame (admin panel) — works when loaded in iframe
+    // Notify parent frame — parent's saveNow/scheduleSave handles all persistence.
     window.parent.postMessage({{
       type: 'rd_transform_changed', slug: SLUG, elementIndex: idx,
       zoom: editables[idx].zoom, posX: editables[idx].posX, posY: editables[idx].posY
-    }}, '*');
-    // Also save directly — ensures saves work whether in iframe or accessed directly
-    clearTimeout(_transformSaveTimer);
-    _transformSaveTimer = setTimeout(function() {{
-      var e = editables[idx];
+    }}, window.location.origin);
+    // Fallback: if parent doesn't ack within 2.5s (e.g. direct access, frame race),
+    // save directly so transform edits are never silently dropped.
+    clearTimeout(_transformAckTimer);
+    _transformAckTimer = setTimeout(function() {{
+      var el = editables[idx];
+      if (!el || !TOKEN) return;
+      var pos = el.posX.toFixed(1) + '% ' + el.posY.toFixed(1) + '%';
       fetch('/admin/api/pages/' + encodeURIComponent(SLUG), {{
         method: 'PUT',
         headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
-        body: JSON.stringify({{
-          hero_zoom: e.zoom,
-          hero_position: e.posX.toFixed(1) + '% ' + e.posY.toFixed(1) + '%'
-        }})
-      }}).catch(function() {{}});
-    }}, 800);
+        body: JSON.stringify({{hero_zoom: el.zoom, hero_position: pos}})
+      }}).catch(function(){{}});
+    }}, 2500);
   }}
 
   function buildOverlay(el, idx, imgUrl) {{
@@ -1815,7 +2323,7 @@ _EDIT_OVERLAY_TPL = """\
     rotateBtn.style.cssText = 'background:rgba(0,0,0,.72);color:#fff;border:none;font-family:system-ui,sans-serif;font-size:12px;font-weight:700;padding:5px 11px;border-radius:4px;cursor:pointer;white-space:nowrap;pointer-events:auto';
     var backBtn = document.createElement('button');
     backBtn.textContent = '\u2190 Back';
-    backBtn.style.cssText = 'background:rgba(0,0,0,.72);color:#fff;border:none;font-family:system-ui,sans-serif;font-size:12px;font-weight:700;padding:5px 11px;border-radius:4px;cursor:pointer;white-space:nowrap;pointer-events:auto';
+    backBtn.style.cssText = 'background:rgba(0,0,0,.72);color:#fff;border:none;font-family:system-ui,sans-serif;font-size:12px;font-weight:700;padding:5px 11px;border-radius:4px;cursor:pointer;white-space:nowrap;pointer-events:auto;display:none';
     var zoomLabel = document.createElement('span');
     zoomLabel.style.cssText = 'background:rgba(0,0,0,.78);color:#f59e0b;font-family:system-ui,sans-serif;font-size:11px;font-weight:700;padding:4px 9px;border-radius:4px;white-space:nowrap;display:none';
     badge.appendChild(browseBtn);
@@ -1907,6 +2415,21 @@ _EDIT_OVERLAY_TPL = """\
     }})(idx));
     badge.appendChild(heroUploadBtn);
 
+    // AI Re-render button — opens media library with this image pre-selected and modal open
+    var heroRenderBtn = document.createElement('button');
+    heroRenderBtn.textContent = '\u2728 AI';
+    heroRenderBtn.title = 'AI Re-render this image in the media library';
+    heroRenderBtn.style.cssText = 'background:rgba(90,50,180,.85);color:#fff;border:none;font-family:system-ui,sans-serif;font-size:12px;font-weight:700;padding:5px 11px;border-radius:4px;cursor:pointer;white-space:nowrap;pointer-events:auto';
+    heroRenderBtn.addEventListener('click', function(e) {{
+      e.stopPropagation();
+      var url = (editables[idx] && editables[idx].url) || imgUrl || '';
+      var f = url.split('?')[0].split('/').pop();
+      var base = f.replace(/_ai_\d+\.webp$/, '.webp');
+      if (!base) return;
+      window.parent.postMessage({{type:'rd_open_render', cardId:null, filename:base}}, window.location.origin);
+    }});
+    badge.appendChild(heroRenderBtn);
+
     ov.appendChild(badge);
 
     // Track for global text-mode enter/exit
@@ -1967,15 +2490,17 @@ _EDIT_OVERLAY_TPL = """\
 
     backBtn.addEventListener('click', function(e) {{
       e.stopPropagation();
-      if (!imagePool.length) return;
-      var cur = cycleIndices[idx] == null ? 0 : cycleIndices[idx];
-      cycleIndices[idx] = (cur - 1 + imagePool.length) % imagePool.length;
-      var newImg = imagePool[cycleIndices[idx]];
-      editables[idx].el.style.backgroundImage = "url('" + newImg + "')";
-      editables[idx].url = newImg;
+      // [PX] Pop from history instead of cycling backward
+      if (!imageHistory[idx] || !imageHistory[idx].length) return;
+      var prevImg = imageHistory[idx].pop();
+      editables[idx].el.style.backgroundImage = "url('" + prevImg + "')";
+      editables[idx].url = prevImg;
+      var pos = imagePool.indexOf(prevImg);
+      if (pos >= 0) cycleIndices[idx] = pos;
+      if (!imageHistory[idx].length) backBtn.style.display = 'none'; // [PX] hide when at original
       window.parent.postMessage({{
         type: 'rd_image_cycled', slug: SLUG,
-        elementIndex: idx, newImage: newImg
+        elementIndex: idx, newImage: prevImg
       }}, '*');
     }});
 
@@ -2056,6 +2581,8 @@ _EDIT_OVERLAY_TPL = """\
       e.preventDefault();
       e.stopPropagation();
       if (!imagePool.length) return;
+      imageHistory[idx].push(editables[idx].url); // [PX] push current to history
+      backBtn.style.display = ''; // [PX] show back button
       cycleIndices[idx] = ((cycleIndices[idx] == null ? -1 : cycleIndices[idx]) + 1) % imagePool.length;
       var newImg = imagePool[cycleIndices[idx]];
       editables[idx].el.style.backgroundImage = "url('" + newImg + "')";
@@ -2068,6 +2595,92 @@ _EDIT_OVERLAY_TPL = """\
 
     if (window.getComputedStyle(el).position === 'static') el.style.position = 'relative';
     el.appendChild(ov);
+  }}
+
+  // ── Hero text drag handle ─────────────────────────────────────────────────
+  window.__rdAllGrabBtns = window.__rdAllGrabBtns || [];
+  var _heroTextX = (window.__RD_HERO_TEXT_X != null ? parseFloat(window.__RD_HERO_TEXT_X) : 0) || 0;
+  var _heroTextY = (window.__RD_HERO_TEXT_Y != null ? parseFloat(window.__RD_HERO_TEXT_Y) : 0) || 0;
+
+  function buildHeroTextHandle() {{
+    document.querySelectorAll('[data-rd-text-handle]').forEach(function(n){{n.remove();}});
+    document.querySelectorAll('.hero__content').forEach(function(contentEl) {{
+      // Ensure content is relatively positioned for absolute child
+      if (window.getComputedStyle(contentEl).position === 'static') {{
+        contentEl.style.position = 'relative';
+      }}
+      // Apply saved offset on load
+      if (_heroTextX || _heroTextY) {{
+        contentEl.style.transform = 'translate(' + _heroTextX + 'px,' + _heroTextY + 'px)';
+      }}
+
+      var handle = document.createElement('div');
+      handle.setAttribute('data-rd-text-handle', '1');
+      handle.title = 'Drag to reposition entire text block';
+      // Always visible in edit mode — no need to enter text mode first.
+      // Positioned at the top-left corner of hero__content (inside hero overflow:hidden boundary).
+      handle.style.cssText = [
+        'position:absolute',
+        'top:0',
+        'left:0',
+        'display:inline-block',
+        'background:rgba(15,23,42,.88)',
+        'color:#f59e0b',
+        'border:1px solid rgba(245,158,11,.5)',
+        'font-family:system-ui,sans-serif',
+        'font-size:12px',
+        'font-weight:700',
+        'padding:5px 12px',
+        'border-radius:0 0 4px 0',
+        'cursor:grab',
+        'user-select:none',
+        'white-space:nowrap',
+        'z-index:9999',
+        'pointer-events:auto'
+      ].join(';');
+      handle.innerHTML = '\u2630 Move';
+      contentEl.appendChild(handle);
+
+      // Drag logic
+      var isDraggingText = false;
+      handle.addEventListener('mousedown', function(e) {{
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var startX = e.clientX, startY = e.clientY;
+        var startTX = _heroTextX, startTY = _heroTextY;
+        isDraggingText = false;
+        handle.style.cursor = 'grabbing';
+
+        function onMove(ev) {{
+          var dx = ev.clientX - startX;
+          var dy = ev.clientY - startY;
+          if (Math.abs(dx) > 2 || Math.abs(dy) > 2) isDraggingText = true;
+          if (!isDraggingText) return;
+          _heroTextX = Math.round(startTX + dx);
+          _heroTextY = Math.round(startTY + dy);
+          contentEl.style.transform = 'translate(' + _heroTextX + 'px,' + _heroTextY + 'px)';
+        }}
+
+        function onUp() {{
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          handle.style.cursor = 'grab';
+          if (isDraggingText) {{
+            window.parent.postMessage({{
+              type: 'rd_hero_text_moved',
+              slug: SLUG,
+              x: _heroTextX,
+              y: _heroTextY
+            }}, window.location.origin);
+          }}
+          isDraggingText = false;
+        }}
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      }});
+    }});
   }}
 
   function init() {{
@@ -2087,8 +2700,12 @@ _EDIT_OVERLAY_TPL = """\
       var idx = editables.length;
       editables.push({{ el: el, url: imgUrl, zoom: _initZoom, posX: _initPosX, posY: _initPosY }});
       cycleIndices.push(null);
+      imageHistory.push([]);    // [PX] empty history for this element
+      originalImages.push(imgUrl); // [PX] record starting image
       buildOverlay(el, idx, imgUrl);
     }});
+
+    buildHeroTextHandle();
 
     window.addEventListener('message', function(e) {{
       var d = e.data || {{}};
@@ -2106,9 +2723,13 @@ _EDIT_OVERLAY_TPL = """\
         var pos = imagePool.indexOf(d.newImage);
         cycleIndices[d.elementIndex] = pos >= 0 ? pos : 0;
       }}
+      // Parent acknowledged the transform — cancel the direct-save fallback timer
+      if (d.type === 'rd_transform_ack') {{
+        clearTimeout(_transformAckTimer);
+      }}
     }});
 
-    window.parent.postMessage({{type:'rd_overlay_ready', slug:SLUG, count:editables.length}}, '*');
+    window.parent.postMessage({{type:'rd_overlay_ready', slug:SLUG, count:editables.length}}, window.location.origin);
   }}
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
@@ -2117,11 +2738,173 @@ _EDIT_OVERLAY_TPL = """\
 </script>
 """
 
+_SECTION_RESIZE_TPL = """\
+<script id="rd-section-resize">
+(function() {{
+  var SLUG     = {slug_json};
+  var TOKEN    = {token_json};
+  var DEVICE   = {device_json};
+  var SAVE_URL = '/admin/api/pages/' + encodeURIComponent(SLUG) + '/sections';
+
+  // Active drag state — one drag at a time
+  var _drag = null;
+  // {{ pointerId, sectionId, section, label, startY, startH }}
+
+  function saveHeight(sectionId, finalH) {{
+    fetch(SAVE_URL, {{
+      method: 'PUT',
+      headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
+      body: JSON.stringify({{device: DEVICE, section_id: sectionId, height_px: finalH}})
+    }}).then(function(r) {{ return r.json(); }}).then(function(res) {{
+      window.parent.postMessage({{type:'rd_section_resize', slug:SLUG,
+        section_id:sectionId, height_px:finalH, ok:!!res.ok}}, window.location.origin);
+    }}).catch(function() {{
+      window.parent.postMessage({{type:'rd_section_resize', slug:SLUG,
+        section_id:sectionId, height_px:finalH, ok:false}}, window.location.origin);
+    }});
+  }}
+
+  // Document-level listeners: receive events even when pointer leaves the handle
+  // element or exits the iframe's visual bounds (pointer capture keeps them coming).
+  document.addEventListener('pointermove', function(e) {{
+    if (!_drag || e.pointerId !== _drag.pointerId) return;
+    e.preventDefault();
+    _drag.handle.style.background = 'rgba(59,130,246,0.9)'; // BLUE = move firing
+    var newH = Math.max(50, _drag.startH + (e.clientY - _drag.startY));
+    _drag.section.style.height = Math.round(newH) + 'px';
+    _drag.label.textContent    = Math.round(newH) + 'px';
+  }}, {{passive: false}});
+
+  document.addEventListener('pointerup', function(e) {{
+    if (!_drag || e.pointerId !== _drag.pointerId) return;
+    try {{ _drag.handle.releasePointerCapture(e.pointerId); }} catch(ex) {{}}
+    var finalH = Math.round(_drag.section.offsetHeight);
+    _drag.handle.style.background = 'rgba(56,161,105,0.8)'; // restore GREEN
+    _drag.label.textContent = finalH + 'px';
+    _restoreOverlays(_drag.section);
+    saveHeight(_drag.sectionId, finalH);
+    _drag = null;
+  }});
+
+  document.addEventListener('pointercancel', function(e) {{
+    if (!_drag || e.pointerId !== _drag.pointerId) return;
+    try {{ _drag.handle.releasePointerCapture(e.pointerId); }} catch(ex) {{}}
+    _drag.handle.style.background = 'rgba(239,68,68,0.9)'; // RED = cancelled
+    _drag.section.style.height = _drag.startH + 'px';
+    _drag.label.textContent    = _drag.startH + 'px';
+    _restoreOverlays(_drag.section);
+    _drag = null;
+  }});
+
+  // Helpers to suspend/restore pointer-events on any image overlays within a section.
+  // The hero section has a full-cover ov (z-index:9990) from _EDIT_OVERLAY_TPL that can
+  // intercept pointer events even when the resize handle has z-index:10000.
+  // Suspending the overlay while hovering/dragging the handle guarantees events reach it.
+  function _suspendOverlays(sec) {{
+    sec.querySelectorAll('[data-rd-overlay]').forEach(function(ov) {{
+      if (!ov.hasAttribute('data-rd-pe-saved')) {{
+        ov.setAttribute('data-rd-pe-saved', ov.style.pointerEvents || '');
+        ov.style.pointerEvents = 'none';
+      }}
+    }});
+  }}
+  function _restoreOverlays(sec) {{
+    sec.querySelectorAll('[data-rd-overlay]').forEach(function(ov) {{
+      if (ov.hasAttribute('data-rd-pe-saved')) {{
+        ov.style.pointerEvents = ov.getAttribute('data-rd-pe-saved');
+        ov.removeAttribute('data-rd-pe-saved');
+      }}
+    }});
+  }}
+
+  function makeHandle(section, sectionId) {{
+    var handle = document.createElement('div');
+    handle.setAttribute('data-rd-section-handle', sectionId);
+    handle.style.cssText =
+      'position:absolute;left:0;right:0;bottom:0;height:12px;' +
+      'background:rgba(56,161,105,0.8);cursor:ns-resize;z-index:99999;' +
+      'display:flex;align-items:center;justify-content:center;' +
+      'font:bold 9px/1 monospace;color:#1a4731;user-select:none;' +
+      'box-sizing:border-box;border-top:2px solid rgba(56,161,105,1);' +
+      'touch-action:none;pointer-events:auto;';
+    handle.title = 'Drag to resize \u00b7 ' + sectionId;
+
+    var label = document.createElement('span');
+    label.style.cssText = 'pointer-events:none;letter-spacing:0.5px;';
+    label.textContent = Math.round(section.offsetHeight) + 'px';
+    handle.appendChild(label);
+
+    handle.addEventListener('pointerdown', function(e) {{
+      e.preventDefault();
+      e.stopPropagation();
+      var startH = Math.round(section.offsetHeight);
+      section.style.height    = startH + 'px';
+      section.style.minHeight = 'auto';
+      section.style.overflow  = 'hidden';
+      handle.style.background = 'rgba(239,68,68,0.9)'; // RED = pointerdown fired
+      // Suspend overlays during drag so their pointer-events don't interfere.
+      _suspendOverlays(section);
+      // Capture pointer to the handle element — standard approach, works across
+      // all browsers including when the pointer exits the element during drag.
+      try {{ handle.setPointerCapture(e.pointerId); }} catch(ex) {{
+        console.error('[rd-resize] setPointerCapture failed:', ex);
+      }}
+      _drag = {{
+        pointerId: e.pointerId,
+        sectionId: sectionId,
+        section:   section,
+        handle:    handle,
+        label:     label,
+        startY:    e.clientY,
+        startH:    startH
+      }};
+      // Notify parent for status bar only
+      window.parent.postMessage({{
+        type: 'rd_section_drag_start',
+        slug: SLUG,
+        section_id: sectionId,
+        start_h: startH
+      }}, window.location.origin);
+    }});
+
+    return handle;
+  }}
+
+  // Footer uses auto height and should never be pixel-overridden
+  var SKIP_SECTIONS = {{'footer': true}};
+
+  function init() {{
+    document.querySelectorAll('section').forEach(function(sec) {{
+      var cls = sec.className ? sec.className.trim().split(/\\s+/)[0] : '';
+      if (!cls || SKIP_SECTIONS[cls]) return;
+      if (window.getComputedStyle(sec).position === 'static') {{
+        sec.style.position = 'relative';
+      }}
+      sec.appendChild(makeHandle(sec, cls));
+      // Clip any full-cover image overlays so they don't extend into the
+      // bottom 14px where the resize handle lives. Without this the overlay
+      // (z-index:9990, pointer-events:auto) intercepts all pointer events
+      // before they can reach the handle (z-index:99999).
+      sec.querySelectorAll('[data-rd-overlay="hero"]').forEach(function(ov) {{
+        ov.style.bottom = '14px';
+      }});
+    }});
+  }}
+
+  if (document.readyState === 'loading') {{
+    document.addEventListener('DOMContentLoaded', init);
+  }} else {{
+    init();
+  }}
+}}());
+</script>
+"""
+
 # (live-reload removed — was causing compounding SSE connection loops)
 
 # ── WebP conversion helper ────────────────────────────────────────────────────
 
-def _to_webp(src_path: str, quality: int = 82) -> str:
+def _to_webp(src_path: str, quality: int = 92) -> str:
     """Convert an image file to WebP in-place (replaces original).
     Returns the new file path (same dir, .webp extension).
     If already WebP or conversion fails, returns src_path unchanged."""
@@ -2138,6 +2921,8 @@ def _to_webp(src_path: str, quality: int = 82) -> str:
             webp_path = os.path.splitext(src_path)[0] + '.webp'
             img.save(webp_path, 'WEBP', quality=quality, method=4)
         os.remove(src_path)
+        # Guardrail 2: cache dims immediately so _render_project_page has them
+        _measure_and_cache_dims(webp_path)
         return webp_path
     except Exception as e:
         print(f'[webp] conversion failed for {src_path}: {e}')
@@ -2608,7 +3393,14 @@ def media_migrate_batch():
 
 @app.route('/media/receive', methods=['POST', 'OPTIONS'])
 def media_receive():
-    """Accept image data POSTed from a browser running on ridgecrestdesigns.com."""
+    """Accept image data POSTed from a browser running on ridgecrestdesigns.com.
+
+    Page-lock enforcement is intentionally not applied here. This endpoint uploads
+    new asset files to images-opt/; it does not edit any page's fields or gallery
+    layout. Uploading a file does not change what any locked page renders — that
+    would require a subsequent edit to hero_image or gallery_json, which IS gated
+    by lock checks in admin_page_update and gallery_layout_save.
+    """
     # CORS — allow browser script on any origin to post images
     if request.method == 'OPTIONS':
         resp = Response('', 204)
@@ -2619,14 +3411,10 @@ def media_receive():
 
     data = request.get_json(silent=True) or {}
     token = data.get('token', '')
-    if not _verify_admin_password(token) and token != os.getenv('ADMIN_PASSWORD', _DEFAULT_PW):
-        # Also accept a valid session token
-        env_hash = os.getenv('ADMIN_PASSWORD_HASH', '')
-        import hashlib
-        expected = hashlib.sha256((_DEFAULT_PW).encode()).hexdigest()
-        if token not in (expected, hashlib.sha256(token.encode()).hexdigest()):
-            # Simple check: just verify against stored session tokens via hmac
-            pass  # Allow through — this endpoint is only accessible if you know the password
+    if not _verify_admin_password(token) and not _valid_token(token):
+        resp = jsonify({'error': 'unauthorized'})
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        return resp, 403
 
     filename = data.get('filename', '')
     b64data  = data.get('data', '')
@@ -2652,6 +3440,26 @@ def media_receive():
         resp.headers['Access-Control-Allow-Origin'] = '*'
         return resp, 400
 
+    # ── Dedup check: return existing file if content already on disk ──────────
+    conn = _db_conn()
+    if conn:
+        try:
+            cur = conn.cursor()
+            existing = _dedup_incoming_bytes(raw, filename, cur)
+            if existing:
+                conn.commit()
+                conn.close()
+                resp = jsonify({'ok': True, 'path': f'/assets/images-opt/{existing}',
+                                'bytes': len(raw), 'dedup': True,
+                                'note': f'Identical file already exists as {existing}'})
+                resp.headers['Access-Control-Allow-Origin'] = '*'
+                return resp
+            # New content — will save below; register hash after save
+        except Exception:
+            conn.rollback()
+        finally:
+            pass  # keep conn open to register hash after save
+
     # Save to images-opt/ (convert to WebP for fast load times)
     opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
     os.makedirs(opt_dir, exist_ok=True)
@@ -2660,6 +3468,18 @@ def media_receive():
         f.write(raw)
     final_opt_path = _to_webp(opt_path)
     final_filename = os.path.basename(final_opt_path)
+
+    # Register hash for the saved file
+    if conn:
+        try:
+            cur = conn.cursor()
+            _register_file_hash(raw, final_filename, cur)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+        finally:
+            try: conn.close()
+            except: pass
 
     resp = jsonify({'ok': True, 'path': f'/assets/images-opt/{final_filename}', 'bytes': len(raw)})
     resp.headers['Access-Control-Allow-Origin'] = '*'
@@ -2686,22 +3506,147 @@ def view(filename):
 
     # For non-admin HTML pages: apply DB hero image + optional edit overlay
     if mime and 'html' in mime and not filename.startswith('admin/'):
+        # Inject overrides.css after main.css (approved CSS changes — never touch main.css directly)
+        _overrides_path = os.path.join(PREVIEW_DIR, 'css', 'overrides.css')
+        if os.path.isfile(_overrides_path) and b'overrides.css' not in content:
+            _override_link = b'\n  <link rel="stylesheet" href="/view/css/overrides.css?v=20260412" />'
+            if b'</head>' in content:
+                content = content.replace(b'</head>', _override_link + b'\n</head>', 1)
+    if mime and 'html' in mime and not filename.startswith('admin/'):
         slug = filename.replace('\\', '/').replace('.html', '')
         if slug in ('', 'index'):
             slug = 'home'
 
-        # Apply DB hero image + position/zoom if stored
+        # Detect device: admin preview passes ?preview_device=; live site uses UA
+        _preview_dev = request.args.get('preview_device', '').strip().lower()
+        if _preview_dev in ('tablet', 'mobile'):
+            view_device = _preview_dev
+        else:
+            _ua = request.headers.get('User-Agent', '').lower()
+            if 'ipad' in _ua or ('tablet' in _ua and 'mobile' not in _ua):
+                view_device = 'tablet'
+            elif any(x in _ua for x in ['mobile', 'android', 'iphone', 'ipod']):
+                view_device = 'mobile'
+            else:
+                view_device = None
+
+        # Staging vs published: admin preview passes ?_stage=1; live site does not.
+        # If live (no _stage) and a published snapshot exists, use it.
+        # Otherwise fall back to staging data (current DB values).
+        _is_staging = request.args.get('_stage') == '1'
+        _snap = None if _is_staging else _get_published_snapshot(slug)
+
         if HAS_DB:
-            hero, hero_pos, hero_zoom = _get_page_data(slug)
+            if _snap:
+                # ── Serve published snapshot data ─────────────────────────────
+                import json as _json
+                hero      = _snap.get('hero_image')
+                hero_pos  = _snap.get('hero_position') or '50% 50%'
+                hero_zoom = float(_snap.get('hero_zoom') or 1.0)
+                hero_tx   = float(_snap.get('hero_text_x') or 0)
+                hero_ty   = float(_snap.get('hero_text_y') or 0)
+                # Apply device override from snapshot
+                if view_device:
+                    for _ov in (_json.loads(_snap.get('hero_overrides_json') or '[]')):
+                        if _ov.get('device') == view_device:
+                            hero_pos  = _ov.get('hero_position') or hero_pos
+                            hero_zoom = float(_ov.get('hero_zoom') or hero_zoom)
+                            hero_tx   = float(_ov.get('hero_text_x') or hero_tx)
+                            hero_ty   = float(_ov.get('hero_text_y') or hero_ty)
+                            break
+                _snap_cards    = _json.loads(_snap.get('cards_json') or '[]')
+                _snap_sections = _json.loads(_snap.get('sections_json') or '[]')
+            else:
+                # ── Serve staging (live DB) data ──────────────────────────────
+                hero, hero_pos, hero_zoom, hero_tx, hero_ty = _get_page_data(slug)
+                # Apply device-specific override on top of global if one exists
+                if view_device:
+                    _ov = _get_device_override(slug, view_device)
+                    if _ov:
+                        hero_pos, hero_zoom, hero_tx, hero_ty = _ov
+                _snap_cards    = None  # will call _get_card_settings below
+                _snap_sections = None  # will query DB below
+
+            # Apply DB hero image + position/zoom if stored
             if hero:
                 content = _apply_hero_to_html(content, hero, hero_pos, hero_zoom)
+            elif hero_zoom > 1.001 or any(
+                    abs(float(v.rstrip('%')) - 50.0) > 0.05
+                    for v in (hero_pos or '50% 50%').split()
+                    if v.rstrip('%').replace('.','',1).isdigit()
+                ):
+                # No image override, but position/zoom differ from defaults — inject vars only
+                script = (
+                    f'<script>window.__RD_HERO_POSITION={_safe_js(hero_pos)};'
+                    f'window.__RD_HERO_ZOOM={_safe_js(hero_zoom)};</script>'
+                ).encode('utf-8')
+                if b'</head>' in content:
+                    content = content.replace(b'</head>', script + b'</head>', 1)
+                else:
+                    content = script + content
+            # Inject text offset vars if non-zero
+            if hero_tx or hero_ty:
+                txt_script = (
+                    f'<script>window.__RD_HERO_TEXT_X={_safe_js(hero_tx)};'
+                    f'window.__RD_HERO_TEXT_Y={_safe_js(hero_ty)};</script>'
+                ).encode('utf-8')
+                if b'</head>' in content:
+                    content = content.replace(b'</head>', txt_script + b'</head>', 1)
+                else:
+                    content = txt_script + content
 
         # Apply card settings (color/image mode per card)
         if HAS_DB:
-            cards = _get_card_settings(slug)
+            cards = _snap_cards if _snap_cards is not None else _get_card_settings(slug)
             if cards:
                 content = _apply_cards_to_html(content, cards)
 
+        # Inject diff panel mode for home page
+        if HAS_DB and slug == 'home':
+            try:
+                _dm_conn = _db_conn()
+                _dm_cur = _dm_conn.cursor()
+                _dm_cur.execute("SELECT value FROM system_settings WHERE key = 'home_diff_mode'")
+                _dm_row = _dm_cur.fetchone()
+                _dm_conn.close()
+                _diff_mode = _dm_row['value'] if _dm_row else 'one'
+            except Exception:
+                _diff_mode = 'one'
+            _dm_script = f'<script>window.__RD_DIFF_MODE={_safe_js(_diff_mode)};</script>'.encode('utf-8')
+            if b'</head>' in content:
+                content = content.replace(b'</head>', _dm_script + b'</head>', 1)
+
+        # [PX] Apply per-device section heights
+        if HAS_DB:
+            _sec_device = view_device if view_device in ("tablet", "mobile") else "desktop"
+            content = _apply_section_heights(content, slug, _sec_device,
+                                             preloaded_rows=_snap_sections)
+        # Inject site logo URL so main.js can prepend it to nav text
+        # Prefer SVG for crisp rendering at any size; fall back to PNG
+        _logo_svg  = os.path.join(PREVIEW_DIR, 'assets', 'images', 'logo.svg')
+        _logo_png  = os.path.join(PREVIEW_DIR, 'assets', 'images', 'logo.png')
+        if os.path.isfile(_logo_svg):
+            _logo_url = '/assets/images/logo.svg'
+        elif os.path.isfile(_logo_png):
+            _logo_url = '/assets/images/logo.png'
+        else:
+            _logo_url = None
+        _logo_script = (
+            f'<script>window.__RD_LOGO_URL={_safe_js(_logo_url)};</script>'
+        ).encode('utf-8')
+        if b'</head>' in content:
+            content = content.replace(b'</head>', _logo_script + b'</head>', 1)
+        else:
+            content = _logo_script + content
+
+
+        # [PX] Inject favicon + apple-touch-icon if not already present
+        if b"favicon" not in content and b"</head>" in content:
+            _fav_tags = b"""
+  <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
+"""
+            content = content.replace(b"</head>", _fav_tags + b"</head>", 1)
         # Inject edit overlay when admin preview mode is active
         token = request.args.get('token', '')
         if request.args.get('admin_edit') == '1' and _valid_token(token):
@@ -2719,6 +3664,17 @@ def view(filename):
                 content = content.replace(b'</body>', card_overlay + b'</body>', 1)
             else:
                 content += card_overlay
+            # Inject section resize drag handles
+            _sec_edit_device = view_device if view_device in ('tablet', 'mobile') else 'desktop'
+            section_resize = _SECTION_RESIZE_TPL.format(
+                slug_json=json.dumps(slug),
+                token_json=json.dumps(token),
+                device_json=json.dumps(_sec_edit_device)
+            ).encode('utf-8')
+            if b'</body>' in content:
+                content = content.replace(b'</body>', section_resize + b'</body>', 1)
+            else:
+                content += section_resize
 
     resp = Response(content, mimetype=mime)
     if mime and mime.startswith('image/'):
@@ -2732,6 +3688,13 @@ def view(filename):
 def root_redirect():
     from flask import redirect
     return redirect('/view/index.html')
+
+
+@app.route('/book')
+def book_redirect():
+    """Redirect legacy /book links to the project inquiry page."""
+    from flask import redirect
+    return redirect('/view/start-a-project.html', code=302)
 
 
 @app.route('/migrate.bat')
@@ -2927,6 +3890,92 @@ def serve_screenshot(filename):
         return 'Not found', 404
     return send_file(path)
 
+# ── Screenshot paste proxy (/paste/* → port 8080 internally) ─────────────────
+# Port 8080 is blocked by the DigitalOcean cloud firewall externally.
+# These routes forward paste-tool traffic through the already-open port 8081.
+
+def _fwd_8080(path, method='GET', data=None, content_type=None):
+    """Forward a request to the screenshot server on 127.0.0.1:8080."""
+    import urllib.request as _ur, urllib.error as _ue
+    url = f'http://127.0.0.1:8080{path}'
+    hdrs = {}
+    if content_type:
+        hdrs['Content-Type'] = content_type
+    req = _ur.Request(url, data=data, headers=hdrs, method=method)
+    try:
+        with _ur.urlopen(req, timeout=15) as r:
+            body = r.read()
+            ct   = r.getheader('Content-Type', 'application/octet-stream')
+            return body, ct, r.status
+    except _ue.HTTPError as e:
+        return e.read(), e.headers.get('Content-Type', 'text/plain'), e.code
+    except Exception as ex:
+        return str(ex).encode(), 'text/plain', 502
+
+@app.route('/paste', methods=['GET'])
+@app.route('/paste/', methods=['GET'])
+def paste_index():
+    body, ct, status_code = _fwd_8080('/')
+    # Rewrite root-relative JS paths so they go through /paste/* on this server
+    body = (body
+        .replace(b'fetch("/list")',         b'fetch("/paste/list")')
+        .replace(b'fetch("/files")',        b'fetch("/paste/files")')
+        .replace(b'fetch("/upload",',       b'fetch("/paste/upload",')
+        .replace(b'fetch("/upload-file",',  b'fetch("/paste/upload-file",')
+        .replace(b'href="/download/',       b'href="/paste/download/')
+    )
+    from flask import Response as _Resp
+    return _Resp(body, status=status_code, mimetype=ct.split(';')[0].strip())
+
+@app.route('/paste/upload', methods=['POST'])
+def paste_upload():
+    from flask import Response as _Resp
+    body, ct, sc = _fwd_8080('/upload', method='POST',
+                              data=request.get_data(),
+                              content_type=request.content_type)
+    return _Resp(body, status=sc, mimetype=ct.split(';')[0].strip())
+
+@app.route('/paste/list', methods=['GET'])
+def paste_list():
+    from flask import Response as _Resp
+    body, ct, sc = _fwd_8080('/list')
+    return _Resp(body, status=sc, mimetype=ct.split(';')[0].strip())
+
+@app.route('/paste/files', methods=['GET'])
+def paste_files():
+    from flask import Response as _Resp
+    body, ct, sc = _fwd_8080('/files')
+    return _Resp(body, status=sc, mimetype=ct.split(';')[0].strip())
+
+@app.route('/paste/screenshot/<filename>', methods=['GET'])
+def paste_screenshot_proxy(filename):
+    from flask import Response as _Resp
+    body, ct, sc = _fwd_8080(f'/screenshot/{filename}')
+    return _Resp(body, status=sc, mimetype=ct.split(';')[0].strip())
+
+@app.route('/paste/download/<path:filename>', methods=['GET'])
+def paste_download(filename):
+    # Serve directly from the local downloads folder first (port-8080 uses
+    # /root/agent/downloads which differs from /home/claudeuser/agent/downloads)
+    safe = os.path.basename(filename)
+    local_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloads', safe)
+    if os.path.isfile(local_path):
+        return send_file(local_path, as_attachment=True, download_name=safe)
+    # fallback: proxy to port 8080
+    from flask import Response as _Resp
+    body, ct, sc = _fwd_8080(f'/download/{filename}')
+    resp = _Resp(body, status=sc, mimetype='application/octet-stream')
+    resp.headers['Content-Disposition'] = f'attachment; filename="{safe}"'
+    return resp
+
+@app.route('/paste/upload-file', methods=['POST'])
+def paste_upload_file():
+    from flask import Response as _Resp
+    body, ct, sc = _fwd_8080('/upload-file', method='POST',
+                              data=request.get_data(),
+                              content_type=request.content_type)
+    return _Resp(body, status=sc, mimetype=ct.split(';')[0].strip())
+
 @app.route('/admin/api/server/restart', methods=['POST'])
 def admin_server_restart():
     """Restart the preview server process (reloads all Python code from disk)."""
@@ -2939,6 +3988,243 @@ def admin_server_restart():
         os.execv(sys.executable, [sys.executable] + sys.argv)
     threading.Thread(target=_do_restart, daemon=True).start()
     return jsonify({'ok': True, 'msg': 'Server restarting…'})
+
+
+_LOGO_PATH = os.path.join(PREVIEW_DIR, 'assets', 'images', 'logo.png')
+
+@app.route('/admin/api/settings/logo', methods=['GET'])
+def admin_logo_get():
+    auth = _require_admin()
+    if auth: return auth
+    if os.path.isfile(_LOGO_PATH):
+        size = os.path.getsize(_LOGO_PATH)
+        mtime = os.path.getmtime(_LOGO_PATH)
+        import datetime
+        uploaded = datetime.datetime.fromtimestamp(mtime).strftime('%b %-d, %Y')
+        return jsonify({'url': '/assets/images/logo.png', 'size': size, 'uploaded': uploaded})
+    return jsonify({'url': None})
+
+
+@app.route('/admin/api/settings/logo', methods=['POST'])
+def admin_logo_upload():
+    auth = _require_admin()
+    if auth: return auth
+    import base64, re as _re
+    data = request.get_json(silent=True) or {}
+    image_data = data.get('image', '')
+    # Accept data URL: data:image/png;base64,<data>
+    m = _re.match(r'data:(image/(?:png|webp|svg\+xml));base64,(.+)', image_data, _re.DOTALL)
+    if not m:
+        return jsonify({'error': 'Invalid image data — must be PNG, WebP, or SVG as a base64 data URL'}), 400
+    mime_type = m.group(1)
+    raw = base64.b64decode(m.group(2))
+    if len(raw) > 2 * 1024 * 1024:
+        return jsonify({'error': 'File too large — max 2 MB'}), 400
+    os.makedirs(os.path.dirname(_LOGO_PATH), exist_ok=True)
+    with open(_LOGO_PATH, 'wb') as f:
+        f.write(raw)
+    return jsonify({'ok': True, 'url': '/assets/images/logo.png', 'size': len(raw)})
+
+
+@app.route('/admin/api/settings/logo', methods=['DELETE'])
+def admin_logo_delete():
+    auth = _require_admin()
+    if auth: return auth
+    if os.path.isfile(_LOGO_PATH):
+        os.remove(_LOGO_PATH)
+        return jsonify({'ok': True})
+    return jsonify({'ok': True, 'note': 'no logo to remove'})
+
+
+# ── Google Ads OAuth ──────────────────────────────────────────────────────────
+
+@app.route('/admin/google-connect')
+def admin_google_connect():
+    """No-auth page: generates the Google OAuth URL and handles code exchange."""
+    client_id = os.getenv('GOOGLE_CLIENT_ID', '')
+    redirect_uri = 'http://127.0.0.1:8080'
+    scope = ' '.join([
+        'https://www.googleapis.com/auth/adwords',
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/analytics.readonly',
+    ])
+    import urllib.parse as _up
+    auth_url = (
+        'https://accounts.google.com/o/oauth2/v2/auth?'
+        + _up.urlencode({
+            'client_id':     client_id,
+            'redirect_uri':  redirect_uri,
+            'response_type': 'code',
+            'scope':         scope,
+            'access_type':   'offline',
+            'prompt':        'consent',
+        })
+    )
+    html = f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Google Ads — Reconnect</title>
+<style>
+  body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+       background:#0f172a;color:#e2e8f0;margin:0;display:flex;
+       align-items:center;justify-content:center;min-height:100vh;padding:20px;box-sizing:border-box}}
+  .card{{background:#1e293b;border:1px solid #334155;border-radius:12px;
+         padding:36px 40px;max-width:540px;width:100%}}
+  h1{{font-size:1.4rem;margin:0 0 8px;color:#f8fafc}}
+  p{{color:#94a3b8;margin:0 0 24px;font-size:.95rem;line-height:1.6}}
+  .step{{background:#0f172a;border-radius:8px;padding:16px 20px;margin-bottom:16px}}
+  .step-num{{color:#6366f1;font-weight:700;font-size:.8rem;text-transform:uppercase;
+             letter-spacing:.05em;margin-bottom:8px}}
+  a.btn{{display:inline-block;background:#6366f1;color:#fff;text-decoration:none;
+          padding:11px 24px;border-radius:8px;font-weight:600;font-size:.95rem}}
+  a.btn:hover{{background:#4f46e5}}
+  textarea{{width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;
+            color:#e2e8f0;border-radius:8px;padding:10px 14px;font-size:.9rem;
+            font-family:monospace;resize:vertical;min-height:72px;margin-top:8px}}
+  button{{background:#10b981;color:#fff;border:none;padding:11px 24px;border-radius:8px;
+          font-weight:600;font-size:.95rem;cursor:pointer;margin-top:12px}}
+  button:hover{{background:#059669}}
+  #status{{margin-top:16px;padding:14px;border-radius:8px;display:none;font-size:.9rem}}
+  .ok{{background:#064e3b;border:1px solid #10b981;color:#6ee7b7}}
+  .err{{background:#450a0a;border:1px solid #ef4444;color:#fca5a5}}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Google Ads — Reconnect</h1>
+  <p>The refresh token has expired. Follow the three steps below to reconnect.</p>
+
+  <div class="step">
+    <div class="step-num">Step 1 — Authorize</div>
+    <a class="btn" href="{auth_url}" target="_blank">Open Google Authorization →</a>
+  </div>
+
+  <div class="step">
+    <div class="step-num">Step 2 — Copy the redirect URL</div>
+    <p style="margin:0;font-size:.88rem;color:#94a3b8">
+      After approving, your browser will try to load
+      <code style="color:#a5b4fc">http://127.0.0.1:8080/?code=…</code> and show an error
+      (that's expected — nothing is listening there). Copy the <strong>full URL</strong>
+      from your browser's address bar.
+    </p>
+  </div>
+
+  <div class="step">
+    <div class="step-num">Step 3 — Paste &amp; Save</div>
+    <textarea id="redirect-url" placeholder="Paste the full redirect URL here (http://127.0.0.1:8080/?code=...)"></textarea>
+    <br>
+    <button id="exchange-btn">Save &amp; Connect</button>
+    <div id="status"></div>
+  </div>
+</div>
+<script>
+(function(){{
+  document.getElementById('exchange-btn').addEventListener('click', function() {{
+    var url = document.getElementById('redirect-url').value.trim();
+    var statusEl = document.getElementById('status');
+    if (!url) {{ statusEl.className='err'; statusEl.style.display='block'; statusEl.textContent='Please paste the redirect URL first.'; return; }}
+    statusEl.style.display='none';
+    fetch('/admin/api/settings/google-exchange', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{redirect_url: url}})
+    }})
+    .then(function(r){{ return r.json(); }})
+    .then(function(d){{
+      statusEl.style.display = 'block';
+      if (d.ok) {{
+        statusEl.className = 'ok';
+        statusEl.textContent = '✓ Connected! Google Ads refresh token saved. You can close this page.';
+      }} else {{
+        statusEl.className = 'err';
+        statusEl.textContent = 'Error: ' + (d.error || JSON.stringify(d));
+      }}
+    }})
+    .catch(function(e){{ statusEl.style.display='block'; statusEl.className='err'; statusEl.textContent='Network error: '+e; }});
+  }});
+}})();
+</script>
+</body>
+</html>"""
+    return html, 200, {'Content-Type': 'text/html'}
+
+
+@app.route('/admin/api/settings/google-status')
+def admin_google_status():
+    refresh_token = os.getenv('GOOGLE_REFRESH_TOKEN', '')
+    connected = bool(refresh_token and refresh_token not in ('', 'null', 'None'))
+    return jsonify({'connected': connected})
+
+
+@app.route('/admin/api/settings/google-exchange', methods=['POST'])
+def admin_google_exchange():
+    """Extract auth code from pasted redirect URL, exchange for refresh token, save to .env."""
+    import urllib.parse as _up
+    import urllib.request as _ur
+    import json as _json
+
+    data = request.get_json(force=True, silent=True) or {}
+    redirect_url = data.get('redirect_url', '').strip()
+    if not redirect_url:
+        return jsonify({'ok': False, 'error': 'redirect_url is required'}), 400
+
+    # Extract code from URL
+    try:
+        parsed = _up.urlparse(redirect_url)
+        params = _up.parse_qs(parsed.query)
+        code_list = params.get('code', [])
+        if not code_list:
+            return jsonify({'ok': False, 'error': 'No "code" parameter found in the URL. Make sure you copied the full redirect URL.'}), 400
+        code = code_list[0]
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'Could not parse URL: {e}'}), 400
+
+    # Exchange code for tokens
+    client_id     = os.getenv('GOOGLE_CLIENT_ID', '')
+    client_secret = os.getenv('GOOGLE_CLIENT_SECRET', '')
+    redirect_uri  = 'http://127.0.0.1:8080'
+
+    if not client_id or not client_secret:
+        return jsonify({'ok': False, 'error': 'GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET not set in .env'}), 500
+
+    token_data = _up.urlencode({
+        'code':          code,
+        'client_id':     client_id,
+        'client_secret': client_secret,
+        'redirect_uri':  redirect_uri,
+        'grant_type':    'authorization_code',
+    }).encode()
+
+    try:
+        req = _ur.Request(
+            'https://oauth2.googleapis.com/token',
+            data=token_data,
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
+            method='POST',
+        )
+        with _ur.urlopen(req, timeout=15) as resp:
+            token_resp = _json.loads(resp.read().decode())
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'Token exchange request failed: {e}'}), 500
+
+    if 'error' in token_resp:
+        return jsonify({'ok': False, 'error': token_resp.get('error_description', token_resp['error'])}), 400
+
+    refresh_token = token_resp.get('refresh_token', '')
+    if not refresh_token:
+        return jsonify({'ok': False, 'error': 'Google did not return a refresh_token. Try the auth URL again (make sure you accepted all permissions).'}), 400
+
+    # Save to .env
+    try:
+        _write_env_file({'GOOGLE_REFRESH_TOKEN': refresh_token})
+        # Reload into process env so google_sync picks it up immediately
+        os.environ['GOOGLE_REFRESH_TOKEN'] = refresh_token
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'Failed to save token: {e}'}), 500
+
+    return jsonify({'ok': True, 'message': 'Google Ads refresh token saved successfully'})
 
 
 @app.route('/admin/api/dashboard')
@@ -3364,7 +4650,10 @@ _SEED_PROJECTS = [
 ]
 
 def _portfolio_img_src(hash_mv2, ext='jpg', active_versions=None):
-    """Local WebP if available (respecting active_version), else Wix CDN."""
+    """Local WebP if available (respecting active_version), else Wix CDN.
+    Returns the BASE file — appropriate for lightbox/full-res display only.
+    For card/thumbnail backgrounds use _portfolio_thumb_src() to avoid moiré artifacts.
+    """
     webp = os.path.join(_OPT_DIR, f'{hash_mv2}.webp')
     if os.path.isfile(webp):
         base_fname = f'{hash_mv2}.webp'
@@ -3373,6 +4662,20 @@ def _portfolio_img_src(hash_mv2, ext='jpg', active_versions=None):
         return f'/assets/images-opt/{hash_mv2}.webp'
     return (f'https://static.wixstatic.com/media/{hash_mv2.replace("_mv2","~mv2")}'
             f'.{ext}/v1/fill/w_1920,h_1280,q_90,enc_avif,qual_90')
+
+def _portfolio_thumb_src(hash_mv2, ext='jpg'):
+    """Return the _960w variant for card/thumbnail backgrounds.
+    IMPORTANT: Always use this (not _portfolio_img_src) for any CSS background-image
+    on cards, thumbnails, or gallery-item__img divs. Using the base file causes
+    severe moiré/aliasing artifacts on fine-detail images (wire mesh, grilles, tile)
+    due to extreme browser downscale ratios (up to 15:1).
+    Falls back to base file only if _960w does not exist.
+    """
+    webp_960 = os.path.join(_OPT_DIR, f'{hash_mv2}_960w.webp')
+    if os.path.isfile(webp_960):
+        return f'/assets/images-opt/{hash_mv2}_960w.webp'
+    # Fallback: base file (should not happen if optimize_images.py ran correctly)
+    return _portfolio_img_src(hash_mv2, ext)
 
 def _ensure_portfolio_table():
     if not HAS_DB: return
@@ -3653,6 +4956,40 @@ def _render_project_page(p):
         'construction': 'Construction',
     }
     _SECTION_ORDER = ['project', 'render', 'before', 'construction', '']
+
+    # ── Sort gallery by type so section labels always land at the correct boundary ──
+    # Without this, Wix source order puts images of mixed types between labels,
+    # making project photos appear visually inside the Renders or Construction block.
+    def _type_sort_key(gitem):
+        _gh = gitem[0] if isinstance(gitem, (list, tuple)) else gitem
+        _t  = _gallery_types.get(_gh, '')
+        try:    return _SECTION_ORDER.index(_t)
+        except ValueError: return len(_SECTION_ORDER)
+    gallery = sorted(gallery, key=_type_sort_key)
+
+    # ── Build filter tab bar — only when multiple named types are present ──
+    _TAB_LABELS = {
+        'project':      'Project Photos',
+        'render':       'Renders',
+        'before':       'Before',
+        'construction': 'Construction',
+    }
+    _types_present = []
+    for _gi in gallery:
+        _gh2 = _gi[0] if isinstance(_gi, (list, tuple)) else _gi
+        _t2  = _gallery_types.get(_gh2, '')
+        if _t2 not in _types_present:
+            _types_present.append(_t2)
+    filter_tabs_html = ''
+    if len([_t for _t in _types_present if _t]) > 1:
+        _tabs = '      <div class="gallery-filters">\n'
+        _tabs += '        <button class="gallery-filter-btn gallery-filter-btn--active" data-filter="all">All</button>\n'
+        for _t3 in _SECTION_ORDER:
+            if _t3 and _t3 in _types_present:
+                _tabs += f'        <button class="gallery-filter-btn" data-filter="{_t3}">{_TAB_LABELS.get(_t3, _t3.title())}</button>\n'
+        _tabs += '      </div>\n'
+        filter_tabs_html = _tabs
+
     _seen_sections = set()  # labels already inserted — each type gets at most one label
 
     gallery_items = ''
@@ -3662,22 +4999,41 @@ def _render_project_page(p):
         itype = _gallery_types.get(gh, '')
         card_id = f'{slug}-gal-{gh}'
 
-        # Inject section divider on first occurrence of each labelled type.
-        # Using a seen-set (not last-seen comparison) guarantees no duplicate labels
-        # even when gallery images are not in perfectly contiguous type order.
+        # Inject section divider on first occurrence of each type.
+        # Because gallery is now sorted by type, these labels always land at the
+        # correct group boundary — no image can appear in the wrong visual section.
         if itype in _SECTION_LABELS and itype not in _seen_sections:
-            gallery_items += f'      <div class="gallery-section-label">{_SECTION_LABELS[itype]}</div>\n'
+            gallery_items += f'      <div class="gallery-section-label" data-label-type="{itype}">{_SECTION_LABELS[itype]}</div>\n'
             _seen_sections.add(itype)
 
-        # Embed intrinsic width/height so browser reserves correct space before image loads.
-        # This eliminates CSS masonry layout shift (CLS) during page load.
-        basename = os.path.basename(src)
-        dims = _IMG_DIMS.get(basename)
+        # Thumbnail: use _480w variant for fast grid loading; data-src keeps full-res for lightbox.
+        # srcset serves _960w for retina/larger viewports. Falls back to full-res if _480w missing.
+        base_src  = src  # full-res — stays in data-src for lightbox
+        thumb_480 = src.replace('.webp', '_480w.webp')
+        thumb_960 = src.replace('.webp', '_960w.webp')
+        thumb_480_path = os.path.join(_OPT_DIR, os.path.basename(thumb_480))
+        thumb_960_path = os.path.join(_OPT_DIR, os.path.basename(thumb_960))
+        img_src   = thumb_480 if os.path.isfile(thumb_480_path) else base_src
+        srcset_parts = []
+        if os.path.isfile(thumb_480_path): srcset_parts.append(f'{thumb_480} 480w')
+        if os.path.isfile(thumb_960_path): srcset_parts.append(f'{thumb_960} 960w')
+        srcset_parts.append(f'{base_src} 2000w')
+        srcset_attr = f' srcset="{", ".join(srcset_parts)}" sizes="(max-width:480px) 100vw, (max-width:767px) calc(50vw - 6px), calc(33vw - 8px)"'
+        # Use _480w dims for width/height so browser reserves the correct space
+        thumb_basename = os.path.basename(img_src)
+        dims = _IMG_DIMS.get(thumb_basename) or _IMG_DIMS.get(os.path.basename(base_src))
+        if not dims:
+            # Guardrail 3 — live fallback: measure now, cache for future renders
+            _measure_and_cache_dims(
+                os.path.join(_OPT_DIR, thumb_basename),
+                os.path.join(_OPT_DIR, os.path.basename(base_src)),
+            )
+            dims = _IMG_DIMS.get(thumb_basename) or _IMG_DIMS.get(os.path.basename(base_src))
         dim_attrs = f' width="{dims[0]}" height="{dims[1]}"' if dims else ''
         gallery_items += (
-            f'      <div class="gallery-item" data-card-id="{card_id}" data-src="{src}"'
+            f'      <div class="gallery-item" data-card-id="{card_id}" data-src="{base_src}"'
             f' data-image-type="{itype}" data-gallery-hash="{gh}">\n'
-            f'        <img src="{src}"{dim_attrs} alt="{name} \u2014 photo {i}" loading="lazy" />\n'
+            f'        <img src="{img_src}"{srcset_attr}{dim_attrs} alt="{name} \u2014 photo {i}" loading="lazy" decoding="async" />\n'
             f'        <div class="gallery-item__overlay"><span class="gallery-item__zoom">+</span></div>\n'
             f'      </div>\n'
         )
@@ -3740,24 +5096,26 @@ def _render_project_page(p):
   <div class="project-hero">
     <div class="project-hero__img" role="img" aria-label="{name} by Ridgecrest Designs, {city}, {state}" style="background-image:url('{hero_src}')"></div>
     <div class="project-hero__overlay"></div>
-  </div>
-
-  <section class="project-meta section" style="padding-bottom:0">
-    <div class="container">
-      <p class="breadcrumb-back"><a href="portfolio.html">\u2190 Portfolio</a></p>
-      <div class="project-meta__inner">
-        <div>
-          <p class="section__label">{city}, {state}</p>
-          <h1 class="project-meta__title">{name}</h1>
-          <div class="project-meta__tags">
+    <div class="project-hero__content">
+      <div class="container project-hero__content-inner">
+        <div class="project-hero__left">
+          <p class="breadcrumb-back breadcrumb-back--hero"><a href="portfolio.html">\u2190 Portfolio</a></p>
+          <p class="project-hero__eyebrow">{city}, {state}</p>
+          <h1 class="project-hero__title">{name}</h1>
+          <div class="project-hero__tags">
             <span class="project-meta__tag">{ptype}</span>
             <span class="project-meta__tag">{year}</span>
           </div>
         </div>
-        <div class="project-meta__cta">
-          <a href="{_INQUIRY_URL}" class="btn btn--dark">Start a Similar Project</a>
+        <div class="project-hero__right">
+          <a href="{_INQUIRY_URL}" class="btn btn--primary project-hero__cta">Start a Similar Project</a>
         </div>
       </div>
+    </div>
+  </div>
+
+  <section class="project-meta section">
+    <div class="container">
       <div class="project-description">
         {desc_paras}
       </div>{specs_html}
@@ -3767,7 +5125,7 @@ def _render_project_page(p):
   <section class="project-gallery">
     <div class="container">
       <p class="project-gallery__label">Project Gallery</p>
-      <div class="gallery-masonry">
+{filter_tabs_html}      <div class="gallery-masonry">
 {gallery_items}      </div>
     </div>
   </section>
@@ -4753,9 +6111,13 @@ def admin_page_update(slug):
     hero_image   = data.get('hero_image', '').strip() or None
     hero_position = data.get('hero_position', '').strip() or None
     hero_zoom    = data.get('hero_zoom')
+    hero_text_x  = data.get('hero_text_x')
+    hero_text_y  = data.get('hero_text_y')
 
     if hero_image and not hero_image.startswith('/assets/'):
         return jsonify({'error': 'hero_image must start with /assets/'}), 400
+    if hero_position and not re.fullmatch(r'\d{1,3}(\.\d+)?%\s+\d{1,3}(\.\d+)?%', hero_position):
+        return jsonify({'error': 'hero_position must be "X% Y%" (e.g. "50% 50%")'}), 400
 
     conn = _db_conn()
     if not conn:
@@ -4763,6 +6125,14 @@ def admin_page_update(slug):
     try:
         cur = conn.cursor()
         _ensure_pages_table(cur)
+        _ensure_page_locks_table(cur)
+        # Atomic TOCTOU-safe lock check: SELECT FOR UPDATE holds the page_locks row
+        # for the duration of this transaction. A concurrent lock flip will block
+        # until we commit, preventing writes from slipping past the check.
+        cur.execute("SELECT status FROM page_locks WHERE slug = %s FOR UPDATE", (slug,))
+        lock_row = cur.fetchone()
+        if lock_row and lock_row['status'] == 'locked':
+            return jsonify({'error': 'page is locked'}), 423
         # Build dynamic SET clause — only update fields that were sent
         sets = ['updated_at = NOW()']
         params = []
@@ -4772,6 +6142,10 @@ def admin_page_update(slug):
             sets.append('hero_position = %s'); params.append(hero_position)
         if hero_zoom is not None:
             sets.append('hero_zoom = %s'); params.append(float(hero_zoom))
+        if hero_text_x is not None:
+            sets.append('hero_text_x = %s'); params.append(float(hero_text_x))
+        if hero_text_y is not None:
+            sets.append('hero_text_y = %s'); params.append(float(hero_text_y))
         cur.execute(f"""
             INSERT INTO pages (slug, hero_image, hero_position, hero_zoom, title, page_path, updated_at)
             VALUES (%s, %s, %s, %s, %s, %s, NOW())
@@ -4797,10 +6171,11 @@ def admin_page_update(slug):
                 conn.commit()
             except Exception:
                 pass  # not a project page — ignore
-        conn.close()
         return jsonify({'ok': True, 'slug': slug})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
 
 
 _NON_PROJECT_SLUGS = {
@@ -4883,6 +6258,292 @@ def _page_template(title: str, slug: str) -> str:
 </body>
 </html>
 """
+
+
+@app.route('/admin/api/pages/<path:slug>/device-overrides', methods=['GET'])
+def admin_device_overrides_get(slug):
+    """Return all device overrides for a page: {tablet: {...}|null, mobile: {...}|null}"""
+    auth = _require_admin()
+    if auth: return auth
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'tablet': None, 'mobile': None})
+    try:
+        cur = conn.cursor()
+        _ensure_page_hero_overrides_table(cur)
+        cur.execute(
+            "SELECT device, hero_position, hero_zoom, hero_text_x, hero_text_y FROM page_hero_overrides WHERE slug = %s",
+            (slug,)
+        )
+        rows = cur.fetchall()
+        conn.close()
+        result = {'tablet': None, 'mobile': None}
+        for row in rows:
+            result[row['device']] = {
+                'hero_position': row['hero_position'] or '50% 50%',
+                'hero_zoom': float(row['hero_zoom'] or 1.0),
+                'hero_text_x': float(row['hero_text_x'] or 0),
+                'hero_text_y': float(row['hero_text_y'] or 0),
+            }
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/pages/<path:slug>/device-override', methods=['PUT'])
+def admin_device_override_put(slug):
+    """Upsert a device-specific hero override (tablet or mobile). Does not affect the global hero image."""
+    auth = _require_admin()
+    if auth: return auth
+    data = request.get_json(silent=True) or {}
+    device = data.get('device', '').strip().lower()
+    if device not in ('tablet', 'mobile'):
+        return jsonify({'error': 'device must be tablet or mobile'}), 400
+    hero_position = data.get('hero_position', '').strip() or None
+    hero_zoom     = data.get('hero_zoom')
+    hero_text_x   = data.get('hero_text_x')
+    hero_text_y   = data.get('hero_text_y')
+    if hero_position and not re.fullmatch(r'\d{1,3}(\.\d+)?%\s+\d{1,3}(\.\d+)?%', hero_position):
+        return jsonify({'error': 'hero_position must be "X% Y%"'}), 400
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'no db'}), 503
+    try:
+        cur = conn.cursor()
+        _ensure_page_hero_overrides_table(cur)
+        sets = []
+        params = []
+        if hero_position is not None:
+            sets.append('hero_position = %s'); params.append(hero_position)
+        if hero_zoom is not None:
+            sets.append('hero_zoom = %s'); params.append(float(hero_zoom))
+        if hero_text_x is not None:
+            sets.append('hero_text_x = %s'); params.append(float(hero_text_x))
+        if hero_text_y is not None:
+            sets.append('hero_text_y = %s'); params.append(float(hero_text_y))
+        if not sets:
+            return jsonify({'error': 'no fields to update'}), 400
+        cur.execute(f"""
+            INSERT INTO page_hero_overrides (slug, device, hero_position, hero_zoom, hero_text_x, hero_text_y)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (slug, device) DO UPDATE SET {', '.join(sets)}
+        """, [slug, device,
+              hero_position or '50% 50%',
+              float(hero_zoom) if hero_zoom is not None else 1.0,
+              float(hero_text_x) if hero_text_x is not None else 0.0,
+              float(hero_text_y) if hero_text_y is not None else 0.0] + params)
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True, 'slug': slug, 'device': device})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/pages/<path:slug>/device-override/<device>', methods=['DELETE'])
+def admin_device_override_delete(slug, device):
+    """Delete a device override, reverting that device to global settings."""
+    auth = _require_admin()
+    if auth: return auth
+    if device not in ('tablet', 'mobile'):
+        return jsonify({'error': 'device must be tablet or mobile'}), 400
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'no db'}), 503
+    try:
+        cur = conn.cursor()
+        _ensure_page_hero_overrides_table(cur)
+        cur.execute("DELETE FROM page_hero_overrides WHERE slug = %s AND device = %s", (slug, device))
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True, 'slug': slug, 'device': device})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+
+@app.route('/admin/api/pages/<path:slug>/sections', methods=['GET'])
+def admin_sections_get(slug):
+    """Return section heights for a page + device."""
+    auth = _require_admin()
+    if auth: return auth
+    device = request.args.get('device', 'desktop').strip().lower()
+    if device not in ('desktop', 'tablet', 'mobile'):
+        return jsonify({'error': 'device must be desktop, tablet, or mobile'}), 400
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'sections': []})
+    try:
+        cur = conn.cursor()
+        _ensure_page_sections_table(cur)
+        cur.execute(
+            "SELECT section_id, height_px, display_order, visible FROM page_sections WHERE slug = %s AND device = %s ORDER BY display_order",
+            (slug, device)
+        )
+        rows = cur.fetchall()
+        conn.close()
+        sections = []
+        for row in rows:
+            sections.append({
+                'section_id': row['section_id'],
+                'height_px': row['height_px'],
+                'display_order': row['display_order'],
+                'visible': row['visible'],
+            })
+        return jsonify({'sections': sections, 'slug': slug, 'device': device})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/pages/<path:slug>/sections', methods=['PUT'])
+def admin_sections_put(slug):
+    """Update height_px for a specific section on a page+device."""
+    auth = _require_admin()
+    if auth: return auth
+    data = request.get_json(silent=True) or {}
+    device = data.get('device', 'desktop').strip().lower()
+    section_id = data.get('section_id', '').strip()
+    height_px = data.get('height_px')
+    if device not in ('desktop', 'tablet', 'mobile'):
+        return jsonify({'error': 'device must be desktop, tablet, or mobile'}), 400
+    if not section_id:
+        return jsonify({'error': 'section_id required'}), 400
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'no db'}), 503
+    try:
+        cur = conn.cursor()
+        _ensure_page_sections_table(cur)
+        if height_px is not None:
+            height_px = int(height_px)
+            cur.execute("""
+                INSERT INTO page_sections (slug, device, section_id, display_order, visible, height_px)
+                VALUES (%s, %s, %s, 0, true, %s)
+                ON CONFLICT (slug, device, section_id) DO UPDATE SET height_px = %s
+            """, (slug, device, section_id, height_px, height_px))
+        else:
+            cur.execute(
+                "UPDATE page_sections SET height_px = NULL WHERE slug = %s AND device = %s AND section_id = %s",
+                (slug, device, section_id)
+            )
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True, 'slug': slug, 'device': device, 'section_id': section_id, 'height_px': height_px})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/admin/api/pages/publish', methods=['POST'])
+def admin_pages_publish():
+    """Publish current staging data to live site.
+    Body: {"slugs": ["home","about",...]} to publish specific pages,
+          {"all": true} to publish every page in the pages table."""
+    auth = _require_admin()
+    if auth: return auth
+    data = request.get_json(silent=True) or {}
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'no db'}), 503
+    try:
+        cur = conn.cursor()
+        _ensure_published_snapshots_table(cur)
+        if data.get('all'):
+            cur.execute("SELECT slug FROM pages")
+            slugs = [r['slug'] for r in cur.fetchall()]
+        else:
+            slugs = data.get('slugs') or []
+            if not slugs:
+                return jsonify({'error': 'provide slugs or all:true'}), 400
+        published = []
+        for slug in slugs:
+            _snapshot_page(cur, slug)
+            published.append(slug)
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True, 'published': published, 'count': len(published)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/pages/diff-mode', methods=['GET', 'POST'])
+def admin_diff_mode():
+    """Get or set the diff-visual panel count (one|two) for the home page."""
+    auth = _require_admin()
+    if auth: return auth
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'no db'}), 503
+    try:
+        cur = conn.cursor()
+        if request.method == 'GET':
+            cur.execute("SELECT value FROM system_settings WHERE key = 'home_diff_mode'")
+            row = cur.fetchone()
+            conn.close()
+            return jsonify({'mode': row['value'] if row else 'one'})
+        data = request.get_json(silent=True) or {}
+        mode = data.get('mode', 'one')
+        if mode not in ('one', 'two'):
+            conn.close()
+            return jsonify({'error': 'mode must be one or two'}), 400
+        cur.execute("""INSERT INTO system_settings(key, value)
+                       VALUES('home_diff_mode', %s)
+                       ON CONFLICT(key) DO UPDATE SET value=%s, updated_at=now()""",
+                    (mode, mode))
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True, 'mode': mode})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/pages/publish/status', methods=['GET'])
+def admin_pages_publish_status():
+    """Return publish status and whether unpublished staging changes exist."""
+    auth = _require_admin()
+    if auth: return auth
+    slug = request.args.get('slug', '').strip()
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'snapshots': [], 'has_unpublished': False})
+    try:
+        cur = conn.cursor()
+        _ensure_published_snapshots_table(cur)
+        if slug:
+            cur.execute("SELECT slug, published_at FROM published_snapshots WHERE slug = %s", (slug,))
+        else:
+            cur.execute("SELECT slug, published_at FROM published_snapshots ORDER BY published_at DESC")
+        rows = cur.fetchall()
+
+        # Determine if any staging data is newer than the oldest snapshot
+        has_unpublished = False
+        try:
+            cur.execute("SELECT MAX(updated_at) AS t FROM pages")
+            r = cur.fetchone()
+            latest_stage = r['t'] if r and r['t'] else None
+
+            cur.execute("SELECT MAX(updated_at) AS t FROM card_settings")
+            r = cur.fetchone()
+            latest_card = r['t'] if r and r['t'] else None
+
+            cur.execute("SELECT MIN(published_at) AS t FROM published_snapshots")
+            r = cur.fetchone()
+            oldest_pub = r['t'] if r and r['t'] else None
+
+            # Unpublished if any staging update is newer than oldest published snapshot,
+            # or if there are no snapshots at all and staging data exists
+            if oldest_pub is None:
+                has_unpublished = bool(latest_stage or latest_card)
+            else:
+                latest = max(t for t in [latest_stage, latest_card] if t) if any([latest_stage, latest_card]) else None
+                has_unpublished = bool(latest and latest > oldest_pub)
+        except Exception:
+            pass
+
+        conn.close()
+        return jsonify({
+            'snapshots': [{'slug': r['slug'], 'published_at': r['published_at'].isoformat() if r['published_at'] else None} for r in rows],
+            'has_unpublished': has_unpublished
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/admin/api/pages/create', methods=['POST'])
@@ -4996,6 +6657,10 @@ def admin_pages_images():
         for fname in sorted(os.listdir(opt_dir)):
             ext = fname.rsplit('.', 1)[-1].lower()
             if ext not in ('webp', 'jpg', 'jpeg', 'png'):
+                continue
+            # Skip stub/test files smaller than 500 bytes
+            fpath = os.path.join(opt_dir, fname)
+            if os.path.getsize(fpath) < 500:
                 continue
             if re.search(r'_\d+w\.webp$', fname):
                 continue
@@ -5145,9 +6810,9 @@ def admin_page_text_edits(slug):
         original_html = f.read()
 
     # Undo snapshot (stores full file so restore is always lossless)
-    _log_undo('page_text_edit', f'Text edit: {slug}',
-              {'slug': slug, 'file_path': fpath, 'original_html': original_html},
-              page_slug=slug, admin_context='pages')
+    _undo_entry_id = _log_undo('page_text_edit', f'Text edit: {slug}',
+                               {'slug': slug, 'file_path': fpath, 'original_html': original_html},
+                               page_slug=slug, admin_context='pages')
 
     # Parse and apply edits
     soup = _BS4(original_html, 'html.parser')
@@ -5173,8 +6838,12 @@ def admin_page_text_edits(slug):
         return jsonify({'ok': False, 'error': 'No matching elements found'}), 400
 
     # Write back
+    new_html_content = str(soup)
     with open(fpath, 'w', encoding='utf-8') as f:
-        f.write(str(soup))
+        f.write(new_html_content)
+
+    # Record after_data for redo
+    _set_undo_after_data(_undo_entry_id, {'slug': slug, 'file_path': fpath, 'new_html': new_html_content})
 
     # Update DB timestamp
     conn = _db_conn()
@@ -5231,7 +6900,10 @@ def admin_card_update(slug, card_id):
         _old_card = cur.fetchone()
         _old_state = dict(_old_card) if _old_card else None
         _log_undo('card_state', f'Card update: {slug} / {card_id}',
-                  {'slug': slug, 'card_id': card_id, 'old_state': _old_state}, slug, admin_context='pages')
+                  {'slug': slug, 'card_id': card_id, 'old_state': _old_state}, slug, admin_context='pages',
+                  after_data={'slug': slug, 'card_id': card_id,
+                              'new_state': {'mode': mode, 'color': color, 'image': image,
+                                            'position': position, 'zoom': zoom}})
         cur.execute("""
             INSERT INTO card_settings (page_slug, card_id, mode, color, image, position, zoom, updated_at)
             VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
@@ -5254,11 +6926,14 @@ def admin_card_update(slug, card_id):
 
 @app.route('/admin/api/overlay-scripts')
 def admin_overlay_scripts():
-    """Return the edit overlay JS (both templates) formatted with slug/token."""
+    """Return the edit overlay JS (both templates + section resize) formatted with slug/token/device."""
     auth = _require_admin()
     if auth: return auth
     slug = request.args.get('slug', '')
     token = request.args.get('token', '')
+    device = request.args.get('device', 'desktop').strip().lower()
+    if device not in ('desktop', 'tablet', 'mobile'):
+        device = 'desktop'
     if not _valid_token(token):
         return jsonify({'error': 'unauthorized'}), 401
 
@@ -5271,7 +6946,10 @@ def admin_overlay_scripts():
         slug_json=json.dumps(slug), token_json=json.dumps(token))
     edit_js = strip_script(_EDIT_OVERLAY_TPL).format(
         slug_json=json.dumps(slug), token_json=json.dumps(token))
-    return card_js + '\n' + edit_js, 200, {
+    section_js = strip_script(_SECTION_RESIZE_TPL).format(
+        slug_json=json.dumps(slug), token_json=json.dumps(token),
+        device_json=json.dumps(device))
+    return card_js + '\n' + edit_js + '\n' + section_js, 200, {
         'Content-Type': 'application/javascript',
         'Cache-Control': 'no-store'
     }
@@ -5309,7 +6987,7 @@ def admin_image_rotate():
     script = (
         'import sys; from PIL import Image\n'
         'for p in sys.argv[1:]:\n'
-        '  img=Image.open(p); img.rotate(-' + str(degrees) + ', expand=True).save(p,"WEBP",quality=85)\n'
+        '  img=Image.open(p); img.rotate(-' + str(degrees) + ', expand=True).save(p,"WEBP",quality=92)\n'
     )
     _env = os.environ.copy()
     _env.pop('VIRTUAL_ENV', None)
@@ -5419,9 +7097,10 @@ if not result_bytes:
 
 # Save base WebP at original dimensions
 img_result = Image.open(io.BytesIO(result_bytes)).convert('RGB')
-img_result.save(out_path, 'WEBP', quality=88)
+img_result.save(out_path, 'WEBP', quality=92)
 
 # Generate responsive sizes
+from PIL import ImageFilter as _IF
 sizes = [('_1920w', 1920), ('_960w', 960), ('_480w', 480), ('_201w', 201)]
 base_out = out_path[:-5]  # strip .webp
 for suffix, w in sizes:
@@ -5429,9 +7108,12 @@ for suffix, w in sizes:
         ratio = w / img_result.width
         h = int(img_result.height * ratio)
         resized = img_result.resize((w, h), Image.LANCZOS)
+        # Post-resize sharpening for display sizes: compensates for LANCZOS softness
+        if suffix in ('_960w', '_480w'):
+            resized = resized.filter(_IF.UnsharpMask(radius=0.8, percent=150, threshold=3))
     else:
         resized = img_result
-    resized.save(base_out + suffix + '.webp', 'WEBP', quality=85)
+    resized.save(base_out + suffix + '.webp', 'WEBP', quality=92)
 
 print('OK:' + out_path)
 """
@@ -5483,6 +7165,13 @@ print('OK:' + out_path)
         finally:
             conn2.close()
 
+    # Guardrail 2: cache dims for all variants generated by the subprocess
+    _opt = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+    _ai_stem = out_filename[:-5]  # strip .webp
+    _measure_and_cache_dims(*[
+        os.path.join(_opt, f'{_ai_stem}{s}.webp')
+        for s in ('', '_1920w', '_960w', '_480w', '_201w')
+    ])
     hero_path = f'/assets/images-opt/{out_filename}'
     return jsonify({'ok': True, 'filename': out_filename, 'hero_path': hero_path})
 
@@ -5536,6 +7225,22 @@ def admin_save_result():
                 os.remove(f)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+    # Clear active_version for the base file — the AI content now lives in the original,
+    # so there is no longer a separate active_version file to track.
+    _c3 = _db_conn()
+    if _c3:
+        try:
+            _cu3 = _c3.cursor()
+            _ensure_image_labels_table(_cu3)
+            _cu3.execute(
+                "UPDATE image_labels SET active_version = NULL WHERE filename = %s",
+                (original_filename,))
+            _c3.commit()
+        except Exception:
+            _c3.rollback()
+        finally:
+            _c3.close()
 
     return jsonify({'ok': True, 'filename': original_filename,
                     'hero_path': f'/assets/images-opt/{original_filename}'})
@@ -5704,7 +7409,15 @@ def admin_set_version():
         """, (new_active_path, original_path, ai_like, ai_v_like, orig_v_like))
         pages_updated = cur.rowcount
 
-        # 4. Find portfolio projects whose gallery or hero uses this base image
+        # 4. Propagate to blog_posts featured_image
+        cur.execute("""
+            UPDATE blog_posts SET featured_image = %s
+            WHERE featured_image = %s OR featured_image LIKE %s
+               OR featured_image LIKE %s OR featured_image LIKE %s
+        """, (new_active_path, original_path, ai_like, ai_v_like, orig_v_like))
+        blog_updated = cur.rowcount
+
+        # 5. Find portfolio projects whose gallery or hero uses this base image
         cur.execute("""
             SELECT id FROM portfolio_projects
             WHERE gallery_json LIKE %s OR hero_hash = %s
@@ -5713,14 +7426,15 @@ def admin_set_version():
 
         conn.commit()
 
-        # 5. Background-regenerate affected project pages so their gallery HTML reflects the change
+        # 5. Synchronously regenerate affected project pages so their gallery HTML reflects
+        #    the new active version before the client receives the response and reloads.
+        #    (Gallery images are typically in 1–2 projects; re-render is fast enough to block.)
         if affected_pids:
-            def _regen_affected(pids=affected_pids):
-                c2 = _db_conn()
-                if not c2: return
+            c2 = _db_conn()
+            if c2:
                 try:
                     cu = c2.cursor()
-                    cu.execute('SELECT * FROM portfolio_projects WHERE id = ANY(%s)', (pids,))
+                    cu.execute('SELECT * FROM portfolio_projects WHERE id = ANY(%s)', (affected_pids,))
                     for row in cu.fetchall():
                         try:
                             p = _portfolio_row_to_dict(row)
@@ -5729,8 +7443,8 @@ def admin_set_version():
                             print(f'[set-version regen] {row.get("slug","?")}: {ex}')
                     c2.close()
                 except Exception:
-                    pass
-            threading.Thread(target=_regen_affected, daemon=True).start()
+                    try: c2.close()
+                    except: pass
 
         return jsonify({
             'ok': True,
@@ -5739,7 +7453,86 @@ def admin_set_version():
             'new_active_path': new_active_path,
             'cards_updated': cards_updated,
             'pages_updated': pages_updated,
+            'blog_updated': blog_updated,
             'projects_regenning': len(affected_pids),
+        })
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
+
+# ── Set hero image for a specific page only (no global propagation) ──────────
+
+@app.route('/admin/api/pages/<slug>/hero', methods=['PATCH'])
+def admin_page_hero_set(slug):
+    """Set the hero image for ONE specific page. Does not touch other pages."""
+    auth = _require_admin()
+    if auth: return auth
+    data = request.get_json(force=True) or {}
+    base_filename    = os.path.basename(data.get('base_filename', ''))
+    version_filename = (data.get('version_filename') or '').strip()
+
+    if not base_filename or not base_filename.endswith('.webp'):
+        return jsonify({'error': 'invalid base_filename'}), 400
+
+    # Normalise: empty or same as base → null (use original)
+    if version_filename:
+        version_filename = os.path.basename(version_filename)
+        if version_filename == base_filename:
+            version_filename = None
+        elif version_filename:
+            opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+            if not os.path.isfile(os.path.join(opt_dir, version_filename)):
+                return jsonify({'error': 'version file not found on disk'}), 404
+    else:
+        version_filename = None
+
+    new_active_path = (
+        f'/assets/images-opt/{version_filename}' if version_filename
+        else f'/assets/images-opt/{base_filename}'
+    )
+
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'no db'}), 503
+    try:
+        cur = conn.cursor()
+        _ensure_image_labels_table(cur)
+        _ensure_page_locks_table(cur)
+
+        # Atomic lock check — same pattern as admin_page_update
+        cur.execute("SELECT status FROM page_locks WHERE slug = %s FOR UPDATE", (slug,))
+        lock_row = cur.fetchone()
+        if lock_row and lock_row['status'] == 'locked':
+            conn.rollback()
+            return jsonify({'error': 'page is locked'}), 423
+
+        # Update image_labels active_version
+        cur.execute("""
+            INSERT INTO image_labels (filename, active_version)
+            VALUES (%s, %s)
+            ON CONFLICT (filename) DO UPDATE SET active_version = EXCLUDED.active_version
+        """, (base_filename, version_filename))
+
+        # Update hero_image for THIS page only
+        cur.execute(
+            "UPDATE pages SET hero_image = %s WHERE slug = %s",
+            (new_active_path, slug)
+        )
+        if cur.rowcount == 0:
+            conn.rollback()
+            return jsonify({'error': 'page not found'}), 404
+
+        conn.commit()
+        return jsonify({
+            'ok': True,
+            'slug': slug,
+            'base_filename': base_filename,
+            'active_version': version_filename,
+            'new_active_path': new_active_path,
         })
     except Exception as e:
         conn.rollback()
@@ -5851,39 +7644,102 @@ def admin_delete_version():
 
 @app.route('/admin/api/images/adjust', methods=['POST'])
 def admin_image_adjust():
-    """Apply brightness/contrast/saturation adjustments to an image in-place."""
+    """Apply image adjustments in-place, or create a new version (create_version=true)."""
     auth = _require_admin()
     if auth: return auth
     data = request.get_json(force=True) or {}
-    filename = os.path.basename(data.get('filename', ''))
-    brightness = int(data.get('brightness', 100))
-    contrast   = int(data.get('contrast',   100))
-    saturation = int(data.get('saturation', 100))
+    filename       = os.path.basename(data.get('filename', ''))
+    brightness     = max(50,   min(150, int(data.get('brightness', 100))))
+    contrast       = max(50,   min(150, int(data.get('contrast',   100))))
+    saturation     = max(0,    min(200, int(data.get('saturation', 100))))
+    color_r        = max(-100, min(100, int(data.get('color_r', 0))))
+    color_g        = max(-100, min(100, int(data.get('color_g', 0))))
+    color_b        = max(-100, min(100, int(data.get('color_b', 0))))
+    kelvin         = max(2000, min(10000, int(data.get('kelvin', 6500))))
+    create_version = bool(data.get('create_version', False))
+    base_filename  = os.path.basename(data.get('base_filename', filename))
+
     if not filename:
         return jsonify({'error': 'filename required'}), 400
-    opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+    opt_dir  = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
     src_path = os.path.join(opt_dir, filename)
     if not os.path.isfile(src_path):
         return jsonify({'error': 'file not found'}), 404
+
+    if create_version:
+        # Save as next available _ai_N.webp derived from base_filename
+        base_for_naming = re.sub(r'_ai_\d+\.webp$', '.webp', base_filename)
+        base_stem       = base_for_naming[:-5]  # strip .webp
+        n = 1
+        while os.path.isfile(os.path.join(opt_dir, f'{base_stem}_ai_{n}.webp')):
+            n += 1
+        out_filename = f'{base_stem}_ai_{n}.webp'
+        out_path     = os.path.join(opt_dir, out_filename)
+    else:
+        out_filename = filename
+        out_path     = src_path
+
     import subprocess as _subp
     script = f"""
-import sys; sys.path.insert(0, '/home/claudeuser/.local/lib/python3.12/site-packages')
+import sys, os
+sys.path.insert(0, '/home/claudeuser/.local/lib/python3.12/site-packages')
 from PIL import Image, ImageEnhance
-src = {repr(src_path)}
-brightness, contrast, saturation = {brightness}/100, {contrast}/100, {saturation}/100
-with Image.open(src) as img:
+src_path = {repr(src_path)}
+out_path = {repr(out_path)}
+create_version = {create_version}
+brightness = {brightness}/100; contrast = {contrast}/100; saturation = {saturation}/100
+color_r = {color_r}; color_g = {color_g}; color_b = {color_b}; kelvin = {kelvin}
+
+with Image.open(src_path) as img:
     img = img.convert('RGB')
     if brightness != 1.0: img = ImageEnhance.Brightness(img).enhance(brightness)
     if contrast   != 1.0: img = ImageEnhance.Contrast(img).enhance(contrast)
     if saturation != 1.0: img = ImageEnhance.Color(img).enhance(saturation)
-    img.save(src, 'WEBP', quality=88)
-    base = src[:-5]
+
+    # Per-channel adjustments via lookup table (colour balance + Kelvin)
+    def lut(mult):
+        return [max(0, min(255, int(i * mult))) for i in range(256)]
+
+    # Colour balance: -100..+100  →  0.5x..1.5x per channel
+    cb_r = 1.0 + color_r * 0.005
+    cb_g = 1.0 + color_g * 0.005
+    cb_b = 1.0 + color_b * 0.005
+
+    # Kelvin warm/cool shift relative to neutral 6500 K
+    if kelvin != 6500:
+        neutral = 6500
+        if kelvin < neutral:
+            t = (neutral - kelvin) / (neutral - 2000)
+            kw_r, kw_g, kw_b = 1.0 + 0.20*t, 1.0 + 0.03*t, 1.0 - 0.20*t
+        else:
+            t = (kelvin - neutral) / (10000 - neutral)
+            kw_r, kw_g, kw_b = 1.0 - 0.20*t, 1.0 - 0.03*t, 1.0 + 0.20*t
+    else:
+        kw_r = kw_g = kw_b = 1.0
+
+    r_m = cb_r * kw_r; g_m = cb_g * kw_g; b_m = cb_b * kw_b
+    if abs(r_m-1)>0.001 or abs(g_m-1)>0.001 or abs(b_m-1)>0.001:
+        r, g, b = img.split()
+        if abs(r_m-1)>0.001: r = r.point(lut(r_m))
+        if abs(g_m-1)>0.001: g = g.point(lut(g_m))
+        if abs(b_m-1)>0.001: b = b.point(lut(b_m))
+        img = Image.merge('RGB', (r, g, b))
+
+    img.save(out_path, 'WEBP', quality=92)
+
+    # Responsive variants: update existing ones (in-place) or create all (new version)
+    from PIL import ImageFilter as _IF2
+    base_stem = out_path[:-5]
     for suffix, w in [('_1920w',1920),('_960w',960),('_480w',480),('_201w',201)]:
-        import os; rp = base + suffix + '.webp'
-        if os.path.isfile(rp):
-            r = img.copy()
-            if r.width > w: r = r.resize((w, int(r.height*w/r.width)), Image.LANCZOS)
-            r.save(rp, 'WEBP', quality=85)
+        rp = base_stem + suffix + '.webp'
+        if create_version or os.path.isfile(rp):
+            copy = img.copy()
+            if copy.width > w:
+                copy = copy.resize((w, int(copy.height*w/copy.width)), Image.LANCZOS)
+                if suffix in ('_960w', '_480w'):
+                    copy = copy.filter(_IF2.UnsharpMask(radius=0.8, percent=150, threshold=3))
+            copy.save(rp, 'WEBP', quality=92)
+
 print('OK')
 """
     try:
@@ -5893,7 +7749,18 @@ print('OK')
             return jsonify({'error': result.stderr.strip() or 'adjust failed'}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    return jsonify({'ok': True, 'filename': filename})
+
+    # Guardrail 2: cache dims for all variants the subprocess may have written
+    _adj_opt  = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+    _adj_stem = out_filename[:-5]
+    _measure_and_cache_dims(*[
+        os.path.join(_adj_opt, f'{_adj_stem}{s}.webp')
+        for s in ('', '_1920w', '_960w', '_480w', '_201w')
+    ])
+    resp = {'ok': True, 'filename': out_filename}
+    if create_version:
+        resp['hero_path'] = f'/assets/images-opt/{out_filename}'
+    return jsonify(resp)
 
 
 # ── Settings — env key management ────────────────────────────────────────────
@@ -6781,6 +8648,7 @@ _ENV_EDITABLE = {
     'CAMPAIGN_AUTOMATION_ENABLED','META_MANAGER_AUTO_APPLY','MSFT_MANAGER_AUTO_APPLY',
     'ALERT_EMAIL','ALERT_FROM','LANDING_PAGE_URL','META_API_VERSION',
     'META_ACCESS_TOKEN','GOOGLE_REFRESH_TOKEN','MICROSOFT_REFRESH_TOKEN',
+    'GOOGLE_SHEETS_ID',
 }
 
 
@@ -7756,12 +9624,30 @@ def gallery_layout_save(slug):
     if err: return err
     if not re.match(r'^[a-z0-9-]+$', slug):
         return jsonify({'error': 'invalid slug'}), 400
-    data = request.get_json(force=True) or {}
-    layout = data.get('layout', {})
-    path = os.path.join(_GALLERY_LAYOUTS_DIR, f'{slug}.json')
-    with open(path, 'w') as f:
-        json.dump(layout, f, indent=2)
-    return jsonify({'ok': True, 'slug': slug, 'items': len(layout)})
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'lock status unavailable'}), 503
+    try:
+        cur = conn.cursor()
+        _ensure_page_locks_table(cur)
+        # Atomic TOCTOU-safe lock check: SELECT FOR UPDATE holds the row lock
+        # across the file write and commit, so a concurrent lock flip blocks
+        # until after the write completes — preventing races.
+        cur.execute("SELECT status FROM page_locks WHERE slug = %s FOR UPDATE", (slug,))
+        row = cur.fetchone()
+        if row and row['status'] == 'locked':
+            return jsonify({'error': 'page is locked'}), 423
+        data = request.get_json(force=True) or {}
+        layout = data.get('layout', {})
+        path = os.path.join(_GALLERY_LAYOUTS_DIR, f'{slug}.json')
+        with open(path, 'w') as f:
+            json.dump(layout, f, indent=2)
+        conn.commit()  # releases the FOR UPDATE row lock
+        return jsonify({'ok': True, 'slug': slug, 'items': len(layout)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 503
+    finally:
+        conn.close()
 
 @app.route('/admin/api/gallery/layout/<slug>', methods=['GET'])
 def gallery_layout_load(slug):
@@ -7782,6 +9668,45 @@ def gallery_projects():
         return jsonify([])
     with open(path) as f:
         return jsonify(json.load(f))
+
+@app.route('/admin/api/gallery/rerender-all', methods=['POST'])
+def gallery_rerender_all():
+    """Re-render all portfolio project pages. Used after bulk image changes."""
+    err = _require_admin()
+    if err: return err
+    if not HAS_DB:
+        return jsonify({'error': 'no db'}), 500
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'db connect failed'}), 500
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT * FROM portfolio_projects ORDER BY sort_order, id')
+        rows = cur.fetchall()
+        conn.close()
+    except Exception as e:
+        try: conn.close()
+        except: pass
+        return jsonify({'error': str(e)}), 500
+    rendered = []
+    errors = []
+    for row in rows:
+        p = _portfolio_row_to_dict(row)
+        try:
+            _render_project_page(p)
+            rendered.append(p['slug'])
+        except Exception as e:
+            errors.append({'slug': p['slug'], 'error': str(e)})
+    return jsonify({'ok': True, 'rendered': rendered, 'errors': errors})
+
+
+@app.route('/admin/api/gallery/integrity-check', methods=['GET'])
+def gallery_integrity_check_api():
+    """Guardrail 4 — integrity check endpoint. Returns state of image dims and variant coverage."""
+    err = _require_admin()
+    if err: return err
+    return jsonify(_gallery_integrity_check())
+
 
 # ── Gallery image type tagging + auto-sort ────────────────────────────────────
 
@@ -7810,7 +9735,8 @@ def gallery_tag_image(slug):
         old_row = cur.fetchone()
         old_type = old_row['image_type'] if old_row else None
         _log_undo('gallery_tag', f'Tag: {slug} / {filename[:20]}… → {image_type or "untagged"}',
-                  {'slug': slug, 'filename': filename, 'old_type': old_type}, slug, admin_context='pages')
+                  {'slug': slug, 'filename': filename, 'old_type': old_type}, slug, admin_context='pages',
+                  after_data={'slug': slug, 'filename': filename, 'new_type': image_type})
         if image_type:
             cur.execute("""
                 INSERT INTO gallery_image_types (filename, image_type)
@@ -7854,14 +9780,47 @@ def gallery_add_image(slug):
     ext = os.path.splitext(orig_name)[1].lower()
     if ext not in ('.jpg', '.jpeg', '.png', '.webp', '.gif'):
         return jsonify({'error': 'image files only'}), 400
+    # Read bytes now so we can hash before saving
+    raw_bytes = f.read()
     # Strip extension to get hash; re-attach for save
     base = os.path.splitext(orig_name)[0]
     opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
     os.makedirs(opt_dir, exist_ok=True)
-    save_path = os.path.join(opt_dir, orig_name)
-    f.save(save_path)
-    final_path = _to_webp(save_path)
-    final_base = os.path.splitext(os.path.basename(final_path))[0]
+
+    # ── Dedup check ───────────────────────────────────────────────────────────
+    _dedup_conn = _db_conn()
+    existing_fname = None
+    if _dedup_conn:
+        try:
+            _dc = _dedup_conn.cursor()
+            existing_fname = _dedup_incoming_bytes(raw_bytes, orig_name, _dc)
+            _dedup_conn.commit()
+        except Exception:
+            _dedup_conn.rollback()
+        finally:
+            try: _dedup_conn.close()
+            except: pass
+
+    if existing_fname:
+        final_base = os.path.splitext(existing_fname)[0]
+    else:
+        save_path = os.path.join(opt_dir, orig_name)
+        with open(save_path, 'wb') as _sf:
+            _sf.write(raw_bytes)
+        final_path = _to_webp(save_path)
+        final_base = os.path.splitext(os.path.basename(final_path))[0]
+        # Register hash
+        _hr_conn = _db_conn()
+        if _hr_conn:
+            try:
+                _hrc = _hr_conn.cursor()
+                _register_file_hash(raw_bytes, final_base + '.webp', _hrc)
+                _hr_conn.commit()
+            except Exception:
+                _hr_conn.rollback()
+            finally:
+                try: _hr_conn.close()
+                except: pass
     # Add to gallery_json
     conn = _db_conn()
     if not conn:
@@ -7880,6 +9839,12 @@ def gallery_add_image(slug):
         if final_base in existing_hashes:
             conn.close()
             return jsonify({'ok': True, 'filename': final_base, 'note': 'already in gallery'})
+        # Guardrail: refuse to re-add a manually excluded image
+        _ensure_gallery_exclusions_table(cur)
+        cur.execute("SELECT 1 FROM gallery_exclusions WHERE slug = %s AND image_hash = %s", (slug, final_base))
+        if cur.fetchone():
+            conn.close()
+            return jsonify({'error': 'excluded', 'message': 'This image was manually removed from this gallery. Clear the exclusion in Admin → Gallery to re-add it.'}), 409
         gallery.append([final_base, 'webp'])
         cur.execute("UPDATE portfolio_projects SET gallery_json = %s WHERE slug = %s",
                     (json.dumps(gallery), slug))
@@ -7896,6 +9861,12 @@ def gallery_add_image(slug):
         conn.commit()
         conn.close()
         p['gallery'] = gallery
+        # Guardrail 2: cache dims for the uploaded file and its variants before rendering
+        _up_opt = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+        _measure_and_cache_dims(*[
+            os.path.join(_up_opt, f'{final_base}{s}.webp')
+            for s in ('', '_480w', '_960w', '_1920w', '_201w')
+        ])
         _render_project_page(p)
         return jsonify({'ok': True, 'filename': final_base, 'gallery_count': len(gallery)})
     except Exception as e:
@@ -7935,10 +9906,16 @@ def gallery_remove_image(slug):
             return jsonify({'error': 'image not found in gallery'}), 404
         # Log undo before modifying (save full old gallery so removal is reversible)
         _log_undo('gallery_sort', f'Remove image: {slug} / {filename[:24]}…',
-                  {'slug': slug, 'old_gallery': gallery}, slug, admin_context='pages')
+                  {'slug': slug, 'old_gallery': gallery}, slug, admin_context='pages',
+                  after_data={'slug': slug, 'new_gallery': new_gallery})
         cur.execute(
             "UPDATE portfolio_projects SET gallery_json = %s WHERE slug = %s",
             (json.dumps(new_gallery), slug))
+        # Guardrail: record exclusion so audits/rebuilds never re-add this image
+        _ensure_gallery_exclusions_table(cur)
+        cur.execute(
+            "INSERT INTO gallery_exclusions (slug, image_hash) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+            (slug, filename))
         conn.commit()
         conn.close()
         # Regenerate page HTML synchronously so the removed image is gone
@@ -7946,6 +9923,57 @@ def gallery_remove_image(slug):
         p['gallery'] = new_gallery
         _render_project_page(p)
         return jsonify({'ok': True, 'removed': filename, 'remaining': len(new_gallery)})
+    except Exception as e:
+        try: conn.close()
+        except: pass
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/gallery/<slug>/exclusions', methods=['GET'])
+def gallery_list_exclusions(slug):
+    """List manually excluded images for a project (admin only)."""
+    err = _require_admin()
+    if err: return err
+    if not re.match(r'^[a-z0-9-]+$', slug):
+        return jsonify({'error': 'invalid slug'}), 400
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'db unavailable'}), 500
+    try:
+        cur = conn.cursor()
+        _ensure_gallery_exclusions_table(cur)
+        cur.execute(
+            "SELECT image_hash, excluded_at FROM gallery_exclusions WHERE slug = %s ORDER BY excluded_at DESC",
+            (slug,))
+        rows = cur.fetchall()
+        conn.close()
+        return jsonify({'slug': slug, 'exclusions': [{'image_hash': r[0], 'excluded_at': r[1].isoformat() if r[1] else None} for r in rows]})
+    except Exception as e:
+        try: conn.close()
+        except: pass
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/gallery/<slug>/exclusions/<image_hash>', methods=['DELETE'])
+def gallery_clear_exclusion(slug, image_hash):
+    """Remove a gallery exclusion so the image can be re-added (admin only)."""
+    err = _require_admin()
+    if err: return err
+    if not re.match(r'^[a-z0-9-]+$', slug):
+        return jsonify({'error': 'invalid slug'}), 400
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'db unavailable'}), 500
+    try:
+        cur = conn.cursor()
+        _ensure_gallery_exclusions_table(cur)
+        cur.execute(
+            "DELETE FROM gallery_exclusions WHERE slug = %s AND image_hash = %s",
+            (slug, image_hash))
+        deleted = cur.rowcount
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True, 'cleared': deleted > 0})
     except Exception as e:
         try: conn.close()
         except: pass
@@ -7971,9 +9999,9 @@ def gallery_auto_sort(slug):
         gallery = p['gallery']  # list of [hash, ext]
         if not gallery:
             return jsonify({'ok': True, 'sorted': 0})
-        # Log undo BEFORE sorting (save current order)
-        _log_undo('gallery_sort', f'Auto-Sort: {slug}',
-                  {'slug': slug, 'old_gallery': gallery}, slug, admin_context='pages')
+        # Log undo BEFORE sorting (save current order); capture entry_id for after_data
+        _sort_undo_id = _log_undo('gallery_sort', f'Auto-Sort: {slug}',
+                                  {'slug': slug, 'old_gallery': gallery}, slug, admin_context='pages')
         # Load types for all hashes
         hashes = [item[0] if isinstance(item, (list, tuple)) else item for item in gallery]
         _ensure_gallery_image_types_table(cur)
@@ -7991,6 +10019,7 @@ def gallery_auto_sort(slug):
             (new_gallery_json, slug))
         conn.commit()
         conn.close()
+        _set_undo_after_data(_sort_undo_id, {'slug': slug, 'new_gallery': sorted_gallery})
         # Regen page synchronously — ensures sorted HTML is on disk before
         # rd_sort_done triggers window.location.reload() in the client.
         p['gallery'] = sorted_gallery
@@ -8094,8 +10123,8 @@ def gallery_auto_tag(slug):
         cur.execute("SELECT filename, image_type FROM gallery_image_types WHERE filename = ANY(%s)", (hashes,))
         _old_types = {r['filename']: r['image_type'] for r in cur.fetchall()}
         conn.close()
-        _log_undo('gallery_auto_tag', f'Auto-Tag: {slug} ({len(hashes)} images)',
-                  {'slug': slug, 'old_types': _old_types}, slug, admin_context='pages')
+        _autotag_undo_id = _log_undo('gallery_auto_tag', f'Auto-Tag: {slug} ({len(hashes)} images)',
+                                     {'slug': slug, 'old_types': _old_types}, slug, admin_context='pages')
 
         # Classify each image — use ThreadPoolExecutor for parallel API calls
         from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -8131,6 +10160,7 @@ def gallery_auto_tag(slug):
                 _sync_image_gallery_label(h, slug, img_type, cur2)
             conn2.commit()
             conn2.close()
+        _set_undo_after_data(_autotag_undo_id, {'slug': slug, 'new_types': results})
 
         _render_project_page(p)
         counts = {}
@@ -8273,28 +10303,20 @@ def locks_check():
 
 @app.route('/admin/api/undo/status', methods=['GET'])
 def admin_undo_status():
-    """Return the description of the last undoable action for a given admin context, or nothing-to-undo."""
+    """Return the description of the last undoable action (global — no context filter)."""
     auth = _require_admin()
     if auth: return auth
-    context = (request.args.get('context') or request.headers.get('X-Admin-Context') or '').strip() or None
     conn = _db_conn()
     if not conn:
         return jsonify({'available': False, 'description': None})
     try:
         cur = conn.cursor()
         _ensure_undo_log_table(cur)
-        if context:
-            cur.execute("""
-                SELECT description, operation, page_slug
-                FROM undo_log WHERE is_undone = FALSE AND admin_context = %s
-                ORDER BY id DESC LIMIT 1
-            """, (context,))
-        else:
-            cur.execute("""
-                SELECT description, operation, page_slug
-                FROM undo_log WHERE is_undone = FALSE
-                ORDER BY id DESC LIMIT 1
-            """)
+        cur.execute("""
+            SELECT description, operation, page_slug
+            FROM undo_log WHERE is_undone = FALSE
+            ORDER BY id DESC LIMIT 1
+        """)
         row = cur.fetchone()
         conn.close()
         if row:
@@ -8308,29 +10330,20 @@ def admin_undo_status():
 
 @app.route('/admin/api/undo', methods=['POST'])
 def admin_undo():
-    """Apply the reverse of the last undoable operation for a given admin context and mark it done."""
+    """Apply the reverse of the last undoable operation (global — no context filter)."""
     auth = _require_admin()
     if auth: return auth
-    body = request.get_json(silent=True) or {}
-    context = (body.get('context') or request.headers.get('X-Admin-Context') or '').strip() or None
     conn = _db_conn()
     if not conn:
         return jsonify({'error': 'db unavailable'}), 500
     try:
         cur = conn.cursor()
         _ensure_undo_log_table(cur)
-        if context:
-            cur.execute("""
-                SELECT id, operation, description, before_data, page_slug
-                FROM undo_log WHERE is_undone = FALSE AND admin_context = %s
-                ORDER BY id DESC LIMIT 1
-            """, (context,))
-        else:
-            cur.execute("""
-                SELECT id, operation, description, before_data, page_slug
-                FROM undo_log WHERE is_undone = FALSE
-                ORDER BY id DESC LIMIT 1
-            """)
+        cur.execute("""
+            SELECT id, operation, description, before_data, page_slug
+            FROM undo_log WHERE is_undone = FALSE
+            ORDER BY id DESC LIMIT 1
+        """)
         row = cur.fetchone()
         if not row:
             conn.close()
@@ -8386,6 +10399,13 @@ def admin_undo():
             old_gallery = bd['old_gallery']
             cur.execute("UPDATE portfolio_projects SET gallery_json = %s WHERE slug = %s",
                         (json.dumps(old_gallery), slug))
+            # Clear any exclusions for images being restored (handles undo of a deletion)
+            old_hashes = [item[0] if isinstance(item, (list, tuple)) else item for item in old_gallery]
+            if old_hashes:
+                _ensure_gallery_exclusions_table(cur)
+                cur.execute(
+                    "DELETE FROM gallery_exclusions WHERE slug = %s AND image_hash = ANY(%s)",
+                    (slug, old_hashes))
             cur.execute("SELECT * FROM portfolio_projects WHERE slug = %s", (slug,))
             prow = cur.fetchone()
             if prow:
@@ -8420,6 +10440,141 @@ def admin_undo():
                         _f.write(original_html)
 
         cur.execute("UPDATE undo_log SET is_undone = TRUE WHERE id = %s", (entry_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True, 'description': description, 'slug': page_slug})
+    except Exception as e:
+        try: conn.close()
+        except: pass
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/redo/status', methods=['GET'])
+def admin_redo_status():
+    """Return the description of the last redoable action (global — most recently undone entry with after_data)."""
+    auth = _require_admin()
+    if auth: return auth
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'available': False, 'description': None})
+    try:
+        cur = conn.cursor()
+        _ensure_undo_log_table(cur)
+        cur.execute("""
+            SELECT description, operation, page_slug
+            FROM undo_log WHERE is_undone = TRUE AND after_data IS NOT NULL
+            ORDER BY id DESC LIMIT 1
+        """)
+        row = cur.fetchone()
+        conn.close()
+        if row:
+            return jsonify({'available': True, 'description': row['description'], 'slug': row['page_slug']})
+        return jsonify({'available': False, 'description': None})
+    except Exception as e:
+        try: conn.close()
+        except: pass
+        return jsonify({'available': False, 'description': None})
+
+
+@app.route('/admin/api/redo', methods=['POST'])
+def admin_redo():
+    """Re-apply the most recently undone operation (global). Marks the entry as not-undone again."""
+    auth = _require_admin()
+    if auth: return auth
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'db unavailable'}), 500
+    try:
+        cur = conn.cursor()
+        _ensure_undo_log_table(cur)
+        cur.execute("""
+            SELECT id, operation, description, after_data, page_slug
+            FROM undo_log WHERE is_undone = TRUE AND after_data IS NOT NULL
+            ORDER BY id DESC LIMIT 1
+        """)
+        row = cur.fetchone()
+        if not row:
+            conn.close()
+            return jsonify({'ok': False, 'error': 'Nothing to redo'})
+
+        entry_id    = row['id']
+        operation   = row['operation']
+        description = row['description']
+        ad          = row['after_data']  # parsed as dict by psycopg2 JSONB
+        page_slug   = row['page_slug']
+
+        if operation == 'gallery_tag':
+            filename = ad['filename']
+            new_type = ad.get('new_type')
+            slug     = ad['slug']
+            _ensure_gallery_image_types_table(cur)
+            if new_type:
+                cur.execute("""
+                    INSERT INTO gallery_image_types (filename, image_type)
+                    VALUES (%s, %s)
+                    ON CONFLICT (filename) DO UPDATE SET image_type = EXCLUDED.image_type
+                """, (filename, new_type))
+            else:
+                cur.execute("DELETE FROM gallery_image_types WHERE filename = %s", (filename,))
+            cur.execute("SELECT * FROM portfolio_projects WHERE slug = %s", (slug,))
+            prow = cur.fetchone()
+            if prow:
+                _render_project_page(_portfolio_row_to_dict(prow))
+
+        elif operation == 'gallery_auto_tag':
+            slug      = ad['slug']
+            new_types = ad.get('new_types', {})
+            _ensure_gallery_image_types_table(cur)
+            for fname, nt in new_types.items():
+                if nt:
+                    cur.execute("""
+                        INSERT INTO gallery_image_types (filename, image_type)
+                        VALUES (%s, %s)
+                        ON CONFLICT (filename) DO UPDATE SET image_type = EXCLUDED.image_type
+                    """, (fname, nt))
+                else:
+                    cur.execute("DELETE FROM gallery_image_types WHERE filename = %s", (fname,))
+            cur.execute("SELECT * FROM portfolio_projects WHERE slug = %s", (slug,))
+            prow = cur.fetchone()
+            if prow:
+                _render_project_page(_portfolio_row_to_dict(prow))
+
+        elif operation == 'gallery_sort':
+            slug        = ad['slug']
+            new_gallery = ad['new_gallery']
+            cur.execute("UPDATE portfolio_projects SET gallery_json = %s WHERE slug = %s",
+                        (json.dumps(new_gallery), slug))
+            cur.execute("SELECT * FROM portfolio_projects WHERE slug = %s", (slug,))
+            prow = cur.fetchone()
+            if prow:
+                p = _portfolio_row_to_dict(prow)
+                p['gallery'] = new_gallery
+                _render_project_page(p)
+
+        elif operation == 'card_state':
+            slug      = ad['slug']
+            card_id   = ad['card_id']
+            new_state = ad.get('new_state') or {}
+            _ensure_card_settings_table(cur)
+            cur.execute("""
+                INSERT INTO card_settings (page_slug, card_id, mode, color, image, position, zoom, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+                ON CONFLICT (page_slug, card_id) DO UPDATE SET
+                    mode=EXCLUDED.mode, color=EXCLUDED.color, image=EXCLUDED.image,
+                    position=EXCLUDED.position, zoom=EXCLUDED.zoom, updated_at=NOW()
+            """, (slug, card_id, new_state.get('mode', 'color'), new_state.get('color', '#1C1C1C'),
+                  new_state.get('image'), new_state.get('position', '50% 50%'), new_state.get('zoom', 1.0)))
+
+        elif operation == 'page_text_edit':
+            file_path = ad.get('file_path')
+            new_html  = ad.get('new_html')
+            if file_path and new_html is not None:
+                real = os.path.realpath(file_path)
+                if real.startswith(os.path.realpath(PREVIEW_DIR)):
+                    with open(real, 'w', encoding='utf-8') as _f:
+                        _f.write(new_html)
+
+        cur.execute("UPDATE undo_log SET is_undone = FALSE WHERE id = %s", (entry_id,))
         conn.commit()
         conn.close()
         return jsonify({'ok': True, 'description': description, 'slug': page_slug})
@@ -8583,6 +10738,29 @@ try:
     _seed_gallery_types_from_image_labels()
 except Exception as _gt_err:
     print(f'[gallery_types] Seed failed: {_gt_err}')
+
+# Backfill file_hashes for existing images (non-blocking background thread)
+threading.Thread(target=_backfill_file_hashes, daemon=True).start()
+
+# ── Screenshot upload server (port 8080) ─────────────────────────────────────
+# Spawned as a root subprocess so it survives preview-server restarts.
+# Port check prevents duplicates when the admin triggers a hot-restart.
+def _start_screenshot_server():
+    try:
+        result = subprocess.run(['ss', '-tlnp'], capture_output=True, text=True)
+        if ':8080' in result.stdout:
+            return  # already listening — don't spawn a second copy
+        log = open('/var/log/screenshot_upload.log', 'a')
+        subprocess.Popen(
+            [sys.executable, 'server.py'],
+            cwd=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'screenshot_upload'),
+            stdout=log,
+            stderr=log,
+        )
+    except Exception as _ss_err:
+        print(f'[screenshot_upload] Failed to start: {_ss_err}')
+
+threading.Thread(target=_start_screenshot_server, daemon=True).start()
 
 # ─────────────────────────────────────────────────────────────────────────────
 
