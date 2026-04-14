@@ -7100,6 +7100,7 @@ img_result = Image.open(io.BytesIO(result_bytes)).convert('RGB')
 img_result.save(out_path, 'WEBP', quality=92)
 
 # Generate responsive sizes
+from PIL import ImageFilter as _IF
 sizes = [('_1920w', 1920), ('_960w', 960), ('_480w', 480), ('_201w', 201)]
 base_out = out_path[:-5]  # strip .webp
 for suffix, w in sizes:
@@ -7107,6 +7108,9 @@ for suffix, w in sizes:
         ratio = w / img_result.width
         h = int(img_result.height * ratio)
         resized = img_result.resize((w, h), Image.LANCZOS)
+        # Post-resize sharpening for display sizes: compensates for LANCZOS softness
+        if suffix in ('_960w', '_480w'):
+            resized = resized.filter(_IF.UnsharpMask(radius=0.8, percent=150, threshold=3))
     else:
         resized = img_result
     resized.save(base_out + suffix + '.webp', 'WEBP', quality=92)
@@ -7724,12 +7728,16 @@ with Image.open(src_path) as img:
     img.save(out_path, 'WEBP', quality=92)
 
     # Responsive variants: update existing ones (in-place) or create all (new version)
+    from PIL import ImageFilter as _IF2
     base_stem = out_path[:-5]
     for suffix, w in [('_1920w',1920),('_960w',960),('_480w',480),('_201w',201)]:
         rp = base_stem + suffix + '.webp'
         if create_version or os.path.isfile(rp):
             copy = img.copy()
-            if copy.width > w: copy = copy.resize((w, int(copy.height*w/copy.width)), Image.LANCZOS)
+            if copy.width > w:
+                copy = copy.resize((w, int(copy.height*w/copy.width)), Image.LANCZOS)
+                if suffix in ('_960w', '_480w'):
+                    copy = copy.filter(_IF2.UnsharpMask(radius=0.8, percent=150, threshold=3))
             copy.save(rp, 'WEBP', quality=92)
 
 print('OK')
