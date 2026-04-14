@@ -4872,6 +4872,40 @@ def _render_project_page(p):
         'construction': 'Construction',
     }
     _SECTION_ORDER = ['project', 'render', 'before', 'construction', '']
+
+    # ── Sort gallery by type so section labels always land at the correct boundary ──
+    # Without this, Wix source order puts images of mixed types between labels,
+    # making project photos appear visually inside the Renders or Construction block.
+    def _type_sort_key(gitem):
+        _gh = gitem[0] if isinstance(gitem, (list, tuple)) else gitem
+        _t  = _gallery_types.get(_gh, '')
+        try:    return _SECTION_ORDER.index(_t)
+        except ValueError: return len(_SECTION_ORDER)
+    gallery = sorted(gallery, key=_type_sort_key)
+
+    # ── Build filter tab bar — only when multiple named types are present ──
+    _TAB_LABELS = {
+        'project':      'Project Photos',
+        'render':       'Renders',
+        'before':       'Before',
+        'construction': 'Construction',
+    }
+    _types_present = []
+    for _gi in gallery:
+        _gh2 = _gi[0] if isinstance(_gi, (list, tuple)) else _gi
+        _t2  = _gallery_types.get(_gh2, '')
+        if _t2 not in _types_present:
+            _types_present.append(_t2)
+    filter_tabs_html = ''
+    if len([_t for _t in _types_present if _t]) > 1:
+        _tabs = '      <div class="gallery-filters">\n'
+        _tabs += '        <button class="gallery-filter-btn gallery-filter-btn--active" data-filter="all">All</button>\n'
+        for _t3 in _SECTION_ORDER:
+            if _t3 and _t3 in _types_present:
+                _tabs += f'        <button class="gallery-filter-btn" data-filter="{_t3}">{_TAB_LABELS.get(_t3, _t3.title())}</button>\n'
+        _tabs += '      </div>\n'
+        filter_tabs_html = _tabs
+
     _seen_sections = set()  # labels already inserted — each type gets at most one label
 
     gallery_items = ''
@@ -4881,11 +4915,11 @@ def _render_project_page(p):
         itype = _gallery_types.get(gh, '')
         card_id = f'{slug}-gal-{gh}'
 
-        # Inject section divider on first occurrence of each labelled type.
-        # Using a seen-set (not last-seen comparison) guarantees no duplicate labels
-        # even when gallery images are not in perfectly contiguous type order.
+        # Inject section divider on first occurrence of each type.
+        # Because gallery is now sorted by type, these labels always land at the
+        # correct group boundary — no image can appear in the wrong visual section.
         if itype in _SECTION_LABELS and itype not in _seen_sections:
-            gallery_items += f'      <div class="gallery-section-label">{_SECTION_LABELS[itype]}</div>\n'
+            gallery_items += f'      <div class="gallery-section-label" data-label-type="{itype}">{_SECTION_LABELS[itype]}</div>\n'
             _seen_sections.add(itype)
 
         # Thumbnail: use _480w variant for fast grid loading; data-src keeps full-res for lightbox.
@@ -5000,7 +5034,7 @@ def _render_project_page(p):
   <section class="project-gallery">
     <div class="container">
       <p class="project-gallery__label">Project Gallery</p>
-      <div class="gallery-masonry">
+{filter_tabs_html}      <div class="gallery-masonry">
 {gallery_items}      </div>
     </div>
   </section>
