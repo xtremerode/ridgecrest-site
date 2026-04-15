@@ -1098,9 +1098,10 @@
       }
       populatePageSelect(pages);
       buildTree(pages);
-      // Do NOT auto-load any page on entry — show the tree, let user select.
-      // Auto-loading was confusing (loaded portfolio or home unexpectedly).
-      sessionStorage.removeItem('rd_last_slug');
+      // Restore last-edited page on refresh. Only fires if the user already
+      // loaded a page in this tab — fresh navigation has no saved slug.
+      const _savedSlug = sessionStorage.getItem('rd_last_slug');
+      if (_savedSlug) loadPage(_savedSlug);
     } catch(e) {
       editStatus.textContent = 'Error loading pages';
       document.getElementById('pageTree').innerHTML =
