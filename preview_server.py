@@ -4899,17 +4899,27 @@ def _render_project_page(p):
 
         # Thumbnail: use _480w variant for fast grid loading; data-src keeps full-res for lightbox.
         # srcset serves _960w for retina/larger viewports. Falls back to full-res if _480w missing.
+        # Renders use _960w as src (not _480w) — renders have limited source resolution and look
+        # blurry at the 1.19× downscale that _480w produces at a ~402px column. _960w gives 2.39×
+        # downscale which is sharp. sizes="960px" forces browser to always pick the 960w srcset entry.
         base_src  = src  # full-res — stays in data-src for lightbox
         thumb_480 = src.replace('.webp', '_480w.webp')
         thumb_960 = src.replace('.webp', '_960w.webp')
         thumb_480_path = os.path.join(_OPT_DIR, os.path.basename(thumb_480))
         thumb_960_path = os.path.join(_OPT_DIR, os.path.basename(thumb_960))
-        img_src   = thumb_480 if os.path.isfile(thumb_480_path) else base_src
+        if itype == 'render':
+            img_src = thumb_960 if os.path.isfile(thumb_960_path) else base_src
+        else:
+            img_src = thumb_480 if os.path.isfile(thumb_480_path) else base_src
         srcset_parts = []
         if os.path.isfile(thumb_480_path): srcset_parts.append(f'{thumb_480} 480w')
         if os.path.isfile(thumb_960_path): srcset_parts.append(f'{thumb_960} 960w')
         srcset_parts.append(f'{base_src} 2000w')
-        srcset_attr = f' srcset="{", ".join(srcset_parts)}" sizes="(max-width:480px) 100vw, (max-width:767px) calc(50vw - 6px), calc(33vw - 8px)"'
+        if itype == 'render':
+            sizes_val = '(max-width:480px) 100vw, (max-width:767px) calc(50vw - 6px), 960px'
+        else:
+            sizes_val = '(max-width:480px) 100vw, (max-width:767px) calc(50vw - 6px), calc(33vw - 8px)'
+        srcset_attr = f' srcset="{", ".join(srcset_parts)}" sizes="{sizes_val}"'
         # Use _480w dims for width/height so browser reserves the correct space
         thumb_basename = os.path.basename(img_src)
         dims = _IMG_DIMS.get(thumb_basename) or _IMG_DIMS.get(os.path.basename(base_src))
