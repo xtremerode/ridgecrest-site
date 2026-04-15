@@ -867,10 +867,12 @@ _CARD_APPLY_SCRIPT = """\
       if (!el) return;
       if (c.mode === 'image' && c.image) {
         if (el.hasAttribute('data-src')) {
-          // Gallery item — only update if different (preserves lazy-load for unchanged items)
+          // Gallery item — update thumbnail img.src if DB image differs from current src.
+          // Compare pathnames only (img.src is absolute, c.image is relative).
+          // data-src is the lightbox full-res source — never overwrite it here.
           var img = el.querySelector('img');
-          if (img && img.src.split('?')[0] !== c.image.split('?')[0]) {
-            el.setAttribute('data-src', c.image);
+          var imgPath = img ? img.src.replace(/^https?:\/\/[^\/]+/, '') : '';
+          if (img && imgPath.split('?')[0] !== c.image.split('?')[0]) {
             img.src = c.image;
           }
         } else {
