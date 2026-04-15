@@ -2371,6 +2371,27 @@
     }
 
     frameLoading.classList.add('hidden');
+
+    // ── Sync currentSlug when iframe navigates internally (e.g. footer links) ─
+    // Without this, currentSlug stays stale after footer navigation, causing
+    // toggleEditOverlay() to inject the overlay with the wrong slug — which
+    // makes edits silently save to the original page instead of the visible one.
+    try {
+      const iframePath = siteFrame.contentWindow?.location?.pathname || '';
+      if (iframePath) {
+        const rawSlug = iframePath
+          .replace(/^.*\/view\//, '')
+          .replace(/\.html.*$/, '')
+          .replace(/^index$/, 'home');
+        // /view/ (root index) produces empty string → treat as 'home'
+        const newSlug = rawSlug || (iframePath.includes('/view/') ? 'home' : currentSlug);
+        if (newSlug && newSlug !== currentSlug) {
+          currentSlug = newSlug;
+          syncTreeActive(currentSlug);
+        }
+      }
+    } catch(e) {}
+
     if (editMode) {
       // Re-inject overlays after any iframe reload (e.g. after undo)
       _resetTextEditState();
