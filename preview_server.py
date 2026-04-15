@@ -61,88 +61,6 @@ def _load_img_dims():
 
 _load_img_dims()
 
-
-# ── Guardrail: shared dims helper + startup self-heal ─────────────────────────
-
-def _measure_and_cache_dims(*filenames):
-    """Measure image files and update the in-memory cache + img_dims.json on disk.
-    Accepts basenames or full paths. Missing or already-cached files are silently skipped.
-    Called after any image write so dims never fall out of sync with files on disk."""
-    opt_dir   = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
-    dims_file = os.path.join(PREVIEW_DIR, 'assets', 'img_dims.json')
-    updated   = []
-    try:
-        from PIL import Image as _PILDim
-    except ImportError:
-        return
-    for fname in filenames:
-        basename = os.path.basename(fname)
-        if basename in _IMG_DIMS:
-            continue
-        path = fname if os.path.isabs(fname) else os.path.join(opt_dir, basename)
-        if not os.path.isfile(path):
-            continue
-        try:
-            with _PILDim.open(path) as img:
-                _IMG_DIMS[basename] = img.size
-                updated.append(basename)
-        except Exception:
-            pass
-    if updated:
-        try:
-            existing = {}
-            if os.path.isfile(dims_file):
-                with open(dims_file) as f:
-                    existing = json.load(f)
-            for k in updated:
-                existing[k] = list(_IMG_DIMS[k])
-            with open(dims_file, 'w') as f:
-                json.dump(existing, f, indent=2, sort_keys=True)
-        except Exception:
-            pass
-
-
-def _startup_dims_heal():
-    """Guardrail 1 — startup self-heal: scan images-opt/ for any .webp not in _IMG_DIMS.
-    Measures and caches them so the server always starts with complete dimension data.
-    Prevents gallery layout errors caused by images added after the last full rebuild."""
-    opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
-    if not os.path.isdir(opt_dir):
-        return
-    missing = [f for f in os.listdir(opt_dir) if f.endswith('.webp') and f not in _IMG_DIMS]
-    if missing:
-        print(f'[dims] Healing {len(missing)} missing dimension(s) at startup...')
-        _measure_and_cache_dims(*[os.path.join(opt_dir, f) for f in missing])
-        print(f'[dims] Startup heal complete — {len(_IMG_DIMS)} total entries')
-
-_startup_dims_heal()
-
-
-def _gallery_integrity_check():
-    """Guardrail 4 — integrity check: report the state of image variants and dimension coverage.
-    Returns a dict; 'clean' is True only when zero images are missing dims or _480w variants."""
-    opt_dir  = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
-    if not os.path.isdir(opt_dir):
-        return {'error': 'images-opt directory not found'}
-    all_webp  = [f for f in os.listdir(opt_dir) if f.endswith('.webp')]
-    all_set   = set(all_webp)
-    missing_dims = [f for f in all_webp if f not in _IMG_DIMS]
-    base_only = [f for f in all_webp
-                 if not any(s in f for s in ('_480w','_960w','_1920w','_201w'))]
-    base_missing_480 = [b for b in base_only
-                        if b.replace('.webp','_480w.webp') not in all_set]
-    return {
-        'total_webp':        len(all_webp),
-        'dims_cached':       len(_IMG_DIMS),
-        'missing_dims':      len(missing_dims),
-        'missing_dims_list': missing_dims[:20],
-        'base_files':        len(base_only),
-        'files_480w':        len([f for f in all_webp if '_480w' in f]),
-        'base_missing_480w': len(base_missing_480),
-        'base_missing_480w_list': base_missing_480[:20],
-        'clean': len(missing_dims) == 0 and len(base_missing_480) == 0,
-    }
-
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32))
 
@@ -2921,8 +2839,6 @@ def _to_webp(src_path: str, quality: int = 92) -> str:
             webp_path = os.path.splitext(src_path)[0] + '.webp'
             img.save(webp_path, 'WEBP', quality=quality, method=4)
         os.remove(src_path)
-        # Guardrail 2: cache dims immediately so _render_project_page has them
-        _measure_and_cache_dims(webp_path)
         return webp_path
     except Exception as e:
         print(f'[webp] conversion failed for {src_path}: {e}')
@@ -4956,40 +4872,6 @@ def _render_project_page(p):
         'construction': 'Construction',
     }
     _SECTION_ORDER = ['project', 'render', 'before', 'construction', '']
-
-    # ── Sort gallery by type so section labels always land at the correct boundary ──
-    # Without this, Wix source order puts images of mixed types between labels,
-    # making project photos appear visually inside the Renders or Construction block.
-    def _type_sort_key(gitem):
-        _gh = gitem[0] if isinstance(gitem, (list, tuple)) else gitem
-        _t  = _gallery_types.get(_gh, '')
-        try:    return _SECTION_ORDER.index(_t)
-        except ValueError: return len(_SECTION_ORDER)
-    gallery = sorted(gallery, key=_type_sort_key)
-
-    # ── Build filter tab bar — only when multiple named types are present ──
-    _TAB_LABELS = {
-        'project':      'Project Photos',
-        'render':       'Renders',
-        'before':       'Before',
-        'construction': 'Construction',
-    }
-    _types_present = []
-    for _gi in gallery:
-        _gh2 = _gi[0] if isinstance(_gi, (list, tuple)) else _gi
-        _t2  = _gallery_types.get(_gh2, '')
-        if _t2 not in _types_present:
-            _types_present.append(_t2)
-    filter_tabs_html = ''
-    if len([_t for _t in _types_present if _t]) > 1:
-        _tabs = '      <div class="gallery-filters">\n'
-        _tabs += '        <button class="gallery-filter-btn gallery-filter-btn--active" data-filter="all">All</button>\n'
-        for _t3 in _SECTION_ORDER:
-            if _t3 and _t3 in _types_present:
-                _tabs += f'        <button class="gallery-filter-btn" data-filter="{_t3}">{_TAB_LABELS.get(_t3, _t3.title())}</button>\n'
-        _tabs += '      </div>\n'
-        filter_tabs_html = _tabs
-
     _seen_sections = set()  # labels already inserted — each type gets at most one label
 
     gallery_items = ''
@@ -4999,11 +4881,11 @@ def _render_project_page(p):
         itype = _gallery_types.get(gh, '')
         card_id = f'{slug}-gal-{gh}'
 
-        # Inject section divider on first occurrence of each type.
-        # Because gallery is now sorted by type, these labels always land at the
-        # correct group boundary — no image can appear in the wrong visual section.
+        # Inject section divider on first occurrence of each labelled type.
+        # Using a seen-set (not last-seen comparison) guarantees no duplicate labels
+        # even when gallery images are not in perfectly contiguous type order.
         if itype in _SECTION_LABELS and itype not in _seen_sections:
-            gallery_items += f'      <div class="gallery-section-label" data-label-type="{itype}">{_SECTION_LABELS[itype]}</div>\n'
+            gallery_items += f'      <div class="gallery-section-label">{_SECTION_LABELS[itype]}</div>\n'
             _seen_sections.add(itype)
 
         # Thumbnail: use _480w variant for fast grid loading; data-src keeps full-res for lightbox.
@@ -5022,13 +4904,6 @@ def _render_project_page(p):
         # Use _480w dims for width/height so browser reserves the correct space
         thumb_basename = os.path.basename(img_src)
         dims = _IMG_DIMS.get(thumb_basename) or _IMG_DIMS.get(os.path.basename(base_src))
-        if not dims:
-            # Guardrail 3 — live fallback: measure now, cache for future renders
-            _measure_and_cache_dims(
-                os.path.join(_OPT_DIR, thumb_basename),
-                os.path.join(_OPT_DIR, os.path.basename(base_src)),
-            )
-            dims = _IMG_DIMS.get(thumb_basename) or _IMG_DIMS.get(os.path.basename(base_src))
         dim_attrs = f' width="{dims[0]}" height="{dims[1]}"' if dims else ''
         gallery_items += (
             f'      <div class="gallery-item" data-card-id="{card_id}" data-src="{base_src}"'
@@ -5125,7 +5000,7 @@ def _render_project_page(p):
   <section class="project-gallery">
     <div class="container">
       <p class="project-gallery__label">Project Gallery</p>
-{filter_tabs_html}      <div class="gallery-masonry">
+      <div class="gallery-masonry">
 {gallery_items}      </div>
     </div>
   </section>
@@ -7100,7 +6975,6 @@ img_result = Image.open(io.BytesIO(result_bytes)).convert('RGB')
 img_result.save(out_path, 'WEBP', quality=92)
 
 # Generate responsive sizes
-from PIL import ImageFilter as _IF
 sizes = [('_1920w', 1920), ('_960w', 960), ('_480w', 480), ('_201w', 201)]
 base_out = out_path[:-5]  # strip .webp
 for suffix, w in sizes:
@@ -7108,9 +6982,6 @@ for suffix, w in sizes:
         ratio = w / img_result.width
         h = int(img_result.height * ratio)
         resized = img_result.resize((w, h), Image.LANCZOS)
-        # Post-resize sharpening for display sizes: compensates for LANCZOS softness
-        if suffix in ('_960w', '_480w'):
-            resized = resized.filter(_IF.UnsharpMask(radius=0.8, percent=150, threshold=3))
     else:
         resized = img_result
     resized.save(base_out + suffix + '.webp', 'WEBP', quality=92)
@@ -7165,13 +7036,6 @@ print('OK:' + out_path)
         finally:
             conn2.close()
 
-    # Guardrail 2: cache dims for all variants generated by the subprocess
-    _opt = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
-    _ai_stem = out_filename[:-5]  # strip .webp
-    _measure_and_cache_dims(*[
-        os.path.join(_opt, f'{_ai_stem}{s}.webp')
-        for s in ('', '_1920w', '_960w', '_480w', '_201w')
-    ])
     hero_path = f'/assets/images-opt/{out_filename}'
     return jsonify({'ok': True, 'filename': out_filename, 'hero_path': hero_path})
 
@@ -7728,16 +7592,12 @@ with Image.open(src_path) as img:
     img.save(out_path, 'WEBP', quality=92)
 
     # Responsive variants: update existing ones (in-place) or create all (new version)
-    from PIL import ImageFilter as _IF2
     base_stem = out_path[:-5]
     for suffix, w in [('_1920w',1920),('_960w',960),('_480w',480),('_201w',201)]:
         rp = base_stem + suffix + '.webp'
         if create_version or os.path.isfile(rp):
             copy = img.copy()
-            if copy.width > w:
-                copy = copy.resize((w, int(copy.height*w/copy.width)), Image.LANCZOS)
-                if suffix in ('_960w', '_480w'):
-                    copy = copy.filter(_IF2.UnsharpMask(radius=0.8, percent=150, threshold=3))
+            if copy.width > w: copy = copy.resize((w, int(copy.height*w/copy.width)), Image.LANCZOS)
             copy.save(rp, 'WEBP', quality=92)
 
 print('OK')
@@ -7750,13 +7610,6 @@ print('OK')
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-    # Guardrail 2: cache dims for all variants the subprocess may have written
-    _adj_opt  = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
-    _adj_stem = out_filename[:-5]
-    _measure_and_cache_dims(*[
-        os.path.join(_adj_opt, f'{_adj_stem}{s}.webp')
-        for s in ('', '_1920w', '_960w', '_480w', '_201w')
-    ])
     resp = {'ok': True, 'filename': out_filename}
     if create_version:
         resp['hero_path'] = f'/assets/images-opt/{out_filename}'
@@ -9699,15 +9552,6 @@ def gallery_rerender_all():
             errors.append({'slug': p['slug'], 'error': str(e)})
     return jsonify({'ok': True, 'rendered': rendered, 'errors': errors})
 
-
-@app.route('/admin/api/gallery/integrity-check', methods=['GET'])
-def gallery_integrity_check_api():
-    """Guardrail 4 — integrity check endpoint. Returns state of image dims and variant coverage."""
-    err = _require_admin()
-    if err: return err
-    return jsonify(_gallery_integrity_check())
-
-
 # ── Gallery image type tagging + auto-sort ────────────────────────────────────
 
 @app.route('/admin/api/gallery/<slug>/tag', methods=['POST'])
@@ -9861,12 +9705,6 @@ def gallery_add_image(slug):
         conn.commit()
         conn.close()
         p['gallery'] = gallery
-        # Guardrail 2: cache dims for the uploaded file and its variants before rendering
-        _up_opt = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
-        _measure_and_cache_dims(*[
-            os.path.join(_up_opt, f'{final_base}{s}.webp')
-            for s in ('', '_480w', '_960w', '_1920w', '_201w')
-        ])
         _render_project_page(p)
         return jsonify({'ok': True, 'filename': final_base, 'gallery_count': len(gallery)})
     except Exception as e:
