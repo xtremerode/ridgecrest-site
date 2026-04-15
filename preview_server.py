@@ -353,11 +353,23 @@ def _snapshot_page(cur, slug):
         "SELECT section_id, device, height_px FROM page_sections WHERE slug = %s AND height_px IS NOT NULL",
         (slug,))
     sections = [dict(r) for r in cur.fetchall()]
-    # Card settings
+    # Card settings (active versions resolved — same logic as _get_card_settings)
     cur.execute(
         "SELECT card_id, mode, color, image, position, zoom FROM card_settings WHERE page_slug = %s",
         (slug,))
     cards = [dict(r) for r in cur.fetchall()]
+    _snap_basenames = []
+    for _sc in cards:
+        if _sc.get('mode') == 'image' and _sc.get('image'):
+            _sfname = _sc['image'].split('?')[0].split('/')[-1]
+            _sbase = re.sub(r'_ai_\d+\.webp$', '.webp', _sfname)
+            if _sbase.endswith('.webp'):
+                _snap_basenames.append(_sbase)
+    if _snap_basenames:
+        _snap_av_map = _resolve_active_versions_batch(_snap_basenames, cur)
+        for _sc in cards:
+            if _sc.get('mode') == 'image' and _sc.get('image'):
+                _sc['image'] = _active_path_for(_sc['image'], _snap_av_map)
     # Hero overrides per device
     cur.execute(
         "SELECT device, hero_position, hero_zoom, hero_text_x, hero_text_y FROM page_hero_overrides WHERE slug = %s",

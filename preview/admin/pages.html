@@ -1989,6 +1989,8 @@
     editStatus.textContent = 'Publishing…';
     editStatus.className = 'edit-status';
     try {
+      // Flush any pending unsaved hero edits before the snapshot runs
+      if (editMode && _heroTouched) await saveNow();
       const res = await API('/admin/api/pages/publish', { method: 'POST', body: JSON.stringify({ all: true }) });
       if (res && res.ok) {
         publishBtnText.textContent = `Published ✓ (${res.count})`;
