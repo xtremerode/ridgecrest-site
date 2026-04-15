@@ -4872,6 +4872,15 @@ def _render_project_page(p):
         'construction': 'Construction',
     }
     _SECTION_ORDER = ['project', 'render', 'before', 'construction', '']
+
+    # ── Sort gallery by type so section labels always land at the correct boundary ──
+    def _type_sort_key(gitem):
+        _gh = gitem[0] if isinstance(gitem, (list, tuple)) else gitem
+        _t  = _gallery_types.get(_gh, '')
+        try:    return _SECTION_ORDER.index(_t)
+        except ValueError: return len(_SECTION_ORDER)
+    gallery = sorted(gallery, key=_type_sort_key)
+
     _seen_sections = set()  # labels already inserted — each type gets at most one label
 
     gallery_items = ''
