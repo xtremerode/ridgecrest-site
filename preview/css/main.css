@@ -1367,9 +1367,50 @@ p { line-height: 1.8; }
   .portfolio-item:nth-child(1), .portfolio-item:nth-child(4) { grid-column: span 1; aspect-ratio: 4/3; }
   .process-strip__steps { flex-direction: column; align-items: center; }
   .step__line { width: 1px; height: 30px; margin-top: 0; margin-left: 22px; }
+  /* ── Footer mobile layout ── */
   .footer__inner { grid-template-columns: 1fr; gap: var(--space-md); }
-  .footer__nav { flex-wrap: wrap; gap: 1.5rem 1rem; }
-  .footer__col { flex: 0 0 calc(50% - 0.5rem); }
+  .footer__brand { text-align: left; margin-bottom: 0.5rem; }
+
+  /* Company + Services side by side, Service Areas + Connect full width below */
+  .footer__nav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem 1rem;
+  }
+
+  /* Service Areas (3rd column): inline flowing list with pipe separators */
+  .footer__col:nth-child(3) {
+    grid-column: 1 / -1;
+    flex: none;
+    display: block;
+  }
+  .footer__col:nth-child(3) .footer__col-head { margin-bottom: 0.6rem; display: block; }
+  .footer__col:nth-child(3) a {
+    display: inline;
+    font-size: 0.82rem;
+    line-height: 2;
+  }
+  .footer__col:nth-child(3) a::after {
+    content: " | ";
+    color: rgba(255,255,255,0.2);
+    font-size: 0.75rem;
+  }
+  .footer__col:nth-child(3) a:last-child::after {
+    content: "";
+  }
+
+  /* Connect (4th column): full width */
+  .footer__col:nth-child(4) {
+    grid-column: 1 / -1;
+    flex: none;
+  }
+  /* Social links (external) inline */
+  .footer__col:nth-child(4) a[target="_blank"] {
+    display: inline-block;
+    margin-right: 0.8rem;
+  }
+
+  .footer__col { flex: 1; }
   .footer__col-head { font-size: 0.68rem; }
   .footer__col a { font-size: 0.85rem; }
   .footer__bottom .container { flex-direction: column; align-items: flex-start; gap: 0.4rem; }
