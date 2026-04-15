@@ -12,10 +12,20 @@
 
   let current = 0;
 
-  /* Return only gallery items that are currently visible */
+  /* Return visible gallery items sorted by visual grid position.
+     gallery.js sets inline style.gridColumn (e.g. "2") and style.gridRow
+     (e.g. "14 / span 6") — parseInt of each gives the real masonry position. */
   function visibleItems() {
-    return Array.from(document.querySelectorAll('.gallery-item[data-src]'))
+    const els = Array.from(document.querySelectorAll('.gallery-item[data-src]'))
       .filter(el => el.style.display !== 'none' && !el._hidden);
+    els.sort((a, b) => {
+      const rowA = parseInt(a.style.gridRow)    || 0;
+      const rowB = parseInt(b.style.gridRow)    || 0;
+      const colA = parseInt(a.style.gridColumn) || 0;
+      const colB = parseInt(b.style.gridColumn) || 0;
+      return rowA !== rowB ? rowA - rowB : colA - colB;
+    });
+    return els;
   }
 
   function open(idx) {
@@ -37,14 +47,21 @@
   function prev() { open(current - 1); }
   function next() { open(current + 1); }
 
-  /* delegate click — works after JS repositioning */
+  /* Click handler: read data-src directly from the clicked element — correct image
+     opens regardless of DOM vs visual order. Index into sorted list sets current
+     so prev/next navigation continues from the right position. */
   document.addEventListener('click', e => {
     const item = e.target.closest('.gallery-item[data-src]');
     if (!item || item._hidden || item.style.display === 'none') return;
     if (e.target.classList.contains('gallery-resize-h') ||
         e.target.classList.contains('gallery-resize-v')) return;
-    const idx = visibleItems().indexOf(item);
-    if (idx >= 0) open(idx);
+    const items = visibleItems();
+    const idx = items.indexOf(item);
+    current = idx >= 0 ? idx : 0;
+    lbImg.src = item.dataset.src;
+    lbCounter.textContent = `${current + 1} / ${items.length}`;
+    lb.classList.add('active');
+    document.body.style.overflow = 'hidden';
   });
 
   lbClose.addEventListener('click', close);
