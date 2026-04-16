@@ -962,6 +962,10 @@ _CARD_APPLY_SCRIPT = """\
 
 # ── Card edit overlay (admin_edit=1 mode) ────────────────────────────────────
 _CARD_EDIT_OVERLAY_TPL = """\
+<style id="rd-card-edit-pseudo-suppress">
+  [data-card-id].rd-card--color-mode::before,
+  [data-card-id].rd-card--color-mode::after {{ display: none !important; }}
+</style>
 <script id="rd-card-edit-overlay">
 (function(){{
   'use strict';
@@ -1037,12 +1041,14 @@ _CARD_EDIT_OVERLAY_TPL = """\
       el.style.backgroundSize = z > 1.001 ? Math.round(z*100) + '%' : 'cover';
       el.style.backgroundPosition = state.position || '50% 50%';
       el.classList.add('rd-card--image-mode');
+      el.classList.remove('rd-card--color-mode');
     }} else {{
       el.style.backgroundImage = '';
       el.style.backgroundSize = '';
       el.style.backgroundPosition = '';
       el.style.background = state.color || '#1C1C1C';
       el.classList.remove('rd-card--image-mode');
+      el.classList.add('rd-card--color-mode');
     }}
   }}
 
