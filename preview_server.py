@@ -5329,6 +5329,25 @@ def admin_save_seo():
 
 # ── Blog public routes ────────────────────────────────────────────────────────
 
+def _blog_head_extras(head_html):
+    """Inject __RD_LOGO_URL and favicon into blog <head> so main.js
+    renders the logo and nav behaves identically to static pages."""
+    _logo_svg = os.path.join(PREVIEW_DIR, "assets", "images", "logo.svg")
+    _logo_png = os.path.join(PREVIEW_DIR, "assets", "images", "logo.png")
+    if os.path.isfile(_logo_svg):
+        _logo_url = "/assets/images/logo.svg"
+    elif os.path.isfile(_logo_png):
+        _logo_url = "/assets/images/logo.png"
+    else:
+        _logo_url = None
+    inject = f"<script>window.__RD_LOGO_URL={_safe_js(_logo_url)};</script>"
+    inject += '\n  <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">'
+    inject += '\n  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">'
+    if "</head>" in head_html:
+        return head_html.replace("</head>", inject + "\n</head>", 1)
+    return inject + head_html
+
+
 _BLOG_NAV = '''<nav class="nav" id="nav">
     <a class="nav__logo" href="/view/index.html">RIDGECREST DESIGNS</a>
     <button aria-label="Menu" class="nav__toggle" id="navToggle">
@@ -5495,6 +5514,7 @@ def blog_index():
         og_type='website',
         schema=f'<script type="application/ld+json">{schema}</script>'
     )
+    head = _blog_head_extras(head)
 
     cat_links = '<a href="/blog" class="blog-cat-pill{}"  >All</a>'.format(
         ' blog-cat-pill--active' if not request.args.get('cat') else ''
@@ -5606,6 +5626,7 @@ def blog_post(slug):
         og_type='article',
         schema=f'<script type="application/ld+json">{schema}</script>'
     )
+    head = _blog_head_extras(head)
 
     related_html = ''
     if related:
