@@ -795,6 +795,99 @@ def _safe_js(value) -> str:
 
 _SECTION_HEIGHT_SKIP = {'footer'}  # footer uses auto height — never override with px
 
+# Classes that should never get data-rd-section injected.
+_SECTION_SKIP_FOR_ID = {'footer'}
+# Classes where we ALWAYS append a positional counter even on first occurrence,
+# because multiple identical first-classes appear on the same page.
+# 'cta' intentionally excluded — most pages have one CTA section, so 'cta'
+# as a bare ID is backward-compatible with old DB entries.
+_SECTION_ALWAYS_COUNTER = {'section'}
+
+def _strip_hero_card_ids(content: bytes) -> bytes:
+    """Remove data-card-id from .page-hero--service divs so the hero overlay
+    system (editables array) claims them instead of the card system.
+    This is the architectural fix for the dual-system conflict: one attribute =
+    one system. Card overlay → data-card-id elements only. Hero overlay →
+    page-hero--service divs (no data-card-id needed or wanted).
+    """
+    try:
+        s = content.decode('utf-8', errors='replace')
+
+        def _remove_card_id_from_hero(m):
+            tag = m.group(0)
+            if 'page-hero--service' not in tag:
+                return tag
+            return re.sub(r'\s+data-card-id="[^"]*"', '', tag)
+
+        s = re.sub(r'<div\b[^>]*>', _remove_card_id_from_hero, s)
+        return s.encode('utf-8')
+    except Exception:
+        return content
+
+
+def _inject_auto_section_ids(html: str) -> str:
+    """Inject data-rd-section on <section> elements and hero <div>s that lack them.
+    Algorithm mirrors the JS _seenIds counter so IDs are consistent between server
+    and browser, enabling height persistence on reload for all pages.
+    - Unique-first-class sections (hero, diff, intro, …): use class as-is (backward compat).
+    - Generic/repeated classes (section, cta): always append counter (section-1, cta-1).
+    - Explicitly-tagged elements: left unchanged."""
+    seen_ids: dict = {}
+
+    def _compute_id(first_class: str) -> str:
+        seen_ids[first_class] = seen_ids.get(first_class, 0) + 1
+        count = seen_ids[first_class]
+        # Always use counter for generic classes; for unique classes use class as-is on first occurrence
+        if first_class in _SECTION_ALWAYS_COUNTER or count > 1:
+            return first_class + '-' + str(count)
+        return first_class
+
+    def _replace_section(m: re.Match) -> str:
+        tag = m.group(0)
+        # Skip if already has data-rd-section
+        if 'data-rd-section=' in tag:
+            return tag
+        # Get first CSS class
+        cls_m = re.search(r'\bclass="([^"]*)"', tag)
+        if not cls_m:
+            return tag
+        first_cls = cls_m.group(1).strip().split()[0] if cls_m.group(1).strip() else ''
+        if not first_cls or first_cls in _SECTION_SKIP_FOR_ID:
+            return tag
+        auto_id = _compute_id(first_cls)
+        # Insert data-rd-section before the closing >
+        return tag[:-1] + f' data-rd-section="{auto_id}">'
+
+    # Inject on <section ...> tags
+    html = re.sub(r'<section\b[^>]*>', _replace_section, html)
+
+    # Inject data-rd-section="page-hero" on .page-hero--service divs
+    def _replace_page_hero(m: re.Match) -> str:
+        tag = m.group(0)
+        if 'data-rd-section=' in tag:
+            return tag
+        return tag[:-1] + ' data-rd-section="page-hero">'
+
+    html = re.sub(
+        r'<div\b[^>]*\bclass="[^"]*\bpage-hero--service\b[^"]*"[^>]*>',
+        _replace_page_hero, html
+    )
+
+    # Inject data-rd-section="project-hero" on .project-hero divs
+    def _replace_project_hero(m: re.Match) -> str:
+        tag = m.group(0)
+        if 'data-rd-section=' in tag:
+            return tag
+        return tag[:-1] + ' data-rd-section="project-hero">'
+
+    html = re.sub(
+        r'<div\b[^>]*\bclass="[^"]*\bproject-hero\b[^"]*"[^>]*>',
+        _replace_project_hero, html
+    )
+
+    return html
+
+
 def _apply_section_heights(content: bytes, slug: str, device: str, preloaded_rows=None) -> bytes:
     """Inject inline height styles on <section> elements based on DB overrides.
     Skips hero and footer sections — their heights are controlled by CSS (100vh / auto).
@@ -2822,22 +2915,34 @@ _SECTION_RESIZE_TPL = """\
   }}
 
   // Footer uses auto height and should never be pixel-overridden.
-  // Generic 'section' first-class is skipped as a safety net — sections that
-  // need handles must use data-rd-section or a unique semantic first class.
-  var SKIP_SECTIONS = {{'footer': true, 'section': true}};
+  var SKIP_SECTIONS = {{'footer': true}};
 
   function init() {{
     // Process <section> elements (home page + project pages via first-class fallback,
     // non-home sections via data-rd-section) PLUS any non-section elements that carry
     // data-rd-section (page-hero divs on inner pages, project-hero divs).
-    // Concat avoids double-processing sections that also have data-rd-section.
+    // Also auto-detect .page-hero--service and .project-hero divs that lack data-rd-section
+    // so service/city pages work without requiring manual attribute addition.
+    document.querySelectorAll('.page-hero--service:not([data-rd-section])').forEach(function(el) {{
+      el.setAttribute('data-rd-section', 'page-hero');
+    }});
+    document.querySelectorAll('.project-hero:not([data-rd-section])').forEach(function(el) {{
+      el.setAttribute('data-rd-section', 'project-hero');
+    }});
     var _sectionEls = Array.from(document.querySelectorAll('section'));
     var _divEls     = Array.from(document.querySelectorAll('[data-rd-section]:not(section)'));
+    var _seenIds    = {{}};
     _sectionEls.concat(_divEls).forEach(function(sec) {{
       // Prefer data-rd-section attribute; fall back to first CSS class.
       var cls = sec.getAttribute('data-rd-section') ||
                 (sec.className ? sec.className.trim().split(/\\s+/)[0] : '');
       if (!cls || SKIP_SECTIONS[cls]) return;
+      // For sections without an explicit data-rd-section, deduplicate repeated class names
+      // by appending a counter so each section gets a unique, stable handle ID.
+      if (!sec.getAttribute('data-rd-section')) {{
+        _seenIds[cls] = (_seenIds[cls] || 0) + 1;
+        cls = cls + '-' + _seenIds[cls];
+      }}
       if (window.getComputedStyle(sec).position === 'static') {{
         sec.style.position = 'relative';
       }}
@@ -3582,6 +3687,10 @@ def view(filename):
                 else:
                     content = txt_script + content
 
+        # Strip data-card-id from page-hero--service divs so hero overlay owns them.
+        # Must run before _apply_cards_to_html so the card script never finds these elements.
+        content = _strip_hero_card_ids(content)
+
         # Apply card settings (color/image mode per card)
         if HAS_DB:
             cards = _snap_cards if _snap_cards is not None else _get_card_settings(slug)
@@ -3617,6 +3726,16 @@ def view(filename):
             _av_script = f'<script>window.__RD_ABOUT_VISUAL_MODE={_safe_js(_av_mode)};</script>'.encode('utf-8')
             if b'</head>' in content:
                 content = content.replace(b'</head>', _av_script + b'</head>', 1)
+
+        # [AUTO-ID] Inject data-rd-section on sections/divs lacking explicit IDs
+        # so server-side height persistence works even for generic-class sections.
+        # Must run BEFORE _apply_section_heights so the injected IDs are findable.
+        try:
+            _html_str = content.decode('utf-8', errors='replace')
+            _html_str = _inject_auto_section_ids(_html_str)
+            content = _html_str.encode('utf-8')
+        except Exception:
+            pass  # never break page serving
 
         # [PX] Apply per-device section heights
         if HAS_DB:
@@ -5150,7 +5269,7 @@ def _render_project_page(p):
     </div>
   </div>
 
-  <section class="project-meta section">
+  <section class="project-meta section" data-rd-section="project-meta">
     <div class="container">
       <div class="project-description">
         {desc_paras}
@@ -5158,7 +5277,7 @@ def _render_project_page(p):
     </div>
   </section>
 
-  <section class="project-gallery">
+  <section class="project-gallery" data-rd-section="project-gallery">
     <div class="container">
       <p class="project-gallery__label">Project Gallery</p>
       <div class="gallery-masonry">
@@ -5174,7 +5293,7 @@ def _render_project_page(p):
     <span class="lightbox__counter"></span>
   </div>
 
-  <section class="cta section section--dark">
+  <section class="cta section section--dark" data-rd-section="project-cta">
     <div class="container container--narrow cta__inner">
       <h2 class="cta__headline">Start your own<br><em>extraordinary project.</em></h2>
       <p class="cta__sub">We take on a limited number of projects each year. Tell us about yours.</p>
