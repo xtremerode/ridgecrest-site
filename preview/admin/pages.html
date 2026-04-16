@@ -2135,6 +2135,21 @@
       });
     });
 
+    /* Temporarily remove href from anchors that wrap editable elements.
+       Browsers prevent reliable contenteditable focus when a parent <a href>
+       is present — removing href during edit mode fixes this without any
+       visual or layout change. Restored by __rdTextEditCleanup. */
+    var _disabledAnchors = [];
+    var _seenAnchors = new Set();
+    els.forEach(function(el) {
+      var a = el.closest('a[href]');
+      if (a && !_seenAnchors.has(a)) {
+        _seenAnchors.add(a);
+        _disabledAnchors.push({ el: a, href: a.getAttribute('href') });
+        a.removeAttribute('href');
+      }
+    });
+
     window.__rdTextEditCleanup = function(){
       var s = document.getElementById('rd-text-edit-style');
       if(s) s.remove();
@@ -2143,6 +2158,8 @@
         el.removeAttribute('contenteditable');
         el.removeAttribute('spellcheck');
       });
+      _disabledAnchors.forEach(function(item){ item.el.setAttribute('href', item.href); });
+      _disabledAnchors = [];
       window.__rdTextEditActive = false;
       window.__rdTextEdits = {};
     };
