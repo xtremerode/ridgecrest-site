@@ -3556,21 +3556,6 @@ def view(filename):
             if b'</head>' in content:
                 content = content.replace(b'</head>', _dm_script + b'</head>', 1)
 
-        # Inject about-visual panel mode for about page
-        if HAS_DB and slug == 'about':
-            try:
-                _av_conn = _db_conn()
-                _av_cur = _av_conn.cursor()
-                _av_cur.execute("SELECT value FROM system_settings WHERE key = 'about_visual_mode'")
-                _av_row = _av_cur.fetchone()
-                _av_conn.close()
-                _av_mode = _av_row['value'] if _av_row else 'one'
-            except Exception:
-                _av_mode = 'one'
-            _av_script = f'<script>window.__RD_ABOUT_VISUAL_MODE={_safe_js(_av_mode)};</script>'.encode('utf-8')
-            if b'</head>' in content:
-                content = content.replace(b'</head>', _av_script + b'</head>', 1)
-
         # [PX] Apply per-device section heights
         if HAS_DB:
             _sec_device = view_device if view_device in ("tablet", "mobile") else "desktop"
@@ -6418,37 +6403,6 @@ def admin_diff_mode():
             return jsonify({'error': 'mode must be one or two'}), 400
         cur.execute("""INSERT INTO system_settings(key, value)
                        VALUES('home_diff_mode', %s)
-                       ON CONFLICT(key) DO UPDATE SET value=%s, updated_at=now()""",
-                    (mode, mode))
-        conn.commit()
-        conn.close()
-        return jsonify({'ok': True, 'mode': mode})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/admin/api/pages/about-visual-mode', methods=['GET', 'POST'])
-def admin_about_visual_mode():
-    """Get or set the about-visual panel count (one|two) for the about page."""
-    auth = _require_admin()
-    if auth: return auth
-    conn = _db_conn()
-    if not conn:
-        return jsonify({'error': 'no db'}), 503
-    try:
-        cur = conn.cursor()
-        if request.method == 'GET':
-            cur.execute("SELECT value FROM system_settings WHERE key = 'about_visual_mode'")
-            row = cur.fetchone()
-            conn.close()
-            return jsonify({'mode': row['value'] if row else 'one'})
-        data = request.get_json(silent=True) or {}
-        mode = data.get('mode', 'one')
-        if mode not in ('one', 'two'):
-            conn.close()
-            return jsonify({'error': 'mode must be one or two'}), 400
-        cur.execute("""INSERT INTO system_settings(key, value)
-                       VALUES('about_visual_mode', %s)
                        ON CONFLICT(key) DO UPDATE SET value=%s, updated_at=now()""",
                     (mode, mode))
         conn.commit()
