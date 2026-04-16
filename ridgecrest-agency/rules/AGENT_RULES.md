@@ -115,6 +115,18 @@ Before starting any multi-file task, say exactly this:
 
 Do not begin implementation until Henry says yes.
 
+### Conflict Check (MANDATORY before writing any code)
+
+Before adding any attribute, class, or feature to an element, verify the element does not already have that capability through another mechanism. Duplicate editability causes conflicts and breaks the admin panel.
+
+**Required conflict checks:**
+- Does the element already have `data-card-id`? → Skip it. Already editable.
+- Does the element receive `__RD_HERO` background injection AND have `.hero__bg` in its class chain? → Hero controls already own it. Do NOT add `data-card-id`.
+- Does the element have any existing JS event listeners or overlay injections targeting it by class or ID? → Check the overlay scripts before adding new attributes.
+- Is there a CSS `::before` or `::after` that would cover any image set by the card system? → Note it. Adding editability is still valid but flag the visual layering to Henry.
+
+**The rule:** Only add editability to elements that have NO existing editability path. Never create two competing systems targeting the same element.
+
 ### Violation
 
-If Henry discovers you missed files he asked to be changed, you have wasted a full work session and broken trust. This rule has no exceptions, even when the scope seems obvious.
+If Henry discovers you missed files he asked to be changed, or created a conflict by duplicating editability, you have wasted a full work session and broken trust. This rule has no exceptions, even when the scope seems obvious.
