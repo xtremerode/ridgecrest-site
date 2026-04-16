@@ -210,13 +210,3 @@ document.querySelectorAll('.service-card, .step, .portfolio-card, .portfolio-ite
   vis.classList.remove('diff__visual--one', 'diff__visual--two');
   vis.classList.add('diff__visual--' + mode);
 })();
-
-// ── About visual split mode ────────────────────────────────────────────────
-// Apply the correct panel-count class from the server-injected mode variable.
-(function() {
-  var mode = window.__RD_ABOUT_VISUAL_MODE || 'one';
-  var vis = document.querySelector('.about-visual');
-  if (!vis) return;
-  vis.classList.remove('about-visual--one', 'about-visual--two');
-  vis.classList.add('about-visual--' + mode);
-})();
