@@ -89,3 +89,32 @@ On April 12, 2026, overrides.css was added with the path /css/overrides.css. The
 
 ### Violation
 If you skip any step and Henry discovers the change doesn't work, you have wasted his time and broken trust. Do not test this boundary.
+
+---
+
+## Rule 12: Full Inventory Before Touching Any Files
+
+Before making ANY change that is supposed to apply across multiple pages or files, you MUST enumerate the complete scope first. Never assume you know every file from memory or a partial audit.
+
+### Required Steps Before Starting
+
+1. **List every file in the directory** — run `ls /home/claudeuser/agent/preview/*.html` (or equivalent glob) and read the full output
+2. **Grep for the exact class/pattern being changed** — e.g. `grep -l "page-hero" *.html` to find every file containing that pattern
+3. **Read the hero/target section of EVERY matched file** — not just the ones you expect. Surprises live in the files you don't think to check.
+4. **Confirm the full list with Henry before writing a single line of code** — say "I found X pages that need this change: [list them all]." Wait for confirmation.
+
+### Why This Rule Exists
+
+On April 16, 2026, Henry asked for hero text changes across every page on the site. Claude audited only 4 pages (about, process, portfolio, contact) without listing the directory first. Pages missed: services, team, kitchen-remodels, bathroom-remodels, whole-house-remodels, custom-homes. Henry had to discover the gaps himself after the work was reported as done.
+
+### Scope Confirmation Template
+
+Before starting any multi-file task, say exactly this:
+
+> "I found [N] files that match this change. Full list: [file1, file2, ...]. Confirming before I touch anything — is this the complete scope?"
+
+Do not begin implementation until Henry says yes.
+
+### Violation
+
+If Henry discovers you missed files he asked to be changed, you have wasted a full work session and broken trust. This rule has no exceptions, even when the scope seems obvious.
