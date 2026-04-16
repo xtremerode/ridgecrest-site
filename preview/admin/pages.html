@@ -2233,6 +2233,65 @@
     vis.appendChild(pill);
   }
 
+  // Adds a "1 / 2" pill to .about-visual so the user can switch between
+  // single-image and split 50/50 modes without leaving edit mode.
+  function _setupAboutVisualToggle(iframeDoc) {
+    const vis = iframeDoc.querySelector('.about-visual');
+    if (!vis) return;
+
+    const pill = iframeDoc.createElement('div');
+    pill.setAttribute('data-rd-overlay', 'about-panel');
+    pill.style.cssText = [
+      'position:absolute',
+      'top:10px',
+      'left:50%',
+      'transform:translateX(-50%)',
+      'z-index:9992',
+      'display:flex',
+      'align-items:center',
+      'gap:6px',
+      'background:rgba(0,0,0,.78)',
+      'border:1px solid rgba(255,255,255,.2)',
+      'border-radius:20px',
+      'padding:5px 13px',
+      'cursor:pointer',
+      'white-space:nowrap',
+      'opacity:0',
+      'transition:opacity .15s',
+      'pointer-events:auto',
+      'box-shadow:0 2px 8px rgba(0,0,0,.5)',
+    ].join(';');
+
+    function _refreshPill() {
+      const isTwo = vis.classList.contains('about-visual--two');
+      pill.innerHTML =
+        '<span style="font-size:10px;font-weight:700;font-family:system-ui,sans-serif;color:#94a3b8;letter-spacing:.06em;text-transform:uppercase">Panels</span>' +
+        '<span style="font-size:12px;font-weight:700;font-family:system-ui,sans-serif;color:#fff">' + (isTwo ? '2' : '1') + '</span>' +
+        '<span style="font-size:10px;font-family:system-ui,sans-serif;color:#64748b">\u2192 ' + (isTwo ? 'merge' : 'split') + '</span>';
+    }
+    _refreshPill();
+
+    pill.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const isTwo = vis.classList.contains('about-visual--two');
+      const newMode = isTwo ? 'one' : 'two';
+      vis.classList.remove('about-visual--one', 'about-visual--two');
+      vis.classList.add('about-visual--' + newMode);
+      _refreshPill();
+      try {
+        await fetch('/admin/api/pages/about-visual-mode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Token': TOKEN },
+          body: JSON.stringify({ mode: newMode })
+        });
+      } catch(e) { console.error('about-visual-mode save failed', e); }
+    });
+
+    vis.addEventListener('mouseenter', () => { pill.style.opacity = '1'; });
+    vis.addEventListener('mouseleave', () => { pill.style.opacity = '0'; });
+    vis.appendChild(pill);
+  }
+
   // ── Edit mode toggle (no reload — inject/remove overlay in live iframe) ──
   async function toggleEditOverlay() {
     if (!currentSlug) return;
@@ -2267,6 +2326,7 @@
         _injectTextEdit(iframeDoc);
         _buildSecHandles();
         _setupDiffPanelToggle(iframeDoc);
+        _setupAboutVisualToggle(iframeDoc);
         editStatus.textContent = '';
         editStatus.className = 'edit-status ready';
         const imgs = allImages.length ? allImages : await API('/admin/api/pages/images').then(r => { allImages = r; return r; });
