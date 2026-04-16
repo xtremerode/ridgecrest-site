@@ -3546,6 +3546,21 @@ def view(filename):
             if b'</head>' in content:
                 content = content.replace(b'</head>', _dm_script + b'</head>', 1)
 
+        # Inject about-visual panel mode for about page
+        if HAS_DB and slug == 'about':
+            try:
+                _av_conn = _db_conn()
+                _av_cur = _av_conn.cursor()
+                _av_cur.execute("SELECT value FROM system_settings WHERE key = 'about_visual_mode'")
+                _av_row = _av_cur.fetchone()
+                _av_conn.close()
+                _av_mode = _av_row['value'] if _av_row else 'one'
+            except Exception:
+                _av_mode = 'one'
+            _av_script = f'<script>window.__RD_ABOUT_VISUAL_MODE={_safe_js(_av_mode)};</script>'.encode('utf-8')
+            if b'</head>' in content:
+                content = content.replace(b'</head>', _av_script + b'</head>', 1)
+
         # [PX] Apply per-device section heights
         if HAS_DB:
             _sec_device = view_device if view_device in ("tablet", "mobile") else "desktop"
