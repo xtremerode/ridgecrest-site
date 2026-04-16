@@ -6402,6 +6402,34 @@ def admin_page_update(slug):
                 conn.commit()
             except Exception:
                 pass  # not a project page — ignore
+        # Snapshot sync: if a published snapshot exists for this slug, update its
+        # hero fields so the published view stays in sync with live edits.
+        # Without this, hero saves write to pages.hero_image (staging) but the
+        # published snapshot takes priority on non-?_stage=1 loads — causing
+        # the saved image to appear to revert every time the page reloads.
+        _snap_sets = []
+        _snap_params = []
+        if hero_image is not None:
+            _snap_sets.append('hero_image = %s'); _snap_params.append(hero_image)
+        if hero_position is not None:
+            _snap_sets.append('hero_position = %s'); _snap_params.append(hero_position)
+        if hero_zoom is not None:
+            _snap_sets.append('hero_zoom = %s'); _snap_params.append(float(hero_zoom))
+        if hero_text_x is not None:
+            _snap_sets.append('hero_text_x = %s'); _snap_params.append(float(hero_text_x))
+        if hero_text_y is not None:
+            _snap_sets.append('hero_text_y = %s'); _snap_params.append(float(hero_text_y))
+        if _snap_sets:
+            try:
+                _ensure_published_snapshots_table(cur)
+                cur.execute(
+                    f"UPDATE published_snapshots SET {', '.join(_snap_sets)} WHERE slug = %s",
+                    _snap_params + [slug]
+                )
+                conn.commit()
+            except Exception:
+                pass  # snapshot table may not exist yet — silently continue
+
         return jsonify({'ok': True, 'slug': slug})
     except Exception as e:
         return jsonify({'error': str(e)}), 500

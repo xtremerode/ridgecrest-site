@@ -2419,6 +2419,23 @@
     // Don't hide the tree when iframe resets to about:blank
     if (!currentSlug) return;
 
+    // ── Enforce ?_stage=1 on all iframe loads ─────────────────────────────────
+    // loadPage() always sets ?_stage=1, but internal link clicks (nav, footer,
+    // project cards) navigate the iframe without it. Without _stage=1, the server
+    // serves the published snapshot instead of live DB data — causing hero image
+    // saves to appear to revert immediately after navigation.
+    try {
+      const iLoc = siteFrame.contentWindow && siteFrame.contentWindow.location;
+      if (iLoc && iLoc.pathname && iLoc.pathname.startsWith('/view/')) {
+        const hasStage = iLoc.search && iLoc.search.includes('_stage=1');
+        if (!hasStage) {
+          const sep = iLoc.search ? '&' : '?';
+          siteFrame.contentWindow.location.replace(iLoc.href + sep + '_stage=1');
+          return; // load event will fire again with _stage=1
+        }
+      }
+    } catch(e) {}
+
     // ── Fix viewport-height to match standard desktop (100vh → 900px) ────────
     // Without this, 100vh inside the iframe equals the iframe's declared height
     // which is taller than a real browser window, causing the hero to crop
