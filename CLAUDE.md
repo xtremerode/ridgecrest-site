@@ -408,3 +408,56 @@ This rule is self-enforcing: if Claude starts a session without reading these fi
 ```bash
 cat /home/claudeuser/agent/ridgecrest-agency/CURRENT_STATUS.md && cat /home/claudeuser/agent/ridgecrest-agency/agency_mode.txt && ls -t /home/claudeuser/agent/ridgecrest-agency/handoffs/*.md | head -3
 ```
+
+---
+
+## 24. Hero Restructure — Page Status (updated 2026-04-16)
+
+All non-project pages are being converted to left-aligned hero with "Start Your Project" button → `start-a-project.html`.
+
+### Hero HTML Pattern (secondary pages)
+```html
+<div class="page-hero page-hero--service page-hero--left">
+  <div class="page-hero__inner">
+    <p class="page-hero__eyebrow">...</p>
+    <h1 class="page-hero__title">...</h1>
+    <p class="page-hero__sub">...</p>
+    <div class="hero__actions">
+      <a class="btn btn--primary" href="start-a-project.html">Start Your Project</a>
+    </div>
+  </div>
+</div>
+```
+
+### Page Status
+| Page | Status |
+|---|---|
+| `index.html` | Original — untouched (already correct) |
+| `about.html` | Done ✓ |
+| `process.html` | Done ✓ |
+| `contact.html` | Done ✓ |
+| `portfolio.html` | Done ✓ (hero_text_x/y reset to 0 — had stale offsets from wrong-page-save bug) |
+| `services.html` | Pending — needs inner wrapper + left-align + CTA |
+| `team.html` | Pending — needs inner wrapper + left-align + CTA |
+| `kitchen-remodels.html` | Skipped — user likes existing hero/CTA structure |
+| `bathroom-remodels.html` | Skipped — user likes existing hero/CTA structure |
+| `whole-house-remodels.html` | Skipped — user likes existing hero/CTA structure |
+| `custom-homes.html` | Skipped — user likes existing hero/CTA structure |
+| All 9 project pages | Skipped — already have correct layout |
+
+### Critical Note — hero_text_x/y and New Page Targets
+`main.js` applies `__RD_HERO_TEXT_X/Y` to `.hero__content, .page-hero__inner`.
+When adding `.page-hero__inner` to any page, FIRST check the DB for stored hero_text_x/y:
+```sql
+SELECT slug, hero_text_x, hero_text_y FROM pages WHERE slug = 'your-slug';
+SELECT slug, hero_text_x, hero_text_y FROM published_snapshots WHERE slug = 'your-slug';
+```
+If non-zero, reset both to 0 before deploying the HTML change. Failure to do this will cause the content to offset off-screen.
+
+### Admin Panel Fixes Applied (2026-04-16)
+- `loadPage()` now awaits lock check synchronously — DB truth applied before user can interact
+- `saveNow()` uses `_putAPI()` wrapper — shows "Page is locked — unlock it first" on 423
+- `currentSlug` syncs with save-flush on iframe internal navigation (wrong-page-save bug fixed)
+- Publish button flushes pending saves before snapshot runs
+- Overlay drag handle targets `.hero__content, .page-hero__inner` (secondary pages now draggable after server restart)
+- All 103 page locks reset to 'development' via SQL on 2026-04-16
