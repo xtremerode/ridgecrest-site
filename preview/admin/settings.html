@@ -736,6 +736,10 @@
         document.getElementById('navScrolledOpacity').value = res.scrolled_opacity;
         navScrolledUpdatePreview(res.scrolled_opacity);
       }
+      if (res && typeof res.blur_radius === 'number') {
+        document.getElementById('navBlurRadius').value = res.blur_radius;
+        navBlurUpdatePreview(res.blur_radius);
+      }
     } catch(e) {}
   }
 
@@ -820,6 +824,54 @@
     var res = await Admin.post('/settings/nav-band', { scrolled_opacity: val });
     if (res && res.ok) {
       Admin.toast('Scrolled nav opacity updated to ' + val, 'success');
+      status.textContent = 'Saved';
+      status.style.color = 'var(--green)';
+      setTimeout(function() { status.textContent = ''; }, 3000);
+    } else {
+      Admin.toast('Failed to save: ' + (res ? res.error : 'unknown error'), 'error');
+      status.textContent = 'Error';
+      status.style.color = 'var(--red)';
+    }
+  }
+
+  // ── Blur Radius ─────────────────────────────────────────────
+  function navBlurUpdatePreview(val) {
+    var bar = document.getElementById('navBlurPreviewBar');
+    if (bar) {
+      bar.style.backdropFilter = 'blur(' + val + 'px)';
+      bar.style.webkitBackdropFilter = 'blur(' + val + 'px)';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    var inp3 = document.getElementById('navBlurRadius');
+    if (inp3) {
+      inp3.addEventListener('input', function() {
+        var val = parseFloat(this.value);
+        if (!isNaN(val) && val >= 0 && val <= 20) {
+          navBlurUpdatePreview(val);
+          document.getElementById('navBlurStatus').textContent = '';
+        } else if (this.value !== '' && this.value !== '.') {
+          document.getElementById('navBlurStatus').textContent = 'Enter a value between 0 and 20';
+          document.getElementById('navBlurStatus').style.color = 'var(--red)';
+        }
+      });
+    }
+  });
+
+  async function navBlurSave() {
+    var inp = document.getElementById('navBlurRadius');
+    var status = document.getElementById('navBlurStatus');
+    var val = parseFloat(inp.value);
+    if (isNaN(val) || val < 0 || val > 20) {
+      Admin.toast('Blur must be a number between 0 and 20', 'error');
+      return;
+    }
+    status.textContent = 'Saving...';
+    status.style.color = 'var(--text-3)';
+    var res = await Admin.post('/settings/nav-band', { blur_radius: val });
+    if (res && res.ok) {
+      Admin.toast('Backdrop blur updated to ' + val + 'px', 'success');
       status.textContent = 'Saved';
       status.style.color = 'var(--green)';
       setTimeout(function() { status.textContent = ''; }, 3000);

@@ -28,6 +28,11 @@ if (nav) {
   if (typeof _navScrolledOpacity === 'number') {
     nav.style.setProperty('--nav-scrolled-opacity', _navScrolledOpacity);
   }
+  // [PX] Apply admin-controlled blur radius (0 = off, default 8px)
+  var _navBlur = window.__RD_NAV_BLUR;
+  if (typeof _navBlur === 'number') {
+    nav.style.setProperty('--nav-blur', 'blur(' + _navBlur + 'px)');
+  }
 
   window.addEventListener('scroll', () => {
     nav.classList.toggle('nav--scrolled', window.scrollY > 60);

@@ -3610,7 +3610,20 @@ def view(filename):
                     _nav_scrolled_opacity = float(_nso_row['value'])
             except Exception:
                 pass
-        _nbo_script = f'<script>window.__RD_NAV_OPACITY={_safe_js(_nav_opacity)};window.__RD_NAV_SCROLLED_OPACITY={_safe_js(_nav_scrolled_opacity)};</script>'.encode('utf-8')
+        # [PX] Read nav blur radius
+        _nav_blur = 8  # default 8px
+        if HAS_DB:
+            try:
+                _nb_conn = _db_conn()
+                _nb_cur = _nb_conn.cursor()
+                _nb_cur.execute("SELECT value FROM system_settings WHERE key = 'nav_blur_radius'")
+                _nb_row = _nb_cur.fetchone()
+                _nb_conn.close()
+                if _nb_row:
+                    _nav_blur = float(_nb_row['value'])
+            except Exception:
+                pass
+        _nbo_script = f'<script>window.__RD_NAV_OPACITY={_safe_js(_nav_opacity)};window.__RD_NAV_SCROLLED_OPACITY={_safe_js(_nav_scrolled_opacity)};window.__RD_NAV_BLUR={_safe_js(_nav_blur)};</script>'.encode('utf-8')
         if b'</head>' in content:
             content = content.replace(b'</head>', _nbo_script + b'</head>', 1)
 
@@ -5396,7 +5409,20 @@ def _blog_head_extras(head_html):
         except Exception:
             pass
     inject = f"<script>window.__RD_LOGO_URL={_safe_js(_logo_url)};</script>"
-    inject += f"\n  <script>window.__RD_NAV_OPACITY={_safe_js(_nav_opacity)};window.__RD_NAV_SCROLLED_OPACITY={_safe_js(_nav_scrolled_opacity)};</script>"
+    # Nav blur radius
+    _nav_blur = 8  # default 8px
+    if HAS_DB:
+        try:
+            _nb_conn = _db_conn()
+            _nb_cur = _nb_conn.cursor()
+            _nb_cur.execute("SELECT value FROM system_settings WHERE key = 'nav_blur_radius'")
+            _nb_row = _nb_cur.fetchone()
+            _nb_conn.close()
+            if _nb_row:
+                _nav_blur = float(_nb_row['value'])
+        except Exception:
+            pass
+    inject += f"\n  <script>window.__RD_NAV_OPACITY={_safe_js(_nav_opacity)};window.__RD_NAV_SCROLLED_OPACITY={_safe_js(_nav_scrolled_opacity)};window.__RD_NAV_BLUR={_safe_js(_nav_blur)};</script>"
     inject += '\n  <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">'
     inject += '\n  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">'
     if "</head>" in head_html:
@@ -6506,12 +6532,13 @@ def admin_nav_band_opacity():
     try:
         cur = conn.cursor()
         if request.method == 'GET':
-            cur.execute("SELECT key, value FROM system_settings WHERE key IN ('nav_band_opacity', 'nav_scrolled_opacity')")
+            cur.execute("SELECT key, value FROM system_settings WHERE key IN ('nav_band_opacity', 'nav_scrolled_opacity', 'nav_blur_radius')")
             rows = {r['key']: r['value'] for r in cur.fetchall()}
             conn.close()
             return jsonify({
                 'opacity': float(rows.get('nav_band_opacity', '0.6')),
-                'scrolled_opacity': float(rows.get('nav_scrolled_opacity', '0.94'))
+                'scrolled_opacity': float(rows.get('nav_scrolled_opacity', '0.94')),
+                'blur_radius': float(rows.get('nav_blur_radius', '8'))
             })
         data = request.get_json(silent=True) or {}
         result = {}
@@ -6549,6 +6576,23 @@ def admin_nav_band_opacity():
                            ON CONFLICT(key) DO UPDATE SET value=%s, updated_at=now()""",
                         (val_s, val_s))
             result['scrolled_opacity'] = scrolled
+        # Handle blur radius
+        if 'blur_radius' in data:
+            raw_b = data['blur_radius']
+            try:
+                blur = float(raw_b)
+            except (ValueError, TypeError):
+                conn.close()
+                return jsonify({'error': 'blur_radius must be a number'}), 400
+            if blur < 0 or blur > 20:
+                conn.close()
+                return jsonify({'error': 'blur_radius must be between 0 and 20'}), 400
+            val_b = str(round(blur, 1))
+            cur.execute("""INSERT INTO system_settings(key, value)
+                           VALUES('nav_blur_radius', %s)
+                           ON CONFLICT(key) DO UPDATE SET value=%s, updated_at=now()""",
+                        (val_b, val_b))
+            result['blur_radius'] = blur
         conn.commit()
         conn.close()
         return jsonify({'ok': True, **result})

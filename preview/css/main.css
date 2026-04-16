@@ -187,7 +187,7 @@ p { line-height: 1.8; }
 }
 .nav--scrolled {
   background: rgba(17,17,17,var(--nav-scrolled-opacity, 0.94));
-  backdrop-filter: blur(8px);
+  backdrop-filter: var(--nav-blur, blur(8px));
   padding: 1rem clamp(1rem, calc(10vw - 112px), 2rem);
   box-shadow: 0 1px 0 rgba(255,255,255,0.06);
 }
