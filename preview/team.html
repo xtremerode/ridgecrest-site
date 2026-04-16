@@ -148,7 +148,7 @@
               ? 'background-image:url(\'' + m.photo + '\'); background-size:cover; background-position:center top;'
               : 'background:#e8e0d5;';
             return '<div class="team-card fade-in">' +
-              '<div class="team-card__photo" style="' + photoStyle + '"></div>' +
+              '<div class="team-card__photo" data-card-id="team-member-' + m.id + '" style="' + photoStyle + '"></div>' +
               '<h3 class="team-card__name">' + m.name + '</h3>' +
               '<p class="team-card__title">' + m.role + '</p>' +
               '<p class="team-card__bio">' + (m.bio || '') + '</p>' +
