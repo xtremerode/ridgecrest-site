@@ -181,6 +181,65 @@
           </div>
         </div>
 
+        <!-- Card Overlay Controls -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Card Image Overlay</div>
+              <div class="card-sub">Controls the dark overlay on image cards (home page services, portfolio showcase)</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;">
+              <div style="flex:1;max-width:320px;">
+                <label class="form-label" style="margin-bottom:6px;">Default Overlay</label>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <input class="form-input" id="cardOverlay" type="text" inputmode="decimal" style="width:80px;text-align:center;font-family:monospace;font-size:14px;" placeholder="0.5" />
+                  <span style="font-size:12px;color:var(--text-3);">0 = no overlay &middot; 1 = solid black</span>
+                </div>
+              </div>
+            </div>
+            <div id="cardOverlayPreview" style="position:relative;border-radius:8px;overflow:hidden;height:80px;margin-bottom:12px;">
+              <div style="position:absolute;inset:0;background:url('/assets/images-opt/ff5b18_c520c9ca384d4c3ebe02707d0c8f45ab_mv2_960w.webp') center/cover no-repeat;"></div>
+              <div id="cardOverlayBar" style="position:absolute;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;padding:12px 16px;transition:background 0.15s ease;">
+                <div>
+                  <span style="color:rgba(255,255,255,0.6);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;">PLEASANTON, CA</span>
+                  <div style="color:#fff;font-size:15px;font-weight:400;margin-top:2px;">Custom Dream Home</div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+              <button class="btn btn-primary btn-sm" onclick="cardOverlaySave('card_overlay')">Save</button>
+              <span id="cardOverlayStatus" style="font-size:12px;color:var(--text-3);"></span>
+            </div>
+
+            <div style="border-top:1px solid var(--border);padding-top:20px;">
+              <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;">
+                <div style="flex:1;max-width:320px;">
+                  <label class="form-label" style="margin-bottom:6px;">Hover Overlay</label>
+                  <div style="display:flex;align-items:center;gap:10px;">
+                    <input class="form-input" id="cardOverlayHover" type="text" inputmode="decimal" style="width:80px;text-align:center;font-family:monospace;font-size:14px;" placeholder="0.3" />
+                    <span style="font-size:12px;color:var(--text-3);">Lightens on mouseover to reveal image</span>
+                  </div>
+                </div>
+              </div>
+              <div id="cardOverlayHoverPreview" style="position:relative;border-radius:8px;overflow:hidden;height:80px;margin-bottom:12px;">
+                <div style="position:absolute;inset:0;background:url('/assets/images-opt/ff5b18_c520c9ca384d4c3ebe02707d0c8f45ab_mv2_960w.webp') center/cover no-repeat;"></div>
+                <div id="cardOverlayHoverBar" style="position:absolute;inset:0;background:rgba(0,0,0,0.3);display:flex;align-items:flex-end;padding:12px 16px;transition:background 0.15s ease;">
+                  <div>
+                    <span style="color:rgba(255,255,255,0.6);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;">PLEASANTON, CA</span>
+                    <div style="color:#fff;font-size:15px;font-weight:400;margin-top:2px;">Custom Dream Home</div>
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <button class="btn btn-primary btn-sm" onclick="cardOverlaySave('card_overlay_hover')">Save</button>
+                <span id="cardOverlayHoverStatus" style="font-size:12px;color:var(--text-3);"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-header"><div class="card-title">Business Information</div></div>
           <div class="card-body">
@@ -763,6 +822,14 @@
         document.getElementById('navBlurRadius').value = res.blur_radius;
         navBlurUpdatePreview(res.blur_radius);
       }
+      if (res && typeof res.card_overlay === 'number') {
+        document.getElementById('cardOverlay').value = res.card_overlay;
+        cardOverlayUpdatePreview('cardOverlayBar', res.card_overlay);
+      }
+      if (res && typeof res.card_overlay_hover === 'number') {
+        document.getElementById('cardOverlayHover').value = res.card_overlay_hover;
+        cardOverlayUpdatePreview('cardOverlayHoverBar', res.card_overlay_hover);
+      }
     } catch(e) {}
   }
 
@@ -895,6 +962,61 @@
     var res = await Admin.post('/settings/nav-band', { blur_radius: val });
     if (res && res.ok) {
       Admin.toast('Backdrop blur updated to ' + val + 'px', 'success');
+      status.textContent = 'Saved';
+      status.style.color = 'var(--green)';
+      setTimeout(function() { status.textContent = ''; }, 3000);
+    } else {
+      Admin.toast('Failed to save: ' + (res ? res.error : 'unknown error'), 'error');
+      status.textContent = 'Error';
+      status.style.color = 'var(--red)';
+    }
+  }
+
+  // ── Card Overlay ────────────────────────────────────────────
+  function cardOverlayUpdatePreview(barId, val) {
+    var bar = document.getElementById(barId);
+    if (bar) bar.style.background = 'rgba(0,0,0,' + val + ')';
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    var co1 = document.getElementById('cardOverlay');
+    var co2 = document.getElementById('cardOverlayHover');
+    if (co1) {
+      co1.addEventListener('input', function() {
+        var val = parseFloat(this.value);
+        if (!isNaN(val) && val >= 0 && val <= 1) {
+          cardOverlayUpdatePreview('cardOverlayBar', val);
+          document.getElementById('cardOverlayStatus').textContent = '';
+        }
+      });
+    }
+    if (co2) {
+      co2.addEventListener('input', function() {
+        var val = parseFloat(this.value);
+        if (!isNaN(val) && val >= 0 && val <= 1) {
+          cardOverlayUpdatePreview('cardOverlayHoverBar', val);
+          document.getElementById('cardOverlayHoverStatus').textContent = '';
+        }
+      });
+    }
+  });
+
+  async function cardOverlaySave(key) {
+    var isHover = key === 'card_overlay_hover';
+    var inp = document.getElementById(isHover ? 'cardOverlayHover' : 'cardOverlay');
+    var status = document.getElementById(isHover ? 'cardOverlayHoverStatus' : 'cardOverlayStatus');
+    var val = parseFloat(inp.value);
+    if (isNaN(val) || val < 0 || val > 1) {
+      Admin.toast('Overlay must be a number between 0 and 1', 'error');
+      return;
+    }
+    status.textContent = 'Saving...';
+    status.style.color = 'var(--text-3)';
+    var body = {};
+    body[key] = val;
+    var res = await Admin.post('/settings/nav-band', body);
+    if (res && res.ok) {
+      Admin.toast((isHover ? 'Hover' : 'Default') + ' card overlay updated to ' + val, 'success');
       status.textContent = 'Saved';
       status.style.color = 'var(--green)';
       setTimeout(function() { status.textContent = ''; }, 3000);

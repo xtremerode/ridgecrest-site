@@ -3623,7 +3623,21 @@ def view(filename):
                     _nav_blur = float(_nb_row['value'])
             except Exception:
                 pass
-        _nbo_script = f'<script>window.__RD_NAV_OPACITY={_safe_js(_nav_opacity)};window.__RD_NAV_SCROLLED_OPACITY={_safe_js(_nav_scrolled_opacity)};window.__RD_NAV_BLUR={_safe_js(_nav_blur)};</script>'.encode('utf-8')
+        # [PX] Read card overlay values
+        _card_overlay = 0.5
+        _card_overlay_hover = 0.3
+        if HAS_DB:
+            try:
+                _co_conn = _db_conn()
+                _co_cur = _co_conn.cursor()
+                _co_cur.execute("SELECT key, value FROM system_settings WHERE key IN ('card_overlay', 'card_overlay_hover')")
+                for _co_row in _co_cur.fetchall():
+                    if _co_row['key'] == 'card_overlay': _card_overlay = float(_co_row['value'])
+                    if _co_row['key'] == 'card_overlay_hover': _card_overlay_hover = float(_co_row['value'])
+                _co_conn.close()
+            except Exception:
+                pass
+        _nbo_script = f'<script>window.__RD_NAV_OPACITY={_safe_js(_nav_opacity)};window.__RD_NAV_SCROLLED_OPACITY={_safe_js(_nav_scrolled_opacity)};window.__RD_NAV_BLUR={_safe_js(_nav_blur)};window.__RD_CARD_OVERLAY={_safe_js(_card_overlay)};window.__RD_CARD_OVERLAY_HOVER={_safe_js(_card_overlay_hover)};</script>'.encode('utf-8')
         if b'</head>' in content:
             content = content.replace(b'</head>', _nbo_script + b'</head>', 1)
 
@@ -5422,7 +5436,21 @@ def _blog_head_extras(head_html):
                 _nav_blur = float(_nb_row['value'])
         except Exception:
             pass
-    inject += f"\n  <script>window.__RD_NAV_OPACITY={_safe_js(_nav_opacity)};window.__RD_NAV_SCROLLED_OPACITY={_safe_js(_nav_scrolled_opacity)};window.__RD_NAV_BLUR={_safe_js(_nav_blur)};</script>"
+    # Card overlay values
+    _card_overlay = 0.5
+    _card_overlay_hover = 0.3
+    if HAS_DB:
+        try:
+            _co_conn = _db_conn()
+            _co_cur = _co_conn.cursor()
+            _co_cur.execute("SELECT key, value FROM system_settings WHERE key IN ('card_overlay', 'card_overlay_hover')")
+            for _co_row in _co_cur.fetchall():
+                if _co_row['key'] == 'card_overlay': _card_overlay = float(_co_row['value'])
+                if _co_row['key'] == 'card_overlay_hover': _card_overlay_hover = float(_co_row['value'])
+            _co_conn.close()
+        except Exception:
+            pass
+    inject += f"\n  <script>window.__RD_NAV_OPACITY={_safe_js(_nav_opacity)};window.__RD_NAV_SCROLLED_OPACITY={_safe_js(_nav_scrolled_opacity)};window.__RD_NAV_BLUR={_safe_js(_nav_blur)};window.__RD_CARD_OVERLAY={_safe_js(_card_overlay)};window.__RD_CARD_OVERLAY_HOVER={_safe_js(_card_overlay_hover)};</script>"
     inject += '\n  <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">'
     inject += '\n  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">'
     if "</head>" in head_html:
@@ -6532,13 +6560,15 @@ def admin_nav_band_opacity():
     try:
         cur = conn.cursor()
         if request.method == 'GET':
-            cur.execute("SELECT key, value FROM system_settings WHERE key IN ('nav_band_opacity', 'nav_scrolled_opacity', 'nav_blur_radius')")
+            cur.execute("SELECT key, value FROM system_settings WHERE key IN ('nav_band_opacity', 'nav_scrolled_opacity', 'nav_blur_radius', 'card_overlay', 'card_overlay_hover')")
             rows = {r['key']: r['value'] for r in cur.fetchall()}
             conn.close()
             return jsonify({
                 'opacity': float(rows.get('nav_band_opacity', '0.6')),
                 'scrolled_opacity': float(rows.get('nav_scrolled_opacity', '0.94')),
-                'blur_radius': float(rows.get('nav_blur_radius', '8'))
+                'blur_radius': float(rows.get('nav_blur_radius', '8')),
+                'card_overlay': float(rows.get('card_overlay', '0.5')),
+                'card_overlay_hover': float(rows.get('card_overlay_hover', '0.3'))
             })
         data = request.get_json(silent=True) or {}
         result = {}
@@ -6576,6 +6606,23 @@ def admin_nav_band_opacity():
                            ON CONFLICT(key) DO UPDATE SET value=%s, updated_at=now()""",
                         (val_s, val_s))
             result['scrolled_opacity'] = scrolled
+        # Handle card overlay
+        for _ck in ('card_overlay', 'card_overlay_hover'):
+            if _ck in data:
+                try:
+                    _cv = float(data[_ck])
+                except (ValueError, TypeError):
+                    conn.close()
+                    return jsonify({'error': f'{_ck} must be a number'}), 400
+                if _cv < 0 or _cv > 1:
+                    conn.close()
+                    return jsonify({'error': f'{_ck} must be between 0 and 1'}), 400
+                _cvs = str(round(_cv, 2))
+                cur.execute("""INSERT INTO system_settings(key, value)
+                               VALUES(%s, %s)
+                               ON CONFLICT(key) DO UPDATE SET value=%s, updated_at=now()""",
+                            (_ck, _cvs, _cvs))
+                result[_ck] = _cv
         # Handle blur radius
         if 'blur_radius' in data:
             raw_b = data['blur_radius']

@@ -39,6 +39,16 @@ if (nav) {
   });
 }
 
+// [PX] Apply admin-controlled card overlay values (site-wide via :root)
+var _cardOverlay = window.__RD_CARD_OVERLAY;
+var _cardOverlayHover = window.__RD_CARD_OVERLAY_HOVER;
+if (typeof _cardOverlay === 'number') {
+  document.documentElement.style.setProperty('--card-overlay', _cardOverlay);
+}
+if (typeof _cardOverlayHover === 'number') {
+  document.documentElement.style.setProperty('--card-overlay-hover', _cardOverlayHover);
+}
+
 // Mobile menu toggle
 const toggle = document.getElementById('navToggle');
 const links = document.getElementById('navLinks');

@@ -105,11 +105,18 @@
     }
     .portfolio-featured__overlay {
       position: absolute; inset: 0;
-      background: rgba(0, 0, 0, 0.45);
+      background: rgba(0, 0, 0, var(--card-overlay, 0.5));
+      transition: background 0.3s ease;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .portfolio-featured__card:hover .portfolio-featured__overlay {
+      background: rgba(0, 0, 0, var(--card-overlay-hover, 0.3));
     }
     .portfolio-featured__info {
       position: absolute; bottom: 0; left: 0; right: 0;
       padding: 28px 24px 24px;
+      z-index: 2;
     }
     .portfolio-featured__loc {
       display: block;
