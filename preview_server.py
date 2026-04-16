@@ -962,13 +962,17 @@ _CARD_APPLY_SCRIPT = """\
 
 # ── Card edit overlay (admin_edit=1 mode) ────────────────────────────────────
 _CARD_EDIT_OVERLAY_TPL = """\
-<style id="rd-card-edit-pseudo-suppress">
-  [data-card-id].rd-card--color-mode::before,
-  [data-card-id].rd-card--color-mode::after {{ display: none !important; }}
-</style>
 <script id="rd-card-edit-overlay">
 (function(){{
   'use strict';
+  // Inject pseudo-element suppression rule once — hides ::before/::after on cards in color mode
+  // so the background color set by the card system is visible through the gradient overlay.
+  if (!document.getElementById('rd-card-edit-pseudo-suppress')) {{
+    var _rdPseudoStyle = document.createElement('style');
+    _rdPseudoStyle.id = 'rd-card-edit-pseudo-suppress';
+    _rdPseudoStyle.textContent = '[data-card-id].rd-card--color-mode::before,[data-card-id].rd-card--color-mode::after{{display:none!important}}';
+    (document.head || document.documentElement).appendChild(_rdPseudoStyle);
+  }}
   var SLUG = {slug_json};
   var TOKEN = {token_json};
   var COLORS = ['#1C1C1C','#1a2a35','#2a2218','#1e2e24','#212830'];
