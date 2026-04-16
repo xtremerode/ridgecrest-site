@@ -527,3 +527,79 @@ Full file at `/home/claudeuser/agent/ridgecrest-agency/rules/AGENT_RULES.md`
 - **Rule 14: Single Source of Truth — No Duplicate Data Paths** — Every element must have exactly one owner (DB table, JS injection, or static HTML). Never add a second mechanism for the same element. Check what already controls an element before adding new logic. Origin: April 16 — about-visual had both a `data-card-id` and a `::before` gradient covering it, causing visible conflicts.
 - **Rule 17: Backup Protocol** — PRE git commit before change, POST git commit after, pg_dump before any DB change.
 - **Rule 19: Rule 11 = End-to-End Verification** — File on disk + browser URL 200 + rendered effect — all three must pass before declaring done.
+
+---
+
+## 27. Admin Panel — Security & Accessibility (2026-04-16 Session 2)
+
+### Current State
+The admin panel at port 8082 (dev) and 8081 (prod) uses IP allowlist authentication only. The admin JS checks `rd_admin_token` in localStorage — the token is set after password entry and validated against a hardcoded hash. There is no SSL, no subdomain, and no reverse proxy in front of the server.
+
+### Problem
+Henry cannot log in from a second computer because the session token is localStorage-only (per-browser, not roaming). The IP allowlist also blocks unknown IPs.
+
+### Required Solution (Deferred — Not Yet Implemented)
+To make the admin panel safely accessible from any device/location:
+1. Set up Nginx as a reverse proxy in front of the Flask server
+2. Provision SSL via Let's Encrypt (certbot) for `admin.ridgecrestdesigns.com`
+3. Move admin panel to `admin.ridgecrestdesigns.com` (subdomain)
+4. Replace IP allowlist with HTTPS + strong password auth only
+5. Optionally add HTTP Basic Auth as a second layer in Nginx
+
+**Status:** Deferred — Henry said to move on and return to this later.
+
+---
+
+## 28. Admin Pages Editor — Edit Mode Bug Fixes (2026-04-16 Session 2)
+
+### Fix 1: iframe Link Navigation Blocked During Edit Mode
+**Problem:** Clicking any link inside the iframe (nav, CTAs, footer links) while edit mode was ON caused the iframe to navigate to another page, losing all pending edits.
+
+**Fix:** Added a `click` listener inside `_rdHeightResetAttached` that intercepts all `<a href>` clicks when edit mode is active and calls `preventDefault()` + `stopPropagation()`. Links that only have `href="#"` or no href are allowed through.
+
+**Committed:** `331807b` — "FIX: block iframe link navigation during edit mode"
+
+### Fix 2: Text Editing Broken Inside Anchor-Wrapped Portfolio Cards
+**Problem:** On `portfolio.html`, the featured project cards are wrapped in `<a class="portfolio-featured__card" href="...">`. The TEXT_EDIT_SCRIPT injects `pointer-events:none` on all `<a>` tags to suppress navigation — this also blocked click events from reaching the text inside.
+
+**Fix:** TEXT_EDIT_SCRIPT now explicitly re-enables `pointer-events` on editable text elements (`h1–h6, p, li, etc.`) inside anchor-wrapped cards after suppressing the anchor itself.
+
+**Committed:** `b268081` — "FIX: enable text editing inside anchor-wrapped portfolio cards"
+
+---
+
+## 29. AI Re-Render API — Systems Check (2026-04-16 Session 2)
+
+### Architecture
+Three-layer pipeline:
+```
+User clicks Re-render → Gemini AI generates image → save-result → set-version → propagation
+```
+
+### What Works
+- Gemini API call, responsive sizes (1920w / 960w / 480w / 201w), storage
+- Version filmstrip UI in page editor and media library
+- DB propagation via `set-version` across `image_labels`, `card_settings`, `pages`, `blog_posts`, `portfolio_projects`
+- Portfolio project HTML pages regenerated synchronously on `set-version`
+
+### Critical Gap — Static Non-Portfolio HTML Files Not Updated
+`set-version` updates the DB and regenerates portfolio project pages (`danville-dream.html`, etc.) but does NOT rewrite static non-portfolio pages:
+- `index.html`, `portfolio.html`, `about.html`, `contact.html`, `process.html`, `team.html`
+
+These files have hardcoded image paths that never update when a new version becomes active.
+
+### Secondary Gap — Card Settings Not Applied to Public-Facing Pages
+Card images set via `card_settings` table are applied at runtime by the overlay script injected into the admin iframe only. The raw HTML files are never rewritten. Public pages served directly (not via admin iframe) do not see card changes unless explicitly regenerated.
+
+### Propagation Summary
+| Location | Propagates on set-version? |
+|---|---|
+| DB tables (image_labels, card_settings, pages, etc.) | Yes |
+| Portfolio project HTML pages (on disk) | Yes |
+| Static non-portfolio HTML pages (on disk) | **No — gap** |
+| Public-facing card backgrounds | **No — only applied in admin iframe** |
+
+### Planned Fix (Not Yet Implemented)
+Add a step to the `set-version` endpoint in `preview_server.py`: after DB updates and portfolio page regeneration, trigger regeneration of all affected non-portfolio static pages whose `hero_image` matches the updated image. The server already has a page rendering function — it needs to be called for all page slugs, not just portfolio project pages.
+
+**Status:** Full systems check done. Fix planned but NOT implemented. Session ended in discussion mode.
