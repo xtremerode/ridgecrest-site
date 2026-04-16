@@ -827,11 +827,12 @@ def _apply_section_heights(content: bytes, slug: str, device: str, preloaded_row
                 continue  # Never override hero/footer height via DB
             hpx = int(row['height_px'])
             style_str = 'height:' + str(hpx) + 'px;overflow:hidden;min-height:auto!important'
-            # Try data-rd-section attribute first (non-home pages use this).
+            # Try data-rd-section attribute first (non-home sections and div heroes).
+            # Matches <section> or <div> so page-hero / project-hero divs are covered.
             # Captures the full opening tag so style can be inserted correctly
             # whether the tag already has a style attribute or not.
             pattern_attr = re.compile(
-                r'(<section\b[^>]*\bdata-rd-section="' + re.escape(sid) + r'"[^>]*>)',
+                r'(<(?:section|div)\b[^>]*\bdata-rd-section="' + re.escape(sid) + r'"[^>]*>)',
                 re.IGNORECASE
             )
             match = pattern_attr.search(text)
@@ -2826,7 +2827,13 @@ _SECTION_RESIZE_TPL = """\
   var SKIP_SECTIONS = {{'footer': true, 'section': true}};
 
   function init() {{
-    document.querySelectorAll('section').forEach(function(sec) {{
+    // Process <section> elements (home page + project pages via first-class fallback,
+    // non-home sections via data-rd-section) PLUS any non-section elements that carry
+    // data-rd-section (page-hero divs on inner pages, project-hero divs).
+    // Concat avoids double-processing sections that also have data-rd-section.
+    var _sectionEls = Array.from(document.querySelectorAll('section'));
+    var _divEls     = Array.from(document.querySelectorAll('[data-rd-section]:not(section)'));
+    _sectionEls.concat(_divEls).forEach(function(sec) {{
       // Prefer data-rd-section attribute; fall back to first CSS class.
       var cls = sec.getAttribute('data-rd-section') ||
                 (sec.className ? sec.className.trim().split(/\\s+/)[0] : '');
@@ -2839,6 +2846,8 @@ _SECTION_RESIZE_TPL = """\
       // bottom 14px where the resize handle lives. Without this the overlay
       // (z-index:9990, pointer-events:auto) intercepts all pointer events
       // before they can reach the handle (z-index:99999).
+      // Applies to both the home page <section class="hero"> and inner-page
+      // <div class="page-hero"> — same fix, same code path.
       sec.querySelectorAll('[data-rd-overlay="hero"]').forEach(function(ov) {{
         ov.style.bottom = '14px';
       }});
@@ -5094,7 +5103,7 @@ def _render_project_page(p):
     </ul>
   </nav>
 
-  <div class="project-hero">
+  <div class="project-hero" data-rd-section="project-hero">
     <div class="project-hero__img" role="img" aria-label="{name} by Ridgecrest Designs, {city}, {state}" style="background-image:url('{hero_src}')"></div>
     <div class="project-hero__overlay"></div>
     <div class="project-hero__content">
