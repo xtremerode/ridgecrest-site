@@ -826,19 +826,37 @@ def _apply_section_heights(content: bytes, slug: str, device: str, preloaded_row
             if sid in _SECTION_HEIGHT_SKIP:
                 continue  # Never override hero/footer height via DB
             hpx = int(row['height_px'])
-            pattern = re.compile(
-                r'(<section\s+class="' + re.escape(sid) + r'[^"]*")',
+            style_str = 'height:' + str(hpx) + 'px;overflow:hidden;min-height:auto!important'
+            # Try data-rd-section attribute first (non-home pages use this).
+            # Captures the full opening tag so style can be inserted correctly
+            # whether the tag already has a style attribute or not.
+            pattern_attr = re.compile(
+                r'(<section\b[^>]*\bdata-rd-section="' + re.escape(sid) + r'"[^>]*>)',
                 re.IGNORECASE
             )
-            match = pattern.search(text)
+            match = pattern_attr.search(text)
             if match:
-                tag = match.group(0)
-                style_str = 'height:' + str(hpx) + 'px;overflow:hidden;min-height:auto!important'
-                if 'style="' not in tag:
-                    new_tag = tag + ' style="' + style_str + '"'
+                tag = match.group(0)  # full opening tag, ends with >
+                if 'style="' in tag:
+                    new_tag = tag.replace('style="', 'style="' + style_str + ';', 1)
                 else:
-                    new_tag = tag.replace('style="', 'style="' + style_str + ';')
-                text = text.replace(tag, new_tag, 1)
+                    new_tag = tag[:-1] + ' style="' + style_str + '">'
+            else:
+                # Fall back: match by first CSS class (home page, project pages).
+                pattern_cls = re.compile(
+                    r'(<section\s+class="' + re.escape(sid) + r'[^"]*")',
+                    re.IGNORECASE
+                )
+                match = pattern_cls.search(text)
+                if match:
+                    tag = match.group(0)  # partial tag, ends at closing class-attr quote
+                    if 'style="' not in tag:
+                        new_tag = tag + ' style="' + style_str + '"'
+                    else:
+                        new_tag = tag.replace('style="', 'style="' + style_str + ';')
+                else:
+                    continue  # section not found in this page's HTML
+            text = text.replace(tag, new_tag, 1)
         return text.encode('utf-8')
     except Exception:
         return content
@@ -2802,12 +2820,16 @@ _SECTION_RESIZE_TPL = """\
     return handle;
   }}
 
-  // Footer uses auto height and should never be pixel-overridden
-  var SKIP_SECTIONS = {{'footer': true}};
+  // Footer uses auto height and should never be pixel-overridden.
+  // Generic 'section' first-class is skipped as a safety net — sections that
+  // need handles must use data-rd-section or a unique semantic first class.
+  var SKIP_SECTIONS = {{'footer': true, 'section': true}};
 
   function init() {{
     document.querySelectorAll('section').forEach(function(sec) {{
-      var cls = sec.className ? sec.className.trim().split(/\\s+/)[0] : '';
+      // Prefer data-rd-section attribute; fall back to first CSS class.
+      var cls = sec.getAttribute('data-rd-section') ||
+                (sec.className ? sec.className.trim().split(/\\s+/)[0] : '');
       if (!cls || SKIP_SECTIONS[cls]) return;
       if (window.getComputedStyle(sec).position === 'static') {{
         sec.style.position = 'relative';
