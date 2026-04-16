@@ -23,6 +23,11 @@ if (nav) {
   if (typeof _navOpacity === 'number') {
     nav.style.setProperty('--nav-band-opacity', _navOpacity);
   }
+  // [PX] Apply admin-controlled nav scrolled opacity (post-scroll state)
+  var _navScrolledOpacity = window.__RD_NAV_SCROLLED_OPACITY;
+  if (typeof _navScrolledOpacity === 'number') {
+    nav.style.setProperty('--nav-scrolled-opacity', _navScrolledOpacity);
+  }
 
   window.addEventListener('scroll', () => {
     nav.classList.toggle('nav--scrolled', window.scrollY > 60);

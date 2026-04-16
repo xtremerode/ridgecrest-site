@@ -3597,7 +3597,20 @@ def view(filename):
                     _nav_opacity = float(_nbo_row['value'])
             except Exception:
                 pass
-        _nbo_script = f'<script>window.__RD_NAV_OPACITY={_safe_js(_nav_opacity)};</script>'.encode('utf-8')
+        # [PX] Inject nav scrolled opacity from system_settings
+        _nav_scrolled_opacity = 0.94  # default
+        if HAS_DB:
+            try:
+                _nso_conn = _db_conn()
+                _nso_cur = _nso_conn.cursor()
+                _nso_cur.execute("SELECT value FROM system_settings WHERE key = 'nav_scrolled_opacity'")
+                _nso_row = _nso_cur.fetchone()
+                _nso_conn.close()
+                if _nso_row:
+                    _nav_scrolled_opacity = float(_nso_row['value'])
+            except Exception:
+                pass
+        _nbo_script = f'<script>window.__RD_NAV_OPACITY={_safe_js(_nav_opacity)};window.__RD_NAV_SCROLLED_OPACITY={_safe_js(_nav_scrolled_opacity)};</script>'.encode('utf-8')
         if b'</head>' in content:
             content = content.replace(b'</head>', _nbo_script + b'</head>', 1)
 
@@ -5369,8 +5382,21 @@ def _blog_head_extras(head_html):
                 _nav_opacity = float(_nbo_row['value'])
         except Exception:
             pass
+    # Nav scrolled opacity from system_settings
+    _nav_scrolled_opacity = 0.94  # default
+    if HAS_DB:
+        try:
+            _nso_conn = _db_conn()
+            _nso_cur = _nso_conn.cursor()
+            _nso_cur.execute("SELECT value FROM system_settings WHERE key = 'nav_scrolled_opacity'")
+            _nso_row = _nso_cur.fetchone()
+            _nso_conn.close()
+            if _nso_row:
+                _nav_scrolled_opacity = float(_nso_row['value'])
+        except Exception:
+            pass
     inject = f"<script>window.__RD_LOGO_URL={_safe_js(_logo_url)};</script>"
-    inject += f"\n  <script>window.__RD_NAV_OPACITY={_safe_js(_nav_opacity)};</script>"
+    inject += f"\n  <script>window.__RD_NAV_OPACITY={_safe_js(_nav_opacity)};window.__RD_NAV_SCROLLED_OPACITY={_safe_js(_nav_scrolled_opacity)};</script>"
     inject += '\n  <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">'
     inject += '\n  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">'
     if "</head>" in head_html:
@@ -6480,28 +6506,52 @@ def admin_nav_band_opacity():
     try:
         cur = conn.cursor()
         if request.method == 'GET':
-            cur.execute("SELECT value FROM system_settings WHERE key = 'nav_band_opacity'")
-            row = cur.fetchone()
+            cur.execute("SELECT key, value FROM system_settings WHERE key IN ('nav_band_opacity', 'nav_scrolled_opacity')")
+            rows = {r['key']: r['value'] for r in cur.fetchall()}
             conn.close()
-            return jsonify({'opacity': float(row['value']) if row else 0.6})
+            return jsonify({
+                'opacity': float(rows.get('nav_band_opacity', '0.6')),
+                'scrolled_opacity': float(rows.get('nav_scrolled_opacity', '0.94'))
+            })
         data = request.get_json(silent=True) or {}
-        raw = data.get('opacity', 0.6)
-        try:
-            opacity = float(raw)
-        except (ValueError, TypeError):
-            conn.close()
-            return jsonify({'error': 'opacity must be a number'}), 400
-        if opacity < 0 or opacity > 1:
-            conn.close()
-            return jsonify({'error': 'opacity must be between 0 and 1'}), 400
-        val_str = str(round(opacity, 2))
-        cur.execute("""INSERT INTO system_settings(key, value)
-                       VALUES('nav_band_opacity', %s)
-                       ON CONFLICT(key) DO UPDATE SET value=%s, updated_at=now()""",
-                    (val_str, val_str))
+        result = {}
+        # Handle pre-scroll opacity
+        if 'opacity' in data:
+            raw = data['opacity']
+            try:
+                opacity = float(raw)
+            except (ValueError, TypeError):
+                conn.close()
+                return jsonify({'error': 'opacity must be a number'}), 400
+            if opacity < 0 or opacity > 1:
+                conn.close()
+                return jsonify({'error': 'opacity must be between 0 and 1'}), 400
+            val_str = str(round(opacity, 2))
+            cur.execute("""INSERT INTO system_settings(key, value)
+                           VALUES('nav_band_opacity', %s)
+                           ON CONFLICT(key) DO UPDATE SET value=%s, updated_at=now()""",
+                        (val_str, val_str))
+            result['opacity'] = opacity
+        # Handle scrolled opacity
+        if 'scrolled_opacity' in data:
+            raw_s = data['scrolled_opacity']
+            try:
+                scrolled = float(raw_s)
+            except (ValueError, TypeError):
+                conn.close()
+                return jsonify({'error': 'scrolled_opacity must be a number'}), 400
+            if scrolled < 0 or scrolled > 1:
+                conn.close()
+                return jsonify({'error': 'scrolled_opacity must be between 0 and 1'}), 400
+            val_s = str(round(scrolled, 2))
+            cur.execute("""INSERT INTO system_settings(key, value)
+                           VALUES('nav_scrolled_opacity', %s)
+                           ON CONFLICT(key) DO UPDATE SET value=%s, updated_at=now()""",
+                        (val_s, val_s))
+            result['scrolled_opacity'] = scrolled
         conn.commit()
         conn.close()
-        return jsonify({'ok': True, 'opacity': opacity})
+        return jsonify({'ok': True, **result})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
