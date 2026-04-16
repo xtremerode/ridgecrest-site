@@ -2414,6 +2414,8 @@
         doc.addEventListener('click', function(e) {
           const a = e.target.closest('a[href]');
           if (!a) return;
+          // Block all link navigation while editing
+          if (editMode) { e.preventDefault(); e.stopPropagation(); return; }
           const href = a.getAttribute('href') || '';
           // Only intercept same-frame navigation (no target="_blank", no hash-only, no javascript:)
           if (a.target === '_blank' || href.startsWith('#') || href.startsWith('javascript:')) return;
