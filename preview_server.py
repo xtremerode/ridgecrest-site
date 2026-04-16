@@ -5330,8 +5330,8 @@ def admin_save_seo():
 # ── Blog public routes ────────────────────────────────────────────────────────
 
 _BLOG_NAV = '''<nav class="nav" id="nav">
-    <a href="/view/index.html" class="nav__logo">RIDGECREST DESIGNS</a>
-    <button class="nav__toggle" id="navToggle" aria-label="Menu">
+    <a class="nav__logo" href="/view/index.html">RIDGECREST DESIGNS</a>
+    <button aria-label="Menu" class="nav__toggle" id="navToggle">
       <span></span><span></span><span></span>
     </button>
     <ul class="nav__links" id="navLinks">
@@ -5341,7 +5341,7 @@ _BLOG_NAV = '''<nav class="nav" id="nav">
       <li><a href="/view/portfolio.html">Portfolio</a></li>
       <li><a href="/blog">The RD Edit</a></li>
       <li><a href="/view/team.html">Team</a></li>
-      <li><a href="/view/contact.html" class="nav__cta">Start a Project</a></li>
+      <li><a class="nav__cta" href="/view/start-a-project.html">Start a Project</a></li>
     </ul>
   </nav>'''
 
