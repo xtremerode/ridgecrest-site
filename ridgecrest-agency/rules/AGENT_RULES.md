@@ -155,3 +155,29 @@ Before executing any task at session start, ask: "Did Henry tell me to do this i
 ### Violation
 
 If Henry has to say "undo that — we weren't working on that," you have failed this rule.
+
+---
+
+## Rule 14: Single Source of Truth — No Duplicate Data Paths
+
+Every visual element on the site must have exactly ONE source controlling its appearance at any given time. Never create a second path that can set the same property.
+
+### How It Works
+
+**Before first admin edit:** The static HTML file (inline style or CSS class) is the sole source. No DB record exists. The apply script ignores the element.
+
+**After first admin edit:** The DB record in `card_settings` becomes the sole source. The apply script reads from DB and sets the inline style on page load. The original HTML/CSS value is permanently overridden.
+
+There is never a moment where both sources are active. The handoff is one-way and permanent.
+
+### Rules
+
+- **Never hardcode an image path in HTML/CSS if that element already has a `data-card-id` with a DB record.** Check `card_settings` first.
+- **Never write JS that sets `background-image`, `src`, or `data-src` on an element that the card apply script already manages.** If `_CARD_APPLY_SCRIPT` handles it, nothing else touches it.
+- **Never duplicate element IDs.** Every `data-card-id` value must be globally unique across the entire site.
+- **When adding editability to a new element, only add the `data-card-id` attribute.** Do not create a DB record — that happens automatically on first admin edit.
+- **If a server-side render function (like `_render_project_page`) generates HTML with inline styles, and that element also has a `data-card-id`, the render function's value is the initial default.** The DB overrides it after first edit. Document which function generates the default so there's no confusion.
+
+### Violation
+
+If an image appears differently in edit mode vs published mode, or if editing one element changes a different element, there is a duplicate data path. Find it and eliminate one source.
