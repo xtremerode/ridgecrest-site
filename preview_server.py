@@ -7218,11 +7218,15 @@ src_path = sys.argv[2]
 out_path = sys.argv[3]
 prompt   = sys.argv[4]
 
-# Read source image, convert to JPEG for API (wider compatibility)
+# Read source image, downscale to max 1024px, convert to JPEG for API.
+# Large source files (8–18 MB webp) would otherwise be sent as 10–20 MB
+# JPEG payloads. Gemini needs enough detail to understand the image, not
+# full-resolution data; 1024px preserves all meaningful content.
 with Image.open(src_path) as img:
     img_rgb = img.convert('RGB')
+    img_rgb.thumbnail((1024, 1024), Image.LANCZOS)
     buf = io.BytesIO()
-    img_rgb.save(buf, 'JPEG', quality=92)
+    img_rgb.save(buf, 'JPEG', quality=85)
     img_bytes = buf.getvalue()
 
 client = genai.Client(api_key=api_key)
@@ -7275,7 +7279,7 @@ print('OK:' + out_path)
     try:
         result = _subp.run(
             ['/usr/bin/python3', '-c', script, api_key, src_path, out_path, prompt],
-            env=_env, capture_output=True, text=True, timeout=120
+            env=_env, capture_output=True, text=True, timeout=300
         )
         if result.returncode != 0:
             raw = result.stderr.strip() or 'rerender failed'
