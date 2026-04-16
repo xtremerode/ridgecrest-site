@@ -918,12 +918,7 @@ p { line-height: 1.8; }
   position: relative;
   overflow: hidden;
 }
-.about-visual::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, #1a2530 0%, #0d1520 100%);
-}
+/* ::before removed - was blocking card image */
 .about-visual::after {
   content: '';
   position: absolute;
