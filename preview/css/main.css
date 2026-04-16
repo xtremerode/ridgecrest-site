@@ -881,6 +881,28 @@ p { line-height: 1.8; }
   margin: 0 auto;
 }
 
+/* Left-aligned inner-page hero — matches home page text layout */
+.page-hero--left {
+  text-align: left;
+}
+.page-hero--left .page-hero__inner {
+  position: relative;          /* anchor for drag handle */
+  max-width: var(--max-w);
+  margin: 0 auto;
+  width: 100%;
+}
+.page-hero--left .page-hero__title {
+  margin-left: 0;
+  margin-right: 0;
+}
+.page-hero--left .page-hero__sub {
+  margin-left: 0;
+  margin-right: 0;
+}
+.page-hero--left .hero__actions {
+  margin-top: 2rem;
+}
+
 /* ============================================================
    ABOUT PAGE
    ============================================================ */
@@ -1424,6 +1446,7 @@ p { line-height: 1.8; }
   /* ── Hero — mobile fixes ── */
   /* Reset any admin-set text offset so content stays inside hero on small screens */
   .hero__content { transform: none !important; padding-top: 6rem; padding-bottom: 2rem; }
+  .page-hero__inner { transform: none !important; }
   .hero__sub { margin-bottom: 1.5rem; }
   .hero__actions { flex-direction: column; gap: 0.75rem; }
   .hero__actions .btn { width: 100%; text-align: center; justify-content: center; display: flex; }
@@ -1652,6 +1675,7 @@ p { line-height: 1.8; }
   /* ── Hero — small phone ── */
   .hero { min-height: 560px; }
   .hero__content { padding-top: 5rem; }
+  .page-hero__inner { transform: none !important; }
 
   /* ── Page hero ── */
   .page-hero { padding: 6rem 1.2rem 3rem; }

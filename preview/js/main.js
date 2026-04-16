@@ -116,7 +116,7 @@ document.querySelectorAll('.project-hero__img').forEach(el => {
 if (window.__RD_HERO_TEXT_X || window.__RD_HERO_TEXT_Y) {
   const tx = window.__RD_HERO_TEXT_X || 0;
   const ty = window.__RD_HERO_TEXT_Y || 0;
-  document.querySelectorAll('.hero__content').forEach(el => {
+  document.querySelectorAll('.hero__content, .page-hero__inner').forEach(el => {
     el.style.transform = `translate(${tx}px, ${ty}px)`;
   });
 }

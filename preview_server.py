@@ -2536,7 +2536,7 @@ _EDIT_OVERLAY_TPL = """\
 
   function buildHeroTextHandle() {{
     document.querySelectorAll('[data-rd-text-handle]').forEach(function(n){{n.remove();}});
-    document.querySelectorAll('.hero__content').forEach(function(contentEl) {{
+    document.querySelectorAll('.hero__content, .page-hero__inner').forEach(function(contentEl) {{
       // Ensure content is relatively positioned for absolute child
       if (window.getComputedStyle(contentEl).position === 'static') {{
         contentEl.style.position = 'relative';
