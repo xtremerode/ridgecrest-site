@@ -130,3 +130,28 @@ Before adding any attribute, class, or feature to an element, verify the element
 ### Violation
 
 If Henry discovers you missed files he asked to be changed, or created a conflict by duplicating editability, you have wasted a full work session and broken trust. This rule has no exceptions, even when the scope seems obvious.
+
+---
+
+## Rule 13: Never Execute Stale Tasks from a Session Summary
+
+When a conversation resumes from a context-window summary, the summary may list "pending tasks" that Henry has since abandoned, deprioritized, or explicitly decided to skip. That list is a historical record — it is NOT a work queue.
+
+### Required Behavior on Session Resume
+
+1. **Do not execute any pending task listed in the summary without Henry's explicit direction.** The summary tells you what was happening; Henry tells you what to do next.
+2. **Read the summary for context only** — architecture decisions, bug fixes already applied, files already changed. Use it to understand the state of the project, not as a to-do list.
+3. **If the summary's last action was mid-task** (e.g., a POST commit was pending), you may complete that single atomic action — but stop immediately after and wait for Henry's next instruction.
+4. **Never chain from a completed carry-over action into additional "pending" items** without asking Henry first.
+
+### Why This Rule Exists
+
+On April 16, 2026, a session summary listed "services.html hero restructure" and "team.html hero restructure" as pending. Henry had already moved on — the active task was card editability. Claude executed the hero restructure anyway, touching files Henry did not ask to be touched. The changes had to be reverted. Time wasted, trust damaged.
+
+### The Test
+
+Before executing any task at session start, ask: "Did Henry tell me to do this in this session, or is this something I inferred from a summary?" If the answer is the latter, stop and ask.
+
+### Violation
+
+If Henry has to say "undo that — we weren't working on that," you have failed this rule.
