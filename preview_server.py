@@ -2849,7 +2849,33 @@ _SECTION_RESIZE_TPL = """\
       // Applies to both the home page <section class="hero"> and inner-page
       // <div class="page-hero"> — same fix, same code path.
       sec.querySelectorAll('[data-rd-overlay="hero"]').forEach(function(ov) {{
+        // Replace inset:0 shorthand entirely — setting ov.style.bottom alone is
+        // unreliable because CSS shorthand inset:0 can win over longhand bottom.
+        // Strip inset from cssText, then explicitly set all four sides.
+        ov.style.cssText = ov.style.cssText.replace(/\binset\s*:[^;]+;?\s*/gi, '');
+        ov.style.top    = '0';
+        ov.style.left   = '0';
+        ov.style.right  = '0';
         ov.style.bottom = '14px';
+      }});
+      // Also clip any full-cover positioned direct children (e.g. .project-hero__img,
+      // .project-hero__overlay) that reach the section bottom and have pointer-events:auto.
+      // These can intercept pointer events on the handle even when the overlay inside
+      // them is clipped — because the parent element itself is still inset:0.
+      Array.from(sec.children).forEach(function(child) {{
+        if (child.hasAttribute('data-rd-section-handle')) return; // skip the handle itself
+        if (child.hasAttribute('data-rd-overlay')) return;        // already handled above
+        var cs = window.getComputedStyle(child);
+        if (cs.position !== 'absolute' && cs.position !== 'fixed') return;
+        if (cs.pointerEvents === 'none') return; // already non-interactive — skip
+        // Only clip elements whose bottom edge is flush with the section (bottom:0 or near 0)
+        // Use inline style or computed bottom to check — 'auto' means it's positioned by top+height
+        var inlineBottom = child.style.bottom;
+        var computedBottom = cs.bottom; // px value relative to containing block
+        var flush = (inlineBottom === '0' || inlineBottom === '0px') ||
+                    (computedBottom === '0px');
+        if (!flush) return;
+        child.style.bottom = '14px';
       }});
     }});
   }}
