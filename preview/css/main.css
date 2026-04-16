@@ -945,6 +945,35 @@ p { line-height: 1.8; }
   color: var(--white);
   line-height: 1.4;
 }
+/* Split panel support — mirrors diff__zone / diff__visual pattern exactly */
+.about-visual {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+}
+.about-visual__zone {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.about-visual--one .about-visual__zone--top { flex: 1; }
+.about-visual--one .about-visual__zone--bottom { display: none !important; }
+.about-visual--two .about-visual__zone--top { flex: 1; }
+.about-visual--two .about-visual__zone--bottom { flex: 1; }
+.about-visual__text {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  padding: clamp(1rem, 3vw, 2rem) clamp(1rem, 4vw, 2.5rem);
+  background: linear-gradient(to top, rgba(0,0,0,0.72) 0%, transparent 100%);
+  pointer-events: none;
+}
 
 .about-content .section__headline { margin-bottom: 1.5rem; }
 .about-content p {
