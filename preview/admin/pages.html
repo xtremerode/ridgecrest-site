@@ -1712,7 +1712,7 @@
     }
   });
 
-  function loadPage(slug) {
+  async function loadPage(slug) {
     if (!slug) return;
     // Save any in-progress hero/image edits on the current page before switching.
     // Fire-and-forget with the OLD slug captured before currentSlug changes.
@@ -1758,21 +1758,20 @@
       if (currentSlug === slug) _applyDeviceOverride(_currentDevice, slug);
     });
 
-    // Apply lock status from cache (or fetch if not cached)
-    const cachedLock = _pageLocks[slug] || 'development';
-    _applyLockUI(cachedLock);
-    // Also refresh from server in background to stay current
-    API(`/admin/api/locks/pages/${encodeURIComponent(slug)}`).then(res => {
-      if (res && res.ok === false && res.error) return; // error — keep cached
-    }).catch(() => {});
-    // Use check endpoint instead
-    API(`/admin/api/locks/check?slug=${encodeURIComponent(slug)}`).then(res => {
-      if (res && res.page) {
-        const status = res.page.status || 'development';
+    // Fetch lock status from DB (authoritative) — await so UI always reflects truth
+    // before the user can interact. Fall back to cache only if server fails.
+    try {
+      const lockRes = await API(`/admin/api/locks/check?slug=${encodeURIComponent(slug)}`);
+      if (lockRes && lockRes.page) {
+        const status = lockRes.page.status || 'development';
         _pageLocks[slug] = status;
-        if (currentSlug === slug) _applyLockUI(status);
+        _applyLockUI(status);
+      } else {
+        _applyLockUI(_pageLocks[slug] || 'development');
       }
-    }).catch(() => {});
+    } catch(_e) {
+      _applyLockUI(_pageLocks[slug] || 'development');
+    }
 
     // Reset iframe to standard viewport height before loading the new page.
     // Without this, a tall previous page leaves the iframe element taller than
@@ -2416,6 +2415,22 @@
   // ── Save logic ───────────────────────────────────────────────────────────
   let saveTimer = null;
 
+  // _putAPI: PUT wrapper that surfaces 423 (locked) as a thrown error with .status=423.
+  // Used by saveNow() to detect lock responses that API() silently swallows.
+  async function _putAPI(path, body) {
+    const res = await fetch(path, {
+      method: 'PUT',
+      headers: { 'X-Admin-Token': TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (res.status === 423) {
+      const err = new Error('Page is locked');
+      err.status = 423;
+      throw err;
+    }
+    return res.json();
+  }
+
   // saveNow: immediate, awaitable save — used on edit-mode exit and page switch.
   // Pass slugOverride when calling before currentSlug changes (e.g. loadPage).
   async function saveNow(slugOverride) {
@@ -2446,7 +2461,7 @@
     try {
       // Image changes always go to global (hero image is device-independent)
       if (snap.image) {
-        await API(`/admin/api/pages/${slug}`, { method: 'PUT', body: JSON.stringify({ hero_image: snap.image }) });
+        await _putAPI(`/admin/api/pages/${slug}`, { hero_image: snap.image });
         const pg = pages.find(p => p.slug === slug);
         if (pg) pg.hero_image = snap.image;
         _savedSomething = true;
@@ -2461,7 +2476,7 @@
         if (snap.textX != null) devPayload.hero_text_x = snap.textX;
         if (snap.textY != null) devPayload.hero_text_y = snap.textY;
         if (Object.keys(devPayload).length > 1) {
-          await API(`/admin/api/pages/${encodeURIComponent(slug)}/device-override`, { method: 'PUT', body: JSON.stringify(devPayload) });
+          await _putAPI(`/admin/api/pages/${encodeURIComponent(slug)}/device-override`, devPayload);
           if (!_deviceOverrides[slug]) _deviceOverrides[slug] = {tablet: null, mobile: null};
           _deviceOverrides[slug][dbDev] = {
             hero_zoom: snap.zoom != null ? snap.zoom : 1.0,
@@ -2481,7 +2496,7 @@
         if (snap.textX != null) payload.hero_text_x = snap.textX;
         if (snap.textY != null) payload.hero_text_y = snap.textY;
         if (Object.keys(payload).length) {
-          await API(`/admin/api/pages/${slug}`, { method: 'PUT', body: JSON.stringify(payload) });
+          await _putAPI(`/admin/api/pages/${slug}`, payload);
           const pg = pages.find(p => p.slug === slug);
           if (pg) {
             if (snap.zoom  != null) pg.hero_zoom = snap.zoom;
@@ -2500,7 +2515,11 @@
       }
     } catch(e) {
       if (currentSlug === slug) {
-        editStatus.textContent = 'Save failed — try again';
+        if (e.status === 423) {
+          editStatus.textContent = 'Page is locked — unlock it first';
+        } else {
+          editStatus.textContent = 'Save failed — try again';
+        }
         editStatus.className = 'edit-status';
       }
     }
