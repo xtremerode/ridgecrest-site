@@ -2806,11 +2806,16 @@
       // Strip the !important height CSS for this section so the drag handler's
       // inline style can take effect. Without this, _updateViewportFix's
       // !important rule beats the inline style and the section won't resize visually.
+      // IMPORTANT: use the CSS class selector, not section_id — they differ for page-hero
+      // (section_id='page-hero' → CSS class '.page-hero--service').
       try {
         const doc = siteFrame.contentDocument;
         const vpFix = doc && doc.getElementById('rd-preview-viewport-fix');
         if (vpFix) {
-          const re = new RegExp(`\\.${d.section_id}\\{height:[^}]+\\}`);
+          const _sectionToCss = { 'hero': 'hero', 'project-hero': 'project-hero', 'page-hero': 'page-hero--service' };
+          const cssClass = _sectionToCss[d.section_id] || d.section_id;
+          // Strip any rule for this CSS class (height, min-height, max-height)
+          const re = new RegExp(`\\.${cssClass}\\{[^}]+\\}`);
           vpFix.textContent = vpFix.textContent.replace(re, '');
         }
       } catch(e) {}
