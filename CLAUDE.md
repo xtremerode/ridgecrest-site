@@ -437,8 +437,8 @@ All non-project pages are being converted to left-aligned hero with "Start Your 
 | `process.html` | Done ✓ |
 | `contact.html` | Done ✓ |
 | `portfolio.html` | Done ✓ (hero_text_x/y reset to 0 — had stale offsets from wrong-page-save bug) |
-| `services.html` | Pending — needs inner wrapper + left-align + CTA |
-| `team.html` | Pending — needs inner wrapper + left-align + CTA |
+| `services.html` | Pending — NOT updated (reverted 2026-04-16; session summary error) |
+| `team.html` | Pending — NOT updated (reverted 2026-04-16; session summary error) |
 | `kitchen-remodels.html` | Skipped — user likes existing hero/CTA structure |
 | `bathroom-remodels.html` | Skipped — user likes existing hero/CTA structure |
 | `whole-house-remodels.html` | Skipped — user likes existing hero/CTA structure |
@@ -461,3 +461,69 @@ If non-zero, reset both to 0 before deploying the HTML change. Failure to do thi
 - Publish button flushes pending saves before snapshot runs
 - Overlay drag handle targets `.hero__content, .page-hero__inner` (secondary pages now draggable after server restart)
 - All 103 page locks reset to 'development' via SQL on 2026-04-16
+
+---
+
+## 25. Card Editability System — Audit & Pending Work (2026-04-16)
+
+Every image/card element on every page must have a `data-card-id` attribute so the edit pill appears in admin Edit Mode. The system is zero-risk for new elements: if no DB record exists, the element is unchanged on page load. The first admin edit creates the DB record.
+
+### How the Card System Works
+- Admin overlay runs `document.querySelectorAll('[data-card-id]')` on edit mode entry
+- `window.__RD_CARDS` from DB drives background-image injection on page load
+- `card_settings` table: one row per `data-card-id`, created on first save
+- Single source of truth: DB → `__RD_CARDS` → element style
+
+### Conflict Check Rules (MANDATORY before adding any data-card-id)
+- Does the element already have `data-card-id`? → SKIP — already editable
+- Does the element use `.hero__bg` + `__RD_HERO` injection? → SKIP — hero system owns it, do NOT add `data-card-id`
+- Does the element have existing JS event listeners targeting it? → Flag first
+
+### Elements Already Editable (DO NOT TOUCH)
+| Element | Page(s) | Mechanism |
+|---|---|---|
+| Homepage hero background | `index.html` | `.hero__bg` + `__RD_HERO` controls |
+| 4 service cards | `index.html` | `data-card-id` ✓ |
+| 2 differentiator zone images | `index.html` | `data-card-id` ✓ |
+| 4 featured portfolio images | `portfolio.html` | `data-card-id` ✓ |
+| About visual section | `about.html` | `data-card-id` ✓ (added 2026-04-16) |
+| Background image | `start-a-project.html` | `data-card-id` ✓ (added 2026-04-16) |
+| Founder photo | `team.html` | `data-card-id` ✓ (added 2026-04-16) |
+| All gallery images | All 9 project pages | `data-card-id` (dozens each) |
+| All gallery images | kitchen, bath, whole-house, custom pages | `data-card-id` ✓ |
+
+### Implementation Complete — 6 Groups (ALL DONE 2026-04-16)
+All 107 elements across 87 files now have `data-card-id`. Committed `4bad044` (Groups 1–4, 6) and `dbee7a8` (Group 5).
+
+**Group 1 — Project page heroes (9 files) ✓**
+`data-card-id="[page]-hero"` added to `.project-hero__img` on all 9 project pages
+
+**Group 2 — Homepage portfolio cards ✓**
+`data-card-id="home-portfolio-1"` through `"home-portfolio-4"` on `index.html`
+
+**Group 3 — Service category page heroes ✓**
+`kitchen-hero`, `bathroom-hero`, `whole-house-hero`, `custom-homes-hero` on their respective pages
+
+**Group 4 — Services/ subpages ✓**
+All 72 files in `preview/services/` — each gets `data-card-id="services-[filename-stem]-hero"` (scripted via sed loop)
+
+**Group 5 — Dynamic team cards ✓**
+`team.html` JS template injects `data-card-id="team-member-${m.id}"` at runtime. Static founder card (`team-member-1`) untouched.
+
+**Group 6 — allprojects.html cards ✓**
+All 18 `.proj-card__img` divs get `data-card-id="allproj-[slug]"` (e.g. `allproj-sierra-mountain-ranch`)
+
+### Color Cycling Fix for CSS ::before/::after Cards (2026-04-16)
+Cards with CSS `::before`/`::after` pseudo-elements (e.g. `.about-visual`) could not show color cycling because the pseudo-element gradient covered the card background. Fix: the card overlay JS now dynamically injects a `<style>` that sets `element::before { display: none }` when a color is applied (CSS class `rd-card--color-mode`), restoring it when switched back to image mode. Implemented in `preview_server.py` `_CARD_EDIT_OVERLAY_TPL`. Committed `e74ac83`.
+
+---
+
+## 26. AGENT_RULES.md — Key Rules Summary (2026-04-16)
+
+Full file at `/home/claudeuser/agent/ridgecrest-agency/rules/AGENT_RULES.md`
+
+- **Rule 12: Full Inventory Before Touching Any Files** — List all files, grep for pattern, read every match, confirm with Henry. Also: conflict check before adding any `data-card-id` (grep for existing attribute first). Origin: April 16 — missed 6 pages by not running full inventory.
+- **Rule 13: Never Execute Stale Tasks from Session Summary** — Session summaries are context, not a work queue. Only complete a single atomic carry-over action (e.g. a pending POST commit). Then stop and wait. Origin: April 16 — Claude executed services.html/team.html hero restructure from stale summary when Henry had moved on to card editability.
+- **Rule 14: Single Source of Truth — No Duplicate Data Paths** — Every element must have exactly one owner (DB table, JS injection, or static HTML). Never add a second mechanism for the same element. Check what already controls an element before adding new logic. Origin: April 16 — about-visual had both a `data-card-id` and a `::before` gradient covering it, causing visible conflicts.
+- **Rule 17: Backup Protocol** — PRE git commit before change, POST git commit after, pg_dump before any DB change.
+- **Rule 19: Rule 11 = End-to-End Verification** — File on disk + browser URL 200 + rendered effect — all three must pass before declaring done.
