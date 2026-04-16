@@ -423,10 +423,16 @@ p { line-height: 1.8; }
 [data-card-id].rd-card--image-mode:hover {
   filter: none;
 }
+/* ── Portfolio featured cards: overlay handled by .portfolio-featured__overlay div, not ::before ── */
+.portfolio-featured__img.rd-card--image-mode::before { display: none !important; }
+.portfolio-featured__img.rd-card--image-mode:hover::before { display: none !important; }
 /* ── Team headshots: no gradient overlay, no brightness hover ── */
 .team-card__photo.rd-card--image-mode::before { display: none !important; }
 .team-card__photo.rd-card--image-mode:hover::before { display: none !important; }
 .team-card__photo[data-card-id]:hover { filter: none !important; }
+/* ── Portfolio featured image panels: overlay div handles hover, no brightness filter ── */
+.portfolio-featured__img[data-card-id] { transition: transform 0.6s ease !important; }
+.portfolio-featured__img[data-card-id]:hover { filter: none !important; }
 /* ── Featured home image panels: static, no hover effects ── */
 .featured-home__img[data-card-id] { transition: none !important; }
 .featured-home__img[data-card-id]:hover { filter: none !important; }
