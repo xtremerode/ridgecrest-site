@@ -965,14 +965,6 @@ _CARD_EDIT_OVERLAY_TPL = """\
 <script id="rd-card-edit-overlay">
 (function(){{
   'use strict';
-  // Inject pseudo-element suppression rule once — hides ::before/::after on cards in color mode
-  // so the background color set by the card system is visible through the gradient overlay.
-  if (!document.getElementById('rd-card-edit-pseudo-suppress')) {{
-    var _rdPseudoStyle = document.createElement('style');
-    _rdPseudoStyle.id = 'rd-card-edit-pseudo-suppress';
-    _rdPseudoStyle.textContent = '[data-card-id].rd-card--color-mode::before,[data-card-id].rd-card--color-mode::after{{display:none!important}}';
-    (document.head || document.documentElement).appendChild(_rdPseudoStyle);
-  }}
   var SLUG = {slug_json};
   var TOKEN = {token_json};
   var COLORS = ['#1C1C1C','#1a2a35','#2a2218','#1e2e24','#212830'];
@@ -1045,14 +1037,12 @@ _CARD_EDIT_OVERLAY_TPL = """\
       el.style.backgroundSize = z > 1.001 ? Math.round(z*100) + '%' : 'cover';
       el.style.backgroundPosition = state.position || '50% 50%';
       el.classList.add('rd-card--image-mode');
-      el.classList.remove('rd-card--color-mode');
     }} else {{
       el.style.backgroundImage = '';
       el.style.backgroundSize = '';
       el.style.backgroundPosition = '';
       el.style.background = state.color || '#1C1C1C';
       el.classList.remove('rd-card--image-mode');
-      el.classList.add('rd-card--color-mode');
     }}
   }}
 
@@ -3555,21 +3545,6 @@ def view(filename):
             _dm_script = f'<script>window.__RD_DIFF_MODE={_safe_js(_diff_mode)};</script>'.encode('utf-8')
             if b'</head>' in content:
                 content = content.replace(b'</head>', _dm_script + b'</head>', 1)
-
-        # Inject about-visual panel mode for about page
-        if HAS_DB and slug == 'about':
-            try:
-                _av_conn = _db_conn()
-                _av_cur = _av_conn.cursor()
-                _av_cur.execute("SELECT value FROM system_settings WHERE key = 'about_visual_mode'")
-                _av_row = _av_cur.fetchone()
-                _av_conn.close()
-                _av_mode = _av_row['value'] if _av_row else 'one'
-            except Exception:
-                _av_mode = 'one'
-            _av_script = f'<script>window.__RD_ABOUT_VISUAL_MODE={_safe_js(_av_mode)};</script>'.encode('utf-8')
-            if b'</head>' in content:
-                content = content.replace(b'</head>', _av_script + b'</head>', 1)
 
         # [PX] Apply per-device section heights
         if HAS_DB:
@@ -6418,37 +6393,6 @@ def admin_diff_mode():
             return jsonify({'error': 'mode must be one or two'}), 400
         cur.execute("""INSERT INTO system_settings(key, value)
                        VALUES('home_diff_mode', %s)
-                       ON CONFLICT(key) DO UPDATE SET value=%s, updated_at=now()""",
-                    (mode, mode))
-        conn.commit()
-        conn.close()
-        return jsonify({'ok': True, 'mode': mode})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/admin/api/pages/about-visual-mode', methods=['GET', 'POST'])
-def admin_about_visual_mode():
-    """Get or set the about-visual panel count (one|two) for the about page."""
-    auth = _require_admin()
-    if auth: return auth
-    conn = _db_conn()
-    if not conn:
-        return jsonify({'error': 'no db'}), 503
-    try:
-        cur = conn.cursor()
-        if request.method == 'GET':
-            cur.execute("SELECT value FROM system_settings WHERE key = 'about_visual_mode'")
-            row = cur.fetchone()
-            conn.close()
-            return jsonify({'mode': row['value'] if row else 'one'})
-        data = request.get_json(silent=True) or {}
-        mode = data.get('mode', 'one')
-        if mode not in ('one', 'two'):
-            conn.close()
-            return jsonify({'error': 'mode must be one or two'}), 400
-        cur.execute("""INSERT INTO system_settings(key, value)
-                       VALUES('about_visual_mode', %s)
                        ON CONFLICT(key) DO UPDATE SET value=%s, updated_at=now()""",
                     (mode, mode))
         conn.commit()
