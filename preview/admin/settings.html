@@ -105,6 +105,37 @@
           </div>
         </div>
 
+        <!-- Nav Band Opacity -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Nav Bar Overlay</div>
+              <div class="card-sub">Controls the dark band behind the navigation bar (pre-scroll state)</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;">
+              <div style="flex:1;max-width:320px;">
+                <label class="form-label" style="margin-bottom:6px;">Background Opacity</label>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <input class="form-input" id="navBandOpacity" type="text" inputmode="decimal" style="width:80px;text-align:center;font-family:monospace;font-size:14px;" placeholder="0.6" />
+                  <span style="font-size:12px;color:var(--text-3);">0 = transparent &nbsp;&middot;&nbsp; 1 = solid black</span>
+                </div>
+              </div>
+            </div>
+            <div id="navBandPreview" style="position:relative;border-radius:8px;overflow:hidden;height:64px;background:url('/assets/images-opt/ff5b18_c520c9ca384d4c3ebe02707d0c8f45ab_mv2_960w.webp') center/cover no-repeat;margin-bottom:12px;">
+              <div id="navBandPreviewBar" style="position:absolute;top:0;left:0;right:0;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;padding:0 20px;transition:background 0.15s ease;">
+                <span style="color:#fff;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;font-weight:500;opacity:0.9;">RIDGECREST DESIGNS</span>
+                <span style="margin-left:auto;color:rgba(255,255,255,0.7);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;">About &nbsp; Process &nbsp; Services &nbsp; Portfolio</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <button class="btn btn-primary btn-sm" onclick="navBandSave()">Save Opacity</button>
+              <span id="navBandStatus" style="font-size:12px;color:var(--text-3);"></span>
+            </div>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-header"><div class="card-title">Business Information</div></div>
           <div class="card-body">
@@ -511,6 +542,7 @@
   // Load general tab state on page init
   document.addEventListener('DOMContentLoaded', function() {
     logoLoadState();
+    navBandLoadState();
   });
 
   // Show/hide panels on tab click
@@ -670,6 +702,62 @@
   }
 
   // ── Logo upload feature ────────────────────────────────────────────────────
+  // ── Nav Band Opacity ─────────────────────────────────────────
+  async function navBandLoadState() {
+    try {
+      var res = await Admin.get('/settings/nav-band');
+      if (res && typeof res.opacity === 'number') {
+        document.getElementById('navBandOpacity').value = res.opacity;
+        navBandUpdatePreview(res.opacity);
+      }
+    } catch(e) {}
+  }
+
+  function navBandUpdatePreview(val) {
+    var bar = document.getElementById('navBandPreviewBar');
+    if (bar) bar.style.background = 'rgba(0,0,0,' + val + ')';
+  }
+
+  // Live preview as user types
+  document.addEventListener('DOMContentLoaded', function() {
+    var inp = document.getElementById('navBandOpacity');
+    if (inp) {
+      inp.addEventListener('input', function() {
+        var val = parseFloat(this.value);
+        if (!isNaN(val) && val >= 0 && val <= 1) {
+          navBandUpdatePreview(val);
+          document.getElementById('navBandStatus').textContent = '';
+        } else if (this.value !== '' && this.value !== '.') {
+          document.getElementById('navBandStatus').textContent = 'Enter a value between 0 and 1';
+          document.getElementById('navBandStatus').style.color = 'var(--red)';
+        }
+      });
+    }
+  });
+
+  async function navBandSave() {
+    var inp = document.getElementById('navBandOpacity');
+    var status = document.getElementById('navBandStatus');
+    var val = parseFloat(inp.value);
+    if (isNaN(val) || val < 0 || val > 1) {
+      Admin.toast('Opacity must be a number between 0 and 1', 'error');
+      return;
+    }
+    status.textContent = 'Saving...';
+    status.style.color = 'var(--text-3)';
+    var res = await Admin.post('/settings/nav-band', { opacity: val });
+    if (res && res.ok) {
+      Admin.toast('Nav bar opacity updated to ' + val, 'success');
+      status.textContent = 'Saved';
+      status.style.color = 'var(--green)';
+      setTimeout(function() { status.textContent = ''; }, 3000);
+    } else {
+      Admin.toast('Failed to save: ' + (res ? res.error : 'unknown error'), 'error');
+      status.textContent = 'Error';
+      status.style.color = 'var(--red)';
+    }
+  }
+
   async function logoLoadState() {
     try {
       const res = await Admin.get('/settings/logo');

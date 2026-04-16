@@ -12,7 +12,7 @@
    Approved: 2026-04-08 — opacity 0.6 after testing 0.95 (too heavy) and 0.4 (too light)
 */
 .nav:not(.nav--scrolled) {
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, var(--nav-band-opacity, 0.6));
   padding: 1rem clamp(1rem, calc(10vw - 112px), 2rem);
 }
 

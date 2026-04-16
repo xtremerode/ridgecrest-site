@@ -18,6 +18,12 @@
 // Nav scroll
 const nav = document.getElementById('nav');
 if (nav) {
+  // [PX] Apply admin-controlled nav band opacity (pre-scroll state)
+  var _navOpacity = window.__RD_NAV_OPACITY;
+  if (typeof _navOpacity === 'number') {
+    nav.style.setProperty('--nav-band-opacity', _navOpacity);
+  }
+
   window.addEventListener('scroll', () => {
     nav.classList.toggle('nav--scrolled', window.scrollY > 60);
   });

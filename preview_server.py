@@ -3584,6 +3584,22 @@ def view(filename):
         else:
             content = _logo_script + content
 
+        # [PX] Inject nav band opacity from system_settings
+        _nav_opacity = 0.6  # default
+        if HAS_DB:
+            try:
+                _nbo_conn = _db_conn()
+                _nbo_cur = _nbo_conn.cursor()
+                _nbo_cur.execute("SELECT value FROM system_settings WHERE key = 'nav_band_opacity'")
+                _nbo_row = _nbo_cur.fetchone()
+                _nbo_conn.close()
+                if _nbo_row:
+                    _nav_opacity = float(_nbo_row['value'])
+            except Exception:
+                pass
+        _nbo_script = f'<script>window.__RD_NAV_OPACITY={_safe_js(_nav_opacity)};</script>'.encode('utf-8')
+        if b'</head>' in content:
+            content = content.replace(b'</head>', _nbo_script + b'</head>', 1)
 
         # [PX] Inject favicon + apple-touch-icon if not already present
         if b"favicon" not in content and b"</head>" in content:
@@ -5340,7 +5356,21 @@ def _blog_head_extras(head_html):
         _logo_url = "/assets/images/logo.png"
     else:
         _logo_url = None
+    # Nav band opacity from system_settings
+    _nav_opacity = 0.6  # default
+    if HAS_DB:
+        try:
+            _nbo_conn = _db_conn()
+            _nbo_cur = _nbo_conn.cursor()
+            _nbo_cur.execute("SELECT value FROM system_settings WHERE key = 'nav_band_opacity'")
+            _nbo_row = _nbo_cur.fetchone()
+            _nbo_conn.close()
+            if _nbo_row:
+                _nav_opacity = float(_nbo_row['value'])
+        except Exception:
+            pass
     inject = f"<script>window.__RD_LOGO_URL={_safe_js(_logo_url)};</script>"
+    inject += f"\n  <script>window.__RD_NAV_OPACITY={_safe_js(_nav_opacity)};</script>"
     inject += '\n  <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">'
     inject += '\n  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">'
     if "</head>" in head_html:
@@ -6435,6 +6465,43 @@ def admin_diff_mode():
         conn.commit()
         conn.close()
         return jsonify({'ok': True, 'mode': mode})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/settings/nav-band', methods=['GET', 'POST'])
+def admin_nav_band_opacity():
+    """Get or set the nav bar overlay opacity (0-1). Stored in system_settings."""
+    auth = _require_admin()
+    if auth: return auth
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'no db'}), 503
+    try:
+        cur = conn.cursor()
+        if request.method == 'GET':
+            cur.execute("SELECT value FROM system_settings WHERE key = 'nav_band_opacity'")
+            row = cur.fetchone()
+            conn.close()
+            return jsonify({'opacity': float(row['value']) if row else 0.6})
+        data = request.get_json(silent=True) or {}
+        raw = data.get('opacity', 0.6)
+        try:
+            opacity = float(raw)
+        except (ValueError, TypeError):
+            conn.close()
+            return jsonify({'error': 'opacity must be a number'}), 400
+        if opacity < 0 or opacity > 1:
+            conn.close()
+            return jsonify({'error': 'opacity must be between 0 and 1'}), 400
+        val_str = str(round(opacity, 2))
+        cur.execute("""INSERT INTO system_settings(key, value)
+                       VALUES('nav_band_opacity', %s)
+                       ON CONFLICT(key) DO UPDATE SET value=%s, updated_at=now()""",
+                    (val_str, val_str))
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True, 'opacity': opacity})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
