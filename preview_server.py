@@ -2803,7 +2803,7 @@ _SECTION_RESIZE_TPL = """\
   }}
 
   // Footer uses auto height and should never be pixel-overridden
-  var SKIP_SECTIONS = {{'footer': true}};
+  var SKIP_SECTIONS = {{'footer': true, 'section': true}};
 
   function init() {{
     document.querySelectorAll('section').forEach(function(sec) {{
