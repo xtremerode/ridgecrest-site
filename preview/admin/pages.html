@@ -2388,8 +2388,18 @@
         // /view/ (root index) produces empty string → treat as 'home'
         const newSlug = rawSlug || (iframePath.includes('/view/') ? 'home' : currentSlug);
         if (newSlug && newSlug !== currentSlug) {
+          if (editMode && _heroTouched) {
+            saveNow(currentSlug);
+          }
           currentSlug = newSlug;
           syncTreeActive(currentSlug);
+          _heroTouched = false;
+          pendingImage = null;
+          pendingZoom = null;
+          pendingPosX = null;
+          pendingPosY = null;
+          pendingTextX = null;
+          pendingTextY = null;
         }
       }
     } catch(e) {}
