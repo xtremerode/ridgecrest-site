@@ -465,14 +465,6 @@ p { line-height: 1.8; }
 }
 .service-card__link:hover { color: var(--white); }
 
-/* [TEST] Text shadow on kitchen remodels card only — scoped by data-card-id */
-[data-card-id="service-kitchen-remodels"] .service-card__num,
-[data-card-id="service-kitchen-remodels"] .service-card__title,
-[data-card-id="service-kitchen-remodels"] .service-card__body,
-[data-card-id="service-kitchen-remodels"] .service-card__link {
-  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
-}
-
 /* ============================================================
    DIFFERENTIATORS
    ============================================================ */
