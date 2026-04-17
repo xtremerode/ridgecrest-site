@@ -142,11 +142,14 @@
 }
 
 .service-project__link {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   background: var(--charcoal);
   color: var(--off-white);
   padding: 2.5rem;
   transition: background var(--transition);
+  box-sizing: border-box;
 }
 
 .service-project__link:hover {
