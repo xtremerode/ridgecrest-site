@@ -825,6 +825,48 @@ def _strip_hero_card_ids(content: bytes) -> bytes:
         return content
 
 
+def _upgrade_card_images(cards: list) -> list:
+    """Upgrade _960w → _1920w for background-image cards at serve time.
+
+    Context: the admin image picker saves _960w paths to card_settings. At
+    typical card display widths (~656 px) a 960 px source downscales only 1.46×,
+    which causes moiré on fine-detail images (wire mesh, grilles). A 1920 px
+    source downscales 2.93× and browser anti-aliasing renders cleanly.
+
+    Scope: only background-image cards (mode='image') whose image path ends in
+    _960w.webp and whose card_id does NOT contain '-gal-' (gallery items are
+    rendered as <img> tags and handled separately by the srcset pipeline).
+
+    The upgrade is conditional: if the _1920w file does not exist on disk, the
+    original _960w path is kept (safe fallback for images that were never
+    optimised to 1920 w).
+    """
+    import os as _os
+    upgraded = []
+    for card in cards:
+        c = dict(card)
+        cid = c.get('card_id', '')
+        if (
+            c.get('mode') == 'image'
+            and c.get('image')
+            and '-gal-' not in cid
+        ):
+            img = c['image']
+            # Strip query strings for path resolution
+            img_path = img.split('?')[0]
+            if img_path.endswith('_960w.webp'):
+                candidate = img_path.replace('_960w.webp', '_1920w.webp')
+                # Build absolute filesystem path for existence check
+                rel = candidate.lstrip('/')
+                # Strip leading 'assets/' prefix used in URLs
+                # Images live at PREVIEW_DIR/assets/images-opt/<name>.webp
+                abs_path = _os.path.join(PREVIEW_DIR, rel)
+                if _os.path.isfile(abs_path):
+                    c['image'] = candidate
+        upgraded.append(c)
+    return upgraded
+
+
 def _inject_auto_section_ids(html: str) -> str:
     """Inject data-rd-section on <section> elements and hero <div>s that lack them.
     Algorithm mirrors the JS _seenIds counter so IDs are consistent between server
@@ -3695,6 +3737,7 @@ def view(filename):
         if HAS_DB:
             cards = _snap_cards if _snap_cards is not None else _get_card_settings(slug)
             if cards:
+                cards = _upgrade_card_images(cards)
                 content = _apply_cards_to_html(content, cards)
 
         # Inject diff panel mode for home page
