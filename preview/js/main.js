@@ -245,3 +245,26 @@ document.querySelectorAll('.service-card, .step, .portfolio-card, .portfolio-ite
   vis.classList.remove('about-visual--one', 'about-visual--two');
   vis.classList.add('about-visual--' + mode);
 })();
+
+
+// ── Mobile touch hover simulation ────────────────────────────
+// Adds .is-touched class on tap, removes on touchend/delay.
+// Only active on touch devices (hover: none).
+(function() {
+  if (window.matchMedia && window.matchMedia('(hover: hover)').matches) return;
+  var active = null;
+  document.addEventListener('touchstart', function(e) {
+    var card = e.target.closest('[data-card-id], .portfolio-featured__card, .service-card');
+    if (!card) return;
+    if (active && active !== card) active.classList.remove('is-touched');
+    card.classList.add('is-touched');
+    active = card;
+  }, { passive: true });
+  document.addEventListener('touchend', function() {
+    if (active) {
+      var el = active;
+      setTimeout(function() { el.classList.remove('is-touched'); }, 300);
+      active = null;
+    }
+  }, { passive: true });
+})();

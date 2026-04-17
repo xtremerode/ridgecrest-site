@@ -389,8 +389,12 @@ p { line-height: 1.8; }
   position: relative;
   overflow: hidden;
 }
-.service-card:hover { background: #242424; }
-.service-card.rd-card--image-mode:hover { background: transparent; }
+@media (hover: hover) {
+  .service-card:hover { background: #242424; }
+  .service-card.rd-card--image-mode:hover { background: transparent; }
+}
+.service-card.is-touched { background: #242424; }
+.service-card.rd-card--image-mode.is-touched { background: transparent; }
 
 /* ── Card image-mode overlay (gradient so text stays readable) ── */
 .rd-card--image-mode {
@@ -405,7 +409,13 @@ p { line-height: 1.8; }
   pointer-events: none;
   transition: background 0.3s ease;
 }
-.rd-card--image-mode:hover::before {
+@media (hover: hover) {
+  .rd-card--image-mode:hover::before {
+    background: var(--rd-overlay, rgba(0, 0, 0, var(--card-overlay-hover, 0.3)));
+  }
+}
+/* Touch equivalent for mobile */
+.rd-card--image-mode.is-touched::before {
   background: var(--rd-overlay, rgba(0, 0, 0, var(--card-overlay-hover, 0.3)));
 }
 .rd-card--image-mode > * {
@@ -417,10 +427,19 @@ p { line-height: 1.8; }
 [data-card-id] {
   transition: filter 0.2s ease;
 }
-[data-card-id]:hover {
+@media (hover: hover) {
+  [data-card-id]:hover {
+    filter: brightness(1.15);
+  }
+  [data-card-id].rd-card--image-mode:hover {
+    filter: none;
+  }
+}
+/* Touch equivalents */
+[data-card-id].is-touched {
   filter: brightness(1.15);
 }
-[data-card-id].rd-card--image-mode:hover {
+[data-card-id].rd-card--image-mode.is-touched {
   filter: none;
 }
 /* ── Portfolio featured cards: overlay handled by .portfolio-featured__overlay div, not ::before ── */
