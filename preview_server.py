@@ -854,7 +854,13 @@ def _strip_hero_card_ids(content: bytes) -> bytes:
     This is the architectural fix for the dual-system conflict: one attribute =
     one system. Card overlay → data-card-id elements only. Hero overlay →
     page-hero--service divs (no data-card-id needed or wanted).
+
+    Allowlist: hero divs explicitly enrolled in the gradient card system keep
+    their data-card-id so the G button and card apply-script can reach them.
     """
+    # Hero card IDs that intentionally use the card system for gradient control
+    _HERO_GRADIENT_ALLOWLIST = {'portfolio-hero'}
+
     try:
         s = content.decode('utf-8', errors='replace')
 
@@ -862,6 +868,9 @@ def _strip_hero_card_ids(content: bytes) -> bytes:
             tag = m.group(0)
             if 'page-hero--service' not in tag:
                 return tag
+            id_match = re.search(r'data-card-id="([^"]*)"', tag)
+            if id_match and id_match.group(1) in _HERO_GRADIENT_ALLOWLIST:
+                return tag  # preserve allowlisted IDs
             return re.sub(r'\s+data-card-id="[^"]*"', '', tag)
 
         s = re.sub(r'<div\b[^>]*>', _remove_card_id_from_hero, s)
