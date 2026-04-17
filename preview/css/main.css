@@ -433,6 +433,8 @@ p { line-height: 1.8; }
 /* ── Portfolio featured image panels: overlay div handles hover, no brightness filter ── */
 .portfolio-featured__img[data-card-id] { transition: transform 0.6s ease !important; }
 .portfolio-featured__img[data-card-id]:hover { filter: none !important; }
+/* ── Page hero sections: full-bleed, not interactive cards — no brightness on hover ── */
+.page-hero--service[data-card-id]:hover { filter: none !important; }
 /* ── Featured home image panels: static, no hover effects ── */
 .featured-home__img[data-card-id] { transition: none !important; }
 .featured-home__img[data-card-id]:hover { filter: none !important; }

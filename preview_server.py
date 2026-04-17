@@ -1110,6 +1110,12 @@ _CARD_APPLY_SCRIPT = """\
         el.style.backgroundImage = '';
         el.classList.remove('rd-card--image-mode');
       }
+      // Apply gradient regardless of image/color mode — heroes have a persistent ::before
+      // that exists without rd-card--image-mode. For regular cards this is a no-op (no ::before
+      // without the class). Guard excludes gallery thumbnails (data-src).
+      if (c.gradient_css && !el.hasAttribute('data-src')) {
+        el.style.setProperty('--rd-overlay', c.gradient_css);
+      }
       // Apply saved text block position
       if ((c.text_x != null || c.text_y != null) && !el.hasAttribute('data-src')) {
         var tb = el.querySelector('[data-rd-textblock]');
