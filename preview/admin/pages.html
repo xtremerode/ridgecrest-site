@@ -142,6 +142,72 @@
     }
     .header-actions select:focus { outline: none; border-color: var(--accent, #3b82f6); }
 
+    /* ── Gradient Panel ── */
+    #gradientPanel {
+      display: none;
+      position: fixed;
+      z-index: 10010;
+      background: #1a2332;
+      border: 1px solid #2a3748;
+      border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.7);
+      padding: 16px;
+      width: 256px;
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+      color: #e2e8f0;
+    }
+    #gradientPanel.open { display: block; }
+    .gp-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .gp-close {
+      background: none; border: none;
+      color: #94a3b8; cursor: pointer;
+      font-size: 18px; padding: 0 2px; line-height: 1;
+    }
+    .gp-close:hover { color: #e2e8f0; }
+    .gp-row { margin-bottom: 12px; }
+    .gp-label {
+      display: block;
+      font-size: 11px; font-weight: 600;
+      color: #64748b; margin-bottom: 5px;
+    }
+    .gp-seg {
+      display: flex;
+      border: 1px solid #2a3748;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .gp-seg button {
+      flex: 1; padding: 5px 0;
+      background: #0f1923; border: none;
+      color: #64748b; font-size: 11px; font-weight: 600;
+      cursor: pointer; transition: background .1s, color .1s;
+    }
+    .gp-seg button.active { background: #3b82f6; color: #fff; }
+    .gp-seg button:not(:first-child) { border-left: 1px solid #2a3748; }
+    .gp-slider { width: 100%; accent-color: #7c3aed; cursor: pointer; margin-top: 2px; }
+    .gp-slider-val { float: right; font-size: 11px; color: #7c3aed; font-weight: 700; }
+    .gp-fade-opts { display: none; }
+    .gp-fade-opts.show { display: block; }
+    #gradientPanel .gp-save {
+      width: 100%; padding: 7px; margin-top: 4px;
+      background: #7c3aed; color: #fff;
+      border: none; border-radius: 4px;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+    }
+    #gradientPanel .gp-save:hover { background: #6d28d9; }
+    #gradientPanel .gp-save:disabled { background: #374151; color: #6b7280; cursor: default; }
+
     /* ── Image Picker Modal ── */
     .picker-backdrop {
       display: none;          /* hidden by default — no invisible overlay risk */
@@ -778,6 +844,47 @@
       <div id="secDragOverlay" style="display:none;position:absolute;inset:0;z-index:99999;cursor:ns-resize;"></div>
     </div>
   </div>
+</div>
+
+<!-- Gradient Panel (floating, position-fixed, outside iframe) -->
+<div id="gradientPanel">
+  <div class="gp-title">Gradient Overlay <button class="gp-close" id="gpClose">&times;</button></div>
+  <div class="gp-row">
+    <label class="gp-label">Type</label>
+    <div class="gp-seg" id="gpTypeRow">
+      <button data-gv="none" class="active">None</button>
+      <button data-gv="solid">Solid</button>
+      <button data-gv="fade">Fade</button>
+    </div>
+  </div>
+  <div class="gp-row">
+    <label class="gp-label">Tint</label>
+    <div class="gp-seg" id="gpTintRow">
+      <button data-gv="dark" class="active">Dark</button>
+      <button data-gv="light">Light</button>
+      <button data-gv="warm">Warm</button>
+    </div>
+  </div>
+  <div class="gp-row">
+    <label class="gp-label">Opacity <span class="gp-slider-val" id="gpOpacityVal">50%</span></label>
+    <input type="range" class="gp-slider" id="gpOpacity" min="0" max="100" value="50" />
+  </div>
+  <div class="gp-fade-opts" id="gpFadeOpts">
+    <div class="gp-row">
+      <label class="gp-label">Direction</label>
+      <div class="gp-seg" id="gpDirRow">
+        <button data-gv="bottom" class="active" title="Fade from bottom">↑</button>
+        <button data-gv="top" title="Fade from top">↓</button>
+        <button data-gv="left" title="Fade from left">→</button>
+        <button data-gv="right" title="Fade from right">←</button>
+      </div>
+    </div>
+    <div class="gp-row">
+      <label class="gp-label">Distance <span class="gp-slider-val" id="gpDistVal">80%</span></label>
+      <input type="range" class="gp-slider" id="gpDist" min="10" max="100" value="80" />
+    </div>
+  </div>
+  <button class="gp-save" id="gpSave">Save Gradient</button>
 </div>
 
 <!-- Image Picker Modal -->
@@ -2858,6 +2965,9 @@
         editStatus.className = 'edit-status';
       }
     }
+    if (d.type === 'rd_gradient_open') {
+      _gpOpen(d);
+    }
     if (d.type === 'rd_gallery_save') {
       // Block writes on locked pages — consistent with saveNow/scheduleSave
       if (currentPageLock === 'locked') {
@@ -2888,6 +2998,127 @@
       });
     }
   });
+
+  // ── Gradient Panel ──────────────────────────────────────────────────────────
+  (function() {
+    const panel      = document.getElementById('gradientPanel');
+    const gpClose    = document.getElementById('gpClose');
+    const gpTypeRow  = document.getElementById('gpTypeRow');
+    const gpTintRow  = document.getElementById('gpTintRow');
+    const gpOpacity  = document.getElementById('gpOpacity');
+    const gpOpacityVal = document.getElementById('gpOpacityVal');
+    const gpDist     = document.getElementById('gpDist');
+    const gpDistVal  = document.getElementById('gpDistVal');
+    const gpDirRow   = document.getElementById('gpDirRow');
+    const gpFadeOpts = document.getElementById('gpFadeOpts');
+    const gpSave     = document.getElementById('gpSave');
+    let _gp = null; // { cardId, cardState, gradient }
+
+    function _seg(row, val) {
+      row.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.getAttribute('data-gv') === val));
+    }
+    function _getSeg(row) {
+      const a = row.querySelector('button.active');
+      return a ? a.getAttribute('data-gv') : null;
+    }
+    function _read() {
+      return {
+        gradient_type:      _getSeg(gpTypeRow) || 'none',
+        gradient_tint:      _getSeg(gpTintRow) || 'dark',
+        gradient_opacity:   parseInt(gpOpacity.value),
+        gradient_direction: _getSeg(gpDirRow)  || 'bottom',
+        gradient_distance:  parseInt(gpDist.value)
+      };
+    }
+    function _css(g) {
+      const type = g.gradient_type || 'none';
+      const op = Math.max(0, Math.min(100, parseInt(g.gradient_opacity) || 0)) / 100;
+      if (type === 'none' || op === 0) return null;
+      const tint = g.gradient_tint || 'dark';
+      const c = tint === 'light' ? `rgba(255,255,255,${op.toFixed(2)})`
+              : tint === 'warm'  ? `rgba(40,20,0,${op.toFixed(2)})`
+              :                    `rgba(0,0,0,${op.toFixed(2)})`;
+      if (type === 'solid') return c;
+      const dist = Math.max(10, Math.min(100, parseInt(g.gradient_distance) || 100));
+      const dirMap = { bottom: 'to top', top: 'to bottom', left: 'to right', right: 'to left' };
+      return `linear-gradient(${dirMap[g.gradient_direction || 'bottom'] || 'to top'},${c} 0%,transparent ${dist}%)`;
+    }
+    function _preview() {
+      if (!_gp || !siteFrame.contentWindow) return;
+      const g = _read();
+      const css = _css(g);
+      siteFrame.contentWindow.postMessage({ type: 'rd_set_gradient', cardId: _gp.cardId, gradientCss: css || '', gradient: g }, window.location.origin);
+    }
+    function _fadeVis() {
+      gpFadeOpts.classList.toggle('show', _getSeg(gpTypeRow) === 'fade');
+    }
+
+    [gpTypeRow, gpTintRow, gpDirRow].forEach(row => {
+      row.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          row.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          _fadeVis(); _preview();
+        });
+      });
+    });
+    gpOpacity.addEventListener('input', () => { gpOpacityVal.textContent = gpOpacity.value + '%'; _preview(); });
+    gpDist.addEventListener('input',    () => { gpDistVal.textContent    = gpDist.value    + '%'; _preview(); });
+
+    gpSave.addEventListener('click', async () => {
+      if (!_gp) return;
+      const g = _read();
+      const cs = _gp.cardState || {};
+      gpSave.disabled = true; gpSave.textContent = 'Saving…';
+      try {
+        await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}/${encodeURIComponent(_gp.cardId)}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            mode: cs.mode || 'color', color: cs.color || '#1C1C1C',
+            image: cs.image || null, position: cs.position || '50% 50%', zoom: cs.zoom || 1.0,
+            gradient_type: g.gradient_type, gradient_tint: g.gradient_tint,
+            gradient_opacity: g.gradient_opacity, gradient_direction: g.gradient_direction,
+            gradient_distance: g.gradient_distance
+          })
+        });
+        gpSave.textContent = '✓ Saved';
+        setTimeout(() => { gpSave.textContent = 'Save Gradient'; gpSave.disabled = false; }, 1500);
+      } catch(err) {
+        gpSave.textContent = 'Error'; gpSave.disabled = false;
+      }
+    });
+
+    function _close() { panel.classList.remove('open'); _gp = null; }
+    gpClose.addEventListener('click', _close);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && panel.classList.contains('open')) _close(); });
+    document.addEventListener('mousedown', e => { if (panel.classList.contains('open') && !panel.contains(e.target)) _close(); });
+
+    window._gpOpen = function(d) {
+      _gp = d;
+      const g = d.gradient || {};
+      _seg(gpTypeRow, g.gradient_type || 'none');
+      _seg(gpTintRow, g.gradient_tint || 'dark');
+      gpOpacity.value = g.gradient_opacity != null ? g.gradient_opacity : 50;
+      gpOpacityVal.textContent = gpOpacity.value + '%';
+      _seg(gpDirRow, g.gradient_direction || 'bottom');
+      gpDist.value = g.gradient_distance != null ? g.gradient_distance : 80;
+      gpDistVal.textContent = gpDist.value + '%';
+      _fadeVis();
+      // Position near the target element
+      const r = d.rect || {};
+      const pw = 256, ph = 320;
+      let left = (r.left || 0) + (r.width || 0) - pw;
+      let top  = (r.top  || 0) + (r.height || 0) + 8;
+      if (left < 8) left = 8;
+      if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+      if (top + ph > window.innerHeight - 8) top = (r.top || 0) - ph - 8;
+      if (top < 8) top = 8;
+      panel.style.left = left + 'px';
+      panel.style.top  = top  + 'px';
+      panel.classList.add('open');
+      gpSave.disabled = false; gpSave.textContent = 'Save Gradient';
+    };
+  })();
 
   // Called by render modal (global scope) when a version is made active from a page edit context
   window._notifyRenderActivated = function(newActivePath) {

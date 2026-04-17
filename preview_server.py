@@ -38,7 +38,7 @@ except ImportError:
     HAS_BCRYPT = False
 
 PREVIEW_DIR = '/home/claudeuser/agent/preview'
-PORT = 8081
+PORT = int(os.environ.get('PREVIEW_PORT', 8081))
 os.makedirs(PREVIEW_DIR, exist_ok=True)
 
 # ── Image dimension cache — loaded at startup for layout-shift prevention ─────
@@ -412,6 +412,42 @@ def _ensure_card_settings_table(cur):
             UNIQUE(page_slug, card_id)
         )
     """)
+    cur.execute("ALTER TABLE card_settings ADD COLUMN IF NOT EXISTS gradient_type TEXT DEFAULT NULL")
+    cur.execute("ALTER TABLE card_settings ADD COLUMN IF NOT EXISTS gradient_tint TEXT DEFAULT NULL")
+    cur.execute("ALTER TABLE card_settings ADD COLUMN IF NOT EXISTS gradient_opacity INTEGER DEFAULT NULL")
+    cur.execute("ALTER TABLE card_settings ADD COLUMN IF NOT EXISTS gradient_direction TEXT DEFAULT NULL")
+    cur.execute("ALTER TABLE card_settings ADD COLUMN IF NOT EXISTS gradient_distance INTEGER DEFAULT NULL")
+
+def _compute_gradient_css(gradient_type, gradient_tint, gradient_opacity, gradient_direction, gradient_distance):
+    """Return a CSS background value string from gradient parameters, or None if disabled."""
+    if not gradient_type or gradient_type == 'none':
+        return None
+    try:
+        opacity = max(0, min(100, int(gradient_opacity or 0))) / 100.0
+    except (TypeError, ValueError):
+        return None
+    if opacity == 0:
+        return None
+    tint = gradient_tint or 'dark'
+    if tint == 'light':
+        color = f'rgba(255,255,255,{opacity:.2f})'
+    elif tint == 'warm':
+        color = f'rgba(40,20,0,{opacity:.2f})'
+    else:
+        color = f'rgba(0,0,0,{opacity:.2f})'
+    if gradient_type == 'solid':
+        return color
+    if gradient_type == 'fade':
+        direction = gradient_direction or 'bottom'
+        try:
+            distance = max(10, min(100, int(gradient_distance or 100)))
+        except (TypeError, ValueError):
+            distance = 100
+        dir_map = {'bottom': 'to top', 'top': 'to bottom', 'left': 'to right', 'right': 'to left'}
+        css_dir = dir_map.get(direction, 'to top')
+        return f'linear-gradient({css_dir},{color} 0%,transparent {distance}%)'
+    return None
+
 
 def _ensure_gallery_image_types_table(cur):
     cur.execute("""
@@ -750,7 +786,9 @@ def _get_card_settings(slug):
         cur = conn.cursor()
         _ensure_card_settings_table(cur)
         cur.execute(
-            "SELECT card_id, mode, color, image, position, zoom FROM card_settings WHERE page_slug = %s",
+            "SELECT card_id, mode, color, image, position, zoom,"
+            " gradient_type, gradient_tint, gradient_opacity, gradient_direction, gradient_distance"
+            " FROM card_settings WHERE page_slug = %s",
             (slug,))
         rows = cur.fetchall()
         cards = [dict(r) for r in rows]
@@ -767,6 +805,13 @@ def _get_card_settings(slug):
             for c in cards:
                 if c.get('mode') == 'image' and c.get('image'):
                     c['image'] = _active_path_for(c['image'], av_map)
+        # Compute gradient_css from stored component fields
+        for c in cards:
+            c['gradient_css'] = _compute_gradient_css(
+                c.get('gradient_type'), c.get('gradient_tint'),
+                c.get('gradient_opacity'), c.get('gradient_direction'),
+                c.get('gradient_distance')
+            )
         conn.close()
         return cards
     except Exception:
@@ -1047,6 +1092,9 @@ _CARD_APPLY_SCRIPT = """\
           el.style.backgroundSize = z > 1.001 ? Math.round(z*100) + '%' : 'cover';
           el.style.backgroundPosition = c.position || '50% 50%';
           el.classList.add('rd-card--image-mode');
+          if (c.gradient_css) {
+            el.style.setProperty('--rd-overlay', c.gradient_css);
+          }
         }
       } else if (c.mode === 'color' && c.color && !el.hasAttribute('data-src')) {
         el.style.background = c.color;
@@ -1266,6 +1314,25 @@ _CARD_EDIT_OVERLAY_TPL = """\
         saveCard(d.cardId, s);
       }}
       window.parent.postMessage({{type:'rd_pool_refresh'}}, window.location.origin);
+    }}
+    if (d.type === 'rd_set_gradient' && d.cardId) {{
+      var _gradEl = document.querySelector('[data-card-id="' + d.cardId + '"]');
+      if (_gradEl) {{
+        if (d.gradientCss) {{
+          _gradEl.style.setProperty('--rd-overlay', d.gradientCss);
+        }} else {{
+          _gradEl.style.removeProperty('--rd-overlay');
+        }}
+      }}
+      // Keep local state current so any subsequent saveCard() includes the gradient
+      var _gs = cardMap[d.cardId];
+      if (_gs && d.gradient) {{
+        _gs.gradient_type      = d.gradient.gradient_type;
+        _gs.gradient_tint      = d.gradient.gradient_tint;
+        _gs.gradient_opacity   = d.gradient.gradient_opacity;
+        _gs.gradient_direction = d.gradient.gradient_direction;
+        _gs.gradient_distance  = d.gradient.gradient_distance;
+      }}
     }}
   }});
 
@@ -1613,6 +1680,34 @@ _CARD_EDIT_OVERLAY_TPL = """\
     }});
 
     pill.appendChild(uploadBtn);
+
+    // G button — gradient control (scoped to service-custom-homes only for initial rollout)
+    if (!isGalleryItem && cardId === 'service-custom-homes') {{
+      var gradBtn = document.createElement('button');
+      gradBtn.textContent = 'G';
+      gradBtn.title = 'Gradient overlay';
+      gradBtn.style.cssText = 'padding:5px 9px;font-size:11px;font-weight:700;font-family:system-ui,sans-serif;border:none;border-left:1px solid rgba(255,255,255,.15);cursor:pointer;line-height:1.4;white-space:nowrap;background:rgba(124,58,237,.85);color:#fff';
+      gradBtn.addEventListener('click', function(e) {{
+        e.stopPropagation(); e.preventDefault();
+        var rect = el.getBoundingClientRect();
+        var iframe = window.frameElement;
+        var iRect = iframe ? iframe.getBoundingClientRect() : {{left:0, top:0}};
+        window.parent.postMessage({{
+          type: 'rd_gradient_open',
+          cardId: cardId,
+          cardState: {{ mode: state.mode, color: state.color, image: state.image, position: state.position, zoom: state.zoom }},
+          rect: {{ left: iRect.left + rect.left, top: iRect.top + rect.top, width: rect.width, height: rect.height }},
+          gradient: {{
+            gradient_type:      state.gradient_type      || 'none',
+            gradient_tint:      state.gradient_tint      || 'dark',
+            gradient_opacity:   state.gradient_opacity  != null ? state.gradient_opacity  : 50,
+            gradient_direction: state.gradient_direction || 'bottom',
+            gradient_distance:  state.gradient_distance != null ? state.gradient_distance : 80
+          }}
+        }}, window.location.origin);
+      }});
+      pill.appendChild(gradBtn);
+    }}
 
     _attachEl.appendChild(pill);
 
@@ -7282,6 +7377,19 @@ def admin_card_update(slug, card_id):
     image    = data.get('image') or None
     position = data.get('position', '50% 50%')
     zoom     = float(data.get('zoom', 1.0))
+    gradient_type      = data.get('gradient_type') or None
+    gradient_tint      = data.get('gradient_tint') or None
+    gradient_opacity   = data.get('gradient_opacity')
+    gradient_direction = data.get('gradient_direction') or None
+    gradient_distance  = data.get('gradient_distance')
+    try:
+        gradient_opacity  = int(gradient_opacity)  if gradient_opacity  is not None else None
+    except (TypeError, ValueError):
+        gradient_opacity  = None
+    try:
+        gradient_distance = int(gradient_distance) if gradient_distance is not None else None
+    except (TypeError, ValueError):
+        gradient_distance = None
 
     if mode not in ('color', 'image'):
         return jsonify({'error': 'mode must be color or image'}), 400
@@ -7305,16 +7413,24 @@ def admin_card_update(slug, card_id):
                               'new_state': {'mode': mode, 'color': color, 'image': image,
                                             'position': position, 'zoom': zoom}})
         cur.execute("""
-            INSERT INTO card_settings (page_slug, card_id, mode, color, image, position, zoom, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+            INSERT INTO card_settings (page_slug, card_id, mode, color, image, position, zoom,
+                gradient_type, gradient_tint, gradient_opacity, gradient_direction, gradient_distance,
+                updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
             ON CONFLICT (page_slug, card_id) DO UPDATE SET
                 mode = EXCLUDED.mode,
                 color = EXCLUDED.color,
                 image = EXCLUDED.image,
                 position = EXCLUDED.position,
                 zoom = EXCLUDED.zoom,
+                gradient_type = EXCLUDED.gradient_type,
+                gradient_tint = EXCLUDED.gradient_tint,
+                gradient_opacity = EXCLUDED.gradient_opacity,
+                gradient_direction = EXCLUDED.gradient_direction,
+                gradient_distance = EXCLUDED.gradient_distance,
                 updated_at = NOW()
-        """, (slug, card_id, mode, color, image, position, zoom))
+        """, (slug, card_id, mode, color, image, position, zoom,
+              gradient_type, gradient_tint, gradient_opacity, gradient_direction, gradient_distance))
         conn.commit()
         conn.close()
         return jsonify({'ok': True, 'page_slug': slug, 'card_id': card_id})
