@@ -842,9 +842,17 @@ def _inject_gradient_id_overlays(content: bytes, cards: list) -> bytes:
     receive their overlay value directly in the HTML style attribute at serve time.
     This avoids any JS timing issues, image-mode gating, and card CSS side effects.
     """
-    grad_map = {c['card_id']: c['gradient_css']
-                for c in cards
-                if c.get('card_id') and c.get('gradient_css')}
+    grad_map = {}
+    for c in cards:
+        if not c.get('card_id'):
+            continue
+        css = c.get('gradient_css') or _compute_gradient_css(
+            c.get('gradient_type'), c.get('gradient_tint'),
+            c.get('gradient_opacity'), c.get('gradient_direction'),
+            c.get('gradient_distance')
+        )
+        if css:
+            grad_map[c['card_id']] = css
     if not grad_map:
         return content
     try:
