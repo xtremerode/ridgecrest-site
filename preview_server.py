@@ -355,7 +355,9 @@ def _snapshot_page(cur, slug):
     sections = [dict(r) for r in cur.fetchall()]
     # Card settings (active versions resolved — same logic as _get_card_settings)
     cur.execute(
-        "SELECT card_id, mode, color, image, position, zoom FROM card_settings WHERE page_slug = %s",
+        "SELECT card_id, mode, color, image, position, zoom,"
+        " gradient_type, gradient_tint, gradient_opacity, gradient_direction, gradient_distance"
+        " FROM card_settings WHERE page_slug = %s",
         (slug,))
     cards = [dict(r) for r in cur.fetchall()]
     _snap_basenames = []
