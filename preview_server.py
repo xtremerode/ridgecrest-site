@@ -38,7 +38,7 @@ except ImportError:
     HAS_BCRYPT = False
 
 PREVIEW_DIR = '/home/claudeuser/agent/preview'
-PORT = 8081
+PORT = int(os.environ.get('PREVIEW_PORT', 8081))
 os.makedirs(PREVIEW_DIR, exist_ok=True)
 
 # ── Image dimension cache — loaded at startup for layout-shift prevention ─────
@@ -177,6 +177,12 @@ def _ensure_pages_table(cur):
     cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS hero_zoom FLOAT DEFAULT 1.0")
     cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS hero_text_x FLOAT DEFAULT 0")
     cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS hero_text_y FLOAT DEFAULT 0")
+    # Gradient overlay columns (hero)
+    cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS hero_gradient_type TEXT DEFAULT NULL")
+    cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS hero_gradient_tint TEXT DEFAULT NULL")
+    cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS hero_gradient_opacity INTEGER DEFAULT NULL")
+    cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS hero_gradient_direction TEXT DEFAULT NULL")
+    cur.execute("ALTER TABLE pages ADD COLUMN IF NOT EXISTS hero_gradient_distance INTEGER DEFAULT NULL")
 
 def _seed_pages():
     """Scan all preview/ HTML files and seed the pages table (idempotent)."""
@@ -238,7 +244,11 @@ def _get_page_data(slug):
     try:
         cur = conn.cursor()
         _ensure_pages_table(cur)
-        cur.execute("SELECT hero_image, hero_position, hero_zoom, hero_text_x, hero_text_y FROM pages WHERE slug = %s", (slug,))
+        cur.execute(
+            "SELECT hero_image, hero_position, hero_zoom, hero_text_x, hero_text_y,"
+            " hero_gradient_type, hero_gradient_tint, hero_gradient_opacity,"
+            " hero_gradient_direction, hero_gradient_distance"
+            " FROM pages WHERE slug = %s", (slug,))
         row = cur.fetchone()
         if not row or not row['hero_image']:
             if row:
@@ -273,6 +283,31 @@ def _get_page_data(slug):
         return hero_path, hero_pos, hero_zoom, tx, ty
     except Exception:
         return None, '50% 50%', 1.0, 0.0, 0.0
+
+def _get_hero_gradient_css(slug):
+    """Return computed CSS gradient string for a page's hero overlay, or None."""
+    conn = _db_conn()
+    if not conn:
+        return None
+    try:
+        cur = conn.cursor()
+        _ensure_pages_table(cur)
+        cur.execute(
+            "SELECT hero_gradient_type, hero_gradient_tint, hero_gradient_opacity,"
+            " hero_gradient_direction, hero_gradient_distance"
+            " FROM pages WHERE slug = %s", (slug,))
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            return None
+        return _compute_gradient_css(
+            row.get('hero_gradient_type'), row.get('hero_gradient_tint'),
+            row.get('hero_gradient_opacity'), row.get('hero_gradient_direction'),
+            row.get('hero_gradient_distance')
+        )
+    except Exception:
+        return None
+
 
 def _get_device_override(slug, device):
     """Return (pos, zoom, tx, ty) for a device override row, or None if none exists."""
@@ -412,6 +447,43 @@ def _ensure_card_settings_table(cur):
             UNIQUE(page_slug, card_id)
         )
     """)
+    # Gradient overlay columns (idempotent)
+    cur.execute("ALTER TABLE card_settings ADD COLUMN IF NOT EXISTS gradient_type TEXT DEFAULT NULL")
+    cur.execute("ALTER TABLE card_settings ADD COLUMN IF NOT EXISTS gradient_tint TEXT DEFAULT NULL")
+    cur.execute("ALTER TABLE card_settings ADD COLUMN IF NOT EXISTS gradient_opacity INTEGER DEFAULT NULL")
+    cur.execute("ALTER TABLE card_settings ADD COLUMN IF NOT EXISTS gradient_direction TEXT DEFAULT NULL")
+    cur.execute("ALTER TABLE card_settings ADD COLUMN IF NOT EXISTS gradient_distance INTEGER DEFAULT NULL")
+
+def _compute_gradient_css(gradient_type, gradient_tint, gradient_opacity, gradient_direction, gradient_distance):
+    """Return a CSS background value string from gradient parameters, or None if disabled."""
+    if not gradient_type or gradient_type == 'none':
+        return None
+    try:
+        opacity = max(0, min(100, int(gradient_opacity or 0))) / 100.0
+    except (TypeError, ValueError):
+        return None
+    if opacity == 0:
+        return None
+    tint = gradient_tint or 'dark'
+    if tint == 'light':
+        color = f'rgba(255,255,255,{opacity:.2f})'
+    elif tint == 'warm':
+        color = f'rgba(40,20,0,{opacity:.2f})'
+    else:
+        color = f'rgba(0,0,0,{opacity:.2f})'
+    if gradient_type == 'solid':
+        return color
+    if gradient_type == 'fade':
+        direction = gradient_direction or 'bottom'
+        try:
+            distance = max(10, min(100, int(gradient_distance or 100)))
+        except (TypeError, ValueError):
+            distance = 100
+        dir_map = {'bottom': 'to top', 'top': 'to bottom', 'left': 'to right', 'right': 'to left'}
+        css_dir = dir_map.get(direction, 'to top')
+        return f'linear-gradient({css_dir},{color} 0%,transparent {distance}%)'
+    return None
+
 
 def _ensure_gallery_image_types_table(cur):
     cur.execute("""
@@ -750,7 +822,9 @@ def _get_card_settings(slug):
         cur = conn.cursor()
         _ensure_card_settings_table(cur)
         cur.execute(
-            "SELECT card_id, mode, color, image, position, zoom FROM card_settings WHERE page_slug = %s",
+            "SELECT card_id, mode, color, image, position, zoom, "
+            "gradient_type, gradient_tint, gradient_opacity, gradient_direction, gradient_distance "
+            "FROM card_settings WHERE page_slug = %s",
             (slug,))
         rows = cur.fetchall()
         cards = [dict(r) for r in rows]
@@ -767,6 +841,14 @@ def _get_card_settings(slug):
             for c in cards:
                 if c.get('mode') == 'image' and c.get('image'):
                     c['image'] = _active_path_for(c['image'], av_map)
+        # Compute gradient_css from stored component fields
+        for c in cards:
+            g = _compute_gradient_css(
+                c.get('gradient_type'), c.get('gradient_tint'),
+                c.get('gradient_opacity'), c.get('gradient_direction'),
+                c.get('gradient_distance')
+            )
+            c['gradient_css'] = g  # None when no gradient set
         conn.close()
         return cards
     except Exception:
@@ -1047,6 +1129,9 @@ _CARD_APPLY_SCRIPT = """\
           el.style.backgroundSize = z > 1.001 ? Math.round(z*100) + '%' : 'cover';
           el.style.backgroundPosition = c.position || '50% 50%';
           el.classList.add('rd-card--image-mode');
+          if (c.gradient_css) {
+            el.style.setProperty('--rd-overlay', c.gradient_css);
+          }
         }
       } else if (c.mode === 'color' && c.color && !el.hasAttribute('data-src')) {
         el.style.background = c.color;
@@ -1266,6 +1351,40 @@ _CARD_EDIT_OVERLAY_TPL = """\
         saveCard(d.cardId, s);
       }}
       window.parent.postMessage({{type:'rd_pool_refresh'}}, window.location.origin);
+    }}
+    if (d.type === 'rd_set_gradient' && d.cardId) {{
+      // Live preview: apply --rd-overlay CSS variable to the target card element
+      var _gradEl = document.querySelector('[data-card-id="' + d.cardId + '"]');
+      if (_gradEl) {{
+        if (d.gradientCss) {{
+          _gradEl.style.setProperty('--rd-overlay', d.gradientCss);
+        }} else {{
+          _gradEl.style.removeProperty('--rd-overlay');
+        }}
+      }}
+      // Update local state so save includes latest gradient
+      var _gs = cardMap[d.cardId];
+      if (_gs && d.gradient) {{
+        _gs.gradient_type = d.gradient.gradient_type;
+        _gs.gradient_tint = d.gradient.gradient_tint;
+        _gs.gradient_opacity = d.gradient.gradient_opacity;
+        _gs.gradient_direction = d.gradient.gradient_direction;
+        _gs.gradient_distance = d.gradient.gradient_distance;
+      }}
+    }}
+    if (d.type === 'rd_set_hero_gradient') {{
+      // Live preview: apply --rd-overlay to hero overlay elements
+      var _heroStyle = document.getElementById('rd-hero-gradient');
+      if (!_heroStyle) {{
+        _heroStyle = document.createElement('style');
+        _heroStyle.id = 'rd-hero-gradient';
+        document.head.appendChild(_heroStyle);
+      }}
+      if (d.gradientCss) {{
+        _heroStyle.textContent = '.hero__overlay,.project-hero__overlay,.post-hero__overlay{{--rd-overlay:' + d.gradientCss + '}}.page-hero--service::before{{--rd-overlay:' + d.gradientCss + '}}';
+      }} else {{
+        _heroStyle.textContent = '';
+      }}
     }}
   }});
 
@@ -1554,6 +1673,44 @@ _CARD_EDIT_OVERLAY_TPL = """\
       pill.appendChild(grabBtn);
       window.__rdAllGrabBtns = window.__rdAllGrabBtns || [];
       window.__rdAllGrabBtns.push(grabBtn);
+    }}
+
+    // ── Gradient control button (non-gallery only) ──
+    if (!isGalleryItem) {{
+      var gradBtn = document.createElement('button');
+      gradBtn.textContent = 'G';
+      gradBtn.title = 'Gradient overlay controls';
+      gradBtn.style.cssText = 'padding:5px 9px;font-size:11px;font-weight:700;font-family:system-ui,sans-serif;border:none;border-left:1px solid rgba(255,255,255,.15);cursor:pointer;line-height:1.4;white-space:nowrap;background:rgba(124,58,237,.85);color:#fff';
+      gradBtn.addEventListener('click', function(e) {{
+        e.stopPropagation(); e.preventDefault();
+        var rect = el.getBoundingClientRect();
+        var iframe = window.frameElement;
+        var iRect = iframe ? iframe.getBoundingClientRect() : {{left:0, top:0}};
+        window.parent.postMessage({{
+          type: 'rd_gradient_open',
+          cardId: cardId,
+          isHero: false,
+          cardState: {{
+            mode: state.mode, color: state.color, image: state.image,
+            position: state.position, zoom: state.zoom
+          }},
+          rect: {{ left: iRect.left + rect.left, top: iRect.top + rect.top, width: rect.width, height: rect.height }},
+          gradient: {{
+            gradient_type: state.gradient_type || 'none',
+            gradient_tint: state.gradient_tint || 'dark',
+            gradient_opacity: state.gradient_opacity != null ? state.gradient_opacity : 50,
+            gradient_direction: state.gradient_direction || 'bottom',
+            gradient_distance: state.gradient_distance != null ? state.gradient_distance : 80
+          }}
+        }}, window.location.origin);
+      }});
+      pill.appendChild(gradBtn);
+
+      // Listen for gradient preview/save from parent panel
+      window.__rdGradListeners = window.__rdGradListeners || {{}};
+      if (!window.__rdGradListeners[cardId]) {{
+        window.__rdGradListeners[cardId] = true;
+      }}
     }}
 
     // ── Upload & replace button (all cards) ──
@@ -2515,6 +2672,35 @@ _EDIT_OVERLAY_TPL = """\
       window.parent.postMessage({{type:'rd_open_render', cardId:null, filename:base}}, window.location.origin);
     }});
     badge.appendChild(heroRenderBtn);
+
+    // Gradient button — only for true hero elements (not card-type overlays)
+    if (!isCard) {{
+      var heroGradBtn = document.createElement('button');
+      heroGradBtn.textContent = 'G';
+      heroGradBtn.title = 'Gradient overlay controls';
+      heroGradBtn.style.cssText = 'background:rgba(124,58,237,.85);color:#fff;border:none;font-family:system-ui,sans-serif;font-size:12px;font-weight:700;padding:5px 11px;border-radius:4px;cursor:pointer;white-space:nowrap;pointer-events:auto';
+      heroGradBtn.addEventListener('click', function(e) {{
+        e.stopPropagation();
+        var rect = el.getBoundingClientRect();
+        var iframe = window.frameElement;
+        var iRect = iframe ? iframe.getBoundingClientRect() : {{left:0, top:0}};
+        window.parent.postMessage({{
+          type: 'rd_gradient_open',
+          cardId: null,
+          isHero: true,
+          slug: SLUG,
+          rect: {{ left: iRect.left + rect.left, top: iRect.top + rect.top, width: rect.width, height: rect.height }},
+          gradient: {{
+            gradient_type: (window.__RD_HERO_GRADIENT_TYPE || 'none'),
+            gradient_tint: (window.__RD_HERO_GRADIENT_TINT || 'dark'),
+            gradient_opacity: (window.__RD_HERO_GRADIENT_OPACITY != null ? window.__RD_HERO_GRADIENT_OPACITY : 50),
+            gradient_direction: (window.__RD_HERO_GRADIENT_DIRECTION || 'bottom'),
+            gradient_distance: (window.__RD_HERO_GRADIENT_DISTANCE != null ? window.__RD_HERO_GRADIENT_DISTANCE : 80)
+          }}
+        }}, window.location.origin);
+      }});
+      badge.appendChild(heroGradBtn);
+    }}
 
     ov.appendChild(badge);
 
@@ -3728,6 +3914,43 @@ def view(filename):
                     content = content.replace(b'</head>', txt_script + b'</head>', 1)
                 else:
                     content = txt_script + content
+
+        # Inject hero gradient CSS variable if stored in DB
+        if HAS_DB:
+            _hero_grad_css = _get_hero_gradient_css(slug)
+            if _hero_grad_css:
+                _hg_style = (
+                    f'<style id="rd-hero-gradient">'
+                    f'.hero__overlay,.project-hero__overlay,.post-hero__overlay'
+                    f'{{--rd-overlay:{_hero_grad_css};}}'
+                    f'.page-hero--service::before{{--rd-overlay:{_hero_grad_css};}}'
+                    f'</style>'
+                ).encode('utf-8')
+                if b'</head>' in content:
+                    content = content.replace(b'</head>', _hg_style + b'</head>', 1)
+            # Inject raw gradient settings as JS vars so hero G button can read current state
+            try:
+                _hg_conn = _db_conn()
+                _hg_cur = _hg_conn.cursor()
+                _hg_cur.execute(
+                    "SELECT hero_gradient_type,hero_gradient_tint,hero_gradient_opacity,"
+                    "hero_gradient_direction,hero_gradient_distance FROM pages WHERE slug=%s", (slug,))
+                _hg_row = _hg_cur.fetchone()
+                _hg_conn.close()
+                if _hg_row:
+                    _hg_vars = (
+                        f'<script>'
+                        f'window.__RD_HERO_GRADIENT_TYPE={_safe_js(_hg_row.get("hero_gradient_type") or "none")};'
+                        f'window.__RD_HERO_GRADIENT_TINT={_safe_js(_hg_row.get("hero_gradient_tint") or "dark")};'
+                        f'window.__RD_HERO_GRADIENT_OPACITY={_safe_js(_hg_row.get("hero_gradient_opacity") or 50)};'
+                        f'window.__RD_HERO_GRADIENT_DIRECTION={_safe_js(_hg_row.get("hero_gradient_direction") or "bottom")};'
+                        f'window.__RD_HERO_GRADIENT_DISTANCE={_safe_js(_hg_row.get("hero_gradient_distance") or 80)};'
+                        f'</script>'
+                    ).encode('utf-8')
+                    if b'</head>' in content:
+                        content = content.replace(b'</head>', _hg_vars + b'</head>', 1)
+            except Exception:
+                pass
 
         # Strip data-card-id from page-hero--service divs so hero overlay owns them.
         # Must run before _apply_cards_to_html so the card script never finds these elements.
@@ -6387,6 +6610,19 @@ def admin_page_update(slug):
     hero_zoom    = data.get('hero_zoom')
     hero_text_x  = data.get('hero_text_x')
     hero_text_y  = data.get('hero_text_y')
+    hero_gradient_type      = data.get('hero_gradient_type') or None
+    hero_gradient_tint      = data.get('hero_gradient_tint') or None
+    hero_gradient_opacity   = data.get('hero_gradient_opacity')
+    hero_gradient_direction = data.get('hero_gradient_direction') or None
+    hero_gradient_distance  = data.get('hero_gradient_distance')
+    try:
+        hero_gradient_opacity = int(hero_gradient_opacity) if hero_gradient_opacity is not None else None
+    except (TypeError, ValueError):
+        hero_gradient_opacity = None
+    try:
+        hero_gradient_distance = int(hero_gradient_distance) if hero_gradient_distance is not None else None
+    except (TypeError, ValueError):
+        hero_gradient_distance = None
 
     if hero_image and not hero_image.startswith('/assets/'):
         return jsonify({'error': 'hero_image must start with /assets/'}), 400
@@ -6420,6 +6656,16 @@ def admin_page_update(slug):
             sets.append('hero_text_x = %s'); params.append(float(hero_text_x))
         if hero_text_y is not None:
             sets.append('hero_text_y = %s'); params.append(float(hero_text_y))
+        if hero_gradient_type is not None:
+            sets.append('hero_gradient_type = %s'); params.append(hero_gradient_type)
+        if hero_gradient_tint is not None:
+            sets.append('hero_gradient_tint = %s'); params.append(hero_gradient_tint)
+        if hero_gradient_opacity is not None:
+            sets.append('hero_gradient_opacity = %s'); params.append(hero_gradient_opacity)
+        if hero_gradient_direction is not None:
+            sets.append('hero_gradient_direction = %s'); params.append(hero_gradient_direction)
+        if hero_gradient_distance is not None:
+            sets.append('hero_gradient_distance = %s'); params.append(hero_gradient_distance)
         cur.execute(f"""
             INSERT INTO pages (slug, hero_image, hero_position, hero_zoom, title, page_path, updated_at)
             VALUES (%s, %s, %s, %s, %s, %s, NOW())
@@ -6462,6 +6708,16 @@ def admin_page_update(slug):
             _snap_sets.append('hero_text_x = %s'); _snap_params.append(float(hero_text_x))
         if hero_text_y is not None:
             _snap_sets.append('hero_text_y = %s'); _snap_params.append(float(hero_text_y))
+        if hero_gradient_type is not None:
+            _snap_sets.append('hero_gradient_type = %s'); _snap_params.append(hero_gradient_type)
+        if hero_gradient_tint is not None:
+            _snap_sets.append('hero_gradient_tint = %s'); _snap_params.append(hero_gradient_tint)
+        if hero_gradient_opacity is not None:
+            _snap_sets.append('hero_gradient_opacity = %s'); _snap_params.append(hero_gradient_opacity)
+        if hero_gradient_direction is not None:
+            _snap_sets.append('hero_gradient_direction = %s'); _snap_params.append(hero_gradient_direction)
+        if hero_gradient_distance is not None:
+            _snap_sets.append('hero_gradient_distance = %s'); _snap_params.append(hero_gradient_distance)
         if _snap_sets:
             try:
                 _ensure_published_snapshots_table(cur)
@@ -7282,6 +7538,19 @@ def admin_card_update(slug, card_id):
     image    = data.get('image') or None
     position = data.get('position', '50% 50%')
     zoom     = float(data.get('zoom', 1.0))
+    gradient_type      = data.get('gradient_type') or None
+    gradient_tint      = data.get('gradient_tint') or None
+    gradient_opacity   = data.get('gradient_opacity')
+    gradient_direction = data.get('gradient_direction') or None
+    gradient_distance  = data.get('gradient_distance')
+    try:
+        gradient_opacity = int(gradient_opacity) if gradient_opacity is not None else None
+    except (TypeError, ValueError):
+        gradient_opacity = None
+    try:
+        gradient_distance = int(gradient_distance) if gradient_distance is not None else None
+    except (TypeError, ValueError):
+        gradient_distance = None
 
     if mode not in ('color', 'image'):
         return jsonify({'error': 'mode must be color or image'}), 400
@@ -7305,16 +7574,24 @@ def admin_card_update(slug, card_id):
                               'new_state': {'mode': mode, 'color': color, 'image': image,
                                             'position': position, 'zoom': zoom}})
         cur.execute("""
-            INSERT INTO card_settings (page_slug, card_id, mode, color, image, position, zoom, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+            INSERT INTO card_settings (page_slug, card_id, mode, color, image, position, zoom,
+                gradient_type, gradient_tint, gradient_opacity, gradient_direction, gradient_distance,
+                updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
             ON CONFLICT (page_slug, card_id) DO UPDATE SET
                 mode = EXCLUDED.mode,
                 color = EXCLUDED.color,
                 image = EXCLUDED.image,
                 position = EXCLUDED.position,
                 zoom = EXCLUDED.zoom,
+                gradient_type = EXCLUDED.gradient_type,
+                gradient_tint = EXCLUDED.gradient_tint,
+                gradient_opacity = EXCLUDED.gradient_opacity,
+                gradient_direction = EXCLUDED.gradient_direction,
+                gradient_distance = EXCLUDED.gradient_distance,
                 updated_at = NOW()
-        """, (slug, card_id, mode, color, image, position, zoom))
+        """, (slug, card_id, mode, color, image, position, zoom,
+              gradient_type, gradient_tint, gradient_opacity, gradient_direction, gradient_distance))
         conn.commit()
         conn.close()
         return jsonify({'ok': True, 'page_slug': slug, 'card_id': card_id})

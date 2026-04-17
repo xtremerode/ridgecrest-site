@@ -102,13 +102,18 @@
       overflow-x: hidden;
       background: #111b27;
     }
+    #frameSticky {
+      position: sticky;
+      top: 0;
+      height: 0;
+      z-index: 1;
+    }
     #siteFrame {
       position: absolute;
       top: 0;
       left: 0;
       /* width set by scaleFrame() — 1440px desktop, 768px iPad, 390px Phone */
       border: none;
-      z-index: 1;
       transform-origin: top left; /* overridden to top center for mobile */
     }
     #frameScrollProxy {
@@ -141,6 +146,92 @@
       font-size: 13px;
     }
     .header-actions select:focus { outline: none; border-color: var(--accent, #3b82f6); }
+
+    /* ── Gradient Panel ── */
+    #gradientPanel {
+      display: none;
+      position: fixed;
+      z-index: 10010;
+      background: #1a2332;
+      border: 1px solid #2a3748;
+      border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.7);
+      padding: 16px;
+      width: 260px;
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+      color: #e2e8f0;
+    }
+    #gradientPanel.open { display: block; }
+    .gp-title {
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .gp-close {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0 4px;
+      line-height: 1;
+    }
+    .gp-close:hover { color: #e2e8f0; }
+    .gp-row { margin-bottom: 12px; }
+    .gp-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: #94a3b8;
+      margin-bottom: 5px;
+      letter-spacing: .04em;
+    }
+    .gp-seg {
+      display: flex;
+      gap: 0;
+      border: 1px solid #2a3748;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .gp-seg button {
+      flex: 1;
+      padding: 5px 0;
+      background: #0f1923;
+      border: none;
+      color: #94a3b8;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .12s, color .12s;
+    }
+    .gp-seg button.active { background: #3b82f6; color: #fff; }
+    .gp-seg button:not(:first-child) { border-left: 1px solid #2a3748; }
+    .gp-slider { width: 100%; accent-color: #7c3aed; cursor: pointer; }
+    .gp-slider-val { float: right; font-size: 11px; color: #7c3aed; font-weight: 700; }
+    .gp-fade-opts { display: none; }
+    .gp-fade-opts.show { display: block; }
+    #gradientPanel .gp-save {
+      width: 100%;
+      padding: 7px;
+      background: #7c3aed;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: background .12s;
+    }
+    #gradientPanel .gp-save:hover { background: #6d28d9; }
+    #gradientPanel .gp-save:disabled { background: #374151; color: #6b7280; cursor: default; }
 
     /* ── Image Picker Modal ── */
     .picker-backdrop {
@@ -771,13 +862,63 @@
     </div>
     <div class="editor-frame-wrap">
       <div class="frame-loading" id="frameLoading"><div class="pg-tree" id="pageTree"></div></div>
-      <iframe id="siteFrame" src="about:blank" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+      <div id="frameSticky">
+        <iframe id="siteFrame" src="about:blank" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+      </div>
       <div id="frameScrollProxy"></div>
       <!-- Cross-frame section drag overlay: covers the frame-wrap during drag so
            pointer events stay in the parent document even when pointer leaves iframe -->
       <div id="secDragOverlay" style="display:none;position:absolute;inset:0;z-index:99999;cursor:ns-resize;"></div>
     </div>
   </div>
+</div>
+
+<!-- Gradient Panel -->
+<div id="gradientPanel">
+  <div class="gp-title">
+    Gradient Overlay
+    <button class="gp-close" id="gpClose">&times;</button>
+  </div>
+  <!-- Type -->
+  <div class="gp-row">
+    <label class="gp-label">Type</label>
+    <div class="gp-seg" id="gpTypeRow">
+      <button data-gv="none" class="active">None</button>
+      <button data-gv="solid">Solid</button>
+      <button data-gv="fade">Fade</button>
+    </div>
+  </div>
+  <!-- Tint -->
+  <div class="gp-row">
+    <label class="gp-label">Tint</label>
+    <div class="gp-seg" id="gpTintRow">
+      <button data-gv="dark" class="active">Dark</button>
+      <button data-gv="light">Light</button>
+      <button data-gv="warm">Warm</button>
+    </div>
+  </div>
+  <!-- Opacity -->
+  <div class="gp-row">
+    <label class="gp-label">Opacity <span class="gp-slider-val" id="gpOpacityVal">50%</span></label>
+    <input type="range" class="gp-slider" id="gpOpacity" min="0" max="100" value="50" />
+  </div>
+  <!-- Fade-only options -->
+  <div class="gp-fade-opts" id="gpFadeOpts">
+    <div class="gp-row">
+      <label class="gp-label">Direction</label>
+      <div class="gp-seg" id="gpDirRow">
+        <button data-gv="bottom" class="active">↑</button>
+        <button data-gv="top">↓</button>
+        <button data-gv="left">→</button>
+        <button data-gv="right">←</button>
+      </div>
+    </div>
+    <div class="gp-row">
+      <label class="gp-label">Distance <span class="gp-slider-val" id="gpDistVal">80%</span></label>
+      <input type="range" class="gp-slider" id="gpDist" min="10" max="100" value="80" />
+    </div>
+  </div>
+  <button class="gp-save" id="gpSave">Save Gradient</button>
 </div>
 
 <!-- Image Picker Modal -->
@@ -2858,6 +2999,9 @@
         editStatus.className = 'edit-status';
       }
     }
+    if (d.type === 'rd_gradient_open') {
+      _gpOpenPanel(d);
+    }
     if (d.type === 'rd_gallery_save') {
       // Block writes on locked pages — consistent with saveNow/scheduleSave
       if (currentPageLock === 'locked') {
@@ -2888,6 +3032,188 @@
       });
     }
   });
+
+  // ── Gradient Panel ─────────────────────────────────────────────────────────
+  (function() {
+    const panel     = document.getElementById('gradientPanel');
+    const gpClose   = document.getElementById('gpClose');
+    const gpTypeRow = document.getElementById('gpTypeRow');
+    const gpTintRow = document.getElementById('gpTintRow');
+    const gpOpacity = document.getElementById('gpOpacity');
+    const gpOpacityVal = document.getElementById('gpOpacityVal');
+    const gpDist    = document.getElementById('gpDist');
+    const gpDistVal = document.getElementById('gpDistVal');
+    const gpDirRow  = document.getElementById('gpDirRow');
+    const gpFadeOpts = document.getElementById('gpFadeOpts');
+    const gpSave    = document.getElementById('gpSave');
+
+    let _gpState = null; // { cardId, isHero, slug, gradient: {} }
+
+    function _gpComputeCss(g) {
+      const type    = g.gradient_type || 'none';
+      const opacity = Math.max(0, Math.min(100, parseInt(g.gradient_opacity) || 0)) / 100;
+      if (type === 'none' || opacity === 0) return null;
+      const tint = g.gradient_tint || 'dark';
+      let color;
+      if (tint === 'light') color = `rgba(255,255,255,${opacity.toFixed(2)})`;
+      else if (tint === 'warm') color = `rgba(40,20,0,${opacity.toFixed(2)})`;
+      else color = `rgba(0,0,0,${opacity.toFixed(2)})`;
+      if (type === 'solid') return color;
+      if (type === 'fade') {
+        const dist = Math.max(10, Math.min(100, parseInt(g.gradient_distance) || 100));
+        const dirMap = { bottom: 'to top', top: 'to bottom', left: 'to right', right: 'to left' };
+        const cssDir = dirMap[g.gradient_direction || 'bottom'] || 'to top';
+        return `linear-gradient(${cssDir},${color} 0%,transparent ${dist}%)`;
+      }
+      return null;
+    }
+
+    function _gpSeg(rowEl, val) {
+      rowEl.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.getAttribute('data-gv') === val));
+    }
+
+    function _gpGetSeg(rowEl) {
+      const a = rowEl.querySelector('button.active');
+      return a ? a.getAttribute('data-gv') : null;
+    }
+
+    function _gpReadCurrent() {
+      return {
+        gradient_type:      _gpGetSeg(gpTypeRow) || 'none',
+        gradient_tint:      _gpGetSeg(gpTintRow) || 'dark',
+        gradient_opacity:   parseInt(gpOpacity.value),
+        gradient_direction: _gpGetSeg(gpDirRow) || 'bottom',
+        gradient_distance:  parseInt(gpDist.value)
+      };
+    }
+
+    function _gpPreview() {
+      if (!_gpState) return;
+      const g = _gpReadCurrent();
+      const css = _gpComputeCss(g);
+      if (siteFrame.contentWindow) {
+        if (_gpState.isHero) {
+          siteFrame.contentWindow.postMessage({ type: 'rd_set_hero_gradient', gradientCss: css || '' }, window.location.origin);
+        } else {
+          siteFrame.contentWindow.postMessage({ type: 'rd_set_gradient', cardId: _gpState.cardId, gradientCss: css || '', gradient: g }, window.location.origin);
+        }
+      }
+    }
+
+    function _gpUpdateFadeVis() {
+      const type = _gpGetSeg(gpTypeRow);
+      gpFadeOpts.classList.toggle('show', type === 'fade');
+    }
+
+    // Segmented controls
+    [gpTypeRow, gpTintRow, gpDirRow].forEach(row => {
+      row.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          row.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          _gpUpdateFadeVis();
+          _gpPreview();
+        });
+      });
+    });
+
+    // Sliders
+    gpOpacity.addEventListener('input', () => {
+      gpOpacityVal.textContent = gpOpacity.value + '%';
+      _gpPreview();
+    });
+    gpDist.addEventListener('input', () => {
+      gpDistVal.textContent = gpDist.value + '%';
+      _gpPreview();
+    });
+
+    // Save
+    gpSave.addEventListener('click', async () => {
+      if (!_gpState) return;
+      const g = _gpReadCurrent();
+      gpSave.disabled = true;
+      gpSave.textContent = 'Saving…';
+      try {
+        if (_gpState.isHero) {
+          await API(`/admin/api/pages/${encodeURIComponent(_gpState.slug)}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              hero_gradient_type:      g.gradient_type,
+              hero_gradient_tint:      g.gradient_tint,
+              hero_gradient_opacity:   g.gradient_opacity,
+              hero_gradient_direction: g.gradient_direction,
+              hero_gradient_distance:  g.gradient_distance
+            })
+          });
+        } else {
+          // Use card state captured when G button was clicked (avoids stale __RD_CARDS read)
+          const cardState = _gpState.cardState || {};
+          await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}/${encodeURIComponent(_gpState.cardId)}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              mode:               cardState.mode || 'color',
+              color:              cardState.color || '#1C1C1C',
+              image:              cardState.image || null,
+              position:           cardState.position || '50% 50%',
+              zoom:               cardState.zoom || 1.0,
+              gradient_type:      g.gradient_type,
+              gradient_tint:      g.gradient_tint,
+              gradient_opacity:   g.gradient_opacity,
+              gradient_direction: g.gradient_direction,
+              gradient_distance:  g.gradient_distance
+            })
+          });
+        }
+        gpSave.textContent = '✓ Saved';
+        setTimeout(() => { gpSave.textContent = 'Save Gradient'; gpSave.disabled = false; }, 1500);
+      } catch(err) {
+        gpSave.textContent = 'Error';
+        gpSave.disabled = false;
+        console.error('[Gradient] save error', err);
+      }
+    });
+
+    // Close
+    gpClose.addEventListener('click', _gpClose);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && panel.classList.contains('open')) _gpClose(); });
+    document.addEventListener('mousedown', e => {
+      if (panel.classList.contains('open') && !panel.contains(e.target)) _gpClose();
+    });
+
+    function _gpClose() {
+      panel.classList.remove('open');
+      _gpState = null;
+    }
+
+    window._gpOpenPanel = function(d) {
+      _gpState = d;
+      const g = d.gradient || {};
+      // Populate controls
+      _gpSeg(gpTypeRow, g.gradient_type || 'none');
+      _gpSeg(gpTintRow, g.gradient_tint || 'dark');
+      gpOpacity.value = g.gradient_opacity != null ? g.gradient_opacity : 50;
+      gpOpacityVal.textContent = gpOpacity.value + '%';
+      _gpSeg(gpDirRow, g.gradient_direction || 'bottom');
+      gpDist.value = g.gradient_distance != null ? g.gradient_distance : 80;
+      gpDistVal.textContent = gpDist.value + '%';
+      _gpUpdateFadeVis();
+      // Position panel near the element
+      const r = d.rect || {};
+      const panelW = 260, panelH = 340;
+      let left = (r.left || 0) + (r.width || 0) - panelW;
+      let top  = (r.top  || 0) + (r.height || 0) + 8;
+      // Keep within viewport
+      if (left < 8) left = 8;
+      if (left + panelW > window.innerWidth - 8) left = window.innerWidth - panelW - 8;
+      if (top + panelH > window.innerHeight - 8) top = (r.top || 0) - panelH - 8;
+      if (top < 8) top = 8;
+      panel.style.left = left + 'px';
+      panel.style.top  = top + 'px';
+      panel.classList.add('open');
+      gpSave.disabled = false;
+      gpSave.textContent = 'Save Gradient';
+    };
+  })();
 
   // Called by render modal (global scope) when a version is made active from a page edit context
   window._notifyRenderActivated = function(newActivePath) {

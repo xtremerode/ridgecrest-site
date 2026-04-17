@@ -245,7 +245,7 @@ const Admin = (function() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
         </div>
-        <p class="ai-hint">Enter to send · Shift+Enter for new line</p>
+        <p class="ai-hint">Enter to send · Shift+Enter for new line · Paste image to share screenshot</p>
       </div>
     `;
     document.body.appendChild(panel);
@@ -259,6 +259,43 @@ const Admin = (function() {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAIMessage(); }
     });
     sendBtn.addEventListener('click', sendAIMessage);
+
+    // ── Screenshot paste handler ──────────────────────────────────
+    input.addEventListener('paste', async e => {
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          e.preventDefault();
+          const file = items[i].getAsFile();
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = async function(ev) {
+            const dataUrl = ev.target.result;
+            try {
+              const res = await fetch('/paste/upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: dataUrl })
+              });
+              const json = await res.json();
+              if (json.filename) {
+                const token = '[Screenshot: ' + json.filename + ']';
+                input.value = (input.value ? input.value + ' ' : '') + token;
+                input.focus();
+                toast('Screenshot attached: ' + json.filename, 'success', 3000);
+              } else {
+                toast('Screenshot upload failed', 'error');
+              }
+            } catch(err) {
+              toast('Screenshot upload failed', 'error');
+            }
+          };
+          reader.readAsDataURL(file);
+          break;
+        }
+      }
+    });
   }
 
   function toggleAIPanel() {
