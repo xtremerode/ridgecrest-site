@@ -175,6 +175,54 @@
   font-weight: 500;
 }
 
+/* ── Related links grid (Related Services / Other Cities sections) ── */
+.related-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.related-link {
+  display: inline-block;
+  padding: 0.6rem 1.2rem;
+  border: 1px solid rgba(200, 184, 154, 0.35);
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  color: var(--charcoal);
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+  font-family: var(--font-sans);
+  font-weight: 400;
+}
+
+.related-link:hover {
+  background: var(--charcoal);
+  color: var(--off-white);
+  border-color: var(--charcoal);
+}
+
+/* On dark/accent backgrounds */
+.section--accent .related-link {
+  border-color: rgba(200, 184, 154, 0.4);
+  color: var(--charcoal);
+}
+
+/* ── Back link in hero ── */
+.page-hero__back {
+  margin-top: 2rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mid);
+  font-family: var(--font-sans);
+  font-weight: 500;
+  transition: color var(--transition);
+}
+
+.page-hero__back:hover {
+  color: var(--off-white);
+}
+
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .service-included {
