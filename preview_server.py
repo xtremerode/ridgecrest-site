@@ -833,6 +833,46 @@ def _apply_cards_to_html(content: bytes, cards: list) -> bytes:
     return text.encode('utf-8')
 
 
+def _inject_gradient_id_overlays(content: bytes, cards: list) -> bytes:
+    """Server-side inject --rd-overlay CSS custom property for data-gradient-id elements.
+
+    Unlike data-card-id cards (which use the JS apply script), gradient-id elements
+    receive their overlay value directly in the HTML style attribute at serve time.
+    This avoids any JS timing issues, image-mode gating, and card CSS side effects.
+    """
+    grad_map = {c['card_id']: c['gradient_css']
+                for c in cards
+                if c.get('card_id') and c.get('gradient_css')}
+    if not grad_map:
+        return content
+    try:
+        s = content.decode('utf-8', errors='replace')
+
+        def _inject(m):
+            tag = m.group(0)
+            id_match = re.search(r'data-gradient-id="([^"]*)"', tag)
+            if not id_match:
+                return tag
+            css_val = grad_map.get(id_match.group(1))
+            if not css_val:
+                return tag
+            css_prop = f'--rd-overlay:{css_val}'
+            style_match = re.search(r'\bstyle="([^"]*)"', tag)
+            if style_match:
+                # Append to existing style, removing any stale --rd-overlay first
+                existing = re.sub(r'--rd-overlay:[^;]*;?\s*', '', style_match.group(1)).strip().rstrip(';')
+                new_style = f'{css_prop};{existing}' if existing else css_prop
+                tag = tag[:style_match.start()] + f'style="{new_style}"' + tag[style_match.end():]
+            else:
+                tag = tag[:-1] + f' style="{css_prop}">'
+            return tag
+
+        s = re.sub(r'<div\b[^>]*\bdata-gradient-id="[^"]*"[^>]*>', _inject, s)
+        return s.encode('utf-8')
+    except Exception:
+        return content
+
+
 def _safe_js(value) -> str:
     """JSON-encode a value for inline <script> injection.
     Escapes </ to prevent </script> tag breakout."""
@@ -1329,7 +1369,8 @@ _CARD_EDIT_OVERLAY_TPL = """\
       window.parent.postMessage({{type:'rd_pool_refresh'}}, window.location.origin);
     }}
     if (d.type === 'rd_set_gradient' && d.cardId) {{
-      var _gradEl = document.querySelector('[data-card-id="' + d.cardId + '"]');
+      var _gradEl = document.querySelector('[data-card-id="' + d.cardId + '"]') ||
+                   document.querySelector('[data-gradient-id="' + d.cardId + '"]');
       if (_gradEl) {{
         if (d.gradientCss) {{
           _gradEl.style.setProperty('--rd-overlay', d.gradientCss);
@@ -2387,6 +2428,73 @@ _CARD_EDIT_OVERLAY_TPL = """\
 
     // Run after init() DOM changes settle
     setTimeout(_initTextEditor, 150);
+  }})();
+
+  // ── Gradient-only elements (data-gradient-id) ───────────────────────────
+  // Hero sections that need gradient control but not full card editing.
+  // Uses data-gradient-id instead of data-card-id to avoid card CSS side effects.
+  (function() {{
+    document.querySelectorAll('[data-gradient-id]').forEach(function(el) {{
+      var gid = el.getAttribute('data-gradient-id');
+
+      // Read saved gradient state from __RD_CARDS (injected by _apply_cards_to_html)
+      var cardData = null;
+      if (window.__RD_CARDS) {{
+        for (var i = 0; i < window.__RD_CARDS.length; i++) {{
+          if (window.__RD_CARDS[i].card_id === gid) {{ cardData = window.__RD_CARDS[i]; break; }}
+        }}
+      }}
+      var gradState = {{
+        gradient_type:      (cardData && cardData.gradient_type)      || 'none',
+        gradient_tint:      (cardData && cardData.gradient_tint)      || 'dark',
+        gradient_opacity:   (cardData && cardData.gradient_opacity  != null) ? cardData.gradient_opacity  : 50,
+        gradient_direction: (cardData && cardData.gradient_direction) || 'bottom',
+        gradient_distance:  (cardData && cardData.gradient_distance != null) ? cardData.gradient_distance : 80
+      }};
+
+      // Pill with only the G button — no upload, no type/color controls
+      var pill = document.createElement('div');
+      pill.style.cssText = 'position:absolute;top:12px;right:12px;z-index:10000;display:none;align-items:center;overflow:hidden;border-radius:3px;box-shadow:0 2px 8px rgba(0,0,0,.45);';
+
+      var gradBtn = document.createElement('button');
+      gradBtn.textContent = 'G';
+      gradBtn.title = 'Gradient overlay';
+      gradBtn.style.cssText = 'padding:5px 9px;font-size:11px;font-weight:700;font-family:system-ui,sans-serif;border:none;cursor:pointer;line-height:1.4;white-space:nowrap;background:rgba(124,58,237,.85);color:#fff';
+      gradBtn.addEventListener('click', function(e) {{
+        e.stopPropagation(); e.preventDefault();
+        var rect = el.getBoundingClientRect();
+        var iframe = window.frameElement;
+        var iRect = iframe ? iframe.getBoundingClientRect() : {{left:0, top:0}};
+        window.parent.postMessage({{
+          type: 'rd_gradient_open',
+          cardId: gid,
+          cardState: {{ mode: 'color', color: '#1C1C1C', image: null, position: '50% 50%', zoom: 1.0 }},
+          rect: {{ left: iRect.left + rect.left, top: iRect.top + rect.top, width: rect.width, height: rect.height }},
+          gradient: gradState
+        }}, window.location.origin);
+      }});
+      pill.appendChild(gradBtn);
+
+      // Ensure element is positioned so the pill anchors correctly
+      if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+      el.appendChild(pill);
+      el.addEventListener('mouseenter', function() {{ pill.style.display = 'flex'; }});
+      el.addEventListener('mouseleave', function() {{ pill.style.display = 'none'; }});
+
+      // Live preview: update --rd-overlay when parent sends rd_set_gradient
+      // (also handled by the main message listener for data-card-id elements, but
+      // that selector only checks data-card-id — the main handler was updated to
+      // fall through to data-gradient-id, so this is belt-and-suspenders only)
+      window.addEventListener('message', function(ev) {{
+        if (!ev.data || ev.data.type !== 'rd_set_gradient' || ev.data.cardId !== gid) return;
+        if (ev.data.gradientCss) {{
+          el.style.setProperty('--rd-overlay', ev.data.gradientCss);
+        }} else {{
+          el.style.removeProperty('--rd-overlay');
+        }}
+        if (ev.data.gradient) {{ gradState = ev.data.gradient; }}
+      }});
+    }});
   }})();
   // ─────────────────────────────────────────────────────────────────────────
 }})();
@@ -3847,6 +3955,8 @@ def view(filename):
             if cards:
                 cards = _upgrade_card_images(cards)
                 content = _apply_cards_to_html(content, cards)
+                # Server-side inject --rd-overlay for data-gradient-id elements (heroes)
+                content = _inject_gradient_id_overlays(content, cards)
 
         # Inject diff panel mode for home page
         if HAS_DB and slug == 'home':
