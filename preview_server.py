@@ -1248,25 +1248,38 @@ _CARD_EDIT_OVERLAY_TPL = """\
     }}
   }}
 
+  function _doSaveCard(cardId, state) {{
+    fetch('/admin/api/cards/' + encodeURIComponent(SLUG) + '/' + encodeURIComponent(cardId), {{
+      method: 'PUT',
+      headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
+      body: JSON.stringify(state)
+    }});
+    if (cardId.indexOf('team-member-') === 0 && state.mode === 'image' && state.image) {{
+      var _tmId = cardId.replace('team-member-', '');
+      fetch('/admin/api/team/' + _tmId, {{
+        method: 'PUT',
+        headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
+        body: JSON.stringify({{photo: state.image, bio: _tmBioMap[_tmId] || ''}})
+      }}).catch(function() {{}});
+    }}
+  }}
+
   function saveCard(cardId, state) {{
     clearTimeout(saveTimers[cardId]);
     saveTimers[cardId] = setTimeout(function() {{
-      fetch('/admin/api/cards/' + encodeURIComponent(SLUG) + '/' + encodeURIComponent(cardId), {{
-        method: 'PUT',
-        headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
-        body: JSON.stringify(state)
-      }});
-      // Team card: also persist photo to team_members table so public page reflects it
-      if (cardId.indexOf('team-member-') === 0 && state.mode === 'image' && state.image) {{
-        var _tmId = cardId.replace('team-member-', '');
-        fetch('/admin/api/team/' + _tmId, {{
-          method: 'PUT',
-          headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
-          body: JSON.stringify({{photo: state.image, bio: _tmBioMap[_tmId] || ''}})
-        }}).catch(function() {{}});
-      }}
+      _doSaveCard(cardId, state);
     }}, 1500);
   }}
+
+  // Flush all pending card saves immediately (called by parent before overlay teardown)
+  window.__rdFlushCardSaves = function() {{
+    Object.keys(saveTimers).forEach(function(cid) {{
+      clearTimeout(saveTimers[cid]);
+      var s = cardMap[cid];
+      if (s) _doSaveCard(cid, s);
+    }});
+    saveTimers = {{}};
+  }};
 
   function applyPoolToCards() {{
     if (!imagePool.length) return;

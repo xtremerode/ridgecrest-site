@@ -2433,6 +2433,8 @@
     if (!iframeDoc) return;
 
     if (!editMode) {
+      // Flush any pending card saves before destroying the overlay script
+      try { if (siteFrame.contentWindow && siteFrame.contentWindow.__rdFlushCardSaves) siteFrame.contentWindow.__rdFlushCardSaves(); } catch(e) {}
       // Remove image overlay elements
       iframeDoc.querySelectorAll('[data-rd-overlay]').forEach(el => el.remove());
       const s1 = iframeDoc.getElementById('rd-edit-overlay');
