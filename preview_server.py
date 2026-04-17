@@ -1745,8 +1745,8 @@ _CARD_EDIT_OVERLAY_TPL = """\
 
     pill.appendChild(uploadBtn);
 
-    // G button — gradient control (scoped to service-custom-homes only for initial rollout)
-    if (!isGalleryItem && cardId === 'service-custom-homes') {{
+    // G button — gradient control (all eligible cards)
+    if (!isGalleryItem && cardId.indexOf('team-member-') !== 0 && cardId.indexOf('portfolio-featured-') !== 0) {{
       var gradBtn = document.createElement('button');
       gradBtn.textContent = 'G';
       gradBtn.title = 'Gradient overlay';
