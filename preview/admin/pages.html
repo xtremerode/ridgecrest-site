@@ -2743,6 +2743,9 @@
     // window._suppressSlugSync = true first so this block doesn't corrupt currentSlug.
     try {
       if (window._suppressSlugSync) { window._suppressSlugSync = false; return; }
+      // Guard: skip slug sync when render modal is open — iframe reload triggered by Use This Version
+      // should not corrupt currentSlug. The modal controls the reload target explicitly.
+      if (document.getElementById('rerenderModal')?.style?.display !== 'none') return;
       const iframePath = siteFrame.contentWindow?.location?.pathname || '';
       if (iframePath) {
         const rawSlug = iframePath
@@ -3856,7 +3859,7 @@ function openRerender(baseFilename, label, sourceFilename) {
   document.getElementById('rerenderPrompt').value = label
     ? `photorealistic luxury architectural render — ${label}, high-end finishes, natural light, professional photography`
     : 'photorealistic luxury architectural render, high-end finishes, natural light, professional photography';
-  document.getElementById('rerenderUseBtn').style.display = '';
+  document.getElementById('rerenderUseBtn').style.display = 'none';
   document.getElementById('rerenderUseBtn').disabled = false;
   document.getElementById('rerenderUseBtn').textContent = '✓ Use This Version';
   document.getElementById('rerenderRefineBtn').style.display = 'none';
@@ -3922,9 +3925,12 @@ async function _initFilmstrip() {
       dimensions:      v.dimensions || null,
     }));
     _renderStrip();
-    // Resolution warning: if active version is an AI render smaller than the original
+    // Auto-select currently active AI render version so "Use This Version" works immediately
     const origItem = _rerenderStrip.find(s => s.isOriginal);
     const activeItem = _rerenderStrip.find(s => s.isActive && !s.isOriginal);
+    if (activeItem) {
+      stripSelectSource(activeItem.filename, activeItem.heroPath, false);
+    }
     const resWarn = document.getElementById('rerenderResWarn');
     if (resWarn) {
       if (origItem && origItem.dimensions && activeItem && activeItem.dimensions &&
@@ -4301,16 +4307,15 @@ async function rerenderUseVersion() {
     if (typeof window._notifyRenderActivated === 'function') {
       window._notifyRenderActivated(d.new_active_path);
     }
-    // Reload siteFrame to reflect the updated image — use src assignment with timestamp
-    // to guarantee a fresh network request and bypass any cached response.
+    // Reload siteFrame to reflect the updated image — capture currentSlug BEFORE the timeout
+    // so that if siteFrame.src drifts (e.g. home page loaded) we still reload the correct page.
     var _rvSf = document.getElementById('siteFrame');
-    if (_rvSf && _rvSf.src && _rvSf.src !== 'about:blank') {
+    var _rvSlug = currentSlug;
+    var _rvPath = _rvSlug ? getPagePath(_rvSlug) : null;
+    if (_rvPath && _rvSf && _rvSf.src !== 'about:blank') {
       setTimeout(function() {
         window._suppressSlugSync = true;
-        var _rvBase = _rvSf.src.split('?')[0];
-        var _rvP = new URLSearchParams(_rvSf.src.includes('?') ? _rvSf.src.split('?')[1] : '');
-        _rvP.set('_t', Date.now());
-        _rvSf.src = _rvBase + '?' + _rvP.toString();
+        _rvSf.src = '/view/' + _rvPath + '?_stage=1&_t=' + Date.now();
       }, 600);
     }
   } catch(e) {
@@ -4430,16 +4435,15 @@ async function lbUseVersion() {
     if (typeof window._notifyRenderActivated === 'function') {
       window._notifyRenderActivated(d.new_active_path);
     }
-    // Reload siteFrame to reflect the updated image — use src assignment with timestamp
-    // to guarantee a fresh network request and bypass any cached response.
+    // Reload siteFrame to reflect the updated image — capture currentSlug BEFORE the timeout
+    // so that if siteFrame.src drifts (e.g. home page loaded) we still reload the correct page.
     var _luSf = document.getElementById('siteFrame');
-    if (_luSf && _luSf.src && _luSf.src !== 'about:blank') {
+    var _luSlug = currentSlug;
+    var _luPath = _luSlug ? getPagePath(_luSlug) : null;
+    if (_luPath && _luSf && _luSf.src !== 'about:blank') {
       setTimeout(function() {
         window._suppressSlugSync = true;
-        var _luBase = _luSf.src.split('?')[0];
-        var _luP = new URLSearchParams(_luSf.src.includes('?') ? _luSf.src.split('?')[1] : '');
-        _luP.set('_t', Date.now());
-        _luSf.src = _luBase + '?' + _luP.toString();
+        _luSf.src = '/view/' + _luPath + '?_stage=1&_t=' + Date.now();
       }, 600);
     }
     // Sync re-render modal strip if open behind the lightbox
