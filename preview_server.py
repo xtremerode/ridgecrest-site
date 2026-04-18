@@ -763,7 +763,8 @@ def _resolve_active_versions_batch(basenames: list, cur) -> dict:
             if av and os.path.isfile(os.path.join(opt_dir, av)):
                 result[row['filename']] = f'/assets/images-opt/{av}'
         return result
-    except Exception:
+    except Exception as _rav_exc:
+        app.logger.error('_resolve_active_versions_batch error: %s', _rav_exc)
         return {}
 
 
@@ -6057,15 +6058,19 @@ def blog_index():
                 "SELECT DISTINCT category FROM blog_posts WHERE status='published' AND category IS NOT NULL ORDER BY category"
             )
             categories = [r['category'] for r in cur.fetchall()]
-            # Resolve active image versions (same pattern as portfolio)
+            # Resolve active image versions (same pattern as portfolio).
+            # Also include the _480w size variant so renders made from that size resolve too.
             basenames = []
             for p in posts:
                 fi = p.get('featured_image')
                 if fi:
                     fname = fi.split('?')[0].split('/')[-1]
-                    # Strip _ai_N suffix to get base filename (matches image_labels.filename key)
                     base = re.sub(r'_ai_\d+\.webp$', '.webp', fname)
                     basenames.append(base)
+                    # If main image, also queue _480w so fallback works
+                    base_480w = re.sub(r'_mv2\.webp$', '_mv2_480w.webp', base)
+                    if base_480w != base:
+                        basenames.append(base_480w)
             av_map = _resolve_active_versions_batch(basenames, cur) if basenames else {}
         finally:
             conn.close()
@@ -6107,6 +6112,12 @@ def blog_index():
         img_html = ''
         if p.get('featured_image'):
             resolved_img = _active_path_for(p['featured_image'], av_map)
+            # Fallback: if main image has no active render, try the _480w variant
+            if resolved_img == p['featured_image']:
+                fname = p['featured_image'].split('?')[0].split('/')[-1]
+                fname_480w = re.sub(r'_mv2\.webp$', '_mv2_480w.webp', fname)
+                if fname_480w != fname and av_map.get(fname_480w):
+                    resolved_img = av_map[fname_480w]
             img_html = f'<div class="blog-card__img" style="background-image:url(\'{resolved_img}\')"></div>'
         cards_html += f'''
       <article class="blog-card">
@@ -8077,6 +8088,24 @@ def admin_set_version():
                OR featured_image LIKE %s OR featured_image LIKE %s
         """, (new_active_path, original_path, ai_like, ai_v_like, orig_v_like))
         blog_updated = cur.rowcount
+
+        # 4b. Cross-size fallback: if a _480w render was just activated, also update blog posts
+        #     that store the main (non-480w) path — render modals sometimes generate from _480w.
+        if blog_updated == 0 and '_480w' in base_filename:
+            main_base = base_filename.replace('_mv2_480w.webp', '_mv2.webp')
+            if main_base != base_filename:
+                main_path = f'/assets/images-opt/{main_base}'
+                main_stem = main_base[:-5]
+                cur.execute("""
+                    UPDATE blog_posts SET featured_image = %s
+                    WHERE featured_image = %s OR featured_image LIKE %s
+                       OR featured_image LIKE %s OR featured_image LIKE %s
+                """, (new_active_path,
+                      main_path,
+                      f'/assets/images-opt/{main_stem}_ai_%.webp',
+                      f'/assets/images-opt/{main_stem}_ai_%.webp?v=%',
+                      f'/assets/images-opt/{main_base}?v=%'))
+                blog_updated += cur.rowcount
 
         # 5. Find portfolio projects whose gallery or hero uses this base image
         cur.execute("""
