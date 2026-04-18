@@ -1126,6 +1126,10 @@
   let allImages = [];
   let editMode = false;
   let currentSlug = '';
+  // Guard: set true before any programmatic siteFrame reload so the slug-sync
+  // block doesn't overwrite currentSlug when the iframe reloads at a drifted URL.
+  // Must be set on window so outer IIFEs (BroadcastChannel, undo) can reach it.
+  window._suppressSlugSync = false;
   let pendingPick = null;      // {slug, elementIndex, currentImage} — hero pick
   let pendingCardPick = null;  // {cardId} — card image pick
   let selectedImage = null; // {hero_path, thumb_path, filename}
@@ -1983,6 +1987,8 @@
     siteFrame.style.height = PREVIEW_H + 'px';
     const _dbDev = _dbDevice(_currentDevice);
     // Blog is a Flask route (/blog), not a static file — load it directly
+    // Suppress slug-sync: this is an intentional navigation, not an in-frame drift.
+    window._suppressSlugSync = true;
     siteFrame.src = (path === 'blog.html')
       ? '/blog'
       : (_dbDev ? `/view/${path}?preview_device=${_dbDev}&_stage=1` : `/view/${path}?_stage=1`);
@@ -2722,7 +2728,11 @@
     // Without this, currentSlug stays stale after footer navigation, causing
     // toggleEditOverlay() to inject the overlay with the wrong slug — which
     // makes edits silently save to the original page instead of the visible one.
+    // GUARD: skip when load was triggered by programmatic reload (not organic navigation).
+    // Any code that calls location.reload() or reassigns siteFrame.src must set
+    // window._suppressSlugSync = true first so this block doesn't corrupt currentSlug.
     try {
+      if (window._suppressSlugSync) { window._suppressSlugSync = false; return; }
       const iframePath = siteFrame.contentWindow?.location?.pathname || '';
       if (iframePath) {
         const rawSlug = iframePath
@@ -4681,7 +4691,13 @@ async function lbSaveAdjust() {
     // Reload siteFrame to reflect the updated image (BroadcastChannel doesn't fire to self)
     var _lsSf = document.getElementById('siteFrame');
     if (_lsSf && _lsSf.src && _lsSf.src !== 'about:blank') {
-      setTimeout(function() { _lsSf.contentWindow && _lsSf.contentWindow.location.reload(); }, 400);
+      setTimeout(function() {
+        window._suppressSlugSync = true;
+        var _lsBase = _lsSf.src.split('?')[0];
+        var _lsP = new URLSearchParams(_lsSf.src.includes('?') ? _lsSf.src.split('?')[1] : '');
+        _lsP.set('_t', Date.now());
+        _lsSf.src = _lsBase + '?' + _lsP.toString();
+      }, 400);
     }
     // Sync re-render modal strip if open behind the lightbox
     if (document.getElementById('rerenderModal').style.display !== 'none') {
@@ -4706,8 +4722,15 @@ async function lbSaveAdjust() {
       if (!ev.data || ev.data.type !== 'version_activated') return;
       var sf = document.getElementById('siteFrame');
       if (sf && sf.src && sf.src !== 'about:blank') {
-        // Small delay lets the server finish writing the HTML before we reload
-        setTimeout(function() { sf.contentWindow && sf.contentWindow.location.reload(); }, 400);
+        // Small delay lets the server finish writing the HTML before we reload.
+        // Use src reassignment (not location.reload) so slug-sync never sees a drifted URL.
+        setTimeout(function() {
+          window._suppressSlugSync = true;
+          var _bcBase = sf.src.split('?')[0];
+          var _bcP = new URLSearchParams(sf.src.includes('?') ? sf.src.split('?')[1] : '');
+          _bcP.set('_t', Date.now());
+          sf.src = _bcBase + '?' + _bcP.toString();
+        }, 400);
       }
     };
   } catch(e) {}
@@ -4724,7 +4747,13 @@ async function lbSaveAdjust() {
       if (siteFrame && d.slug) {
         var src = siteFrame.src || '';
         if (src.indexOf(d.slug) >= 0 || src.indexOf('?admin_edit') >= 0) {
-          setTimeout(function() { siteFrame.contentWindow.location.reload(); }, 400);
+          setTimeout(function() {
+            window._suppressSlugSync = true;
+            var _undoBase = siteFrame.src.split('?')[0];
+            var _undoP = new URLSearchParams(siteFrame.src.includes('?') ? siteFrame.src.split('?')[1] : '');
+            _undoP.set('_t', Date.now());
+            siteFrame.src = _undoBase + '?' + _undoP.toString();
+          }, 400);
         }
       }
     }
