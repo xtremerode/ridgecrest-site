@@ -823,6 +823,13 @@ def _apply_cards_to_html(content: bytes, cards: list) -> bytes:
     """Inject window.__RD_CARDS JSON into <head> and card-apply script before </body>."""
     if not cards:
         return content
+    # Ensure gradient_css is always present regardless of whether cards came from
+    # _get_card_settings() (live DB, already computed) or a published snapshot (raw fields only).
+    cards = [dict(c, gradient_css=c.get('gradient_css') or _compute_gradient_css(
+        c.get('gradient_type'), c.get('gradient_tint'),
+        c.get('gradient_opacity'), c.get('gradient_direction'),
+        c.get('gradient_distance')
+    )) for c in cards]
     text = content.decode('utf-8', errors='replace')
     # Inject data var in <head>
     data_script = f'<script>window.__RD_CARDS={json.dumps(cards)};</script>'
