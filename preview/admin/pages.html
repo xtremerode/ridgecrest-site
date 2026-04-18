@@ -1224,10 +1224,17 @@
       }
       populatePageSelect(pages);
       buildTree(pages);
-      // Restore last-edited page on refresh. Only fires if the user already
-      // loaded a page in this tab — fresh navigation has no saved slug.
-      const _savedSlug = sessionStorage.getItem('rd_last_slug');
-      if (_savedSlug) loadPage(_savedSlug);
+      // GUARDRAIL: Always restore from localStorage on refresh. Default = 'index'.
+      // Never use the first item from the API list as default — order is non-deterministic.
+      // Bug history: danville-dream.html was alphabetically first in project list → always loaded on refresh.
+      // sessionStorage was previously used here but is wiped on hard refresh (Ctrl+R) — that was the root cause.
+      const _rawSavedSlug = localStorage.getItem('rd_admin_lastSlug');
+      // Validate: fall back to 'index' if nothing saved or slug no longer exists in page list
+      const _slugExists = _rawSavedSlug && pages.some(p => p.slug === _rawSavedSlug);
+      const _savedSlug = _slugExists ? _rawSavedSlug : 'index';
+      // Guard the startup load so slug-sync block in siteFrame.load doesn't corrupt currentSlug
+      window._suppressSlugSync = true;
+      loadPage(_savedSlug);
     } catch(e) {
       editStatus.textContent = 'Error loading pages';
       document.getElementById('pageTree').innerHTML =
@@ -1940,7 +1947,7 @@
     }
     currentSlug = slug;
     // Persist so browser refresh restores the same page without flashing the tree
-    try { sessionStorage.setItem('rd_last_slug', slug); } catch(e) {}
+    try { localStorage.setItem('rd_admin_lastSlug', slug); } catch(e) {}
     syncTreeActive(slug);
     // Clear all section height overrides — new page loads fresh from DB
     Object.keys(_sectionHeightOverrides).forEach(k => delete _sectionHeightOverrides[k]);
