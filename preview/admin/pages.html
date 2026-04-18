@@ -4307,15 +4307,15 @@ async function rerenderUseVersion() {
     if (typeof window._notifyRenderActivated === 'function') {
       window._notifyRenderActivated(d.new_active_path);
     }
-    // Reload siteFrame to reflect the updated image — capture currentSlug BEFORE the timeout
-    // so that if siteFrame.src drifts (e.g. home page loaded) we still reload the correct page.
+    // Reload siteFrame — capture siteFrame.src NOW before the timeout so that even if
+    // the frame navigates during the 600ms delay we still reload the correct page.
+    // NOTE: currentSlug and getPagePath are in a different IIFE scope — use DOM directly.
     var _rvSf = document.getElementById('siteFrame');
-    var _rvSlug = currentSlug;
-    var _rvPath = _rvSlug ? getPagePath(_rvSlug) : null;
-    if (_rvPath && _rvSf && _rvSf.src !== 'about:blank') {
+    var _rvCaptureSrc = (_rvSf && _rvSf.src && _rvSf.src !== 'about:blank') ? _rvSf.src : null;
+    if (_rvCaptureSrc) {
       setTimeout(function() {
         window._suppressSlugSync = true;
-        _rvSf.src = '/view/' + _rvPath + '?_stage=1&_t=' + Date.now();
+        _rvSf.src = _rvCaptureSrc.split('?')[0] + '?_stage=1&_t=' + Date.now();
       }, 600);
     }
   } catch(e) {
@@ -4435,15 +4435,15 @@ async function lbUseVersion() {
     if (typeof window._notifyRenderActivated === 'function') {
       window._notifyRenderActivated(d.new_active_path);
     }
-    // Reload siteFrame to reflect the updated image — capture currentSlug BEFORE the timeout
-    // so that if siteFrame.src drifts (e.g. home page loaded) we still reload the correct page.
+    // Reload siteFrame — capture siteFrame.src NOW before the timeout so that even if
+    // the frame navigates during the 600ms delay we still reload the correct page.
+    // NOTE: currentSlug and getPagePath are in a different IIFE scope — use DOM directly.
     var _luSf = document.getElementById('siteFrame');
-    var _luSlug = currentSlug;
-    var _luPath = _luSlug ? getPagePath(_luSlug) : null;
-    if (_luPath && _luSf && _luSf.src !== 'about:blank') {
+    var _luCaptureSrc = (_luSf && _luSf.src && _luSf.src !== 'about:blank') ? _luSf.src : null;
+    if (_luCaptureSrc) {
       setTimeout(function() {
         window._suppressSlugSync = true;
-        _luSf.src = '/view/' + _luPath + '?_stage=1&_t=' + Date.now();
+        _luSf.src = _luCaptureSrc.split('?')[0] + '?_stage=1&_t=' + Date.now();
       }, 600);
     }
     // Sync re-render modal strip if open behind the lightbox
