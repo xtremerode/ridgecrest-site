@@ -1117,7 +1117,7 @@ def _apply_hero_to_html(content: bytes, hero_path: str,
     script = (
         f'<script>window.__RD_HERO={_safe_js(hero_path)};'
         f'window.__RD_HERO_POSITION={_safe_js(hero_position)};'
-        f'window.__RD_HERO_ZOOM={_safe_js(hero_zoom)};'
+        f'window.__RD_HERO_ZOOM={_safe_js(hero_zoom)};</script>'
     )
     if '</head>' in new_text:
         new_text = new_text.replace('</head>', script + '</head>', 1)
