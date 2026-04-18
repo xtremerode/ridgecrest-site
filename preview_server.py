@@ -1113,13 +1113,11 @@ def _apply_hero_to_html(content: bytes, hero_path: str,
         text, count=1
     )
     # Detect if active version is an AI render
-    _is_ai = bool(re.search(r'_ai_\d+\.webp$', hero_path))
     # Always inject script vars — main.js reads these for all hero types
     script = (
         f'<script>window.__RD_HERO={_safe_js(hero_path)};'
         f'window.__RD_HERO_POSITION={_safe_js(hero_position)};'
         f'window.__RD_HERO_ZOOM={_safe_js(hero_zoom)};'
-        f'window.__RD_HERO_IS_AI={_safe_js(_is_ai)};</script>'
     )
     if '</head>' in new_text:
         new_text = new_text.replace('</head>', script + '</head>', 1)
@@ -2752,24 +2750,6 @@ _EDIT_OVERLAY_TPL = """\
       window.parent.postMessage({{type:'rd_open_render', cardId:null, filename:base}}, window.location.origin);
     }});
     badge.appendChild(heroRenderBtn);
-
-    // Reset to Original button — only visible when an AI render is active
-    if (window.__RD_HERO_IS_AI && !isCard) {{
-      var heroResetBtn = document.createElement('button');
-      heroResetBtn.textContent = '\u21a9 Original';
-      heroResetBtn.title = 'Reset hero to original image (undo AI edit)';
-      heroResetBtn.style.cssText = 'background:rgba(180,100,0,.85);color:#fff;border:none;font-family:system-ui,sans-serif;font-size:12px;font-weight:700;padding:5px 11px;border-radius:4px;cursor:pointer;white-space:nowrap;pointer-events:auto';
-      heroResetBtn.addEventListener('click', function(e) {{
-        e.stopPropagation();
-        var url = (editables[idx] && editables[idx].url) || imgUrl || '';
-        var f = url.split('?')[0].split('/').pop();
-        var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp');
-        if (!base || base === f || /_ai_\d+/.test(base)) return; // only proceed if this IS an AI render
-        if (!confirm('Reset hero to the original image? This removes the active AI render from the page (the AI render file is kept in the filmstrip).')) return;
-        window.parent.postMessage({{type:'rd_reset_original', filename:base}}, window.location.origin);
-      }});
-      badge.appendChild(heroResetBtn);
-    }}
 
     ov.appendChild(badge);
 

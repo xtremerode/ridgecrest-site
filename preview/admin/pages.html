@@ -2962,26 +2962,6 @@
         openRerender(d.filename, null);
       }
     }
-    if (d.type === 'rd_reset_original') {
-      const base = d.filename;
-      if (!base) return;
-      _activateVersion(base, '').then(result => {
-        if (result && result.ok !== false) {
-          Admin.toast('✓ Reset to original image', 'success');
-          // Reload siteFrame to reflect the change
-          var _rstSf = document.getElementById('siteFrame');
-          if (_rstSf && _rstSf.src && _rstSf.src !== 'about:blank') {
-            window._suppressSlugSync = true;
-            var _rstBase = _rstSf.src.split('?')[0];
-            var _rstP = new URLSearchParams(_rstSf.src.includes('?') ? _rstSf.src.split('?')[1] : '');
-            _rstP.set('_t', Date.now());
-            _rstSf.src = _rstBase + '?' + _rstP.toString();
-          }
-        } else {
-          Admin.toast('Failed to reset — check console', 'error');
-        }
-      }).catch(() => Admin.toast('Reset failed', 'error'));
-    }
     if (d.type === 'rd_auto_tag') {
       const slug = d.slug;
       if (!slug) return;
