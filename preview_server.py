@@ -6036,6 +6036,7 @@ def blog_index():
     conn = _blog_db_conn()
     posts = []
     categories = []
+    av_map = {}
     if conn:
         try:
             cur = conn.cursor()
@@ -6056,6 +6057,16 @@ def blog_index():
                 "SELECT DISTINCT category FROM blog_posts WHERE status='published' AND category IS NOT NULL ORDER BY category"
             )
             categories = [r['category'] for r in cur.fetchall()]
+            # Resolve active image versions (same pattern as portfolio)
+            basenames = []
+            for p in posts:
+                fi = p.get('featured_image')
+                if fi:
+                    fname = fi.split('?')[0].split('/')[-1]
+                    # Strip _ai_N suffix to get base filename (matches image_labels.filename key)
+                    base = re.sub(r'_ai_\d+\.webp$', '.webp', fname)
+                    basenames.append(base)
+            av_map = _resolve_active_versions_batch(basenames, cur) if basenames else {}
         finally:
             conn.close()
 
@@ -6095,7 +6106,8 @@ def blog_index():
         excerpt = p.get('excerpt') or ''
         img_html = ''
         if p.get('featured_image'):
-            img_html = f'<div class="blog-card__img" style="background-image:url(\'{p["featured_image"]}\')"></div>'
+            resolved_img = _active_path_for(p['featured_image'], av_map)
+            img_html = f'<div class="blog-card__img" style="background-image:url(\'{resolved_img}\')"></div>'
         cards_html += f'''
       <article class="blog-card">
         <a href="/blog/{p["slug"]}" class="blog-card__link">
