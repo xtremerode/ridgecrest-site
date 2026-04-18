@@ -6183,6 +6183,20 @@ def blog_post(slug):
                     (slug, post.get('category', ''))
                 )
                 related = [dict(r) for r in cur.fetchall()]
+                # Resolve active image version for featured_image (same logic as blog_index)
+                fi = post.get('featured_image')
+                if fi:
+                    fname = fi.split('?')[0].split('/')[-1]
+                    base = re.sub(r'_ai_\d+\.webp$', '.webp', fname)
+                    basenames = [base]
+                    base_480w = re.sub(r'_mv2\.webp$', '_mv2_480w.webp', base)
+                    if base_480w != base:
+                        basenames.append(base_480w)
+                    av_map = _resolve_active_versions_batch(basenames, cur)
+                    resolved = _active_path_for(fi, av_map)
+                    if resolved == fi and base_480w != base and av_map.get(base_480w):
+                        resolved = av_map[base_480w]
+                    post['featured_image'] = resolved
         finally:
             conn.close()
 
