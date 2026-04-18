@@ -6108,7 +6108,8 @@ def blog_index():
     )
     for cat in categories:
         active = ' blog-cat-pill--active' if request.args.get('cat') == cat else ''
-        cat_links += f'<a href="/blog?cat={cat}" class="blog-cat-pill{active}">{cat}</a>'
+        cat_encoded = cat.replace('&', '%26').replace(' ', '%20')
+        cat_links += f'<a href="/blog?cat={cat_encoded}" class="blog-cat-pill{active}">{cat}</a>'
 
     cards_html = ''
     for p in posts:
@@ -6213,6 +6214,7 @@ def blog_post(slug):
     meta_title = post.get('meta_title') or f"{post['title']} | The RD Edit | Ridgecrest Designs"
     meta_desc = post.get('meta_description') or post.get('excerpt') or ''
     cat = post.get('category', '')
+    cat_encoded = cat.replace('&', '%26').replace(' ', '%20') if cat else ''
 
     schema = f'''{{
   "@context": "https://schema.org",
@@ -6251,7 +6253,7 @@ def blog_post(slug):
     {'<div class="post-hero__overlay"></div>' if post.get('featured_image') else ''}
     <div class="container container--narrow">
       <div class="post-hero__meta">
-        <a href="/blog?cat={cat}" class="post-hero__cat">{cat}</a>
+        <a href="/blog?cat={cat_encoded}" class="post-hero__cat">{cat}</a>
         <span class="post-hero__date">{pub}</span>
       </div>
       <h1 class="post-hero__title">{post["title"]}</h1>
