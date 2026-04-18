@@ -1767,8 +1767,8 @@ p { line-height: 1.8; }
 }
 .lightbox.active { display: flex; }
 .lightbox__img {
-  max-width: 90vw;
-  max-height: 90vh;
+  width: 90vw;
+  height: 88vh;
   object-fit: contain;
 }
 .lightbox__close {

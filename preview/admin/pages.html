@@ -913,11 +913,11 @@
 
 
 <!-- ── Lightbox (shared with Media Library) ──────────────────────────────── -->
-<div id="lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:99999;align-items:center;justify-content:center;flex-direction:column" onclick="if(event.target===this)closeLightbox()">
+<div id="lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:99999;align-items:center;justify-content:center;flex-direction:column;overflow-y:auto" onclick="if(event.target===this)closeLightbox()">
   <button onclick="closeLightbox()" style="position:absolute;top:16px;right:20px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer;line-height:1;opacity:.7" title="Close (Esc)">✕</button>
   <button id="lbPrev" onclick="lightboxNav(-1)" style="position:absolute;left:16px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.12);border:none;color:#fff;font-size:36px;cursor:pointer;border-radius:8px;padding:8px 14px;line-height:1;opacity:.8" title="Previous">‹</button>
   <button id="lbNext" onclick="lightboxNav(1)"  style="position:absolute;right:16px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.12);border:none;color:#fff;font-size:36px;cursor:pointer;border-radius:8px;padding:8px 14px;line-height:1;opacity:.8" title="Next">›</button>
-  <img id="lbImg" src="" style="max-width:88vw;max-height:82vh;object-fit:contain;border-radius:6px;box-shadow:0 8px 40px rgba(0,0,0,.6)" />
+  <img id="lbImg" src="" style="width:88vw;height:64vh;object-fit:contain;border-radius:6px;box-shadow:0 8px 40px rgba(0,0,0,.6)" />
   <div style="display:flex;align-items:center;gap:12px;margin-top:14px;min-height:32px;flex-wrap:wrap;justify-content:center">
     <div id="lbCaption" style="color:rgba(255,255,255,.6);font-size:12px;text-align:center"></div>
     <div id="lbCounter" style="color:rgba(255,255,255,.4);font-size:11px"></div>

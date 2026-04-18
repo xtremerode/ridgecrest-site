@@ -7980,12 +7980,22 @@ def admin_image_versions(filename):
         p = os.path.join(opt_dir, f'{b}_201w.webp')
         return f'/assets/images-opt/{b}_201w.webp' if os.path.isfile(p) else f'/assets/images-opt/{fname}'
 
+    def _hires(fname):
+        """Return highest-resolution size variant available — used for lightbox display.
+        Prefer _1920w → _960w → base so all versions appear at similar display size."""
+        b = fname[:-5]
+        for suffix in ('_1920w', '_960w'):
+            candidate = f'{b}{suffix}.webp'
+            if os.path.isfile(os.path.join(opt_dir, candidate)):
+                return f'/assets/images-opt/{candidate}'
+        return f'/assets/images-opt/{fname}'
+
     versions = []
     # Original
     if os.path.isfile(os.path.join(opt_dir, filename)):
         versions.append({
             'filename':        filename,
-            'hero_path':       f'/assets/images-opt/{filename}',
+            'hero_path':       _hires(filename),
             'thumb_path':      _thumb(filename),
             'label':           'Original',
             'is_original':     True,
@@ -7999,7 +8009,7 @@ def admin_image_versions(filename):
         p = prompts_by_file.get(ai_fname, {})
         versions.append({
             'filename':        ai_fname,
-            'hero_path':       f'/assets/images-opt/{ai_fname}',
+            'hero_path':       _hires(ai_fname),
             'thumb_path':      _thumb(ai_fname),
             'label':           f'AI Render {idx}',
             'is_original':     False,
