@@ -1831,6 +1831,7 @@
         const normalised = siteFrame.src.replace(/[?&]_stage=1/g, '').replace(/\?&/, '?').replace(/[?&]$/, '');
         if (normalised !== src.replace(/[?&]_stage=1/g, '').replace(/\?&/, '?').replace(/[?&]$/, '')) {
           siteFrame.style.height = PREVIEW_H + 'px';
+          window._suppressSlugSync = true;
           siteFrame.src = src;
         }
       }
@@ -1851,7 +1852,7 @@
       _applyDeviceOverride(_currentDevice, currentSlug);
       // Reload iframe to show global settings
       const path = getPagePath(currentSlug);
-      if (path) { siteFrame.style.height = PREVIEW_H + 'px'; siteFrame.src = (path === 'blog.html') ? '/blog' : `/view/${path}?_stage=1`; }
+      if (path) { siteFrame.style.height = PREVIEW_H + 'px'; window._suppressSlugSync = true; siteFrame.src = (path === 'blog.html') ? '/blog' : `/view/${path}?_stage=1`; }
       editStatus.textContent = 'Device override removed — using global';
       editStatus.className = 'edit-status ready';
     } catch(e) {
@@ -1886,6 +1887,7 @@
     const path = getPagePath(currentSlug);
     if (!path) return;
     siteFrame.style.height = PREVIEW_H + 'px';
+    window._suppressSlugSync = true;
     siteFrame.src = (path === 'blog.html') ? '/blog' : `/view/${path}`;
   }
 
@@ -1903,6 +1905,7 @@
     if (!path) return;
     siteFrame.style.height = PREVIEW_H + 'px';
     const _dbDev = _dbDevice(_currentDevice);
+    window._suppressSlugSync = true;
     siteFrame.src = (path === 'blog.html')
       ? '/blog'
       : (_dbDev ? `/view/${path}?preview_device=${_dbDev}&_stage=1` : `/view/${path}?_stage=1`);
@@ -2968,6 +2971,7 @@
           // Reload siteFrame to reflect the change
           var _rstSf = document.getElementById('siteFrame');
           if (_rstSf && _rstSf.src && _rstSf.src !== 'about:blank') {
+            window._suppressSlugSync = true;
             var _rstBase = _rstSf.src.split('?')[0];
             var _rstP = new URLSearchParams(_rstSf.src.includes('?') ? _rstSf.src.split('?')[1] : '');
             _rstP.set('_t', Date.now());
@@ -4298,6 +4302,7 @@ async function rerenderUseVersion() {
     var _rvSf = document.getElementById('siteFrame');
     if (_rvSf && _rvSf.src && _rvSf.src !== 'about:blank') {
       setTimeout(function() {
+        window._suppressSlugSync = true;
         var _rvBase = _rvSf.src.split('?')[0];
         var _rvP = new URLSearchParams(_rvSf.src.includes('?') ? _rvSf.src.split('?')[1] : '');
         _rvP.set('_t', Date.now());
@@ -4426,6 +4431,7 @@ async function lbUseVersion() {
     var _luSf = document.getElementById('siteFrame');
     if (_luSf && _luSf.src && _luSf.src !== 'about:blank') {
       setTimeout(function() {
+        window._suppressSlugSync = true;
         var _luBase = _luSf.src.split('?')[0];
         var _luP = new URLSearchParams(_luSf.src.includes('?') ? _luSf.src.split('?')[1] : '');
         _luP.set('_t', Date.now());
