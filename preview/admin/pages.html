@@ -1796,7 +1796,10 @@
       const path = getPagePath(currentSlug);
       if (path) {
         const dbDev = _dbDevice(device);
-        const src = dbDev ? `/view/${path}?preview_device=${dbDev}&_stage=1` : `/view/${path}?_stage=1`;
+        // Blog is a Flask route — no device params or _stage needed
+        const src = (path === 'blog.html')
+          ? '/blog'
+          : (dbDev ? `/view/${path}?preview_device=${dbDev}&_stage=1` : `/view/${path}?_stage=1`);
         // Strip _stage from comparison so we don't reload when already showing staging
         const normalised = siteFrame.src.replace(/[?&]_stage=1/g, '').replace(/\?&/, '?').replace(/[?&]$/, '');
         if (normalised !== src.replace(/[?&]_stage=1/g, '').replace(/\?&/, '?').replace(/[?&]$/, '')) {
@@ -1821,7 +1824,7 @@
       _applyDeviceOverride(_currentDevice, currentSlug);
       // Reload iframe to show global settings
       const path = getPagePath(currentSlug);
-      if (path) { siteFrame.style.height = PREVIEW_H + 'px'; siteFrame.src = `/view/${path}?_stage=1`; }
+      if (path) { siteFrame.style.height = PREVIEW_H + 'px'; siteFrame.src = (path === 'blog.html') ? '/blog' : `/view/${path}?_stage=1`; }
       editStatus.textContent = 'Device override removed — using global';
       editStatus.className = 'edit-status ready';
     } catch(e) {
@@ -1897,7 +1900,10 @@
     // then visibly shrinks when the viewport-fix style is injected on load.
     siteFrame.style.height = PREVIEW_H + 'px';
     const _dbDev = _dbDevice(_currentDevice);
-    siteFrame.src = _dbDev ? `/view/${path}?preview_device=${_dbDev}&_stage=1` : `/view/${path}?_stage=1`;
+    // Blog is a Flask route (/blog), not a static file — load it directly
+    siteFrame.src = (path === 'blog.html')
+      ? '/blog'
+      : (_dbDev ? `/view/${path}?preview_device=${_dbDev}&_stage=1` : `/view/${path}?_stage=1`);
     // Show device toggle once a page is loaded
     _deviceToggle.style.display = 'flex';
   }

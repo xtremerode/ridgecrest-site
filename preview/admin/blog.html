@@ -152,6 +152,7 @@
                 <div class="editor-panel">
                   <div class="editor-panel__title">Featured Image URL</div>
                   <input type="text" id="postFeaturedImage" class="form-input" placeholder="https://…" />
+                  <button type="button" id="browseImgBtn" style="margin-top:0.5rem;width:100%;padding:0.4rem 0.75rem;font-size:0.78rem;font-weight:600;letter-spacing:0.05em;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);cursor:pointer;">Browse Media Library</button>
                   <div id="featuredImageThumb" class="featured-img-thumb" style="display:none"></div>
                 </div>
 
@@ -220,6 +221,27 @@
     </div><!-- .content -->
   </div><!-- .main -->
 </div><!-- .app -->
+
+<!-- Media picker modal for featured image -->
+<div id="imgPickerBackdrop" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;width:900px;max-width:95vw;height:82vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);flex-shrink:0">
+      <span style="font-weight:700;font-size:0.88rem;letter-spacing:0.04em;color:var(--text)">Select Featured Image</span>
+      <button id="imgPickerClose" style="background:none;border:none;color:var(--text-3);font-size:1.1rem;cursor:pointer;padding:4px 8px;line-height:1">✕</button>
+    </div>
+    <div style="padding:0.625rem 1.25rem;border-bottom:1px solid var(--border);flex-shrink:0">
+      <input type="text" id="imgPickerSearch" placeholder="Search images…" style="width:100%;padding:0.4rem 0.75rem;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:0.85rem;box-sizing:border-box">
+    </div>
+    <div id="imgPickerGrid" style="flex:1;overflow-y:auto;padding:1rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0.625rem;align-content:start"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1.25rem;border-top:1px solid var(--border);flex-shrink:0">
+      <span id="imgPickerLabel" style="font-size:0.78rem;color:var(--text-3)">No image selected</span>
+      <div style="display:flex;gap:0.5rem">
+        <button id="imgPickerCancel" style="padding:0.4rem 1rem;font-size:0.82rem;font-weight:600;border-radius:4px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">Cancel</button>
+        <button id="imgPickerUse" disabled style="padding:0.4rem 1rem;font-size:0.82rem;font-weight:600;border-radius:4px;border:none;background:var(--accent);color:#fff;cursor:not-allowed;opacity:0.5">Use Image</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdn.quilljs.com/1.3.7/quill.js"></script>
 <script src="js/admin.js"></script>
@@ -543,6 +565,98 @@
 
   loadPosts();
   Admin.initUndoButton();
+})();
+
+// ── Media picker for featured image ─────────────────────────────────────────
+(function() {
+  const browseBtn   = document.getElementById('browseImgBtn');
+  const backdrop    = document.getElementById('imgPickerBackdrop');
+  const closeBtn    = document.getElementById('imgPickerClose');
+  const cancelBtn   = document.getElementById('imgPickerCancel');
+  const useBtn      = document.getElementById('imgPickerUse');
+  const grid        = document.getElementById('imgPickerGrid');
+  const searchInput = document.getElementById('imgPickerSearch');
+  const label       = document.getElementById('imgPickerLabel');
+  const fiInput     = document.getElementById('postFeaturedImage');
+  const fiThumb     = document.getElementById('featuredImageThumb');
+
+  let cachedImages = [];
+  let selectedPath = null;
+
+  function closePicker() {
+    backdrop.style.display = 'none';
+    selectedPath = null;
+  }
+
+  function selectImage(path, el) {
+    grid.querySelectorAll('.img-picker-cell').forEach(c => c.style.outline = 'none');
+    el.style.outline = '2px solid var(--accent)';
+    selectedPath = path;
+    useBtn.disabled = false;
+    useBtn.style.opacity = '1';
+    useBtn.style.cursor = 'pointer';
+    label.textContent = path.split('/').pop();
+  }
+
+  function renderGrid(filter) {
+    const q = (filter || '').toLowerCase();
+    const imgs = q
+      ? cachedImages.filter(i => (i.hero_path || '').toLowerCase().includes(q))
+      : cachedImages;
+    grid.innerHTML = '';
+    if (!imgs.length) {
+      grid.innerHTML = '<p style="color:var(--text-3);font-size:0.85rem;grid-column:1/-1;padding:0.5rem">No images found.</p>';
+      return;
+    }
+    imgs.forEach(img => {
+      const cell = document.createElement('div');
+      cell.className = 'img-picker-cell';
+      cell.style.cssText = 'aspect-ratio:4/3;border-radius:4px;background:var(--surface-2) center/cover no-repeat;cursor:pointer;outline:none;transition:outline .1s';
+      cell.style.backgroundImage = `url('${img.hero_path}')`;
+      cell.title = img.hero_path.split('/').pop();
+      cell.addEventListener('click', () => selectImage(img.hero_path, cell));
+      grid.appendChild(cell);
+    });
+  }
+
+  async function openPicker() {
+    // Reset state
+    selectedPath = null;
+    useBtn.disabled = true;
+    useBtn.style.opacity = '0.5';
+    useBtn.style.cursor = 'not-allowed';
+    label.textContent = 'No image selected';
+    searchInput.value = '';
+    backdrop.style.cssText = 'display:flex;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);align-items:center;justify-content:center';
+
+    if (!cachedImages.length) {
+      grid.innerHTML = '<p style="color:var(--text-3);font-size:0.85rem;grid-column:1/-1;padding:0.5rem">Loading…</p>';
+      try {
+        const res = await fetch('/admin/api/pages/images', {
+          headers: { 'X-Admin-Token': Admin.getToken() || '' }
+        });
+        cachedImages = await res.json();
+      } catch(e) {
+        grid.innerHTML = '<p style="color:var(--text-3);font-size:0.85rem;grid-column:1/-1;padding:0.5rem">Error loading images.</p>';
+        return;
+      }
+    }
+    renderGrid('');
+  }
+
+  browseBtn.addEventListener('click', openPicker);
+  closeBtn.addEventListener('click', closePicker);
+  cancelBtn.addEventListener('click', closePicker);
+  backdrop.addEventListener('click', e => { if (e.target === backdrop) closePicker(); });
+  searchInput.addEventListener('input', () => renderGrid(searchInput.value));
+
+  useBtn.addEventListener('click', () => {
+    if (!selectedPath) return;
+    fiInput.value = selectedPath;
+    fiThumb.style.backgroundImage = `url('${selectedPath}')`;
+    fiThumb.style.display = '';
+    closePicker();
+  });
 })();
 </script>
 
