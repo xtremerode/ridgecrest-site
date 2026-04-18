@@ -593,6 +593,19 @@
     }
     .pg-btn-add-page:hover { border-color: #3b82f6; color: #3b82f6; }
 
+    /* ── Unpublished-changes dot on active tree node ── */
+    .pg-node.has-unpublished::after {
+      content: '';
+      display: inline-block;
+      width: 7px; height: 7px;
+      background: #f59e0b;
+      border-radius: 50%;
+      margin-left: 5px;
+      flex-shrink: 0;
+      box-shadow: 0 0 4px rgba(245,158,11,.6);
+      vertical-align: middle;
+    }
+
     /* ── Lock status badge on tree nodes ── */
     .pg-lock-pill {
       font-size: 9px; font-weight: 700;
@@ -1458,6 +1471,8 @@
     }
     active.classList.add('active');
     setTimeout(() => active.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 80);
+    // Re-apply the unpublished dot to reflect the newly active node
+    if (typeof _applyUnpublishedDot === 'function') _applyUnpublishedDot();
   }
   // ── End Page Link Tree ────────────────────────────────────────────────────
 
@@ -2121,6 +2136,8 @@
         publishBtnText.textContent = `Published ✓ (${res.count})`;
         publishBtn.style.background = '#0f766e';
         publishDot.style.display = 'none';
+        _hasUnpublishedChanges = false;
+        _applyUnpublishedDot();
         editStatus.textContent = `Published ${res.count} page${res.count !== 1 ? 's' : ''} to live site`;
         editStatus.className = 'edit-status ready';
         setTimeout(() => {
@@ -2141,17 +2158,28 @@
   });
 
   // ── Publish dot — poll for unpublished changes every 30s ─────────────────
+  let _hasUnpublishedChanges = false;
+
+  function _applyUnpublishedDot() {
+    // Add yellow dot to the currently active tree node when there are unpublished changes.
+    document.querySelectorAll('#pageTree .pg-node').forEach(n => {
+      n.classList.toggle('has-unpublished', _hasUnpublishedChanges && n.classList.contains('active'));
+    });
+  }
+
   async function _checkUnpublished() {
     try {
       const res = await fetch('/admin/api/pages/publish/status');
       const data = await res.json();
-      if (data.has_unpublished) {
+      _hasUnpublishedChanges = !!data.has_unpublished;
+      if (_hasUnpublishedChanges) {
         publishDot.style.display = '';
         publishBtn.title = 'Unpublished edits exist — click to publish';
       } else {
         publishDot.style.display = 'none';
         publishBtn.title = 'Publish all staged edits to the live site';
       }
+      _applyUnpublishedDot();
     } catch(e) {}
   }
   _checkUnpublished();
