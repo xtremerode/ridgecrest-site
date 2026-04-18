@@ -1013,6 +1013,7 @@
         <button id="rerenderSelectBtn" onclick="toggleStripSelectMode()" style="background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);font-size:11px;padding:3px 10px;border-radius:5px;cursor:pointer;line-height:1.4">Select</button>
       </div>
       <div id="rerenderStripScroll" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin;scrollbar-color:var(--border) transparent"></div>
+      <div id="rerenderResWarn" style="display:none;margin-top:8px;padding:7px 10px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);border-radius:5px;font-size:11px;color:#fbbf24;line-height:1.5"></div>
     </div>
     <!-- Adjustment sliders (always visible) -->
     <div id="rerenderAdjustRow" style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:12px">
@@ -2948,6 +2949,25 @@
         openRerender(d.filename, null);
       }
     }
+    if (d.type === 'rd_reset_original') {
+      const base = d.filename;
+      if (!base) return;
+      _activateVersion(base, '').then(result => {
+        if (result && result.ok !== false) {
+          Admin.toast('✓ Reset to original image', 'success');
+          // Reload siteFrame to reflect the change
+          var _rstSf = document.getElementById('siteFrame');
+          if (_rstSf && _rstSf.src && _rstSf.src !== 'about:blank') {
+            var _rstBase = _rstSf.src.split('?')[0];
+            var _rstP = new URLSearchParams(_rstSf.src.includes('?') ? _rstSf.src.split('?')[1] : '');
+            _rstP.set('_t', Date.now());
+            _rstSf.src = _rstBase + '?' + _rstP.toString();
+          }
+        } else {
+          Admin.toast('Failed to reset — check console', 'error');
+        }
+      }).catch(() => Admin.toast('Reset failed', 'error'));
+    }
     if (d.type === 'rd_auto_tag') {
       const slug = d.slug;
       if (!slug) return;
@@ -3886,6 +3906,7 @@ async function _initFilmstrip() {
   if (!_rerenderFilename) return;
   try {
     const d = await Admin.get(`/images/versions/${encodeURIComponent(_rerenderFilename)}`);
+    if (!d || !d.versions) return;  // null = auth failure (Admin.get returns null on 401)
     const all = d.versions || [];
     _rerenderStrip = all.map(v => ({
       filename:        v.filename,
@@ -3894,8 +3915,22 @@ async function _initFilmstrip() {
       isOriginal:      v.is_original,
       prompt:          v.prompt || null,
       source_filename: v.source_filename || null,
+      dimensions:      v.dimensions || null,
     }));
     _renderStrip();
+    // Resolution warning: if active version is an AI render smaller than the original
+    const origItem = _rerenderStrip.find(s => s.isOriginal);
+    const activeItem = _rerenderStrip.find(s => s.isActive && !s.isOriginal);
+    const resWarn = document.getElementById('rerenderResWarn');
+    if (resWarn) {
+      if (origItem && origItem.dimensions && activeItem && activeItem.dimensions &&
+          activeItem.dimensions[0] < origItem.dimensions[0]) {
+        resWarn.textContent = `⚠ Active AI render (${activeItem.dimensions[0]}×${activeItem.dimensions[1]}px) is lower resolution than the original (${origItem.dimensions[0]}×${origItem.dimensions[1]}px) and will appear soft at full width. Click Original in the strip to reset, or use ↩ Original in the hero badge.`;
+        resWarn.style.display = '';
+      } else {
+        resWarn.style.display = 'none';
+      }
+    }
     const srcItem = _rerenderStrip.find(s => s.filename === _rerenderSourceFilename);
     if (srcItem && srcItem.prompt) {
       document.getElementById('rerenderPrompt').value = srcItem.prompt;

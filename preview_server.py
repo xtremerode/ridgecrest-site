@@ -1112,11 +1112,14 @@ def _apply_hero_to_html(content: bytes, hero_path: str,
         lambda m: m.group(1) + hero_path + m.group(3),
         text, count=1
     )
+    # Detect if active version is an AI render
+    _is_ai = bool(re.search(r'_ai_\d+\.webp$', hero_path))
     # Always inject script vars — main.js reads these for all hero types
     script = (
         f'<script>window.__RD_HERO={_safe_js(hero_path)};'
         f'window.__RD_HERO_POSITION={_safe_js(hero_position)};'
-        f'window.__RD_HERO_ZOOM={_safe_js(hero_zoom)};</script>'
+        f'window.__RD_HERO_ZOOM={_safe_js(hero_zoom)};'
+        f'window.__RD_HERO_IS_AI={_safe_js(_is_ai)};</script>'
     )
     if '</head>' in new_text:
         new_text = new_text.replace('</head>', script + '</head>', 1)
@@ -2749,6 +2752,24 @@ _EDIT_OVERLAY_TPL = """\
       window.parent.postMessage({{type:'rd_open_render', cardId:null, filename:base}}, window.location.origin);
     }});
     badge.appendChild(heroRenderBtn);
+
+    // Reset to Original button — only visible when an AI render is active
+    if (window.__RD_HERO_IS_AI && !isCard) {{
+      var heroResetBtn = document.createElement('button');
+      heroResetBtn.textContent = '\u21a9 Original';
+      heroResetBtn.title = 'Reset hero to original image (undo AI edit)';
+      heroResetBtn.style.cssText = 'background:rgba(180,100,0,.85);color:#fff;border:none;font-family:system-ui,sans-serif;font-size:12px;font-weight:700;padding:5px 11px;border-radius:4px;cursor:pointer;white-space:nowrap;pointer-events:auto';
+      heroResetBtn.addEventListener('click', function(e) {{
+        e.stopPropagation();
+        var url = (editables[idx] && editables[idx].url) || imgUrl || '';
+        var f = url.split('?')[0].split('/').pop();
+        var base = f.replace(/_ai_\d+\.webp$/, '.webp');
+        if (!base || base === f) return; // only proceed if this IS an AI render
+        if (!confirm('Reset hero to the original image? This removes the active AI render from the page (the AI render file is kept in the filmstrip).')) return;
+        window.parent.postMessage({{type:'rd_reset_original', filename:base}}, window.location.origin);
+      }});
+      badge.appendChild(heroResetBtn);
+    }}
 
     ov.appendChild(badge);
 
@@ -7800,8 +7821,17 @@ if not result_bytes:
     print('ERROR: no image in response', file=sys.stderr)
     sys.exit(1)
 
-# Save base WebP at original dimensions
+# Save base WebP — upscale to original dimensions if AI result is smaller
+orig_path_for_dims = sys.argv[5] if len(sys.argv) > 5 else ''
 img_result = Image.open(io.BytesIO(result_bytes)).convert('RGB')
+if orig_path_for_dims and os.path.isfile(orig_path_for_dims):
+    try:
+        with Image.open(orig_path_for_dims) as _orig:
+            orig_w, orig_h = _orig.size
+        if img_result.width < orig_w:
+            img_result = img_result.resize((orig_w, orig_h), Image.LANCZOS)
+    except Exception:
+        pass
 img_result.save(out_path, 'WEBP', quality=92)
 
 # Generate responsive sizes
@@ -7825,8 +7855,9 @@ print('OK:' + out_path)
     _env['PATH'] = ':'.join(p for p in _env.get('PATH','').split(':') if 'venv' not in p)
 
     try:
+        orig_path_arg = os.path.join(opt_dir, base_filename)
         result = _subp.run(
-            ['/usr/bin/python3', '-c', script, api_key, src_path, out_path, prompt],
+            ['/usr/bin/python3', '-c', script, api_key, src_path, out_path, prompt, orig_path_arg],
             env=_env, capture_output=True, text=True, timeout=300
         )
         if result.returncode != 0:
@@ -8022,9 +8053,19 @@ def admin_image_versions(filename):
                         return f'/assets/images-opt/{candidate}'
         return f'/assets/images-opt/{fname}'
 
+    def _dims(fname):
+        """Return (width, height) of a file, or None if unreadable."""
+        try:
+            from PIL import Image as _PILImg
+            with _PILImg.open(os.path.join(opt_dir, fname)) as _im:
+                return list(_im.size)
+        except Exception:
+            return None
+
     versions = []
     # Original
     if os.path.isfile(os.path.join(opt_dir, filename)):
+        _orig_dims = _dims(filename)
         versions.append({
             'filename':        filename,
             'hero_path':       _hires(filename),
@@ -8034,6 +8075,7 @@ def admin_image_versions(filename):
             'is_active':       active_version is None,
             'prompt':          None,
             'source_filename': None,
+            'dimensions':      _orig_dims,
         })
 
     # AI renders — build from pre-scanned list
@@ -8048,6 +8090,7 @@ def admin_image_versions(filename):
             'is_active':       active_version == ai_fname,
             'prompt':          p.get('prompt'),
             'source_filename': p.get('source_filename'),
+            'dimensions':      _dims(ai_fname),
         })
 
     return jsonify({'base_filename': filename, 'active_version': active_version, 'versions': versions})
