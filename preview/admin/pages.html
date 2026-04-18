@@ -1722,10 +1722,12 @@
     try {
       const doc = siteFrame.contentDocument;
       if (!doc) return;
-      const _pcViewH = Math.round(frameWrap.clientHeight / ((frameWrap.clientWidth || PREVIEW_W) / PREVIEW_W));
+      // Use a fixed standard desktop viewport height instead of computing from the
+      // admin panel's own dimensions. Without this, the sidebar/toolbar eat into
+      // clientHeight and heroes render at a different height than on the live site.
       const viewH = _currentDevice === 'phone' ? 844
                   : _currentDevice === 'ipad'  ? 1024
-                  : _pcViewH;
+                  : LIVE_SITE_VIEWPORT_H;
       // Use saved override (from DB or drag) if present; else fall back to formula.
       const heroH        = _sectionHeightOverrides['hero']         != null ? _sectionHeightOverrides['hero']         : viewH;
       const projH        = _sectionHeightOverrides['project-hero'] != null ? _sectionHeightOverrides['project-hero'] : Math.round(viewH * 0.7);
@@ -3366,6 +3368,9 @@
   // iPad:  iframe renders at 768px (hits responsive breakpoints), shown 1:1, centered.
   // Phone: iframe renders at 390px (hits mobile breakpoints), shown 1:1, centered.
   const PREVIEW_W = 1440;
+  // Fixed to match standard desktop viewport (1080p minus browser chrome ~180px).
+  // Prevents admin panel dimensions from distorting hero heights vs the live site.
+  const LIVE_SITE_VIEWPORT_H = 900;
   // Use the actual browser viewport height — matches 100vh on the live page tab.
   const PREVIEW_H = window.innerHeight;
   const frameWrap = document.querySelector('.editor-frame-wrap');
