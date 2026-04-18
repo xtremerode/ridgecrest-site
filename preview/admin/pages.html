@@ -4140,10 +4140,16 @@ async function rerenderUseVersion() {
     if (typeof window._notifyRenderActivated === 'function') {
       window._notifyRenderActivated(d.new_active_path);
     }
-    // Reload siteFrame to reflect the updated image (BroadcastChannel doesn't fire to self)
+    // Reload siteFrame to reflect the updated image — use src assignment with timestamp
+    // to guarantee a fresh network request and bypass any cached response.
     var _rvSf = document.getElementById('siteFrame');
     if (_rvSf && _rvSf.src && _rvSf.src !== 'about:blank') {
-      setTimeout(function() { _rvSf.contentWindow && _rvSf.contentWindow.location.reload(); }, 400);
+      setTimeout(function() {
+        var _rvBase = _rvSf.src.split('?')[0];
+        var _rvP = new URLSearchParams(_rvSf.src.includes('?') ? _rvSf.src.split('?')[1] : '');
+        _rvP.set('_t', Date.now());
+        _rvSf.src = _rvBase + '?' + _rvP.toString();
+      }, 600);
     }
   } catch(e) {
     Admin.toast('Failed: ' + e.message, 'error');
@@ -4262,10 +4268,16 @@ async function lbUseVersion() {
     if (typeof window._notifyRenderActivated === 'function') {
       window._notifyRenderActivated(d.new_active_path);
     }
-    // Reload siteFrame to reflect the updated image (BroadcastChannel doesn't fire to self)
+    // Reload siteFrame to reflect the updated image — use src assignment with timestamp
+    // to guarantee a fresh network request and bypass any cached response.
     var _luSf = document.getElementById('siteFrame');
     if (_luSf && _luSf.src && _luSf.src !== 'about:blank') {
-      setTimeout(function() { _luSf.contentWindow && _luSf.contentWindow.location.reload(); }, 400);
+      setTimeout(function() {
+        var _luBase = _luSf.src.split('?')[0];
+        var _luP = new URLSearchParams(_luSf.src.includes('?') ? _luSf.src.split('?')[1] : '');
+        _luP.set('_t', Date.now());
+        _luSf.src = _luBase + '?' + _luP.toString();
+      }, 600);
     }
     // Sync re-render modal strip if open behind the lightbox
     if (document.getElementById('rerenderModal').style.display !== 'none') {

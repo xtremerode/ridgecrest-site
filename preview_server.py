@@ -7982,12 +7982,22 @@ def admin_image_versions(filename):
 
     def _hires(fname):
         """Return highest-resolution size variant available — used for lightbox display.
-        Prefer _1920w → _960w → base so all versions appear at similar display size."""
+        Prefer _1920w → _960w → base.  For _480w originals, also try the non-480w main
+        image so the original and its AI renders appear at equivalent sharpness/scale."""
         b = fname[:-5]
         for suffix in ('_1920w', '_960w'):
             candidate = f'{b}{suffix}.webp'
             if os.path.isfile(os.path.join(opt_dir, candidate)):
                 return f'/assets/images-opt/{candidate}'
+        # _480w originals: try the main image size variants (strip _480w from name)
+        if '_480w' in fname and '_ai_' not in fname:
+            main_base = fname.replace('_480w.webp', '.webp')
+            if main_base != fname:
+                mb = main_base[:-5]
+                for suffix in ('_1920w', '_960w', ''):
+                    candidate = f'{mb}{suffix}.webp' if suffix else main_base
+                    if os.path.isfile(os.path.join(opt_dir, candidate)):
+                        return f'/assets/images-opt/{candidate}'
         return f'/assets/images-opt/{fname}'
 
     versions = []
@@ -8099,22 +8109,31 @@ def admin_set_version():
         """, (new_active_path, original_path, ai_like, ai_v_like, orig_v_like))
         blog_updated = cur.rowcount
 
-        # 4b. Cross-size fallback: if a _480w render was just activated, also update blog posts
-        #     that store the main (non-480w) path — render modals sometimes generate from _480w.
-        if blog_updated == 0 and '_480w' in base_filename:
-            main_base = base_filename.replace('_mv2_480w.webp', '_mv2.webp')
+        # 4b. Cross-size fallback: if a _480w render was activated, also update blog posts that
+        #     store the main (non-480w) path OR a prior _480w_ai render path.
+        #     Covers three cases:
+        #       (a) first activation:  blog_posts has '_mv2.webp'  → matched by main_path
+        #       (b) re-activation:     blog_posts has '_mv2_480w_ai_1.webp' → matched by w480_ai_like
+        #       (c) main-image render: blog_posts has '_mv2_ai_1.webp' → matched by main_ai_like
+        if blog_updated == 0 and '_480w' in base_filename and '_ai_' not in base_filename:
+            main_base = base_filename.replace('_480w.webp', '.webp')
             if main_base != base_filename:
-                main_path = f'/assets/images-opt/{main_base}'
-                main_stem = main_base[:-5]
+                main_path  = f'/assets/images-opt/{main_base}'
+                main_stem  = main_base[:-5]
+                w480_stem  = base_filename[:-5]   # e.g. ..._mv2_480w
                 cur.execute("""
                     UPDATE blog_posts SET featured_image = %s
-                    WHERE featured_image = %s OR featured_image LIKE %s
-                       OR featured_image LIKE %s OR featured_image LIKE %s
+                    WHERE featured_image = %s
+                       OR featured_image LIKE %s
+                       OR featured_image LIKE %s
+                       OR featured_image LIKE %s
+                       OR featured_image LIKE %s
                 """, (new_active_path,
                       main_path,
-                      f'/assets/images-opt/{main_stem}_ai_%.webp',
-                      f'/assets/images-opt/{main_stem}_ai_%.webp?v=%',
-                      f'/assets/images-opt/{main_base}?v=%'))
+                      f'/assets/images-opt/{main_stem}_ai_%.webp',    # _mv2_ai_N
+                      f'/assets/images-opt/{main_base}?v=%',
+                      f'/assets/images-opt/{w480_stem}_ai_%.webp',    # _mv2_480w_ai_N (re-activation)
+                      f'/assets/images-opt/{w480_stem}_ai_%.webp?v=%'))
                 blog_updated += cur.rowcount
 
         # 5. Find portfolio projects whose gallery or hero uses this base image
