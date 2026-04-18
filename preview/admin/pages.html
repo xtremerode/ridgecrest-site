@@ -824,6 +824,7 @@
           </div>
           <span id="devBadge" style="font-size:10px;color:var(--text-muted,#94a3b8);white-space:nowrap;display:none"></span>
           <button id="devResetBtn" title="Reset to global (remove device override)" style="display:none;padding:3px 7px;font-size:10px;border:1px solid var(--border,#2a3748);border-radius:4px;cursor:pointer;background:var(--surface-2,#1e2d3d);color:#f87171">Reset</button>
+          <button id="publicViewBtn" title="Preview exactly what the public sees (no staging data)" style="padding:5px 10px;font-size:11px;font-weight:600;border:1px solid var(--border,#2a3748);border-radius:6px;cursor:pointer;background:var(--surface-2,#1e2d3d);color:var(--text-muted,#94a3b8);white-space:nowrap;display:none">👁 Public View</button>
         </div>
         <button id="publishBtn" title="Publish all staged edits to the live site"
           style="padding:7px 14px;border-radius:6px;border:none;background:#16a34a;
@@ -1660,12 +1661,14 @@
 
   // ── Device preview toggle ─────────────────────────────────────────────────
   let _currentDevice = 'pc';
-  const _deviceToggle = document.getElementById('deviceToggle');
-  const _devBtnPc    = document.getElementById('devBtnPc');
-  const _devBtnIpad  = document.getElementById('devBtnIpad');
-  const _devBtnPhone = document.getElementById('devBtnPhone');
-  const _devBadge    = document.getElementById('devBadge');
-  const _devResetBtn = document.getElementById('devResetBtn');
+  const _deviceToggle  = document.getElementById('deviceToggle');
+  const _devBtnPc      = document.getElementById('devBtnPc');
+  const _devBtnIpad    = document.getElementById('devBtnIpad');
+  const _devBtnPhone   = document.getElementById('devBtnPhone');
+  const _devBadge      = document.getElementById('devBadge');
+  const _devResetBtn   = document.getElementById('devResetBtn');
+  const _publicViewBtn = document.getElementById('publicViewBtn');
+  let   _publicViewMode = false; // true while showing published (non-staged) content
   const _ACCENT      = 'var(--accent,#3b82f6)';
   const _SURF2       = 'var(--surface-2,#1e2d3d)';
   const _COL_ACTIVE  = '#fff';
@@ -1787,6 +1790,8 @@
   }
 
   function setDevice(device) {
+    // Clicking a device button exits Public View and returns to staging preview
+    if (_publicViewMode) _exitPublicView();
     _currentDevice = device;
     // Update button styles
     [['pc', _devBtnPc], ['ipad', _devBtnIpad], ['phone', _devBtnPhone]].forEach(([d, btn]) => {
@@ -1849,6 +1854,65 @@
       editStatus.className = 'edit-status';
     }
   });
+
+  // ── Public View mode ─────────────────────────────────────────────────────
+  // Loads the current page WITHOUT ?_stage=1, showing exactly what the public
+  // sees (published snapshot data). All edit controls are disabled in this mode.
+
+  function _enterPublicView() {
+    if (!currentSlug) return;
+    _publicViewMode = true;
+    // Force edit mode off so toggleEditOverlay() doesn't inject editing scripts
+    if (editMode) {
+      editMode = false;
+      editModeBtn.classList.remove('active');
+      editModeBtn.querySelector('.edit-mode-dot').style.background = '';
+      _removeTextEdit();
+    }
+    // Disable all editing UI
+    editModeBtn.disabled = true;
+    publishBtn.disabled  = true;
+    _publicViewBtn.style.background = 'var(--accent,#3b82f6)';
+    _publicViewBtn.style.color      = '#fff';
+    _publicViewBtn.title = 'Viewing published site — click to return to staging preview';
+    editStatus.textContent = '👁 Viewing published site';
+    editStatus.className   = 'edit-status ready';
+    // Load without ?_stage=1
+    const path = getPagePath(currentSlug);
+    if (!path) return;
+    siteFrame.style.height = PREVIEW_H + 'px';
+    siteFrame.src = (path === 'blog.html') ? '/blog' : `/view/${path}`;
+  }
+
+  function _exitPublicView() {
+    _publicViewMode = false;
+    editModeBtn.disabled = false;
+    publishBtn.disabled  = false;
+    _publicViewBtn.style.background = 'var(--surface-2,#1e2d3d)';
+    _publicViewBtn.style.color      = 'var(--text-muted,#94a3b8)';
+    _publicViewBtn.title = 'Preview exactly what the public sees (no staging data)';
+    editStatus.textContent = '';
+    editStatus.className   = 'edit-status';
+    // Reload with ?_stage=1 to return to staging
+    const path = getPagePath(currentSlug);
+    if (!path) return;
+    siteFrame.style.height = PREVIEW_H + 'px';
+    const _dbDev = _dbDevice(_currentDevice);
+    siteFrame.src = (path === 'blog.html')
+      ? '/blog'
+      : (_dbDev ? `/view/${path}?preview_device=${_dbDev}&_stage=1` : `/view/${path}?_stage=1`);
+  }
+
+  if (_publicViewBtn) {
+    _publicViewBtn.addEventListener('click', () => {
+      if (_publicViewMode) {
+        _exitPublicView();
+      } else {
+        _enterPublicView();
+      }
+    });
+  }
+  // ── End Public View ───────────────────────────────────────────────────────
 
   async function loadPage(slug) {
     if (!slug) return;
@@ -1921,8 +1985,11 @@
     siteFrame.src = (path === 'blog.html')
       ? '/blog'
       : (_dbDev ? `/view/${path}?preview_device=${_dbDev}&_stage=1` : `/view/${path}?_stage=1`);
-    // Show device toggle once a page is loaded
-    _deviceToggle.style.display = 'flex';
+    // Exit public view when navigating to a new page
+    if (_publicViewMode) _exitPublicView();
+    // Show device toggle + public view button once a page is loaded
+    _deviceToggle.style.display  = 'flex';
+    _publicViewBtn.style.display = '';
   }
 
   // ── Paste tool — click to activate → Ctrl+V previews inline → Enter to upload ─
@@ -2569,17 +2636,21 @@
     // project cards) navigate the iframe without it. Without _stage=1, the server
     // serves the published snapshot instead of live DB data — causing hero image
     // saves to appear to revert immediately after navigation.
-    try {
-      const iLoc = siteFrame.contentWindow && siteFrame.contentWindow.location;
-      if (iLoc && iLoc.pathname && iLoc.pathname.startsWith('/view/')) {
-        const hasStage = iLoc.search && iLoc.search.includes('_stage=1');
-        if (!hasStage) {
-          const sep = iLoc.search ? '&' : '?';
-          siteFrame.contentWindow.location.replace(iLoc.href + sep + '_stage=1');
-          return; // load event will fire again with _stage=1
+    // BYPASS this enforcer in Public View mode — the whole point is to show the
+    // published (non-staged) content, so we must NOT add ?_stage=1.
+    if (!_publicViewMode) {
+      try {
+        const iLoc = siteFrame.contentWindow && siteFrame.contentWindow.location;
+        if (iLoc && iLoc.pathname && iLoc.pathname.startsWith('/view/')) {
+          const hasStage = iLoc.search && iLoc.search.includes('_stage=1');
+          if (!hasStage) {
+            const sep = iLoc.search ? '&' : '?';
+            siteFrame.contentWindow.location.replace(iLoc.href + sep + '_stage=1');
+            return; // load event will fire again with _stage=1
+          }
         }
-      }
-    } catch(e) {}
+      } catch(e) {}
+    }
 
     // ── Fix viewport-height to match standard desktop (100vh → 900px) ────────
     // Without this, 100vh inside the iframe equals the iframe's declared height
@@ -2676,11 +2747,12 @@
       }
     } catch(e) {}
 
-    if (editMode) {
+    if (editMode && !_publicViewMode) {
       // Re-inject overlays after any iframe reload (e.g. after undo)
+      // Never inject in Public View mode — it must show a clean, unmodified page.
       _resetTextEditState();
       toggleEditOverlay();
-    } else {
+    } else if (!_publicViewMode) {
       editStatus.textContent = '';
     }
   });
