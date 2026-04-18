@@ -1229,9 +1229,9 @@
       // Bug history: danville-dream.html was alphabetically first in project list → always loaded on refresh.
       // sessionStorage was previously used here but is wiped on hard refresh (Ctrl+R) — that was the root cause.
       const _rawSavedSlug = localStorage.getItem('rd_admin_lastSlug');
-      // Validate: fall back to 'index' if nothing saved or slug no longer exists in page list
+      // Validate: fall back to 'home' if nothing saved or slug no longer exists in page list
       const _slugExists = _rawSavedSlug && pages.some(p => p.slug === _rawSavedSlug);
-      const _savedSlug = _slugExists ? _rawSavedSlug : 'index';
+      const _savedSlug = _slugExists ? _rawSavedSlug : 'home';
       // Guard the startup load so slug-sync block in siteFrame.load doesn't corrupt currentSlug
       window._suppressSlugSync = true;
       loadPage(_savedSlug);
@@ -1966,7 +1966,7 @@
       pendingTextY = pageData.hero_text_y != null ? parseFloat(pageData.hero_text_y) : 0;
     }
     const path = getPagePath(slug);
-    if (!path) return;
+    if (!path) { localStorage.removeItem('rd_admin_lastSlug'); return; }
     frameLoading.classList.remove('hidden');
     editStatus.textContent = 'Loading…';
     editStatus.className = 'edit-status';
