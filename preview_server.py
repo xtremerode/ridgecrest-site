@@ -3015,8 +3015,14 @@ _EDIT_OVERLAY_TPL = """\
       if (!el.style.backgroundImage) return;
       if (el.hasAttribute('data-card-id')) return; // cards have their own overlay — skip
       var m = el.style.backgroundImage.match(/url\\(['"]?([^'"\\)]+)['"]?\\)/);
-      if (!m || !m[1].startsWith('/assets/')) return;
-      var imgUrl = m[1];
+      if (!m) return;
+      // Browsers absolutize background-image URLs (e.g. "http://host/assets/...").
+      // Normalize to pathname so the /assets/ check works regardless.
+      var _rawUrl = m[1];
+      var _pathname = _rawUrl;
+      try {{ _pathname = new URL(_rawUrl, location.href).pathname; }} catch(e) {{}}
+      if (!_pathname.startsWith('/assets/')) return;
+      var imgUrl = _pathname;
       var idx = editables.length;
       editables.push({{ el: el, url: imgUrl, zoom: _initZoom, posX: _initPosX, posY: _initPosY }});
       cycleIndices.push(null);
