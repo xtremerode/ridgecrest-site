@@ -1789,7 +1789,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
       var imgPath = state.image || (isGalleryItem ? el.getAttribute('data-src') : null);
       if (!imgPath) return;
       var f = imgPath.split('?')[0].split('/').pop();
-      var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp').replace(/_(1920|960|480|201)w\.webp$/, '.webp');
+      var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp');
       if (!base) return;
       window.parent.postMessage({{type:'rd_open_render', cardId:cardId, filename:base}}, window.location.origin);
     }});
@@ -2050,7 +2050,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
 
       // Normalize filename: strip AI variant suffix (and any size suffix) to get base name
       var f = src.split('?')[0].split('/').pop();
-      var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp').replace(/_(1920|960|480|201)w\.webp$/, '.webp');
+      var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp');
       if (!base) return;
 
       // Append button to the img's parent container (which becomes the positioning context)
@@ -2745,7 +2745,7 @@ _EDIT_OVERLAY_TPL = """\
       e.stopPropagation();
       var url = (editables[idx] && editables[idx].url) || imgUrl || '';
       var f = url.split('?')[0].split('/').pop();
-      var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp').replace(/_(1920|960|480|201)w\.webp$/, '.webp');
+      var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp');
       if (!base || /_ai_\d+/.test(base)) return;
       window.parent.postMessage({{type:'rd_open_render', cardId:null, filename:base}}, window.location.origin);
     }});
