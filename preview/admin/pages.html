@@ -4213,8 +4213,10 @@ async function rerenderUseVersion() {
   const kelvin     = parseInt(document.getElementById('adjKelvin').value);
   const hasAdjust  = brightness !== 100 || contrast !== 100 || saturation !== 100
                   || colorR !== 0 || colorG !== 0 || colorB !== 0 || kelvin !== 6500;
+  // Case C: user clicked a filmstrip version thumbnail then clicked Use This Version
+  const hasStripSelect = !!_rerenderSourceFilename && _rerenderSourceFilename !== _rerenderFilename;
 
-  if (!hasResult && !hasAdjust) return;
+  if (!hasResult && !hasAdjust && !hasStripSelect) return;
 
   const useBtn = document.getElementById('rerenderUseBtn');
   useBtn.disabled = true;
@@ -4246,6 +4248,10 @@ async function rerenderUseVersion() {
         const stripEl = document.querySelector(`#rerenderStripScroll .rrstrip-item[data-filename="${CSS.escape(activeFilename)}"] div`);
         if (stripEl) stripEl.style.backgroundImage = `url('${newActivePath}?v=${ts}')`;
       }
+
+    } else if (hasStripSelect && !hasAdjust) {
+      // ── Case C: filmstrip version directly selected — activate without new render
+      activeFilename = _rerenderSourceFilename;
 
     } else if (hasAdjust) {
       // ── Case B: No render result but sliders set — create new AI version ─────
