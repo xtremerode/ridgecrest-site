@@ -3906,7 +3906,10 @@ async function _initFilmstrip() {
   if (!_rerenderFilename) return;
   try {
     const d = await Admin.get(`/images/versions/${encodeURIComponent(_rerenderFilename)}`);
-    if (!d || !d.versions) return;  // null = auth failure (Admin.get returns null on 401)
+    if (!d || !d.versions) {
+      if (d && d.error) console.warn('[filmstrip] API rejected filename:', _rerenderFilename, '—', d.error);
+      return;
+    }
     const all = d.versions || [];
     _rerenderStrip = all.map(v => ({
       filename:        v.filename,

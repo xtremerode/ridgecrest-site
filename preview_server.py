@@ -1791,7 +1791,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
       var imgPath = state.image || (isGalleryItem ? el.getAttribute('data-src') : null);
       if (!imgPath) return;
       var f = imgPath.split('?')[0].split('/').pop();
-      var base = f.replace(/_ai_\d+\.webp$/, '.webp');
+      var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp');
       if (!base) return;
       window.parent.postMessage({{type:'rd_open_render', cardId:cardId, filename:base}}, window.location.origin);
     }});
@@ -2050,9 +2050,9 @@ _CARD_EDIT_OVERLAY_TPL = """\
       if (img.getAttribute('data-rd-ai-pill')) return;
       img.setAttribute('data-rd-ai-pill', '1');
 
-      // Normalize filename: strip AI variant suffix to get base name
+      // Normalize filename: strip AI variant suffix (and any size suffix) to get base name
       var f = src.split('?')[0].split('/').pop();
-      var base = f.replace(/_ai_\d+\.webp$/, '.webp');
+      var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp');
       if (!base) return;
 
       // Append button to the img's parent container (which becomes the positioning context)
@@ -2747,8 +2747,8 @@ _EDIT_OVERLAY_TPL = """\
       e.stopPropagation();
       var url = (editables[idx] && editables[idx].url) || imgUrl || '';
       var f = url.split('?')[0].split('/').pop();
-      var base = f.replace(/_ai_\d+\.webp$/, '.webp');
-      if (!base) return;
+      var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp');
+      if (!base || /_ai_\d+/.test(base)) return;
       window.parent.postMessage({{type:'rd_open_render', cardId:null, filename:base}}, window.location.origin);
     }});
     badge.appendChild(heroRenderBtn);
@@ -2763,8 +2763,8 @@ _EDIT_OVERLAY_TPL = """\
         e.stopPropagation();
         var url = (editables[idx] && editables[idx].url) || imgUrl || '';
         var f = url.split('?')[0].split('/').pop();
-        var base = f.replace(/_ai_\d+\.webp$/, '.webp');
-        if (!base || base === f) return; // only proceed if this IS an AI render
+        var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp');
+        if (!base || base === f || /_ai_\d+/.test(base)) return; // only proceed if this IS an AI render
         if (!confirm('Reset hero to the original image? This removes the active AI render from the page (the AI render file is kept in the filmstrip).')) return;
         window.parent.postMessage({{type:'rd_reset_original', filename:base}}, window.location.origin);
       }});
