@@ -4171,6 +4171,17 @@ async function runRerender(refine) {
     document.getElementById('rerenderStatus').textContent = '✓ Render saved — click "✓ Use This Version" to make it live, or keep rendering';
     _stripAppend(newFilename, d.hero_path, prompt, sourceFile);
     _stripHighlight(_rerenderSourceFilename);
+    // FIX 4: Show dimension warning if server reports render is smaller than expected.
+    if (d.width && d.width < 1920) {
+      const resWarnEl = document.getElementById('rerenderResWarn');
+      if (resWarnEl) {
+        resWarnEl.textContent = `⚠ AI render _1920w is ${d.width}×${d.height}px — smaller than expected 1920px. The upscale may have failed. Check server logs for [AI RENDER ERROR].`;
+        resWarnEl.style.display = '';
+      }
+    } else {
+      const resWarnEl = document.getElementById('rerenderResWarn');
+      if (resWarnEl) resWarnEl.style.display = 'none';
+    }
   } catch(e) {
     document.getElementById('rerenderStatus').textContent = '✕ ' + e.message;
     document.getElementById('rerenderPlaceholder').textContent = 'Generation failed';

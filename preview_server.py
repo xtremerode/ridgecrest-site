@@ -1789,7 +1789,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
       var imgPath = state.image || (isGalleryItem ? el.getAttribute('data-src') : null);
       if (!imgPath) return;
       var f = imgPath.split('?')[0].split('/').pop();
-      var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp');
+      var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp').replace(/_(1920|960|480|201)w\.webp$/, '.webp');
       if (!base) return;
       window.parent.postMessage({{type:'rd_open_render', cardId:cardId, filename:base}}, window.location.origin);
     }});
@@ -2050,7 +2050,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
 
       // Normalize filename: strip AI variant suffix (and any size suffix) to get base name
       var f = src.split('?')[0].split('/').pop();
-      var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp');
+      var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp').replace(/_(1920|960|480|201)w\.webp$/, '.webp');
       if (!base) return;
 
       // Append button to the img's parent container (which becomes the positioning context)
@@ -2745,7 +2745,7 @@ _EDIT_OVERLAY_TPL = """\
       e.stopPropagation();
       var url = (editables[idx] && editables[idx].url) || imgUrl || '';
       var f = url.split('?')[0].split('/').pop();
-      var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp');
+      var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp').replace(/_(1920|960|480|201)w\.webp$/, '.webp');
       if (!base || /_ai_\d+/.test(base)) return;
       window.parent.postMessage({{type:'rd_open_render', cardId:null, filename:base}}, window.location.origin);
     }});
@@ -7728,6 +7728,10 @@ def admin_image_rerender():
     # base_filename must be the original, not itself an AI render
     if re.search(r'_ai_\d+\.webp$', base_filename):
         return jsonify({'error': 'base_filename must be the original, not an AI render'}), 400
+    # Strip responsive-size suffixes (_1920w, _960w, _480w, _201w) from base_filename.
+    # If the admin panel sends e.g. foo_1920w.webp, normalise to foo.webp so outputs
+    # are named correctly and orig_path_arg resolves to the right file.
+    base_filename = re.sub(r'_(1920|960|480|201)w\.webp$', '.webp', base_filename)
     if not prompt:
         return jsonify({'error': 'prompt is required'}), 400
 
@@ -7767,15 +7771,15 @@ src_path = sys.argv[2]
 out_path = sys.argv[3]
 prompt   = sys.argv[4]
 
-# Read source image, downscale to max 1024px, convert to JPEG for API.
-# Large source files (8–18 MB webp) would otherwise be sent as 10–20 MB
-# JPEG payloads. Gemini needs enough detail to understand the image, not
-# full-resolution data; 1024px preserves all meaningful content.
+# Read source image — send at up to 2048px to Gemini for higher-quality input context.
+# Gemini outputs ~1024px regardless of input resolution; sending a sharper source
+# improves the model's understanding of colors, textures, and spatial relationships.
+# IMPORTANT: always use the full-resolution original (no _480w/_960w suffix) as src_path.
 with Image.open(src_path) as img:
     img_rgb = img.convert('RGB')
-    img_rgb.thumbnail((1024, 1024), Image.LANCZOS)
+    img_rgb.thumbnail((2048, 2048), Image.LANCZOS)
     buf = io.BytesIO()
-    img_rgb.save(buf, 'JPEG', quality=85)
+    img_rgb.save(buf, 'JPEG', quality=90)
     img_bytes = buf.getvalue()
 
 client = genai.Client(api_key=api_key)
@@ -7801,22 +7805,32 @@ if not result_bytes:
     print('ERROR: no image in response', file=sys.stderr)
     sys.exit(1)
 
-# Save base WebP — upscale to original dimensions if AI result is smaller
+# FIX 1: Upscale to original dimensions BEFORE generating responsive sizes.
+# Gemini returns ~1024px regardless of input. We must upscale back to the
+# original resolution so the _1920w variant is not a blurry 1024px image.
+from PIL import ImageFilter as _IF
 orig_path_for_dims = sys.argv[5] if len(sys.argv) > 5 else ''
 img_result = Image.open(io.BytesIO(result_bytes)).convert('RGB')
+orig_w = orig_h = 0
 if orig_path_for_dims and os.path.isfile(orig_path_for_dims):
     try:
         with Image.open(orig_path_for_dims) as _orig:
             orig_w, orig_h = _orig.size
         if img_result.width < orig_w:
             img_result = img_result.resize((orig_w, orig_h), Image.LANCZOS)
-    except Exception:
-        pass
+            # Apply mild sharpening to reduce Lanczos upscale softness.
+            img_result = img_result.filter(_IF.UnsharpMask(radius=1.2, percent=60, threshold=3))
+    except Exception as _e:
+        print(f'[AI RENDER WARN] upscale failed: {_e}', file=sys.stderr)
+else:
+    print(f'[AI RENDER WARN] orig_path_for_dims missing or not found: {orig_path_for_dims!r}', file=sys.stderr)
+
 img_result.save(out_path, 'WEBP', quality=92)
 
-# Generate responsive sizes
+# FIX 1 (cont): Generate responsive sizes from the upscaled base — order matters.
 sizes = [('_1920w', 1920), ('_960w', 960), ('_480w', 480), ('_201w', 201)]
 base_out = out_path[:-5]  # strip .webp
+saved_dims = {}
 for suffix, w in sizes:
     if img_result.width > w:
         ratio = w / img_result.width
@@ -7824,9 +7838,21 @@ for suffix, w in sizes:
         resized = img_result.resize((w, h), Image.LANCZOS)
     else:
         resized = img_result
-    resized.save(base_out + suffix + '.webp', 'WEBP', quality=92)
+    out_variant = base_out + suffix + '.webp'
+    resized.save(out_variant, 'WEBP', quality=92)
+    saved_dims[suffix] = (resized.width, resized.height)
 
-print('OK:' + out_path)
+# FIX 3: Dimension assertion guardrail — _1920w must match original width.
+if orig_w and '_1920w' in saved_dims:
+    actual_w = saved_dims['_1920w'][0]
+    # _1920w is downscaled to 1920 if original is wider; otherwise kept at original size.
+    expected_w = min(orig_w, 1920)
+    if actual_w != expected_w:
+        print(f'[AI RENDER ERROR] _1920w.webp is {actual_w}px, expected {expected_w}px — upscale failed', file=sys.stderr)
+    else:
+        print(f'[AI RENDER OK] _1920w.webp is {actual_w}px (matches expected {expected_w}px)')
+
+print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
 """
 
     _env = os.environ.copy()
@@ -7878,7 +7904,21 @@ print('OK:' + out_path)
             conn2.close()
 
     hero_path = f'/assets/images-opt/{out_filename}'
-    return jsonify({'ok': True, 'filename': out_filename, 'hero_path': hero_path})
+    # FIX 4: Return _1920w dimensions so admin panel can detect size mismatches.
+    render_w = render_h = 0
+    try:
+        from PIL import Image as _PIL_Image
+        _variant_1920 = os.path.join(opt_dir, out_filename[:-5] + '_1920w.webp')
+        if os.path.isfile(_variant_1920):
+            with _PIL_Image.open(_variant_1920) as _v:
+                render_w, render_h = _v.size
+        else:
+            with _PIL_Image.open(out_path) as _v:
+                render_w, render_h = _v.size
+    except Exception:
+        pass
+    return jsonify({'ok': True, 'filename': out_filename, 'hero_path': hero_path,
+                    'width': render_w, 'height': render_h})
 
 
 # ── Save render result (copy _ai_N file to final destination) ────────────────
