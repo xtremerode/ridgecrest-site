@@ -7861,7 +7861,7 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
     _env['PATH'] = ':'.join(p for p in _env.get('PATH','').split(':') if 'venv' not in p)
 
     try:
-        orig_path_arg = os.path.join(opt_dir, base_filename)
+        orig_path_arg = src_path  # use actual source file for dims — base_filename regex strips _1920w incorrectly
         result = _subp.run(
             ['/usr/bin/python3', '-c', script, api_key, src_path, out_path, prompt, orig_path_arg],
             env=_env, capture_output=True, text=True, timeout=300
