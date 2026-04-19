@@ -4222,7 +4222,13 @@ async function rerenderUseVersion() {
   // Case C: user clicked a filmstrip version thumbnail then clicked Use This Version
   const hasStripSelect = !!_rerenderSourceFilename && _rerenderSourceFilename !== _rerenderFilename;
 
-  if (!hasResult && !hasAdjust && !hasStripSelect) return;
+  console.log('[RD] rerenderUseVersion: hasResult=%s hasAdjust=%s hasStripSelect=%s _rerenderFilename=%s _rerenderSourceFilename=%s',
+    hasResult, hasAdjust, hasStripSelect, _rerenderFilename, _rerenderSourceFilename);
+
+  if (!hasResult && !hasAdjust && !hasStripSelect) {
+    console.log('[RD] rerenderUseVersion: early return — no action taken');
+    return;
+  }
 
   const useBtn = document.getElementById('rerenderUseBtn');
   useBtn.disabled = true;
@@ -4258,6 +4264,7 @@ async function rerenderUseVersion() {
     } else if (hasStripSelect && !hasAdjust) {
       // ── Case C: filmstrip version directly selected — activate without new render
       activeFilename = _rerenderSourceFilename;
+      console.log('[RD] Case C: activeFilename=%s', activeFilename);
 
     } else if (hasAdjust) {
       // ── Case B: No render result but sliders set — create new AI version ─────
@@ -4293,7 +4300,9 @@ async function rerenderUseVersion() {
 
     // ── REQUIRED: persist active_version to DB + synchronously re-render HTML ─
     // See _activateVersion() guardrail comment above. Must not be removed.
+    console.log('[RD] calling _activateVersion base=%s version=%s', _rerenderFilename, activeFilename);
     const d = await _activateVersion(_rerenderFilename, activeFilename);
+    console.log('[RD] _activateVersion result:', d);
 
     // Update strip UI
     _rerenderStrip.forEach(s => { s.isActive = s.filename === activeFilename; });
@@ -4312,13 +4321,17 @@ async function rerenderUseVersion() {
     // NOTE: currentSlug and getPagePath are in a different IIFE scope — use DOM directly.
     var _rvSf = document.getElementById('siteFrame');
     var _rvCaptureSrc = (_rvSf && _rvSf.src && _rvSf.src !== 'about:blank') ? _rvSf.src : null;
+    console.log('[RD] siteFrame found=%s captureSrc=%s', !!_rvSf, _rvCaptureSrc);
     if (_rvCaptureSrc) {
       setTimeout(function() {
+        var _rvReloadUrl = _rvCaptureSrc.split('?')[0] + '?_stage=1&_t=' + Date.now();
+        console.log('[RD] reloading siteFrame to:', _rvReloadUrl);
         window._suppressSlugSync = true;
-        _rvSf.src = _rvCaptureSrc.split('?')[0] + '?_stage=1&_t=' + Date.now();
+        _rvSf.src = _rvReloadUrl;
       }, 600);
     }
   } catch(e) {
+    console.error('[RD] rerenderUseVersion error:', e);
     Admin.toast('Failed: ' + e.message, 'error');
     document.getElementById('rerenderStatus').textContent = '✕ ' + e.message;
   }
