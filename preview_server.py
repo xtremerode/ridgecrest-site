@@ -7723,6 +7723,7 @@ def admin_image_rerender():
     base_filename = data.get('base_filename', '').strip()  # original file — used for output naming
     prompt        = data.get('prompt', '').strip()
     mode          = data.get('mode', 'new')  # 'new' or 'replace'
+    _ARCH_SUFFIX  = ' Maintain the original camera perspective and focal length. Preserve all high-frequency details on metallic hardware and cabinetry edges. Do not smooth or blur the textures of the wood grain or stone surfaces.'
 
     if not filename or not filename.endswith('.webp') or '/' in filename or '..' in filename:
         return jsonify({'error': 'invalid filename'}), 400
@@ -7785,14 +7786,14 @@ with Image.open(src_path) as img:
     img_rgb = img.convert('RGB')
     img_rgb.thumbnail((2048, 2048), Image.LANCZOS)
     buf = io.BytesIO()
-    img_rgb.save(buf, 'JPEG', quality=90)
+    img_rgb.save(buf, 'PNG')
     img_bytes = buf.getvalue()
 
 client = genai.Client(api_key=api_key)
 response = client.models.generate_content(
     model='models/gemini-3.1-flash-image-preview',
     contents=[
-        types.Part(inline_data=types.Blob(mime_type='image/jpeg', data=img_bytes)),
+        types.Part(inline_data=types.Blob(mime_type='image/png', data=img_bytes)),
         types.Part(text=prompt)
     ],
     config=types.GenerateContentConfig(response_modalities=['IMAGE', 'TEXT'])
@@ -7870,7 +7871,7 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
     try:
         orig_path_arg = src_path  # use actual source file for dims — base_filename regex strips _1920w incorrectly
         result = _subp.run(
-            ['/usr/bin/python3', '-c', script, api_key, src_path, out_path, prompt, orig_path_arg],
+            ['/usr/bin/python3', '-c', script, api_key, src_path, out_path, prompt + _ARCH_SUFFIX, orig_path_arg],
             env=_env, capture_output=True, text=True, timeout=300
         )
         if result.returncode != 0:
