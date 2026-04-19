@@ -11557,4 +11557,4 @@ if __name__ == '__main__':
     print(f'Preview server starting on http://0.0.0.0:{PORT}')
     print(f'Watching: {PREVIEW_DIR}')
     print(f'Access at: http://147.182.242.54:{PORT}/')
-    app.run(host='0.0.0.0', port=PORT, threaded=True, debug=False)
+    app.run(host='0.0.0.0', port=PORT, threaded=True, debug=False, use_reloader=True)
