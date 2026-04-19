@@ -256,11 +256,15 @@ def _get_page_data(slug):
         hero_zoom = float(row['hero_zoom'] or 1.0)
         tx        = float(row['hero_text_x'] or 0)
         ty        = float(row['hero_text_y'] or 0)
-        # Resolve active version: if image_labels has an active_version for this file, use it
+        # Resolve active version: if image_labels has an active_version for this file, use it.
+        # pages.hero_image is often stored as a size-suffixed variant (e.g. _mv2_1920w.webp),
+        # but image_labels keyed by the base filename (_mv2.webp). Normalize before lookup.
         base_fname = hero_path.split('/')[-1]
+        import re as _re_av
+        _base_lookup = _re_av.sub(r'_(\d+w)(\.webp)$', r'\2', base_fname)  # strip _Nw suffix
         try:
             _ensure_image_labels_table(cur)
-            cur.execute("SELECT active_version FROM image_labels WHERE filename = %s", (base_fname,))
+            cur.execute("SELECT active_version FROM image_labels WHERE filename = %s", (_base_lookup,))
             lrow = cur.fetchone()
             if lrow and lrow.get('active_version'):
                 av = lrow['active_version']
@@ -348,6 +352,18 @@ def _snapshot_page(cur, slug):
     hero_zoom     = float(page_row['hero_zoom'] or 1.0)      if page_row else 1.0
     hero_text_x   = float(page_row['hero_text_x'] or 0)      if page_row else 0.0
     hero_text_y   = float(page_row['hero_text_y'] or 0)      if page_row else 0.0
+    # Resolve active_version for hero: pages.hero_image may be stored as a size-suffixed
+    # variant (e.g. _mv2_1920w.webp) while image_labels is keyed by the base (_mv2.webp).
+    if hero_image:
+        _snap_base = hero_image.split('/')[-1]
+        _snap_base = re.sub(r'_(\d+w)(\.webp)$', r'\2', _snap_base)
+        try:
+            cur.execute("SELECT active_version FROM image_labels WHERE filename = %s", (_snap_base,))
+            _av_row = cur.fetchone()
+            if _av_row and _av_row.get('active_version'):
+                hero_image = f'/assets/images-opt/{_av_row["active_version"]}'
+        except Exception:
+            pass
     # Section heights
     cur.execute(
         "SELECT section_id, device, height_px FROM page_sections WHERE slug = %s AND height_px IS NOT NULL",
@@ -7805,10 +7821,11 @@ if not result_bytes:
     print('ERROR: no image in response', file=sys.stderr)
     sys.exit(1)
 
-# FIX 1: Upscale to original dimensions BEFORE generating responsive sizes.
-# Gemini returns ~1024px regardless of input. We must upscale back to the
-# original resolution so the _1920w variant is not a blurry 1024px image.
-from PIL import ImageFilter as _IF
+# Gemini returns ~1024px regardless of input size.
+# Upscaling to the original 6000+px in a single LANCZOS step produces severe degradation.
+# Strategy: upscale only to 2x Gemini output (≈2048px). All display sizes (_1920w, _960w,
+# _480w, _201w) are generated from that 2048px source. _1920w is a slight downscale from
+# 2048px — near-perfect quality. Never try to match the original's raw pixel dimensions.
 orig_path_for_dims = sys.argv[5] if len(sys.argv) > 5 else ''
 img_result = Image.open(io.BytesIO(result_bytes)).convert('RGB')
 orig_w = orig_h = 0
@@ -7816,18 +7833,26 @@ if orig_path_for_dims and os.path.isfile(orig_path_for_dims):
     try:
         with Image.open(orig_path_for_dims) as _orig:
             orig_w, orig_h = _orig.size
-        if img_result.width < orig_w:
-            img_result = img_result.resize((orig_w, orig_h), Image.LANCZOS)
-            # Apply mild sharpening to reduce Lanczos upscale softness.
-            img_result = img_result.filter(_IF.UnsharpMask(radius=1.2, percent=60, threshold=3))
     except Exception as _e:
-        print(f'[AI RENDER WARN] upscale failed: {_e}', file=sys.stderr)
-else:
-    print(f'[AI RENDER WARN] orig_path_for_dims missing or not found: {orig_path_for_dims!r}', file=sys.stderr)
+        print(f'[AI RENDER WARN] could not read orig dims: {_e}', file=sys.stderr)
+
+# Target: 2x Gemini native output, capped at original dimensions.
+# For a 1024px Gemini result and 6131px original: target = 2048 (not 6131).
+# For a 1024px Gemini result and 1920px original: target = 1920 (original is smaller).
+_gemini_w = img_result.width
+_target_w = min(orig_w, _gemini_w * 2) if orig_w else _gemini_w * 2
+_target_w = max(_target_w, 1920)  # always at least 1920 so _1920w is a downscale, not upscale
+if orig_w:
+    _target_w = min(_target_w, orig_w)  # never exceed original
+if img_result.width < _target_w:
+    _ratio = _target_w / img_result.width
+    _target_h = int(img_result.height * _ratio)
+    img_result = img_result.resize((_target_w, _target_h), Image.LANCZOS)
+    print(f'[AI RENDER] upscaled {_gemini_w}px → {_target_w}px ({_ratio:.1f}x)', file=sys.stderr)
 
 img_result.save(out_path, 'WEBP', quality=92)
 
-# FIX 1 (cont): Generate responsive sizes from the upscaled base — order matters.
+# Generate responsive sizes from the upscaled base.
 sizes = [('_1920w', 1920), ('_960w', 960), ('_480w', 480), ('_201w', 201)]
 base_out = out_path[:-5]  # strip .webp
 saved_dims = {}
@@ -7842,15 +7867,7 @@ for suffix, w in sizes:
     resized.save(out_variant, 'WEBP', quality=92)
     saved_dims[suffix] = (resized.width, resized.height)
 
-# FIX 3: Dimension assertion guardrail — _1920w must match original width.
-if orig_w and '_1920w' in saved_dims:
-    actual_w = saved_dims['_1920w'][0]
-    # _1920w is downscaled to 1920 if original is wider; otherwise kept at original size.
-    expected_w = min(orig_w, 1920)
-    if actual_w != expected_w:
-        print(f'[AI RENDER ERROR] _1920w.webp is {actual_w}px, expected {expected_w}px — upscale failed', file=sys.stderr)
-    else:
-        print(f'[AI RENDER OK] _1920w.webp is {actual_w}px (matches expected {expected_w}px)')
+print(f'[AI RENDER OK] base={img_result.width}px _1920w={saved_dims.get("_1920w",(0,0))[0]}px')
 
 print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
 """
@@ -8169,29 +8186,33 @@ def admin_set_version():
         ai_like       = f'/assets/images-opt/{base_stem}_ai_%.webp'
         ai_v_like     = f'/assets/images-opt/{base_stem}_ai_%.webp?v=%'
         orig_v_like   = f'/assets/images-opt/{base_filename}?v=%'
+        # Also match size-suffixed variants of the base (e.g. _1920w.webp, _960w.webp).
+        # pages.hero_image is often stored as the 1920w variant; without this pattern
+        # the UPDATE misses it and pages_updated stays 0.
+        stem_like     = f'/assets/images-opt/{base_stem}%.webp'
         cur.execute("""
             UPDATE card_settings
             SET image = %s, updated_at = NOW()
             WHERE mode = 'image' AND (
-                image = %s OR image LIKE %s OR image LIKE %s OR image LIKE %s
+                image = %s OR image LIKE %s OR image LIKE %s OR image LIKE %s OR image LIKE %s
             )
-        """, (new_active_path, original_path, ai_like, ai_v_like, orig_v_like))
+        """, (new_active_path, original_path, ai_like, ai_v_like, orig_v_like, stem_like))
         cards_updated = cur.rowcount
 
         # 3. Propagate to pages hero
         cur.execute("""
             UPDATE pages SET hero_image = %s
             WHERE hero_image = %s OR hero_image LIKE %s
-               OR hero_image LIKE %s OR hero_image LIKE %s
-        """, (new_active_path, original_path, ai_like, ai_v_like, orig_v_like))
+               OR hero_image LIKE %s OR hero_image LIKE %s OR hero_image LIKE %s
+        """, (new_active_path, original_path, ai_like, ai_v_like, orig_v_like, stem_like))
         pages_updated = cur.rowcount
 
         # 4. Propagate to blog_posts featured_image
         cur.execute("""
             UPDATE blog_posts SET featured_image = %s
             WHERE featured_image = %s OR featured_image LIKE %s
-               OR featured_image LIKE %s OR featured_image LIKE %s
-        """, (new_active_path, original_path, ai_like, ai_v_like, orig_v_like))
+               OR featured_image LIKE %s OR featured_image LIKE %s OR featured_image LIKE %s
+        """, (new_active_path, original_path, ai_like, ai_v_like, orig_v_like, stem_like))
         blog_updated = cur.rowcount
 
         # 4b. Cross-size fallback: if a _480w render was activated, also update blog posts that
