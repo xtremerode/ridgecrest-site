@@ -1642,6 +1642,9 @@
     if (!p || !p.page_path) return null;
     return p.page_path;
   }
+  // Expose currentSlug and getPagePath for cross-script-tag access (global render modal functions live outside this IIFE)
+  window._adminGetCurrentSlug = function() { return currentSlug; };
+  window._adminGetPagePath = function(slug) { return getPagePath(slug); };
 
   function _applyLockUI(lockStatus) {
     currentPageLock = lockStatus;
@@ -4322,15 +4325,15 @@ async function rerenderUseVersion() {
     if (typeof window._notifyRenderActivated === 'function') {
       window._notifyRenderActivated(d.new_active_path);
     }
-    // Reload siteFrame — capture siteFrame.src NOW before the timeout so that even if
-    // the frame navigates during the 600ms delay we still reload the correct page.
-    // NOTE: currentSlug and getPagePath are in a different IIFE scope — use DOM directly.
+    // Reload siteFrame — use currentSlug (authoritative) not siteFrame.src (can drift to home).
+    // currentSlug lives in the IIFE; access it via window._adminGetCurrentSlug exposed above.
     var _rvSf = document.getElementById('siteFrame');
-    var _rvCaptureSrc = (_rvSf && _rvSf.src && _rvSf.src !== 'about:blank') ? _rvSf.src : null;
-    console.log('[RD] siteFrame found=%s captureSrc=%s', !!_rvSf, _rvCaptureSrc);
-    if (_rvCaptureSrc) {
+    var _rvSlug = typeof window._adminGetCurrentSlug === 'function' ? window._adminGetCurrentSlug() : null;
+    var _rvPath = (_rvSlug && typeof window._adminGetPagePath === 'function') ? window._adminGetPagePath(_rvSlug) : null;
+    console.log('[RD] rerenderUseVersion reload: slug=%s path=%s', _rvSlug, _rvPath);
+    if (_rvPath && _rvSf) {
       setTimeout(function() {
-        var _rvReloadUrl = _rvCaptureSrc.split('?')[0] + '?_stage=1&_t=' + Date.now();
+        var _rvReloadUrl = '/view/' + _rvPath + '?_stage=1&_t=' + Date.now();
         console.log('[RD] reloading siteFrame to:', _rvReloadUrl);
         window._suppressSlugSync = true;
         _rvSf.src = _rvReloadUrl;
@@ -4454,15 +4457,14 @@ async function lbUseVersion() {
     if (typeof window._notifyRenderActivated === 'function') {
       window._notifyRenderActivated(d.new_active_path);
     }
-    // Reload siteFrame — capture siteFrame.src NOW before the timeout so that even if
-    // the frame navigates during the 600ms delay we still reload the correct page.
-    // NOTE: currentSlug and getPagePath are in a different IIFE scope — use DOM directly.
+    // Reload siteFrame — use currentSlug (authoritative) not siteFrame.src (can drift).
     var _luSf = document.getElementById('siteFrame');
-    var _luCaptureSrc = (_luSf && _luSf.src && _luSf.src !== 'about:blank') ? _luSf.src : null;
-    if (_luCaptureSrc) {
+    var _luSlug = typeof window._adminGetCurrentSlug === 'function' ? window._adminGetCurrentSlug() : null;
+    var _luPath = (_luSlug && typeof window._adminGetPagePath === 'function') ? window._adminGetPagePath(_luSlug) : null;
+    if (_luPath && _luSf) {
       setTimeout(function() {
         window._suppressSlugSync = true;
-        _luSf.src = _luCaptureSrc.split('?')[0] + '?_stage=1&_t=' + Date.now();
+        _luSf.src = '/view/' + _luPath + '?_stage=1&_t=' + Date.now();
       }, 600);
     }
     // Sync re-render modal strip if open behind the lightbox
