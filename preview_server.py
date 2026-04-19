@@ -7760,7 +7760,11 @@ def admin_image_rerender():
         return jsonify({'error': 'GEMINI_API_KEY not set in .env'}), 500
 
     opt_dir  = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
-    src_path = os.path.join(opt_dir, filename)
+    # Always render from the master file — never from a responsive-size variant.
+    # _1920w/_960w/_480w/_201w files are display copies; rendering from them
+    # causes Gemini to receive a downscaled image and blurs the output.
+    src_master = re.sub(r'_(1920|960|480|201)w(\.webp)$', r'\2', filename)
+    src_path = os.path.join(opt_dir, src_master if os.path.isfile(os.path.join(opt_dir, src_master)) else filename)
     if not os.path.isfile(src_path):
         return jsonify({'error': 'source file not found'}), 404
 
