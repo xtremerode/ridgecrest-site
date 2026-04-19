@@ -4101,6 +4101,7 @@ function _stripHighlight(filename) {
 }
 
 function stripSelectSource(filename, heroPath, isOriginal) {
+  console.log('[RD] stripSelectSource: filename=%s isOriginal=%s', filename, isOriginal);
   _rerenderSourceFilename = filename;
   const src = heroPath + '?v=' + Date.now();
   document.getElementById('rerenderOriginal').style.backgroundImage = `url('${src}')`;
@@ -4225,8 +4226,9 @@ async function rerenderUseVersion() {
   console.log('[RD] rerenderUseVersion: hasResult=%s hasAdjust=%s hasStripSelect=%s _rerenderFilename=%s _rerenderSourceFilename=%s',
     hasResult, hasAdjust, hasStripSelect, _rerenderFilename, _rerenderSourceFilename);
 
-  if (!hasResult && !hasAdjust && !hasStripSelect) {
-    console.log('[RD] rerenderUseVersion: early return — no action taken');
+  // Allow all cases through — Case D handles original-selected (no-op or revert-to-original)
+  if (!hasResult && !hasAdjust && !hasStripSelect && !_rerenderFilename) {
+    console.log('[RD] rerenderUseVersion: early return — no base filename');
     return;
   }
 
@@ -4296,6 +4298,10 @@ async function rerenderUseVersion() {
       resetAdjust(true);
       _stripAppend(activeFilename, newActivePath, '', srcFilename);
       _stripHighlight(_rerenderSourceFilename);
+    } else {
+      // ── Case D: Original thumbnail selected (or no thumbnail clicked) — activate original
+      activeFilename = '';  // empty string = reset to original
+      console.log('[RD] Case D: activating original (version_filename=empty)');
     }
 
     // ── REQUIRED: persist active_version to DB + synchronously re-render HTML ─
@@ -4304,8 +4310,8 @@ async function rerenderUseVersion() {
     const d = await _activateVersion(_rerenderFilename, activeFilename);
     console.log('[RD] _activateVersion result:', d);
 
-    // Update strip UI
-    _rerenderStrip.forEach(s => { s.isActive = s.filename === activeFilename; });
+    // Update strip UI (activeFilename='' means original is active)
+    _rerenderStrip.forEach(s => { s.isActive = activeFilename ? s.filename === activeFilename : s.isOriginal; });
     _renderStrip();
     _stripHighlight(_rerenderSourceFilename);
 
