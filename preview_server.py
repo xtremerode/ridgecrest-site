@@ -2465,61 +2465,13 @@ _CARD_EDIT_OVERLAY_TPL = """\
     setTimeout(_initTextEditor, 150);
   }})();
 
-  // ── Gradient-only elements (data-gradient-id) ───────────────────────────
-  // Hero sections that need gradient control but not full card editing.
-  // Uses data-gradient-id instead of data-card-id to avoid card CSS side effects.
+  // ── Gradient live-preview listener for data-gradient-id elements ────────────
+  // The G button now lives inside the edit-mode badge (see _EDIT_OVERLAY_TPL).
+  // This listener handles rd_set_gradient messages so --rd-overlay updates live
+  // while the gradient panel is open, regardless of which overlay sends them.
   (function() {{
     document.querySelectorAll('[data-gradient-id]').forEach(function(el) {{
       var gid = el.getAttribute('data-gradient-id');
-
-      // Read saved gradient state from __RD_CARDS (injected by _apply_cards_to_html)
-      var cardData = null;
-      if (window.__RD_CARDS) {{
-        for (var i = 0; i < window.__RD_CARDS.length; i++) {{
-          if (window.__RD_CARDS[i].card_id === gid) {{ cardData = window.__RD_CARDS[i]; break; }}
-        }}
-      }}
-      var gradState = {{
-        gradient_type:      (cardData && cardData.gradient_type)      || 'none',
-        gradient_tint:      (cardData && cardData.gradient_tint)      || 'dark',
-        gradient_opacity:   (cardData && cardData.gradient_opacity  != null) ? cardData.gradient_opacity  : 50,
-        gradient_direction: (cardData && cardData.gradient_direction) || 'bottom',
-        gradient_distance:  (cardData && cardData.gradient_distance != null) ? cardData.gradient_distance : 80
-      }};
-
-      // Pill with only the G button — no upload, no type/color controls
-      var pill = document.createElement('div');
-      pill.style.cssText = 'position:absolute;top:12px;right:12px;z-index:10000;display:none;align-items:center;overflow:hidden;border-radius:3px;box-shadow:0 2px 8px rgba(0,0,0,.45);';
-
-      var gradBtn = document.createElement('button');
-      gradBtn.textContent = 'G';
-      gradBtn.title = 'Gradient overlay';
-      gradBtn.style.cssText = 'padding:5px 9px;font-size:11px;font-weight:700;font-family:system-ui,sans-serif;border:none;cursor:pointer;line-height:1.4;white-space:nowrap;background:rgba(124,58,237,.85);color:#fff';
-      gradBtn.addEventListener('click', function(e) {{
-        e.stopPropagation(); e.preventDefault();
-        var rect = el.getBoundingClientRect();
-        var iframe = window.frameElement;
-        var iRect = iframe ? iframe.getBoundingClientRect() : {{left:0, top:0}};
-        window.parent.postMessage({{
-          type: 'rd_gradient_open',
-          cardId: gid,
-          cardState: {{ mode: 'color', color: '#1C1C1C', image: null, position: '50% 50%', zoom: 1.0 }},
-          rect: {{ left: iRect.left + rect.left, top: iRect.top + rect.top, width: rect.width, height: rect.height }},
-          gradient: gradState
-        }}, window.location.origin);
-      }});
-      pill.appendChild(gradBtn);
-
-      // Ensure element is positioned so the pill anchors correctly
-      if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
-      el.appendChild(pill);
-      el.addEventListener('mouseenter', function() {{ pill.style.display = 'flex'; }});
-      el.addEventListener('mouseleave', function() {{ pill.style.display = 'none'; }});
-
-      // Live preview: update --rd-overlay when parent sends rd_set_gradient
-      // (also handled by the main message listener for data-card-id elements, but
-      // that selector only checks data-card-id — the main handler was updated to
-      // fall through to data-gradient-id, so this is belt-and-suspenders only)
       window.addEventListener('message', function(ev) {{
         if (!ev.data || ev.data.type !== 'rd_set_gradient' || ev.data.cardId !== gid) return;
         if (ev.data.gradientCss) {{
@@ -2527,7 +2479,6 @@ _CARD_EDIT_OVERLAY_TPL = """\
         }} else {{
           el.style.removeProperty('--rd-overlay');
         }}
-        if (ev.data.gradient) {{ gradState = ev.data.gradient; }}
       }});
     }});
   }})();
@@ -2766,6 +2717,45 @@ _EDIT_OVERLAY_TPL = """\
       window.parent.postMessage({{type:'rd_open_render', cardId:null, filename:base}}, window.location.origin);
     }});
     badge.appendChild(heroRenderBtn);
+
+    // G button — home page hero only for now (.hero__bg sibling of .hero__overlay[data-gradient-id])
+    // Inner pages will be wired up after home page is verified.
+    if (el.classList.contains('hero__bg')) {{
+      var _gradEl = el.parentElement && el.parentElement.querySelector('[data-gradient-id]');
+      if (_gradEl) {{
+        var _gid = _gradEl.getAttribute('data-gradient-id');
+        var _cardData = null;
+        if (window.__RD_CARDS) {{
+          for (var _gi = 0; _gi < window.__RD_CARDS.length; _gi++) {{
+            if (window.__RD_CARDS[_gi].card_id === _gid) {{ _cardData = window.__RD_CARDS[_gi]; break; }}
+          }}
+        }}
+        var heroGradBtn = document.createElement('button');
+        heroGradBtn.textContent = 'G';
+        heroGradBtn.title = 'Gradient overlay';
+        heroGradBtn.style.cssText = 'background:rgba(124,58,237,.85);color:#fff;border:none;border-left:1px solid rgba(255,255,255,.15);font-family:system-ui,sans-serif;font-size:12px;font-weight:700;padding:5px 11px;border-radius:4px;cursor:pointer;white-space:nowrap;pointer-events:auto';
+        heroGradBtn.addEventListener('click', (function(_gid2, _gradEl2, _cardData2) {{ return function(e) {{
+          e.stopPropagation();
+          var rect = _gradEl2.getBoundingClientRect();
+          var iframe = window.frameElement;
+          var iRect = iframe ? iframe.getBoundingClientRect() : {{left:0,top:0}};
+          window.parent.postMessage({{
+            type: 'rd_gradient_open',
+            cardId: _gid2,
+            cardState: {{ mode: 'color', color: '#1C1C1C', image: null, position: '50% 50%', zoom: 1.0 }},
+            rect: {{ left: iRect.left + rect.left, top: iRect.top + rect.top, width: rect.width, height: rect.height }},
+            gradient: {{
+              gradient_type:      (_cardData2 && _cardData2.gradient_type)      || 'none',
+              gradient_tint:      (_cardData2 && _cardData2.gradient_tint)      || 'dark',
+              gradient_opacity:   (_cardData2 && _cardData2.gradient_opacity  != null) ? _cardData2.gradient_opacity  : 50,
+              gradient_direction: (_cardData2 && _cardData2.gradient_direction) || 'bottom',
+              gradient_distance:  (_cardData2 && _cardData2.gradient_distance != null) ? _cardData2.gradient_distance : 80
+            }}
+          }}, window.location.origin);
+        }}; }}(_gid, _gradEl, _cardData)));
+        badge.appendChild(heroGradBtn);
+      }}
+    }}
 
     ov.appendChild(badge);
 
