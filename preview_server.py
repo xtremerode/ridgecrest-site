@@ -8010,6 +8010,8 @@ def admin_image_versions(filename):
         return jsonify({'error': 'must be a .webp filename'}), 400
     if re.search(r'_ai_\d+\.webp$', filename):
         return jsonify({'error': 'pass the base filename, not an AI render'}), 400
+    # Strip responsive-size suffix (_1920w, _960w, _480w, _201w) — treat foo_1920w.webp as foo.webp
+    filename = re.sub(r'_(1920|960|480|201)w\.webp$', '.webp', filename)
 
     opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
     base    = filename[:-5]
@@ -8136,6 +8138,8 @@ def admin_set_version():
         return jsonify({'error': 'invalid base_filename'}), 400
     if re.search(r'_ai_\d+\.webp$', base_filename):
         return jsonify({'error': 'base_filename must be the original, not an AI render'}), 400
+    # Strip responsive-size suffix — same normalization as admin_image_rerender
+    base_filename = re.sub(r'_(1920|960|480|201)w\.webp$', '.webp', base_filename)
 
     # Normalise: empty or same as base → null (use original)
     if version_filename:
