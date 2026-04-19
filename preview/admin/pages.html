@@ -4080,7 +4080,13 @@ function cropMouseUp(e) {
     actualY = Math.round(dispY * (canvas.height > 0 ? 1 : 1));
     actualW2 = Math.round(dispW); actualH2 = Math.round(dispH);
   }
+  if (actualW2 < 4 || actualH2 < 4) {
+    Admin.toast(`Selection too small after mapping (${actualW2}×${actualH2}px) — draw a larger region`, 'info');
+    _rerenderClearCrop();
+    return;
+  }
   _rerenderCropCoords = { x: actualX, y: actualY, w: actualW2, h: actualH2 };
+  console.log('[surgical] crop coords:', JSON.stringify(_rerenderCropCoords), 'dims:', JSON.stringify(_rerenderActualDims), 'canvas:', canvas.width + 'x' + canvas.height);
   const st = document.getElementById('surgicalCropStatus');
   if (st) st.textContent = `\u2713 Selection: ${_rerenderCropCoords.w}\u00d7${_rerenderCropCoords.h}px \u2014 click \u2756 Re-render to apply surgical edit`;
   _rerenderUpdateRunBtn();

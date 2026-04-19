@@ -7899,16 +7899,16 @@ with Image.open(src_path) as img:
 
 master_w, master_h = master.size
 
-# Clamp crop box to image bounds
+# Clamp crop box to image bounds — ensure origin and far edge are both valid
 x1 = max(0, min(master_w - 1, crop_x))
 y1 = max(0, min(master_h - 1, crop_y))
-x2 = min(master_w, crop_x + crop_w)
-y2 = min(master_h, crop_y + crop_h)
+x2 = max(x1 + 1, min(master_w, crop_x + crop_w))
+y2 = max(y1 + 1, min(master_h, crop_y + crop_h))
 actual_w = x2 - x1
 actual_h = y2 - y1
 
 if actual_w < 4 or actual_h < 4:
-    print('ERROR: crop region too small after clamping', file=sys.stderr)
+    print(f'ERROR: crop region too small after clamping — input x={crop_x},y={crop_y},w={crop_w},h={crop_h} on {master_w}x{master_h} image => clamped {actual_w}x{actual_h}', file=sys.stderr)
     sys.exit(1)
 
 # Extract high-res patch — the actual edit target
@@ -8004,7 +8004,7 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
                 err = 'Quota exceeded — enable billing on your Google AI Studio account at aistudio.google.com'
             elif 'NOT_FOUND' in raw or '404' in raw:
                 err = 'Image generation model not found — check your API key and model availability'
-            elif 'INVALID_ARGUMENT' in raw or '400' in raw:
+            elif 'INVALID_ARGUMENT' in raw or 'HTTP/1.1 400' in raw or 'status: 400' in raw:
                 err = 'Invalid request — try a different prompt or image'
             elif 'PERMISSION_DENIED' in raw or '403' in raw:
                 err = 'API key does not have permission — check key scopes in Google AI Studio'
