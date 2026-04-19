@@ -3999,6 +3999,10 @@ function _getCanvasCoords(canvas, e) {
 
 function cropMouseDown(e) {
   if (!_rerenderSurgical) return;
+  if (_rerenderActualDims.w === 0) {
+    Admin.toast('Image dimensions still loading — wait a moment then try again', 'info');
+    return;
+  }
   e.preventDefault(); e.stopPropagation();
   const canvas = document.getElementById('rerenderCropCanvas');
   // Sync buffer size to display size for accurate coordinate mapping

@@ -7900,8 +7900,8 @@ with Image.open(src_path) as img:
 master_w, master_h = master.size
 
 # Clamp crop box to image bounds
-x1 = max(0, crop_x)
-y1 = max(0, crop_y)
+x1 = max(0, min(master_w - 1, crop_x))
+y1 = max(0, min(master_h - 1, crop_y))
 x2 = min(master_w, crop_x + crop_w)
 y2 = min(master_h, crop_y + crop_h)
 actual_w = x2 - x1
