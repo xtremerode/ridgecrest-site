@@ -991,7 +991,9 @@
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0 10px">
       <div>
         <div id="rerenderOriginalLabel" style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Source</div>
-        <div id="rerenderOriginal" style="width:100%;aspect-ratio:4/3;background:var(--surface-2);background-size:cover;background-position:center;border-radius:6px;border:1px solid var(--border);cursor:zoom-in" onclick="rerenderLightbox(0)" title="Click to enlarge"></div>
+        <div id="rerenderOriginal" style="width:100%;aspect-ratio:4/3;background:var(--surface-2);background-size:cover;background-position:center;border-radius:6px;border:1px solid var(--border);cursor:zoom-in;position:relative;overflow:hidden" onclick="if(!this.getAttribute('data-lightbox-disabled'))rerenderLightbox(0)" title="Click to enlarge">
+          <canvas id="rerenderCropCanvas" style="display:none;position:absolute;inset:0;width:100%;height:100%;touch-action:none" onmousedown="cropMouseDown(event)" onmousemove="cropMouseMove(event)" onmouseup="cropMouseUp(event)"></canvas>
+        </div>
       </div>
       <div>
         <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;display:flex;align-items:center;gap:8px">
@@ -1002,6 +1004,12 @@
           <span id="rerenderPlaceholder">Result will appear here</span>
         </div>
       </div>
+    </div>
+    <!-- Surgical Mode toggle -->
+    <div id="surgicalRow" style="display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;flex-wrap:wrap">
+      <button id="surgicalToggleBtn" onclick="toggleSurgicalMode()" style="background:transparent;border:1px solid var(--border);color:var(--text-2);font-size:12px;padding:4px 12px;border-radius:5px;cursor:pointer;font-weight:600;white-space:nowrap">⚔ Surgical Mode</button>
+      <span id="surgicalHint" style="font-size:12px;color:var(--text-muted)">Off — re-renders the full image</span>
+      <span id="surgicalCropStatus" style="display:none;font-size:12px;font-weight:600;color:#a78bfa">Draw a selection box on the source image to define the edit area</span>
     </div>
     <!-- Version filmstrip -->
     <div id="rerenderFilmstrip" style="display:none;margin:4px 0 14px">
@@ -3736,6 +3744,12 @@ let _rerenderSourceFilename = '';
 let _rerenderResultPath = '';
 let _rerenderPass = 0;
 let _rerenderStrip = [];
+// Surgical mode state
+let _rerenderSurgical = false;
+let _rerenderCropCoords = null;   // {x,y,w,h} scaled to actual image pixels
+let _rerenderActualDims = {w:0, h:0};
+let _cropDragging = false;
+let _cropStart = {x:0, y:0};
 let _stripSelectMode = false;
 let _stripSelected = new Set();
 let _rrCacheBust = Date.now();
@@ -3877,12 +3891,169 @@ function openRerender(baseFilename, label, sourceFilename) {
   document.getElementById('rerenderBulkDeleteBtn').style.display = 'none';
   document.getElementById('rerenderStatus').textContent = '';
   resetAdjust(true);
+  // Reset surgical mode on every open
+  _rerenderSurgical = false;
+  _rerenderCropCoords = null;
+  _rerenderActualDims = {w:0, h:0};
+  _cropDragging = false;
+  const _surgBtn = document.getElementById('surgicalToggleBtn');
+  const _surgHint = document.getElementById('surgicalHint');
+  const _surgStatus = document.getElementById('surgicalCropStatus');
+  const _cropCanvas = document.getElementById('rerenderCropCanvas');
+  const _origEl = document.getElementById('rerenderOriginal');
+  if (_surgBtn) { _surgBtn.textContent = '⚔ Surgical Mode'; _surgBtn.style.background=''; _surgBtn.style.borderColor=''; _surgBtn.style.color=''; }
+  if (_surgHint) _surgHint.style.display = '';
+  if (_surgStatus) { _surgStatus.style.display = 'none'; _surgStatus.textContent = 'Draw a selection box on the source image to define the edit area'; }
+  if (_cropCanvas) { _cropCanvas.style.display = 'none'; const _ctx = _cropCanvas.getContext('2d'); if (_ctx) _ctx.clearRect(0,0,_cropCanvas.width,_cropCanvas.height); }
+  if (_origEl) { _origEl.style.cursor = 'zoom-in'; _origEl.removeAttribute('data-lightbox-disabled'); }
   document.getElementById('rerenderModal').style.display = 'flex';
   _initFilmstrip();
 }
 
 function closeRerender() {
   document.getElementById('rerenderModal').style.display = 'none';
+}
+
+// ── Surgical Mode ────────────────────────────────────────────────────────────
+
+function toggleSurgicalMode() {
+  _rerenderSurgical = !_rerenderSurgical;
+  const btn    = document.getElementById('surgicalToggleBtn');
+  const hint   = document.getElementById('surgicalHint');
+  const status = document.getElementById('surgicalCropStatus');
+  const canvas = document.getElementById('rerenderCropCanvas');
+  const origEl = document.getElementById('rerenderOriginal');
+  const runBtn = document.getElementById('rerenderRunBtn');
+  if (_rerenderSurgical) {
+    btn.textContent = '⚔ Surgical Mode ON';
+    btn.style.background = 'rgba(139,92,246,.15)';
+    btn.style.borderColor = 'rgba(139,92,246,.5)';
+    btn.style.color = '#a78bfa';
+    hint.style.display = 'none';
+    status.style.display = '';
+    canvas.style.display = '';
+    origEl.style.cursor = 'crosshair';
+    origEl.setAttribute('data-lightbox-disabled', '1');
+    _rerenderCropCoords = null;
+    _rerenderClearCrop();
+    _rerenderFetchDims(_rerenderSourceFilename || _rerenderFilename);
+  } else {
+    btn.textContent = '⚔ Surgical Mode';
+    btn.style.background = '';
+    btn.style.borderColor = '';
+    btn.style.color = '';
+    hint.style.display = '';
+    status.style.display = 'none';
+    canvas.style.display = 'none';
+    origEl.style.cursor = 'zoom-in';
+    origEl.removeAttribute('data-lightbox-disabled');
+    _rerenderCropCoords = null;
+    _rerenderClearCrop();
+    // Re-enable run button now that surgical constraint is lifted
+    if (runBtn && !runBtn.textContent.includes('Rendering')) {
+      runBtn.disabled = false;
+    }
+  }
+  _rerenderUpdateRunBtn();
+}
+
+async function _rerenderFetchDims(filename) {
+  if (!filename) return;
+  const base = filename.replace(/_(1920|960|480|201)w\.webp$/, '.webp');
+  try {
+    const d = await Admin.get('/images/dims/' + encodeURIComponent(base));
+    if (d && d.width) _rerenderActualDims = {w: d.width, h: d.height};
+  } catch(e) { console.warn('[surgical] dims fetch failed:', e); }
+}
+
+function _rerenderClearCrop() {
+  const canvas = document.getElementById('rerenderCropCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+  _rerenderCropCoords = null;
+  _cropDragging = false;
+  const st = document.getElementById('surgicalCropStatus');
+  if (st && _rerenderSurgical) st.textContent = 'Draw a selection box on the source image to define the edit area';
+}
+
+function _rerenderUpdateRunBtn() {
+  const runBtn = document.getElementById('rerenderRunBtn');
+  if (!runBtn || runBtn.textContent.includes('Rendering')) return;
+  if (_rerenderSurgical && !_rerenderCropCoords) {
+    runBtn.disabled = true;
+    runBtn.title = 'Draw a selection on the source image first';
+  } else {
+    runBtn.disabled = false;
+    runBtn.title = _rerenderSurgical ? 'Surgical edit — only the selected region will be changed' : 'New render from source image';
+  }
+}
+
+function _getCanvasCoords(canvas, e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) * (canvas.width  / rect.width),
+    y: (e.clientY - rect.top)  * (canvas.height / rect.height)
+  };
+}
+
+function cropMouseDown(e) {
+  if (!_rerenderSurgical) return;
+  e.preventDefault(); e.stopPropagation();
+  const canvas = document.getElementById('rerenderCropCanvas');
+  // Sync buffer size to display size for accurate coordinate mapping
+  canvas.width  = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+  _cropStart = _getCanvasCoords(canvas, e);
+  _cropDragging = true;
+  _rerenderCropCoords = null;
+  _rerenderUpdateRunBtn();
+}
+
+function cropMouseMove(e) {
+  if (!_rerenderSurgical || !_cropDragging) return;
+  e.preventDefault(); e.stopPropagation();
+  const canvas = document.getElementById('rerenderCropCanvas');
+  const ctx = canvas.getContext('2d');
+  const pos = _getCanvasCoords(canvas, e);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Dim the unselected area
+  ctx.fillStyle = 'rgba(0,0,0,0.38)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const rx = Math.min(_cropStart.x, pos.x), ry = Math.min(_cropStart.y, pos.y);
+  const rw = Math.abs(pos.x - _cropStart.x), rh = Math.abs(pos.y - _cropStart.y);
+  // Clear selected area so original image shows through
+  ctx.clearRect(rx, ry, rw, rh);
+  // Selection border
+  ctx.strokeStyle = '#a78bfa';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 3]);
+  ctx.strokeRect(rx, ry, rw, rh);
+}
+
+function cropMouseUp(e) {
+  if (!_rerenderSurgical || !_cropDragging) return;
+  e.preventDefault(); e.stopPropagation();
+  _cropDragging = false;
+  const canvas = document.getElementById('rerenderCropCanvas');
+  const pos = _getCanvasCoords(canvas, e);
+  const dispX = Math.min(_cropStart.x, pos.x), dispY = Math.min(_cropStart.y, pos.y);
+  const dispW = Math.abs(pos.x - _cropStart.x), dispH = Math.abs(pos.y - _cropStart.y);
+  if (dispW < 5 || dispH < 5) {
+    // Too small — clear and let user try again
+    _rerenderClearCrop();
+    return;
+  }
+  // Scale display coords to actual image pixels
+  const Rx = _rerenderActualDims.w > 0 ? _rerenderActualDims.w / canvas.width  : 1;
+  const Ry = _rerenderActualDims.h > 0 ? _rerenderActualDims.h / canvas.height : 1;
+  _rerenderCropCoords = {
+    x: Math.round(dispX * Rx), y: Math.round(dispY * Ry),
+    w: Math.round(dispW * Rx), h: Math.round(dispH * Ry)
+  };
+  const st = document.getElementById('surgicalCropStatus');
+  if (st) st.textContent = `\u2713 Selection: ${_rerenderCropCoords.w}\u00d7${_rerenderCropCoords.h}px \u2014 click \u2756 Re-render to apply surgical edit`;
+  _rerenderUpdateRunBtn();
 }
 
 function restartRerender() {
@@ -4161,7 +4332,10 @@ async function runRerender(refine) {
     const res = await fetch('/admin/api/images/rerender', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Admin-Token': _rrToken },
-      body: JSON.stringify({ filename: sourceFile, base_filename: _rerenderFilename, prompt, mode: 'new' })
+      body: JSON.stringify(Object.assign(
+        { filename: sourceFile, base_filename: _rerenderFilename, prompt, mode: 'new' },
+        _rerenderSurgical && _rerenderCropCoords ? { surgical: true, crop_coords: _rerenderCropCoords } : {}
+      ))
     });
     const d = await res.json();
     if (!d.ok) throw new Error(d.error || 'rerender failed');

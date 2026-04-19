@@ -7723,7 +7723,10 @@ def admin_image_rerender():
     base_filename = data.get('base_filename', '').strip()  # original file — used for output naming
     prompt        = data.get('prompt', '').strip()
     mode          = data.get('mode', 'new')  # 'new' or 'replace'
+    surgical      = bool(data.get('surgical', False))
+    crop_coords   = data.get('crop_coords') if surgical else None  # {x,y,w,h} in actual image pixels
     _ARCH_SUFFIX  = ' Maintain the original camera perspective and focal length. Preserve all high-frequency details on metallic hardware and cabinetry edges. Do not smooth or blur the textures of the wood grain or stone surfaces.'
+    _SURGICAL_SUFFIX = ' This is a surgical edit. Focus exclusively on the selected region. Match the lighting, color, and texture of the surrounding scene. Do not alter any area outside the selection. Maintain sharp edges on hardware and treat specular highlights as light sources, not noise.'
 
     if not filename or not filename.endswith('.webp') or '/' in filename or '..' in filename:
         return jsonify({'error': 'invalid filename'}), 400
@@ -7741,6 +7744,16 @@ def admin_image_rerender():
     base_filename = re.sub(r'_(1920|960|480|201)w\.webp$', '.webp', base_filename)
     if not prompt:
         return jsonify({'error': 'prompt is required'}), 400
+    if surgical:
+        if not crop_coords or not isinstance(crop_coords, dict):
+            return jsonify({'error': 'crop_coords required for surgical mode'}), 400
+        try:
+            _cx = int(crop_coords.get('x', 0)); _cy = int(crop_coords.get('y', 0))
+            _cw = int(crop_coords.get('w', 0)); _ch = int(crop_coords.get('h', 0))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'invalid crop_coords values'}), 400
+        if _cw < 4 or _ch < 4:
+            return jsonify({'error': 'crop region too small (min 4px)'}), 400
 
     api_key = os.getenv('GEMINI_API_KEY', '')
     if not api_key:
@@ -7863,17 +7876,133 @@ print(f'[AI RENDER OK] base={img_result.width}px _1920w={saved_dims.get("_1920w"
 print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
 """
 
+    script_surgical = r"""
+import sys, os
+sys.path.insert(0, '/home/claudeuser/.local/lib/python3.12/site-packages')
+from google import genai
+from google.genai import types
+from PIL import Image
+import io
+
+api_key  = sys.argv[1]
+src_path = sys.argv[2]
+out_path = sys.argv[3]
+prompt   = sys.argv[4]
+crop_x   = int(sys.argv[5])
+crop_y   = int(sys.argv[6])
+crop_w   = int(sys.argv[7])
+crop_h   = int(sys.argv[8])
+
+# Open source at full resolution — this is the master, never downsample it
+with Image.open(src_path) as img:
+    master = img.convert('RGB')
+
+master_w, master_h = master.size
+
+# Clamp crop box to image bounds
+x1 = max(0, crop_x)
+y1 = max(0, crop_y)
+x2 = min(master_w, crop_x + crop_w)
+y2 = min(master_h, crop_y + crop_h)
+actual_w = x2 - x1
+actual_h = y2 - y1
+
+if actual_w < 4 or actual_h < 4:
+    print('ERROR: crop region too small after clamping', file=sys.stderr)
+    sys.exit(1)
+
+# Extract high-res patch — the actual edit target
+patch = master.crop((x1, y1, x2, y2))
+patch_buf = io.BytesIO()
+patch.save(patch_buf, 'PNG')
+patch_bytes = patch_buf.getvalue()
+
+# Context image — downsampled full scene for lighting/style reference only
+context = master.copy()
+context.thumbnail((1024, 1024), Image.LANCZOS)
+context_buf = io.BytesIO()
+context.save(context_buf, 'PNG')
+context_bytes = context_buf.getvalue()
+
+print(f'[SURGICAL] master={master_w}x{master_h} patch={actual_w}x{actual_h} at ({x1},{y1}) context={context.width}x{context.height}', file=sys.stderr)
+
+client = genai.Client(api_key=api_key)
+response = client.models.generate_content(
+    model='models/gemini-3.1-flash-image-preview',
+    contents=[
+        types.Part(inline_data=types.Blob(mime_type='image/png', data=context_bytes)),
+        types.Part(inline_data=types.Blob(mime_type='image/png', data=patch_bytes)),
+        types.Part(text=prompt)
+    ],
+    config=types.GenerateContentConfig(response_modalities=['IMAGE', 'TEXT'])
+)
+
+result_bytes = None
+for cand in response.candidates:
+    for part in cand.content.parts:
+        if hasattr(part, 'inline_data') and part.inline_data and part.inline_data.data:
+            result_bytes = part.inline_data.data
+            break
+    if result_bytes:
+        break
+
+if not result_bytes:
+    print('ERROR: no image in Gemini response', file=sys.stderr)
+    sys.exit(1)
+
+# Normalize edited patch to exact crop dimensions
+edited = Image.open(io.BytesIO(result_bytes)).convert('RGB')
+if edited.size != (actual_w, actual_h):
+    print(f'[SURGICAL] normalizing patch {edited.width}x{edited.height} -> {actual_w}x{actual_h}', file=sys.stderr)
+    edited = edited.resize((actual_w, actual_h), Image.LANCZOS)
+
+# Graft patch onto a copy of the master — original file is never touched
+composite = master.copy()
+composite.paste(edited, (x1, y1))
+
+# Save composite as new AI render at master resolution
+composite.save(out_path, 'WEBP', quality=92)
+print(f'[SURGICAL OK] saved composite {composite.width}x{composite.height}', file=sys.stderr)
+
+# Generate responsive sizes from the composite master
+sizes = [('_1920w', 1920), ('_960w', 960), ('_480w', 480), ('_201w', 201)]
+base_out = out_path[:-5]  # strip .webp
+saved_dims = {}
+for suffix, w in sizes:
+    if composite.width > w:
+        ratio = w / composite.width
+        h = int(composite.height * ratio)
+        resized = composite.resize((w, h), Image.LANCZOS)
+    else:
+        resized = composite
+    out_variant = base_out + suffix + '.webp'
+    resized.save(out_variant, 'WEBP', quality=92)
+    saved_dims[suffix] = (resized.width, resized.height)
+
+print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
+"""
+
     _env = os.environ.copy()
     _env.pop('VIRTUAL_ENV', None)
     _env['PYTHONPATH'] = '/home/claudeuser/.local/lib/python3.12/site-packages'
     _env['PATH'] = ':'.join(p for p in _env.get('PATH','').split(':') if 'venv' not in p)
 
     try:
-        orig_path_arg = src_path  # use actual source file for dims — base_filename regex strips _1920w incorrectly
-        result = _subp.run(
-            ['/usr/bin/python3', '-c', script, api_key, src_path, out_path, prompt + _ARCH_SUFFIX, orig_path_arg],
-            env=_env, capture_output=True, text=True, timeout=300
-        )
+        if surgical and crop_coords:
+            # Path B — Surgical: crop patch, dual-stream Gemini call, composite graft
+            result = _subp.run(
+                ['/usr/bin/python3', '-c', script_surgical,
+                 api_key, src_path, out_path, prompt + _SURGICAL_SUFFIX,
+                 str(_cx), str(_cy), str(_cw), str(_ch)],
+                env=_env, capture_output=True, text=True, timeout=300
+            )
+        else:
+            # Path A — Full-scene (unchanged)
+            orig_path_arg = src_path
+            result = _subp.run(
+                ['/usr/bin/python3', '-c', script, api_key, src_path, out_path, prompt + _ARCH_SUFFIX, orig_path_arg],
+                env=_env, capture_output=True, text=True, timeout=300
+            )
         if result.returncode != 0:
             raw = result.stderr.strip() or 'rerender failed'
             if 'RESOURCE_EXHAUSTED' in raw or 'quota' in raw.lower():
@@ -7997,6 +8126,37 @@ def admin_save_result():
 
     return jsonify({'ok': True, 'filename': original_filename,
                     'hero_path': f'/assets/images-opt/{original_filename}'})
+
+
+# ── Image dimension lookup (used by surgical crop UI) ────────────────────────
+
+@app.route('/admin/api/images/dims/<path:filename>')
+def admin_image_dims(filename):
+    """Return actual pixel dimensions of an image in images-opt."""
+    auth = _require_admin()
+    if auth: return auth
+    filename = os.path.basename(filename)
+    if not filename.endswith('.webp') or '/' in filename or '..' in filename:
+        return jsonify({'error': 'invalid filename'}), 400
+    # Strip responsive-size suffix to get base file
+    base_filename = re.sub(r'_(1920|960|480|201)w\.webp$', '.webp', filename)
+    dims = _IMG_DIMS.get(base_filename) or _IMG_DIMS.get(filename)
+    if dims:
+        return jsonify({'width': dims[0], 'height': dims[1]})
+    # Fall back to reading file directly
+    opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+    path = os.path.join(opt_dir, base_filename)
+    if not os.path.isfile(path):
+        path = os.path.join(opt_dir, filename)
+    if not os.path.isfile(path):
+        return jsonify({'error': 'file not found'}), 404
+    try:
+        from PIL import Image as _PIL
+        with _PIL.open(path) as im:
+            w, h = im.size
+        return jsonify({'width': w, 'height': h})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 # ── Image version management ──────────────────────────────────────────────────
