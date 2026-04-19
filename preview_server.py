@@ -7917,20 +7917,15 @@ patch_buf = io.BytesIO()
 patch.save(patch_buf, 'PNG')
 patch_bytes = patch_buf.getvalue()
 
-# Context image — downsampled full scene for lighting/style reference only
-context = master.copy()
-context.thumbnail((1024, 1024), Image.LANCZOS)
-context_buf = io.BytesIO()
-context.save(context_buf, 'PNG')
-context_bytes = context_buf.getvalue()
+print(f'[SURGICAL] master={master_w}x{master_h} patch={actual_w}x{actual_h} at ({x1},{y1})', file=sys.stderr)
 
-print(f'[SURGICAL] master={master_w}x{master_h} patch={actual_w}x{actual_h} at ({x1},{y1}) context={context.width}x{context.height}', file=sys.stderr)
-
+# Send patch only — single-image edit is the supported use case for this model.
+# Style/lighting context is handled by the prompt suffix; the patch edges already
+# contain adjacent material information the model can match against.
 client = genai.Client(api_key=api_key)
 response = client.models.generate_content(
     model='models/gemini-3.1-flash-image-preview',
     contents=[
-        types.Part(inline_data=types.Blob(mime_type='image/png', data=context_bytes)),
         types.Part(inline_data=types.Blob(mime_type='image/png', data=patch_bytes)),
         types.Part(text=prompt)
     ],
@@ -7989,7 +7984,7 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
 
     try:
         if surgical and crop_coords:
-            # Path B — Surgical: crop patch, dual-stream Gemini call, composite graft
+            # Path B — Surgical: crop patch, single-image Gemini edit, composite graft
             result = _subp.run(
                 ['/usr/bin/python3', '-c', script_surgical,
                  api_key, src_path, out_path, prompt + _SURGICAL_SUFFIX,

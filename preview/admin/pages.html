@@ -4044,13 +4044,39 @@ function cropMouseUp(e) {
     _rerenderClearCrop();
     return;
   }
-  // Scale display coords to actual image pixels
-  const Rx = _rerenderActualDims.w > 0 ? _rerenderActualDims.w / canvas.width  : 1;
-  const Ry = _rerenderActualDims.h > 0 ? _rerenderActualDims.h / canvas.height : 1;
-  _rerenderCropCoords = {
-    x: Math.round(dispX * Rx), y: Math.round(dispY * Ry),
-    w: Math.round(dispW * Rx), h: Math.round(dispH * Ry)
-  };
+  // Scale display coords to actual image pixels, accounting for background-size:cover offset.
+  // cover scales the image so the shorter display axis is filled, then centers and crops the
+  // longer axis. Canvas (0,0) is NOT image pixel (0,0) when aspect ratios differ.
+  let actualX, actualY, actualW2, actualH2;
+  if (_rerenderActualDims.w > 0 && _rerenderActualDims.h > 0) {
+    const imgRatio = _rerenderActualDims.w / _rerenderActualDims.h;
+    const boxRatio = canvas.width / canvas.height;
+    let fitScale, offX = 0, offY = 0;
+    if (imgRatio > boxRatio) {
+      // Image wider than box — height fills, width overflows and is center-cropped
+      fitScale = canvas.height / _rerenderActualDims.h;
+      offX = (_rerenderActualDims.w * fitScale - canvas.width) / 2;
+    } else {
+      // Image taller than box — width fills, height overflows and is center-cropped
+      fitScale = canvas.width / _rerenderActualDims.w;
+      offY = (_rerenderActualDims.h * fitScale - canvas.height) / 2;
+    }
+    actualX = Math.round((dispX + offX) / fitScale);
+    actualY = Math.round((dispY + offY) / fitScale);
+    actualW2 = Math.round(dispW / fitScale);
+    actualH2 = Math.round(dispH / fitScale);
+    // Clamp to image bounds
+    actualX = Math.max(0, Math.min(_rerenderActualDims.w - 1, actualX));
+    actualY = Math.max(0, Math.min(_rerenderActualDims.h - 1, actualY));
+    actualW2 = Math.min(actualW2, _rerenderActualDims.w - actualX);
+    actualH2 = Math.min(actualH2, _rerenderActualDims.h - actualY);
+  } else {
+    // Fallback if dims not yet loaded — simple ratio (no offset correction)
+    actualX = Math.round(dispX * (canvas.width  > 0 ? 1 : 1));
+    actualY = Math.round(dispY * (canvas.height > 0 ? 1 : 1));
+    actualW2 = Math.round(dispW); actualH2 = Math.round(dispH);
+  }
+  _rerenderCropCoords = { x: actualX, y: actualY, w: actualW2, h: actualH2 };
   const st = document.getElementById('surgicalCropStatus');
   if (st) st.textContent = `\u2713 Selection: ${_rerenderCropCoords.w}\u00d7${_rerenderCropCoords.h}px \u2014 click \u2756 Re-render to apply surgical edit`;
   _rerenderUpdateRunBtn();
