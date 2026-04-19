@@ -603,3 +603,44 @@ Card images set via `card_settings` table are applied at runtime by the overlay 
 Add a step to the `set-version` endpoint in `preview_server.py`: after DB updates and portfolio page regeneration, trigger regeneration of all affected non-portfolio static pages whose `hero_image` matches the updated image. The server already has a page rendering function — it needs to be called for all page slugs, not just portfolio project pages.
 
 **Status:** Full systems check done. Fix planned but NOT implemented. Session ended in discussion mode.
+
+---
+
+## 30. AI Re-Render — Surgical Mode (2026-04-19)
+
+### Overview
+Two-path bifurcation in the existing rerender route in `preview_server.py`:
+- **Path A (Creative):** `crop_coords` absent → full-scene Gemini edit, existing behavior unchanged
+- **Path B (Surgical):** `crop_coords` present → crop patch at native res → Gemini edits patch only → paste back → save versioned file
+
+### Backend Architecture
+- **Fork condition:** `crop_coords` field in POST payload from admin UI
+- **Source image:** Opened dynamically from whatever resolution is on disk (no hardcoded 6K assumption)
+- **Patch extraction:** Crop at native resolution using `crop_coords` (already scaled from display to native by frontend)
+- **Gemini call:** Single-image call with patch only — NO dual-stream (context image removed). Dual-stream caused Gemini to return patch unchanged.
+- **Composite step:** Pillow pastes patch back into a deep copy of source at exact crop coordinates; LANCZOS resize forces patch to exact `(x2-x1, y2-y1)` dimensions
+- **Non-destructive save:** Deep copy saved as `[original_filename]_edit_[timestamp].[ext]` — original untouched
+- **Responsive chain:** New versioned file becomes parent for all `_1920w/_960w/_480w/_201w` variants
+- **New endpoint:** `GET /admin/api/images/dims/<filename>` — returns `{width, height}` of source image for coordinate scaling; strips `_1920w` / `_960w` suffixes to find base file
+
+### Frontend Architecture (pages.html)
+- **⚔ Surgical Mode toggle** button below source/result panels in rerender modal
+- Toggle ON → canvas overlay with crosshair cursor activates over source image
+- **Drag-to-select:** Purple dashed border + dark overlay on unselected areas; status shows pixel dimensions
+- **Coordinate scaling:** Frontend fetches actual image dimensions from `/admin/api/images/dims/` and scales display-resolution drag coordinates to native resolution before sending
+- **Cover-fit offset math (CRITICAL):** For portrait images (e.g. about hero 1638×2048), CSS `object-fit: cover` shifts the rendered crop significantly. `cropMouseUp()` computes `fitScale` + `offX/offY` to correct for the object-fit offset before scaling drag coords to native. Without this, selections are off by 191px in Y for the about hero.
+
+### Gemini Model
+- Current model: `gemini-3-pro-image-preview` (Pro tier — better structure-aware edits, less composition drift than Flash 3.1)
+- Was: `gemini-3.1-flash-image-preview` (Flash 3.1 — newest but weaker on precise edits)
+- Do NOT use dual-stream (context image + patch): image editing models treat second image as the edit target, ignoring the first — patch is returned unchanged
+
+### Input Format
+- PNG (lossless) — changed from JPEG q=90 in this session. Eliminates DCT block artifacts at high-contrast edges (window frames, trim lines, door hinges).
+- Mime type: `image/png`
+- Prompt suffix appended at call time: instructs model to preserve focal length, hardware edges, wood/stone grain, and not to re-center or re-crop
+
+### Commits (2026-04-19)
+- PNG + prompt suffix: pre `9e134bc`, post `b9990ce`
+- Surgical mode implementation: pre `f5400cb`, post `777da29`
+- Surgical bug fixes (context image removed + cover-fit math): pre `ff6ef74`, post `46be506`
