@@ -208,6 +208,68 @@
     #gradientPanel .gp-save:hover { background: #6d28d9; }
     #gradientPanel .gp-save:disabled { background: #374151; color: #6b7280; cursor: default; }
 
+    /* ── Hero Text Panel ── */
+    #heroTextPanel {
+      display: none;
+      position: fixed;
+      z-index: 10010;
+      background: #1a2332;
+      border: 1px solid #2a3748;
+      border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.7);
+      padding: 16px;
+      width: 220px;
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+      color: #e2e8f0;
+    }
+    #heroTextPanel.open { display: block; }
+    .tp-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .tp-close {
+      background: none; border: none;
+      color: #94a3b8; cursor: pointer;
+      font-size: 18px; padding: 0 2px; line-height: 1;
+    }
+    .tp-close:hover { color: #e2e8f0; }
+    .tp-row { margin-bottom: 12px; }
+    .tp-label {
+      display: block;
+      font-size: 11px; font-weight: 600;
+      color: #64748b; margin-bottom: 5px;
+    }
+    .tp-seg {
+      display: flex;
+      border: 1px solid #2a3748;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .tp-seg button {
+      flex: 1; padding: 5px 0;
+      background: #0f1923; border: none;
+      color: #64748b; font-size: 11px; font-weight: 600;
+      cursor: pointer; transition: background .1s, color .1s;
+    }
+    .tp-seg button.active { background: #0d9488; color: #fff; }
+    .tp-seg button:not(:first-child) { border-left: 1px solid #2a3748; }
+    #heroTextPanel .tp-save {
+      width: 100%; padding: 7px; margin-top: 4px;
+      background: #0d9488; color: #fff;
+      border: none; border-radius: 4px;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+    }
+    #heroTextPanel .tp-save:hover { background: #0f766e; }
+    #heroTextPanel .tp-save:disabled { background: #374151; color: #6b7280; cursor: default; }
+
     /* ── Image Picker Modal ── */
     .picker-backdrop {
       display: none;          /* hidden by default — no invisible overlay risk */
@@ -899,6 +961,34 @@
     </div>
   </div>
   <button class="gp-save" id="gpSave">Save Gradient</button>
+</div>
+
+<!-- Hero Text Panel (floating, position-fixed, outside iframe) -->
+<div id="heroTextPanel">
+  <div class="tp-title">Hero Text <button class="tp-close" id="tpClose">&times;</button></div>
+  <div class="tp-row">
+    <label class="tp-label">Alignment</label>
+    <div class="tp-seg" id="tpAlignRow">
+      <button data-tv="left">Left</button>
+      <button data-tv="center">Center</button>
+      <button data-tv="right">Right</button>
+    </div>
+  </div>
+  <div class="tp-row">
+    <label class="tp-label">Text Color</label>
+    <div class="tp-seg" id="tpColorRow">
+      <button data-tv="light" class="active">Light</button>
+      <button data-tv="dark">Dark</button>
+    </div>
+  </div>
+  <div class="tp-row" id="tpCtaRow">
+    <label class="tp-label">Call to Action</label>
+    <div class="tp-seg" id="tpCtaSeg">
+      <button data-tv="show" class="active">Show</button>
+      <button data-tv="hide">Hide</button>
+    </div>
+  </div>
+  <button class="tp-save" id="tpSave">Save Text Settings</button>
 </div>
 
 <!-- Image Picker Modal -->
@@ -3113,6 +3203,9 @@
     if (d.type === 'rd_gradient_open') {
       _gpOpen(d);
     }
+    if (d.type === 'rd_hero_text_open') {
+      _tpOpen(d);
+    }
     if (d.type === 'rd_gallery_save') {
       // Block writes on locked pages — consistent with saveNow/scheduleSave
       if (currentPageLock === 'locked') {
@@ -3262,6 +3355,116 @@
       panel.style.top  = top  + 'px';
       panel.classList.add('open');
       gpSave.disabled = false; gpSave.textContent = 'Save Gradient';
+    };
+  })();
+
+  // ── Hero Text Panel ──────────────────────────────────────────────────────
+  (() => {
+    const panel  = document.getElementById('heroTextPanel');
+    const tpClose = document.getElementById('tpClose');
+    const tpAlignRow = document.getElementById('tpAlignRow');
+    const tpColorRow = document.getElementById('tpColorRow');
+    const tpCtaRow  = document.getElementById('tpCtaRow');
+    const tpCtaSeg  = document.getElementById('tpCtaSeg');
+    const tpSave    = document.getElementById('tpSave');
+    let _tp = null; // current open panel state
+
+    function _getSeg(row) {
+      const a = row.querySelector('button.active');
+      return a ? a.getAttribute('data-tv') : null;
+    }
+    function _seg(row, val) {
+      row.querySelectorAll('button').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-tv') === val);
+      });
+    }
+    function _read() {
+      return {
+        hero_text_align:  _getSeg(tpAlignRow),
+        hero_text_color:  _getSeg(tpColorRow),
+        hero_cta_visible: _getSeg(tpCtaSeg)
+      };
+    }
+    function _preview() {
+      if (!_tp || !siteFrame.contentWindow) return;
+      const v = _read();
+      siteFrame.contentWindow.postMessage({
+        type: 'rd_set_hero_text',
+        heroId: _tp.heroId,
+        hero_text_align:  v.hero_text_align,
+        hero_text_color:  v.hero_text_color,
+        hero_cta_visible: v.hero_cta_visible
+      }, window.location.origin);
+    }
+
+    [tpAlignRow, tpColorRow, tpCtaSeg].forEach(row => {
+      row.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          row.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          _preview();
+        });
+      });
+    });
+
+    tpSave.addEventListener('click', async () => {
+      if (!_tp) return;
+      const v = _read();
+      const cs = _tp.cardState || {};
+      tpSave.disabled = true; tpSave.textContent = 'Saving…';
+      try {
+        await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}/${encodeURIComponent(_tp.heroId)}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            mode: cs.mode || 'color',
+            color: cs.color || '#1C1C1C',
+            image: cs.image || null,
+            position: cs.position || '50% 50%',
+            zoom: cs.zoom || 1.0,
+            gradient_type: cs.gradient_type || null,
+            gradient_tint: cs.gradient_tint || null,
+            gradient_opacity: cs.gradient_opacity != null ? cs.gradient_opacity : null,
+            gradient_direction: cs.gradient_direction || null,
+            gradient_distance: cs.gradient_distance != null ? cs.gradient_distance : null,
+            hero_text_align:  v.hero_text_align,
+            hero_text_color:  v.hero_text_color,
+            hero_cta_visible: v.hero_cta_visible
+          })
+        });
+        tpSave.textContent = '✓ Saved';
+        setTimeout(() => { tpSave.textContent = 'Save Text Settings'; tpSave.disabled = false; }, 1500);
+      } catch(err) {
+        tpSave.textContent = 'Error'; tpSave.disabled = false;
+      }
+    });
+
+    function _close() { panel.classList.remove('open'); _tp = null; }
+    tpClose.addEventListener('click', _close);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && panel.classList.contains('open')) _close(); });
+    document.addEventListener('mousedown', e => { if (panel.classList.contains('open') && !panel.contains(e.target)) _close(); });
+
+    window._tpOpen = function(d) {
+      _tp = d;
+      const t = d.heroText || {};
+      // Alignment — default to null (no active button) if not set
+      _seg(tpAlignRow, t.hero_text_align || null);
+      _seg(tpColorRow, t.hero_text_color || 'light');
+      _seg(tpCtaSeg, t.hero_cta_visible || 'show');
+      // Show/hide CTA row based on whether this hero has a CTA element
+      tpCtaRow.style.display = (d.hasCta === false) ? 'none' : '';
+      // Position near target element
+      const r = d.rect || {};
+      const pw = 220, ph = 220;
+      let left = (r.left || 0) + (r.width || 0) - pw;
+      let top  = (r.top  || 0) + (r.height || 0) + 8;
+      if (left < 8) left = 8;
+      if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+      if (top + ph > window.innerHeight - 8) top = (r.top || 0) - ph - 8;
+      if (top < 8) top = 8;
+      panel.style.left = left + 'px';
+      panel.style.top  = top  + 'px';
+      panel.classList.add('open');
+      tpSave.disabled = false; tpSave.textContent = 'Save Text Settings';
     };
   })();
 

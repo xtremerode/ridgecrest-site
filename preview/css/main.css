@@ -1913,3 +1913,49 @@ p { line-height: 1.8; }
   font-size: 14px;
   color: var(--dark);
 }
+
+/* ── Hero Text Controls ────────────────────────────────────────────────────── */
+
+/* CTA visibility — controlled via --hero-cta-display CSS var set on the hero root.
+   Fallback preserves original display value when var is not set. */
+.hero__actions           { display: var(--hero-cta-display, flex); }
+.project-hero__right     { display: var(--hero-cta-display, block); }
+
+/* Text alignment — home hero */
+[data-hero-text-align="left"]   .hero__content  { text-align: left; }
+[data-hero-text-align="left"]   .hero__headline { margin-left: 0; margin-right: 0; }
+[data-hero-text-align="center"] .hero__content  { text-align: center; }
+[data-hero-text-align="center"] .hero__headline { margin-left: auto; margin-right: auto; }
+[data-hero-text-align="center"] .hero__actions  { justify-content: center; }
+[data-hero-text-align="right"]  .hero__content  { text-align: right; }
+[data-hero-text-align="right"]  .hero__headline { margin-left: auto; margin-right: 0; }
+[data-hero-text-align="right"]  .hero__actions  { justify-content: flex-end; }
+
+/* Text alignment — inner page heroes */
+[data-hero-text-align="left"]   .page-hero__eyebrow,
+[data-hero-text-align="left"]   .page-hero__title,
+[data-hero-text-align="left"]   .page-hero__sub  { text-align: left;   margin-left: 0;    margin-right: 0; }
+[data-hero-text-align="center"] .page-hero__eyebrow,
+[data-hero-text-align="center"] .page-hero__title,
+[data-hero-text-align="center"] .page-hero__sub  { text-align: center; margin-left: auto; margin-right: auto; }
+[data-hero-text-align="right"]  .page-hero__eyebrow,
+[data-hero-text-align="right"]  .page-hero__title,
+[data-hero-text-align="right"]  .page-hero__sub  { text-align: right;  margin-left: auto; margin-right: 0; }
+
+/* Text alignment — project heroes */
+[data-hero-text-align="left"]   .project-hero__content-inner { justify-content: flex-start; }
+[data-hero-text-align="left"]   .project-hero__left          { text-align: left; }
+[data-hero-text-align="center"] .project-hero__content-inner { justify-content: center; }
+[data-hero-text-align="center"] .project-hero__left          { text-align: center; }
+[data-hero-text-align="right"]  .project-hero__content-inner { justify-content: flex-end; }
+[data-hero-text-align="right"]  .project-hero__left          { text-align: right; }
+
+/* Text color override — dark mode (light text → dark text) */
+[data-hero-text-color="dark"] .hero__eyebrow,
+[data-hero-text-color="dark"] .hero__headline,
+[data-hero-text-color="dark"] .hero__sub,
+[data-hero-text-color="dark"] .page-hero__eyebrow,
+[data-hero-text-color="dark"] .page-hero__title,
+[data-hero-text-color="dark"] .page-hero__sub,
+[data-hero-text-color="dark"] .project-hero__eyebrow,
+[data-hero-text-color="dark"] .project-hero__title { color: #111111 !important; }
