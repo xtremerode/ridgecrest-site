@@ -2718,10 +2718,15 @@ _EDIT_OVERLAY_TPL = """\
     }});
     badge.appendChild(heroRenderBtn);
 
-    // G button — home page hero only for now (.hero__bg sibling of .hero__overlay[data-gradient-id])
-    // Inner pages will be wired up after home page is verified.
-    if (el.classList.contains('hero__bg')) {{
-      var _gradEl = el.parentElement && el.parentElement.querySelector('[data-gradient-id]');
+    // G button — any hero element that has (or is the sibling of) a data-gradient-id element.
+    // Covers three structures:
+    //   1. Home page:     el = .hero__bg  →  sibling .hero__overlay[data-gradient-id]
+    //   2. Inner pages:   el = .page-hero--service[data-gradient-id]  →  el itself
+    //   3. Project pages: el = .project-hero__img  →  sibling .project-hero__overlay[data-gradient-id]
+    (function() {{
+      var _gradEl = el.hasAttribute('data-gradient-id')
+        ? el
+        : (el.parentElement && el.parentElement.querySelector('[data-gradient-id]'));
       if (_gradEl) {{
         var _gid = _gradEl.getAttribute('data-gradient-id');
         var _cardData = null;
@@ -2755,7 +2760,7 @@ _EDIT_OVERLAY_TPL = """\
         }}; }}(_gid, _gradEl, _cardData)));
         badge.appendChild(heroGradBtn);
       }}
-    }}
+    }})();
 
     ov.appendChild(badge);
 
@@ -8040,13 +8045,17 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
             conn2.close()
 
     hero_path = f'/assets/images-opt/{out_filename}'
-    # FIX 4: Return _1920w dimensions so admin panel can detect size mismatches.
+    # display_path: prefer _1920w variant for the preview panel background-image.
+    # The full 6131px base file looks blurry when the browser bilinear-downsamples
+    # it ~15x to fit a small panel; the _1920w LANCZOS variant looks sharp.
+    # hero_path (base file) is kept for use-version activation and refine-from logic.
+    _variant_1920_path = os.path.join(opt_dir, out_filename[:-5] + '_1920w.webp')
+    display_path = f'/assets/images-opt/{out_filename[:-5]}_1920w.webp' if os.path.isfile(_variant_1920_path) else hero_path
     render_w = render_h = 0
     try:
         from PIL import Image as _PIL_Image
-        _variant_1920 = os.path.join(opt_dir, out_filename[:-5] + '_1920w.webp')
-        if os.path.isfile(_variant_1920):
-            with _PIL_Image.open(_variant_1920) as _v:
+        if os.path.isfile(_variant_1920_path):
+            with _PIL_Image.open(_variant_1920_path) as _v:
                 render_w, render_h = _v.size
         else:
             with _PIL_Image.open(out_path) as _v:
@@ -8054,7 +8063,7 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
     except Exception:
         pass
     return jsonify({'ok': True, 'filename': out_filename, 'hero_path': hero_path,
-                    'width': render_w, 'height': render_h})
+                    'display_path': display_path, 'width': render_w, 'height': render_h})
 
 
 # ── Save render result (copy _ai_N file to final destination) ────────────────
