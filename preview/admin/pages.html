@@ -4375,10 +4375,14 @@ async function runRerender(refine) {
     });
     const d = await res.json();
     if (!d.ok) throw new Error(d.error || 'rerender failed');
-    _rerenderResultPath = d.hero_path;
+    _rerenderResultPath = d.hero_path;  // base file — used for use-version activation & refine source
     _rerenderPass++;
     const newFilename = d.filename || d.hero_path.split('/').pop();
-    resultEl.style.backgroundImage = `url('${d.hero_path}?v=${Date.now()}')`;
+    // Use display_path (_1920w variant) for the panel background-image.
+    // The full-res base (6131px) looks blurry at panel size due to browser bilinear downsampling;
+    // the _1920w LANCZOS copy looks sharp.  display_path falls back to hero_path if unavailable.
+    const displayPath = d.display_path || d.hero_path;
+    resultEl.style.backgroundImage = `url('${displayPath}?v=${Date.now()}')`;
     resultEl.style.backgroundSize = 'cover';
     resultEl.style.backgroundPosition = 'center';
     document.getElementById('rerenderPlaceholder').style.display = 'none';
@@ -4396,7 +4400,7 @@ async function runRerender(refine) {
     refineBtn.textContent = '✦ Refine Result';
     document.getElementById('rerenderRestartBtn').style.display = '';
     document.getElementById('rerenderStatus').textContent = '✓ Render saved — click "✓ Use This Version" to make it live, or keep rendering';
-    _stripAppend(newFilename, d.hero_path, prompt, sourceFile);
+    _stripAppend(newFilename, displayPath, prompt, sourceFile);  // filmstrip thumbnail also uses _1920w
     _stripHighlight(_rerenderSourceFilename);
     // FIX 4: Show dimension warning if server reports render is smaller than expected.
     if (d.width && d.width < 1920) {
@@ -4771,8 +4775,11 @@ function rerenderLightbox(panelIndex) {
       startIdx = ri;
     } else {
       const freshStrip = _rerenderStrip.find(s => s.filename === resultFile);
+      // Prefer the strip item's heroPath (_1920w) over _rerenderResultPath (full base)
+      // to avoid the browser bilinear-blur problem on large images in the lightbox.
+      const lbSrc = freshStrip ? freshStrip.heroPath : _rerenderResultPath;
       images.push({
-        src:             _rerenderResultPath + '?v=' + Date.now(),
+        src:             lbSrc + '?v=' + Date.now(),
         label:           _versionLabel(resultFile),
         filename:        resultFile,
         isOriginal:      false,
