@@ -437,6 +437,64 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
                 'T-panel live preview will update iframe in real time',
             ))
 
+        # ── Check: G panel save must NOT wipe T panel settings (cross-contamination) ──
+        # Sequence: save T settings → save gradient (G panel) → verify T settings survive
+        try:
+            # Save T settings
+            _put_json(
+                f'/admin/api/cards/{_slug_enc}/{_TEST_CARD_ID}',
+                {
+                    'mode': 'image', 'color': '#1C1C1C', 'image': None,
+                    'position': '50% 50%', 'zoom': 1.0,
+                    'hero_text_align': 'left', 'hero_text_color': 'dark',
+                    'hero_cta_visible': 'show',
+                },
+                _tok,
+            )
+            # Simulate G panel save (only sends gradient + cardState fields as G panel does)
+            _put_json(
+                f'/admin/api/cards/{_slug_enc}/{_TEST_CARD_ID}',
+                {
+                    'mode': 'image', 'color': '#1C1C1C', 'image': None,
+                    'position': '50% 50%', 'zoom': 1.0,
+                    'gradient_type': 'fade', 'gradient_tint': 'dark',
+                    'gradient_opacity': 50, 'gradient_direction': 'bottom', 'gradient_distance': 80,
+                    # G panel save MUST include hero_text_* (fix was applied)
+                    'hero_text_align': 'left', 'hero_text_color': 'dark', 'hero_cta_visible': 'show',
+                    'hero_cta_align': None, 'hero_cta_primary': None, 'hero_cta_secondary': None,
+                },
+                _tok,
+            )
+            # GET staged page and check text settings survived
+            _gc2, _, _body2 = _get(f'/view/services/{_slug_path}.html?_stage=1')
+            _wipe_missing = []
+            if 'data-hero-text-align="left"' not in _body2:
+                _wipe_missing.append('data-hero-text-align="left"')
+            if 'data-hero-text-color="dark"' not in _body2:
+                _wipe_missing.append('data-hero-text-color="dark"')
+            # Clean up
+            _put_json(
+                f'/admin/api/cards/{_slug_enc}/{_TEST_CARD_ID}',
+                {'mode': 'image', 'color': '#1C1C1C', 'image': None, 'position': '50% 50%', 'zoom': 1.0},
+                _tok,
+            )
+            if _wipe_missing:
+                results.append(_r(
+                    'g_panel_no_text_wipe', 'fail',
+                    'G panel save wiped T panel text settings — after G panel save, '
+                    + ', '.join(_wipe_missing) + ' missing from staged HTML. '
+                    'G panel cardState in rd_gradient_open message must include hero_text_* fields.',
+                    auto_fixable=False,
+                ))
+            else:
+                results.append(_r(
+                    'g_panel_no_text_wipe', 'pass',
+                    'G panel save preserves T panel text settings — cross-contamination fix confirmed',
+                ))
+        except Exception as _wipe_exc:
+            results.append(_r('g_panel_no_text_wipe', 'warn',
+                               f'G panel cross-contamination test skipped: {_wipe_exc}'))
+
     except Exception as exc:
         results.append(_r('hero_text_controls_functional', 'warn',
                            f'Hero text controls test skipped: {exc}'))

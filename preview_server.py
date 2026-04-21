@@ -220,6 +220,13 @@ def _seed_pages():
                         hero_image = COALESCE(pages.hero_image, EXCLUDED.hero_image)
                 """, (slug, title, hero_image, rel))
                 seeded += 1
+        # Seed the blog index (Flask dynamic route — no static HTML file in preview/)
+        cur.execute("""
+            INSERT INTO pages (slug, title, page_path)
+            VALUES ('blog', 'The RD Edit', 'blog.html')
+            ON CONFLICT (slug) DO NOTHING
+        """)
+        seeded += 1
         conn.commit()
         conn.close()
         print(f'[pages] Seeded/verified {seeded} pages')
@@ -875,7 +882,11 @@ def _inject_gradient_id_overlays(content: bytes, cards: list) -> bytes:
     Unlike data-card-id cards (which use the JS apply script), gradient-id elements
     receive their overlay value directly in the HTML style attribute at serve time.
     This avoids any JS timing issues, image-mode gating, and card CSS side effects.
+
+    If no card_settings record exists for a gradient-id, a sensible default fade
+    gradient is applied so the hero always has a readable text overlay.
     """
+    _DEFAULT_HERO_GRADIENT = 'linear-gradient(to top,rgba(0,0,0,0.55) 0%,transparent 75%)'
     grad_map = {}
     for c in cards:
         if not c.get('card_id'):
@@ -887,8 +898,6 @@ def _inject_gradient_id_overlays(content: bytes, cards: list) -> bytes:
         )
         if css:
             grad_map[c['card_id']] = css
-    if not grad_map:
-        return content
     try:
         s = content.decode('utf-8', errors='replace')
 
@@ -897,9 +906,8 @@ def _inject_gradient_id_overlays(content: bytes, cards: list) -> bytes:
             id_match = re.search(r'data-gradient-id="([^"]*)"', tag)
             if not id_match:
                 return tag
-            css_val = grad_map.get(id_match.group(1))
-            if not css_val:
-                return tag
+            # Use stored CSS if available, otherwise apply a default hero gradient
+            css_val = grad_map.get(id_match.group(1), _DEFAULT_HERO_GRADIENT)
             css_prop = f'--rd-overlay:{css_val}'
             style_match = re.search(r'\bstyle="([^"]*)"', tag)
             if style_match:
@@ -1247,24 +1255,40 @@ def _apply_hero_to_html(content: bytes, hero_path: str,
                          hero_position: str = '50% 50%', hero_zoom: float = 1.0) -> bytes:
     """Swap the first inline background-image URL in HTML with hero_path.
     Always injects __RD_HERO / __RD_HERO_POSITION / __RD_HERO_ZOOM script vars
-    so main.js can apply them (home page + any element set by JS)."""
+    so main.js can apply them (home page + any element set by JS).
+
+    Also injects a <style> tag that pre-sets background-image on .page-hero--service
+    so the browser applies it before JS runs, eliminating the dark-overlay flash."""
     text = content.decode('utf-8', errors='replace')
     new_text, _ = re.subn(
         r"(background-image\s*:\s*url\(['\"]?)(/assets/[^'\")\s]+)(['\"]?\))",
         lambda m: m.group(1) + hero_path + m.group(3),
         text, count=1
     )
-    # Detect if active version is an AI render
     # Always inject script vars — main.js reads these for all hero types
     script = (
         f'<script>window.__RD_HERO={_safe_js(hero_path)};'
         f'window.__RD_HERO_POSITION={_safe_js(hero_position)};'
         f'window.__RD_HERO_ZOOM={_safe_js(hero_zoom)};</script>'
     )
+    # Also inject a <style> that pre-sets the background-image on .page-hero--service
+    # so it is applied before JS runs, eliminating the ::before dark-overlay flash.
+    # Also sets --rd-overlay as a CSS var fallback so the hero always has a readable
+    # text gradient even when no card_settings record exists for this page's hero.
+    # If _inject_gradient_id_overlays later injects a specific value via inline style
+    # on the element, that inline style takes precedence over this class-level rule.
+    zoom_css = f'{round(hero_zoom * 100)}%' if hero_zoom > 1.001 else 'cover'
+    pos_css  = hero_position or '50% 50%'
+    flash_fix = (
+        f'<style>.page-hero--service{{background-image:url("{hero_path}");'
+        f'background-position:{pos_css};background-size:{zoom_css};'
+        f'--rd-overlay:linear-gradient(to top,rgba(0,0,0,0.55) 0%,transparent 75%);}}</style>'
+    )
+    inject = flash_fix + script
     if '</head>' in new_text:
-        new_text = new_text.replace('</head>', script + '</head>', 1)
+        new_text = new_text.replace('</head>', inject + '</head>', 1)
     else:
-        new_text = script + new_text
+        new_text = inject + new_text
     return new_text.encode('utf-8')
 
 # ── Card apply script (non-edit mode) ────────────────────────────────────────
@@ -1910,7 +1934,12 @@ _CARD_EDIT_OVERLAY_TPL = """\
         window.parent.postMessage({{
           type: 'rd_gradient_open',
           cardId: cardId,
-          cardState: {{ mode: state.mode, color: state.color, image: state.image, position: state.position, zoom: state.zoom }},
+          cardState: {{
+            mode: state.mode, color: state.color, image: state.image, position: state.position, zoom: state.zoom,
+            hero_text_align: state.hero_text_align || null, hero_text_color: state.hero_text_color || null,
+            hero_cta_visible: state.hero_cta_visible || null, hero_cta_align: state.hero_cta_align || null,
+            hero_cta_primary: state.hero_cta_primary || null, hero_cta_secondary: state.hero_cta_secondary || null
+          }},
           rect: {{ left: iRect.left + rect.left, top: iRect.top + rect.top, width: rect.width, height: rect.height }},
           gradient: {{
             gradient_type:      state.gradient_type      || 'none',
@@ -3029,7 +3058,19 @@ _EDIT_OVERLAY_TPL = """\
           window.parent.postMessage({{
             type: 'rd_gradient_open',
             cardId: _gid2,
-            cardState: {{ mode: 'color', color: '#1C1C1C', image: null, position: '50% 50%', zoom: 1.0 }},
+            cardState: {{
+              mode:               (_cardData2 && _cardData2.mode)               || 'color',
+              color:              (_cardData2 && _cardData2.color)              || '#1C1C1C',
+              image:              (_cardData2 && _cardData2.image)              || null,
+              position:           (_cardData2 && _cardData2.position)           || '50% 50%',
+              zoom:               (_cardData2 && _cardData2.zoom)               || 1.0,
+              hero_text_align:    (_cardData2 && _cardData2.hero_text_align)    || null,
+              hero_text_color:    (_cardData2 && _cardData2.hero_text_color)    || null,
+              hero_cta_visible:   (_cardData2 && _cardData2.hero_cta_visible)   || null,
+              hero_cta_align:     (_cardData2 && _cardData2.hero_cta_align)     || null,
+              hero_cta_primary:   (_cardData2 && _cardData2.hero_cta_primary)   || null,
+              hero_cta_secondary: (_cardData2 && _cardData2.hero_cta_secondary) || null
+            }},
             rect: {{ left: iRect.left + rect.left, top: iRect.top + rect.top, width: rect.width, height: rect.height }},
             gradient: {{
               gradient_type:      (_cardData2 && _cardData2.gradient_type)      || 'none',
@@ -3063,7 +3104,7 @@ _EDIT_OVERLAY_TPL = """\
           }}
         }}
         // Detect if this hero has CTA elements and which ones
-        var _ctaEl = _heroEl.querySelector('.hero__actions, .project-hero__right');
+        var _ctaEl = _heroEl.querySelector('.hero__actions, .project-hero__right, .page-hero__actions');
         var _hasCta = !!_ctaEl;
         var _hasSecondary = _hasCta && !!(_ctaEl.querySelector('[data-cta-id="secondary"]') || _ctaEl.querySelectorAll('.btn').length > 1);
         var heroTextBtn = document.createElement('button');
@@ -4360,12 +4401,15 @@ def view(filename):
             if cards:
                 cards = _upgrade_card_images(cards)
                 content = _apply_cards_to_html(content, cards)
-                # Server-side inject --rd-overlay for data-gradient-id elements (heroes)
-                content = _inject_gradient_id_overlays(content, cards)
                 # Server-side inject hero text control attributes
                 content = _inject_hero_text_controls(content, cards)
                 # Server-side apply hero color mode (overrides background image with solid color)
                 content = _apply_hero_color_mode(content, cards)
+            # Server-side inject --rd-overlay for data-gradient-id elements (heroes).
+            # Always runs even if no card_settings records exist — uses default gradient
+            # fallback so hero overlays are never missing. Must run after _apply_cards_to_html
+            # so existing style attrs from that pass are visible to the regex.
+            content = _inject_gradient_id_overlays(content, cards or [])
 
         # Inject diff panel mode for home page
         if HAS_DB and slug == 'home':
@@ -6488,6 +6532,13 @@ def blog_index():
     )
     head = _blog_head_extras(head)
 
+    # Inject DB hero image (if set) so the blog hero background-image loads
+    # before JS runs, matching the flash-fix pattern used on all other pages.
+    if HAS_DB:
+        _bh, _bh_pos, _bh_zoom, _, _ = _get_page_data('blog')
+        if _bh:
+            head = _apply_hero_to_html(head.encode('utf-8'), _bh, _bh_pos, _bh_zoom).decode('utf-8')
+
     cat_links = '<a href="/blog" class="blog-cat-pill{}"  >All</a>'.format(
         ' blog-cat-pill--active' if not request.args.get('cat') else ''
     )
@@ -6530,11 +6581,15 @@ def blog_index():
     body = f'''
   {_BLOG_NAV}
 
-  <div class="blog-hero">
+  <div class="blog-hero page-hero--service" data-hero-id="blog-index-hero" data-gradient-id="blog-index-hero">
     <div class="container">
       <p class="blog-hero__eyebrow">The RD Edit</p>
       <h1 class="blog-hero__title">Design Ideas, Project Stories &amp; Expert Advice</h1>
       <p class="blog-hero__sub">From the Ridgecrest Designs team in Pleasanton, California</p>
+      <div class="page-hero__actions">
+        <a href="/start-a-project.html" class="btn btn--primary" data-cta-id="primary">Start a Project</a>
+        <a href="/process.html" class="btn btn--outline" data-cta-id="secondary">Our Process</a>
+      </div>
     </div>
   </div>
 
@@ -6634,7 +6689,7 @@ def blog_post(slug):
     body = f'''
   {_BLOG_NAV}
 
-  <div class="post-hero{' post-hero--has-img' if post.get('featured_image') else ''}"{' style="background-image:url(\'' + post['featured_image'] + '\')"' if post.get('featured_image') else ''}>
+  <div class="post-hero{' post-hero--has-img' if post.get('featured_image') else ''}" data-hero-id="blog-{slug}-hero" data-gradient-id="blog-{slug}-hero"{' style="background-image:url(\'' + post['featured_image'] + '\')"' if post.get('featured_image') else ''}>
     {'<div class="post-hero__overlay"></div>' if post.get('featured_image') else ''}
     <div class="container container--narrow">
       <div class="post-hero__meta">
@@ -6664,7 +6719,22 @@ def blog_post(slug):
   {_BLOG_FOOTER}
   {_BLOG_SCRIPTS}'''
 
-    return head + body
+    page = head + body
+    # Inject card edit overlay when admin_edit=1 (same system as /view/ pages)
+    _ae_token = request.args.get('token', '')
+    if request.args.get('admin_edit') == '1' and _valid_token(_ae_token):
+        _blog_slug = f'blog/{slug}'
+        _blog_cards = _get_card_settings(_blog_slug) if HAS_DB else []
+        if _blog_cards:
+            _blog_content = page.encode('utf-8')
+            _blog_content = _inject_hero_text_controls(_blog_content, _blog_cards)
+            page = _blog_content.decode('utf-8', errors='replace')
+        card_overlay = _CARD_EDIT_OVERLAY_TPL.format(
+            slug_json=json.dumps(_blog_slug),
+            token_json=json.dumps(_ae_token)
+        )
+        page = page.replace('</body>', card_overlay + '</body>', 1)
+    return page
 
 
 # ── Blog admin API ─────────────────────────────────────────────────────────────
@@ -7991,7 +8061,10 @@ def admin_card_update(slug, card_id):
         cur = conn.cursor()
         _ensure_card_settings_table(cur)
         # Capture old state for undo
-        cur.execute("SELECT mode, color, image, position, zoom FROM card_settings WHERE page_slug=%s AND card_id=%s",
+        cur.execute("""SELECT mode, color, image, position, zoom,
+                              gradient_type, gradient_tint, gradient_opacity,
+                              gradient_direction, gradient_distance
+                       FROM card_settings WHERE page_slug=%s AND card_id=%s""",
                     (slug, card_id))
         _old_card = cur.fetchone()
         _old_state = dict(_old_card) if _old_card else None
@@ -7999,7 +8072,9 @@ def admin_card_update(slug, card_id):
                   {'slug': slug, 'card_id': card_id, 'old_state': _old_state}, slug, admin_context='pages',
                   after_data={'slug': slug, 'card_id': card_id,
                               'new_state': {'mode': mode, 'color': color, 'image': image,
-                                            'position': position, 'zoom': zoom}})
+                                            'position': position, 'zoom': zoom,
+                                            'gradient_type': gradient_type, 'gradient_tint': gradient_tint,
+                                            'gradient_opacity': gradient_opacity}})
         cur.execute("""
             INSERT INTO card_settings (page_slug, card_id, mode, color, image, position, zoom,
                 gradient_type, gradient_tint, gradient_opacity, gradient_direction, gradient_distance,

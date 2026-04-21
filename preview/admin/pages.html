@@ -2935,7 +2935,9 @@
         const rawSlug = iframePath
           .replace(/^.*\/view\//, '')
           .replace(/\.html.*$/, '')
-          .replace(/^index$/, 'home');
+          .replace(/^index$/, 'home')
+          // Flask dynamic routes (e.g. /blog) → strip leading slash
+          .replace(/^\//, '');
         // /view/ (root index) produces empty string → treat as 'home'
         const newSlug = rawSlug || (iframePath.includes('/view/') ? 'home' : currentSlug);
         if (newSlug && newSlug !== currentSlug) {
@@ -3402,7 +3404,13 @@
             image: cs.image || null, position: cs.position || '50% 50%', zoom: cs.zoom || 1.0,
             gradient_type: g.gradient_type, gradient_tint: g.gradient_tint,
             gradient_opacity: g.gradient_opacity, gradient_direction: g.gradient_direction,
-            gradient_distance: g.gradient_distance
+            gradient_distance: g.gradient_distance,
+            hero_text_align:    cs.hero_text_align    || null,
+            hero_text_color:    cs.hero_text_color    || null,
+            hero_cta_visible:   cs.hero_cta_visible   || null,
+            hero_cta_align:     cs.hero_cta_align     || null,
+            hero_cta_primary:   cs.hero_cta_primary   || null,
+            hero_cta_secondary: cs.hero_cta_secondary || null
           })
         });
         gpSave.textContent = '✓ Saved';
