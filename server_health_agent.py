@@ -11,6 +11,8 @@ Checks (critical = blocks commit):
     • Every HTML page in preview/ returns HTTP 200
     • Admin auth endpoint responds (POST /admin/api/auth)
     • DB tables endpoint responds (GET /admin/api/db/tables)
+    • No test-artifact DB records left in card_settings
+      (mode='color' hero records with no image = leftover test writes)
 
   WARNING
     • Server health endpoint returns healthy JSON (/admin/api/server/health)
@@ -183,6 +185,33 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
     else:
         results.append(_r('admin_pages_200', 'pass',
                            f'All {len(admin_pages)} admin pages returned 200'))
+
+    # ── 5. DB test-artifact guardrail ─────────────────────────────────────────
+    # Detect records that are classic test artifacts:
+    # hero card_settings rows with mode='color' and no image — these get created
+    # when the BG panel is tested and must not persist to the live site.
+    try:
+        import db as _db
+        conn = _db.get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT page_slug, card_id FROM card_settings "
+            "WHERE card_id LIKE '%hero%' AND mode = 'color' AND image IS NULL"
+        )
+        artifacts = cur.fetchall()
+        conn.close()
+        if artifacts:
+            names = ', '.join(f"{r['page_slug']}/{r['card_id']}" for r in artifacts)
+            results.append(_r('no_test_artifacts', 'fail',
+                               f'{len(artifacts)} test-artifact hero color record(s) left in DB: '
+                               f'{names} — run: python db_test_scope.py restore',
+                               auto_fixable=True))
+        else:
+            results.append(_r('no_test_artifacts', 'pass',
+                               'No test-artifact color-mode hero records in DB'))
+    except Exception as exc:
+        results.append(_r('no_test_artifacts', 'warn',
+                           f'Could not check DB for test artifacts: {exc}'))
 
     return results
 
