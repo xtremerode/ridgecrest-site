@@ -10,6 +10,8 @@ Checks (critical = blocks commit):
     • No element with both data-hero-id AND data-card-id
     • All data-card-id values globally unique across all pages
     • No data-card-id on .page-hero--service (stripped by _strip_hero_card_ids)
+    • No CTA links pointing directly to elevate-scheduling or base44.app
+      (all CTAs must go through start-a-project.html — iframe embed is the exception)
 
   WARNING
     • hero__actions class present inside every hero
@@ -191,6 +193,26 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
                     f"hero '{hero_id}': no [data-gradient-id] overlay found",
                     page, auto_fixable=False
                 ))
+
+    # ── Global: no direct external CTA links ──────────────────────────────────
+    # All CTAs must route through start-a-project.html.
+    # start-a-project.html itself is exempt (it embeds the iframe intentionally).
+    BANNED_CTA_DOMAINS = ['elevate-scheduling-6b2fdec8.base44.app', 'base44.app']
+    for filename in html_files:
+        if filename == 'start-a-project.html':
+            continue
+        path = os.path.join(PREVIEW_DIR, filename)
+        with open(path, 'r', encoding='utf-8', errors='replace') as fh:
+            raw = fh.read()
+        for domain in BANNED_CTA_DOMAINS:
+            if domain in raw:
+                results.append(_r(
+                    'no_external_cta', 'fail',
+                    f"Direct link to {domain} found — must route through start-a-project.html",
+                    filename, auto_fixable=True
+                ))
+                hero_pass = False
+                break
 
     # ── Global: card-id duplicates ─────────────────────────────────────────────
     dup_found = False
