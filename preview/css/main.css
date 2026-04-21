@@ -1842,6 +1842,7 @@ p { line-height: 1.8; }
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center center;
+  background-color: #0d1a22; /* dark fallback — prevents white body flashing through ::before overlay while image loads */
 }
 .page-hero--service::before {
   content: '';

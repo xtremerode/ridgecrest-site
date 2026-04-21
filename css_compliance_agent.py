@@ -162,6 +162,59 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
                                f'Split panel incomplete — {missing} defined but pair missing',
                                'main.css'))
 
+    # ── .page-hero--service must have background-color fallback ──────────────────
+    # Without background-color on .page-hero--service, the ::before overlay renders
+    # on the white body background (#FAFAF8) while the hero image is loading,
+    # producing a dark gray flash (rgba(8,12,18,0.72) on white = ~#363d42).
+    # background-color: #0d1a22 ensures a consistent dark tone while image loads.
+    import re as _re
+    _bghero_block = _re.search(
+        r'\.page-hero--service\s*\{[^}]*\}', main_css, _re.DOTALL)
+    if _bghero_block:
+        if 'background-color' not in _bghero_block.group(0):
+            results.append(_r('hero_bg_color_fallback', 'fail',
+                               '.page-hero--service rule in main.css has no background-color — '
+                               '::before overlay will render on white body (#FAFAF8) = dark gray flash '
+                               'while hero image loads. Add background-color: #0d1a22.',
+                               'main.css', auto_fixable=False))
+        else:
+            results.append(_r('hero_bg_color_fallback', 'pass',
+                               '.page-hero--service has background-color — no gray flash while hero image loads',
+                               'main.css'))
+    else:
+        results.append(_r('hero_bg_color_fallback', 'warn',
+                           '.page-hero--service rule not found in main.css',
+                           'main.css'))
+
+    # ── overrides.css: page-hero__actions CTA guardrail (Apr 2026) ───────────────
+    # Services/ subdirectory pages use .page-hero__actions instead of .hero__actions.
+    # overrides.css must extend the CTA visibility/alignment selectors to cover it.
+    # If missing, the T button panel's hide/show/align controls silently do nothing
+    # on 130+ services/ pages.
+    OVERRIDES_REQUIRED = [
+        ('[data-hero-cta="hide"] .page-hero__actions',
+         'CTA hide rule for services page-hero__actions'),
+        ('page-hero__actions [data-cta-id="primary"]',
+         'per-button CTA primary hide rule for services pages'),
+        ('page-hero__actions [data-cta-id="secondary"]',
+         'per-button CTA secondary hide rule for services pages'),
+    ]
+    overrides_css = ''
+    _overrides_path = os.path.join(CSS_DIR, 'overrides.css')
+    if os.path.isfile(_overrides_path):
+        with open(_overrides_path, 'r', encoding='utf-8', errors='replace') as fh:
+            overrides_css = fh.read()
+    for token, description in OVERRIDES_REQUIRED:
+        if token not in overrides_css:
+            results.append(_r('overrides_services_cta', 'fail',
+                               f'overrides.css missing guardrail: {token} ({description}). '
+                               f'Add CTA hide/align rules for .page-hero__actions so the T panel '
+                               f'works on services/ pages.',
+                               'overrides.css', auto_fixable=False))
+        else:
+            results.append(_r('overrides_services_cta', 'pass',
+                               f'overrides.css has {description}', 'overrides.css'))
+
     return results
 
 

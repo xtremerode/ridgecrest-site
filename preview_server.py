@@ -1279,10 +1279,21 @@ def _apply_hero_to_html(content: bytes, hero_path: str,
     # on the element, that inline style takes precedence over this class-level rule.
     zoom_css = f'{round(hero_zoom * 100)}%' if hero_zoom > 1.001 else 'cover'
     pos_css  = hero_position or '50% 50%'
+    # Covers all hero types in one <style> block — each page only has one hero type,
+    # so the other rules are harmless no-ops.
+    #   .page-hero--service — about, process, contact, team, all services/ pages
+    #   .hero__bg           — home page (image applied by JS otherwise; pre-set here eliminates flash)
+    # background-color: #0d1a22 on .page-hero--service ensures the dark navy shows while the
+    # image is loading, so the ::before overlay never renders on white body background (= gray flash).
     flash_fix = (
-        f'<style>.page-hero--service{{background-image:url("{hero_path}");'
+        f'<style>'
+        f'.page-hero--service{{background-image:url("{hero_path}");'
         f'background-position:{pos_css};background-size:{zoom_css};'
-        f'--rd-overlay:linear-gradient(to top,rgba(0,0,0,0.55) 0%,transparent 75%);}}</style>'
+        f'background-color:#0d1a22;'
+        f'--rd-overlay:linear-gradient(to top,rgba(0,0,0,0.55) 0%,transparent 75%);}}'
+        f'.hero__bg{{background-image:url("{hero_path}");'
+        f'background-position:{pos_css};background-size:{zoom_css};}}'
+        f'</style>'
     )
     inject = flash_fix + script
     if '</head>' in new_text:

@@ -236,11 +236,20 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
                            f'Could not check DB for test artifacts: {exc}'))
 
     # ── 6. Hero flash-fix regression guard ────────────────────────────────────
-    # The server must inject a <style>.page-hero--service{background-image:...}
-    # tag in <head> for service pages. If it's missing, the dark ::before overlay
-    # will flash before the background-image loads (root cause: Apr 2026 incident).
+    # The server must inject a <style> in <head> that pre-sets background-image and
+    # background-color on hero elements BEFORE JS runs. Without it the ::before overlay
+    # renders on the white body background = dark gray flash (Apr 2026 incident).
+    #
+    # Checks:
+    #   A. .page-hero--service pages (about, process, services/) must have:
+    #      - .page-hero--service{background-image:...} in flash-fix style
+    #      - background-color:#0d1a22 in flash-fix style (prevents gray flash while image loads)
+    #      - --rd-overlay present (hero gradient)
+    #   B. Home page must have .hero__bg{background-image:...} in flash-fix style
+    #      (home hero is JS-applied otherwise; CSS rule eliminates the flash)
     service_pages = ['about.html', 'process.html', 'services.html']
     flash_fail = []
+    flash_bgcolor_fail = []
     flash_grad_fail = []
     for sp in service_pages:
         try:
@@ -249,6 +258,8 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
                 continue
             if '.page-hero--service{background-image:' not in body:
                 flash_fail.append(sp)
+            if 'background-color:#0d1a22' not in body:
+                flash_bgcolor_fail.append(sp)
             if '--rd-overlay' not in body:
                 flash_grad_fail.append(sp)
         except Exception:
@@ -263,6 +274,17 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
         results.append(_r('hero_flash_fix', 'pass',
                            f'Flash-fix style injected on all checked service pages'))
 
+    if flash_bgcolor_fail:
+        results.append(_r('hero_flash_bgcolor', 'fail',
+                           f'Flash-fix style missing background-color:#0d1a22 on: '
+                           f'{", ".join(flash_bgcolor_fail)} — ::before overlay will render on '
+                           f'white body background = dark gray flash while image loads. '
+                           f'Add background-color:#0d1a22 to flash-fix in _apply_hero_to_html.',
+                           auto_fixable=False))
+    else:
+        results.append(_r('hero_flash_bgcolor', 'pass',
+                           'Flash-fix includes background-color:#0d1a22 — no gray flash while image loads'))
+
     if flash_grad_fail:
         results.append(_r('hero_gradient_present', 'warn',
                            f'--rd-overlay not present on: {", ".join(flash_grad_fail)} '
@@ -270,6 +292,28 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
     else:
         results.append(_r('hero_gradient_present', 'pass',
                            'Hero gradient overlay present on all checked service pages'))
+
+    # Home page flash-fix: .hero__bg must get background-image via CSS in <head>
+    # Without it, .hero__bg shows background-color:#0d1a22 until JS runs = dark flash.
+    try:
+        _hc, _, _hbody = _get('/view/')
+        if _hc == 200:
+            if '.hero__bg{background-image:' not in _hbody:
+                results.append(_r(
+                    'home_hero_flash_fix', 'fail',
+                    'Home page missing .hero__bg flash-fix CSS — .hero__bg background-image '
+                    'is JS-applied only, causing a dark (#0d1a22) flash before the image loads. '
+                    'Add .hero__bg rule to _apply_hero_to_html flash-fix style.',
+                    auto_fixable=False,
+                ))
+            else:
+                results.append(_r('home_hero_flash_fix', 'pass',
+                                   'Home page .hero__bg flash-fix CSS present — no dark flash before hero image loads'))
+        else:
+            results.append(_r('home_hero_flash_fix', 'warn',
+                               f'Home page returned HTTP {_hc}, cannot verify flash-fix'))
+    except Exception as _hfe:
+        results.append(_r('home_hero_flash_fix', 'warn', f'Home hero flash-fix check failed: {_hfe}'))
 
     # ── 8. Services/ subdirectory pages return 200 (sampled) ──────────────────
     # Check one page per service type × one city = representative sample.
