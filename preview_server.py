@@ -3141,6 +3141,7 @@ _EDIT_OVERLAY_TPL = """\
 
     rotateBtn.addEventListener('click', function(e) {{
       e.stopPropagation();
+      if (!editables[idx].url) return; // color-mode hero — no image to rotate
       var url = editables[idx].url.split('?')[0];
       var fname = url.split('/').pop();
       if (!fname) return;
@@ -3170,6 +3171,7 @@ _EDIT_OVERLAY_TPL = """\
       // [PX] Pop from history instead of cycling backward
       if (!imageHistory[idx] || !imageHistory[idx].length) return;
       var prevImg = imageHistory[idx].pop();
+      if (!prevImg) {{ backBtn.style.display = 'none'; return; }} // color-mode origin — nothing to restore
       editables[idx].el.style.backgroundImage = "url('" + prevImg + "')";
       editables[idx].url = prevImg;
       var pos = imagePool.indexOf(prevImg);
@@ -3387,6 +3389,28 @@ _EDIT_OVERLAY_TPL = """\
       originalImages.push(imgUrl); // [PX] record starting image
       buildOverlay(el, idx, imgUrl);
     }});
+
+    // Fallback: build overlays for data-hero-id elements in color mode
+    // (background-image is 'none' or missing, so the [style] scan skipped them,
+    // but BG / G / T controls still need to appear so the user can switch modes).
+    (function() {{
+      document.querySelectorAll('[data-hero-id]').forEach(function(heroEl) {{
+        if (heroEl.hasAttribute('data-card-id')) return; // card system owns it
+        // Find the visual background element for this hero type
+        var bgEl = heroEl.querySelector('.hero__bg')
+                || heroEl.querySelector('.project-hero__img')
+                || heroEl;
+        // Check if this bgEl is already covered by the [style] scan
+        var alreadyCovered = editables.some(function(item) {{ return item.el === bgEl; }});
+        if (alreadyCovered) return;
+        var idx = editables.length;
+        editables.push({{ el: bgEl, url: null, zoom: _initZoom, posX: _initPosX, posY: _initPosY }});
+        cycleIndices.push(null);
+        imageHistory.push([]);
+        originalImages.push(null);
+        buildOverlay(bgEl, idx, null);
+      }});
+    }})();
 
     buildHeroTextHandle();
 
