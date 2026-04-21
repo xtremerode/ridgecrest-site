@@ -977,6 +977,62 @@ def _inject_hero_text_controls(content: bytes, cards: list) -> bytes:
         return content
 
 
+def _apply_hero_color_mode(content: bytes, cards: list) -> bytes:
+    """Apply hero background color mode for hero cards with mode='color'.
+    Injects __RD_HERO_COLOR_MODES in <head> and a post-body override script
+    that runs after main.js to apply the solid background color to heroes."""
+    color_modes = {}
+    for c in cards:
+        cid = c.get('card_id', '')
+        if c.get('mode') == 'color' and c.get('color') and cid:
+            color_modes[cid] = c['color']
+    if not color_modes:
+        return content
+    try:
+        text = content.decode('utf-8', errors='replace')
+        # Inject vars in <head> so the post-body script can read them synchronously
+        head_script = (
+            f'<script>window.__RD_HERO_COLOR_MODES={_safe_js(color_modes)};</script>'
+        )
+        if '</head>' in text:
+            text = text.replace('</head>', head_script + '</head>', 1)
+        # Post-body script — runs AFTER main.js (which is also before </body>)
+        # so it overrides whatever main.js applied to the hero background.
+        body_script = (
+            '<script id="rd-hero-color-mode">'
+            '(function(){'
+            'var modes=window.__RD_HERO_COLOR_MODES;'
+            'if(!modes)return;'
+            'Object.keys(modes).forEach(function(hid){'
+            'var color=modes[hid];'
+            'var heroEl=document.querySelector(\'[data-hero-id="\'+hid+\'"]\');'
+            'if(!heroEl)return;'
+            # Home page: background lives on .hero__bg child
+            'var heroBg=heroEl.querySelector(\'.hero__bg\');'
+            'if(heroBg){'
+            'heroBg.style.backgroundImage=\'none\';'
+            'heroBg.style.backgroundColor=color;'
+            'return;}'
+            # Project pages: background lives on .project-hero__img child
+            'var heroImg=heroEl.querySelector(\'.project-hero__img\');'
+            'if(heroImg){'
+            'heroImg.style.backgroundImage=\'none\';'
+            'heroImg.style.backgroundColor=color;'
+            'return;}'
+            # Service pages: the element itself carries the background-image
+            'heroEl.style.backgroundImage=\'none\';'
+            'heroEl.style.backgroundColor=color;'
+            '});'
+            '})();'
+            '</script>'
+        )
+        if '</body>' in text:
+            text = text.replace('</body>', body_script + '</body>', 1)
+        return text.encode('utf-8')
+    except Exception:
+        return content
+
+
 def _safe_js(value) -> str:
     """JSON-encode a value for inline <script> injection.
     Escapes </ to prevent </script> tag breakout."""
@@ -2597,6 +2653,62 @@ _CARD_EDIT_OVERLAY_TPL = """\
       }}
     }});
   }})();
+  // ── Hero background live-preview listener (rd_set_hero_bg) ────────────────
+  (function() {{
+    window.addEventListener('message', function(ev) {{
+      if (!ev.data || ev.data.type !== 'rd_set_hero_bg') return;
+      var hid   = ev.data.heroId;
+      var mode  = ev.data.mode;
+      var color = ev.data.color || '#1c1c1c';
+      var img   = ev.data.image  || null;
+      var heroEl = document.querySelector('[data-hero-id="' + hid + '"]');
+      if (!heroEl) return;
+      if (mode === 'color') {{
+        // Home page: background on .hero__bg
+        var heroBg = heroEl.querySelector('.hero__bg');
+        if (heroBg) {{
+          heroBg.style.backgroundImage = 'none';
+          heroBg.style.backgroundColor = color;
+          return;
+        }}
+        // Project pages: background on .project-hero__img
+        var heroImg = heroEl.querySelector('.project-hero__img');
+        if (heroImg) {{
+          heroImg.style.backgroundImage = 'none';
+          heroImg.style.backgroundColor = color;
+          return;
+        }}
+        // Service pages: element itself
+        heroEl.style.backgroundImage = 'none';
+        heroEl.style.backgroundColor = color;
+      }} else {{
+        // Image mode — restore background image
+        // Home page
+        var heroBg2 = heroEl.querySelector('.hero__bg');
+        if (heroBg2) {{
+          heroBg2.style.backgroundColor = '';
+          if (img) {{
+            heroBg2.style.backgroundImage = "url('" + img + "')";
+          }} else if (window.__RD_HERO) {{
+            heroBg2.style.backgroundImage = "url('" + window.__RD_HERO + "')";
+          }} else {{
+            heroBg2.style.backgroundImage = '';
+          }}
+          return;
+        }}
+        // Project pages
+        var heroImg2 = heroEl.querySelector('.project-hero__img');
+        if (heroImg2) {{
+          heroImg2.style.backgroundColor = '';
+          heroImg2.style.backgroundImage = img ? "url('" + img + "')" : '';
+          return;
+        }}
+        // Service pages
+        heroEl.style.backgroundColor = '';
+        heroEl.style.backgroundImage = img ? "url('" + img + "')" : '';
+      }}
+    }});
+  }})();
   // ─────────────────────────────────────────────────────────────────────────
 }})();
 </script>
@@ -2832,6 +2944,61 @@ _EDIT_OVERLAY_TPL = """\
       window.parent.postMessage({{type:'rd_open_render', cardId:null, filename:base}}, window.location.origin);
     }});
     badge.appendChild(heroRenderBtn);
+
+    // ── BG button (Hero Background: Color / Image toggle) ─────────────────────
+    // Show on same hero elements as T button (have data-hero-id or are children of one).
+    (function() {{
+      var _bgHeroEl = el.hasAttribute('data-hero-id')
+        ? el
+        : (el.parentElement && (
+            el.parentElement.hasAttribute('data-hero-id')
+              ? el.parentElement
+              : el.parentElement.querySelector('[data-hero-id]')
+          ));
+      if (_bgHeroEl) {{
+        var _bgHid = _bgHeroEl.getAttribute('data-hero-id');
+        var _bgCardData = null;
+        if (window.__RD_CARDS) {{
+          for (var _bgi = 0; _bgi < window.__RD_CARDS.length; _bgi++) {{
+            if (window.__RD_CARDS[_bgi].card_id === _bgHid) {{ _bgCardData = window.__RD_CARDS[_bgi]; break; }}
+          }}
+        }}
+        var heroBgBtn = document.createElement('button');
+        heroBgBtn.textContent = 'BG';
+        heroBgBtn.title = 'Hero background — color or image';
+        heroBgBtn.style.cssText = 'background:rgba(220,38,38,.85);color:#fff;border:none;border-left:1px solid rgba(255,255,255,.15);font-family:system-ui,sans-serif;font-size:12px;font-weight:700;padding:5px 11px;border-radius:4px;cursor:pointer;white-space:nowrap;pointer-events:auto';
+        heroBgBtn.addEventListener('click', (function(_bgHid2, _bgHeroEl2, _bgCardData2) {{ return function(e) {{
+          e.stopPropagation();
+          var rect = _bgHeroEl2.getBoundingClientRect();
+          var iframe = window.frameElement;
+          var iRect = iframe ? iframe.getBoundingClientRect() : {{left:0,top:0}};
+          window.parent.postMessage({{
+            type: 'rd_hero_bg_open',
+            heroId: _bgHid2,
+            bgState: {{
+              mode:     (_bgCardData2 && _bgCardData2.mode)     || 'color',
+              color:    (_bgCardData2 && _bgCardData2.color)    || '#1c1c1c',
+              image:    (_bgCardData2 && _bgCardData2.image)    || null,
+              position: (_bgCardData2 && _bgCardData2.position) || '50% 50%',
+              zoom:     (_bgCardData2 && _bgCardData2.zoom)     || 1.0,
+              gradient_type:      (_bgCardData2 && _bgCardData2.gradient_type)      || null,
+              gradient_tint:      (_bgCardData2 && _bgCardData2.gradient_tint)      || null,
+              gradient_opacity:   (_bgCardData2 && _bgCardData2.gradient_opacity   != null) ? _bgCardData2.gradient_opacity   : null,
+              gradient_direction: (_bgCardData2 && _bgCardData2.gradient_direction) || null,
+              gradient_distance:  (_bgCardData2 && _bgCardData2.gradient_distance  != null) ? _bgCardData2.gradient_distance  : null,
+              hero_text_align:    (_bgCardData2 && _bgCardData2.hero_text_align)    || null,
+              hero_cta_visible:   (_bgCardData2 && _bgCardData2.hero_cta_visible)   || null,
+              hero_text_color:    (_bgCardData2 && _bgCardData2.hero_text_color)    || null,
+              hero_cta_align:     (_bgCardData2 && _bgCardData2.hero_cta_align)     || null,
+              hero_cta_primary:   (_bgCardData2 && _bgCardData2.hero_cta_primary)   || null,
+              hero_cta_secondary: (_bgCardData2 && _bgCardData2.hero_cta_secondary) || null
+            }},
+            rect: {{ left: iRect.left + rect.left, top: iRect.top + rect.top, width: rect.width, height: rect.height }}
+          }}, window.location.origin);
+        }}; }}(_bgHid, _bgHeroEl, _bgCardData)));
+        badge.appendChild(heroBgBtn);
+      }}
+    }})();
 
     // G button — any hero element that has (or is the sibling of) a data-gradient-id element.
     // Covers three structures:
@@ -4173,6 +4340,8 @@ def view(filename):
                 content = _inject_gradient_id_overlays(content, cards)
                 # Server-side inject hero text control attributes
                 content = _inject_hero_text_controls(content, cards)
+                # Server-side apply hero color mode (overrides background image with solid color)
+                content = _apply_hero_color_mode(content, cards)
 
         # Inject diff panel mode for home page
         if HAS_DB and slug == 'home':

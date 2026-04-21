@@ -270,6 +270,39 @@
     #heroTextPanel .tp-save:hover { background: #0f766e; }
     #heroTextPanel .tp-save:disabled { background: #374151; color: #6b7280; cursor: default; }
 
+    /* ── Hero BG Panel ── */
+    #heroBgPanel {
+      display: none;
+      position: fixed;
+      z-index: 10010;
+      background: #1a2332;
+      border: 1px solid #2a3748;
+      border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.7);
+      padding: 16px;
+      width: 220px;
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+      color: #e2e8f0;
+    }
+    #heroBgPanel.open { display: block; }
+    #heroBgPanel .tp-save {
+      width: 100%; padding: 7px; margin-top: 4px;
+      background: #dc2626; color: #fff;
+      border: none; border-radius: 4px;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+    }
+    #heroBgPanel .tp-save:hover { background: #b91c1c; }
+    #heroBgPanel .tp-save:disabled { background: #374151; color: #6b7280; cursor: default; }
+    .tp-action-btn {
+      padding: 5px 10px;
+      background: #1e3a5f; color: #93c5fd;
+      border: 1px solid #2a4a7f; border-radius: 4px;
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      transition: background .1s;
+    }
+    .tp-action-btn:hover { background: #1e3a8a; }
+
     /* ── Image Picker Modal ── */
     .picker-backdrop {
       display: none;          /* hidden by default — no invisible overlay risk */
@@ -1016,6 +1049,30 @@
   <button class="tp-save" id="tpSave">Save Text Settings</button>
 </div>
 
+<!-- Hero BG Panel (floating, position-fixed, outside iframe) -->
+<div id="heroBgPanel">
+  <div class="tp-title">Hero Background <button class="tp-close" id="bgClose">&times;</button></div>
+  <div class="tp-row">
+    <label class="tp-label">Type</label>
+    <div class="tp-seg" id="bgModeRow">
+      <button data-bv="color" class="active">Color</button>
+      <button data-bv="image">Image</button>
+    </div>
+  </div>
+  <div class="tp-row" id="bgColorRow">
+    <label class="tp-label">Color</label>
+    <div style="display:flex;align-items:center;gap:8px;flex:1">
+      <input type="color" id="bgColorPicker" value="#1c1c1c" style="width:44px;height:30px;border:none;border-radius:4px;cursor:pointer;padding:2px;background:rgba(255,255,255,.08)" />
+      <input type="text" id="bgColorHex" value="#1c1c1c" maxlength="7" placeholder="#1c1c1c" style="flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:4px;color:#fff;padding:5px 8px;font-size:12px;font-family:monospace" />
+    </div>
+  </div>
+  <div class="tp-row" id="bgImageRow" style="display:none">
+    <label class="tp-label">Image</label>
+    <button id="bgBrowseBtn" class="tp-action-btn" style="flex:1">Browse &amp; Select Image</button>
+  </div>
+  <button class="tp-save" id="bgSave">Save Background</button>
+</div>
+
 <!-- Image Picker Modal -->
 <div class="picker-backdrop" id="pickerBackdrop">
   <div class="picker-modal">
@@ -1255,6 +1312,7 @@
   window._suppressSlugSync = false;
   let pendingPick = null;      // {slug, elementIndex, currentImage} — hero pick
   let pendingCardPick = null;  // {cardId} — card image pick
+  let pendingBgPick = null;    // {heroId, bgState} — BG panel image pick
   let selectedImage = null; // {hero_path, thumb_path, filename}
   // Transform state — updated by rd_transform_changed / rd_image_cycled / rd_hero_text_moved
   let pendingImage = null;
@@ -3231,6 +3289,9 @@
     if (d.type === 'rd_hero_text_open') {
       _tpOpen(d);
     }
+    if (d.type === 'rd_hero_bg_open') {
+      _bgpOpen(d);
+    }
     if (d.type === 'rd_gallery_save') {
       // Block writes on locked pages — consistent with saveNow/scheduleSave
       if (currentPageLock === 'locked') {
@@ -3525,6 +3586,153 @@
     };
   })();
 
+  // ── Hero BG Panel ───────────────────────────────────────────────────────────
+  (function() {
+    const panel        = document.getElementById('heroBgPanel');
+    const bgClose      = document.getElementById('bgClose');
+    const bgModeRow    = document.getElementById('bgModeRow');
+    const bgColorRow   = document.getElementById('bgColorRow');
+    const bgImageRow   = document.getElementById('bgImageRow');
+    const bgColorPicker = document.getElementById('bgColorPicker');
+    const bgColorHex   = document.getElementById('bgColorHex');
+    const bgBrowseBtn  = document.getElementById('bgBrowseBtn');
+    const bgSave       = document.getElementById('bgSave');
+    let _bgp = null; // current open panel state { heroId, bgState }
+
+    function _getSeg(row) {
+      const a = row.querySelector('button.active');
+      return a ? a.getAttribute('data-bv') : null;
+    }
+    function _seg(row, val) {
+      row.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.getAttribute('data-bv') === val));
+    }
+    function _updateModeVis() {
+      const mode = _getSeg(bgModeRow);
+      bgColorRow.style.display = (mode === 'color') ? '' : 'none';
+      bgImageRow.style.display = (mode === 'image') ? '' : 'none';
+    }
+    function _getColor() {
+      const hex = bgColorHex.value.trim();
+      return /^#[0-9a-fA-F]{3,6}$/.test(hex) ? hex : (bgColorPicker.value || '#1c1c1c');
+    }
+    function _preview() {
+      if (!_bgp || !siteFrame.contentWindow) return;
+      const mode = _getSeg(bgModeRow) || 'color';
+      siteFrame.contentWindow.postMessage({
+        type: 'rd_set_hero_bg',
+        heroId: _bgp.heroId,
+        mode,
+        color: mode === 'color' ? _getColor() : null,
+        image: mode === 'image' ? (_bgp.bgState.image || null) : null
+      }, window.location.origin);
+    }
+
+    // Mode toggle
+    bgModeRow.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        bgModeRow.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _updateModeVis();
+        _preview();
+      });
+    });
+
+    // Color picker sync
+    bgColorPicker.addEventListener('input', () => {
+      bgColorHex.value = bgColorPicker.value;
+      _preview();
+    });
+    bgColorHex.addEventListener('input', () => {
+      const hex = bgColorHex.value.trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(hex)) bgColorPicker.value = hex;
+      _preview();
+    });
+    bgColorHex.addEventListener('blur', () => {
+      let hex = bgColorHex.value.trim();
+      if (hex && !hex.startsWith('#')) hex = '#' + hex;
+      if (/^#[0-9a-fA-F]{3,6}$/.test(hex)) {
+        bgColorHex.value = hex;
+        bgColorPicker.value = hex.length === 7 ? hex : hex;
+      }
+    });
+
+    // Browse button — open image picker with BG context
+    bgBrowseBtn.addEventListener('click', () => {
+      if (!_bgp) return;
+      pendingBgPick = { heroId: _bgp.heroId, bgState: _bgp.bgState };
+      pendingPick = null;
+      pendingCardPick = null;
+      openPicker(_bgp.bgState.image || '');
+    });
+
+    // Save
+    bgSave.addEventListener('click', async () => {
+      if (!_bgp) return;
+      const mode = _getSeg(bgModeRow) || 'color';
+      const color = mode === 'color' ? _getColor() : (_bgp.bgState.color || '#1c1c1c');
+      const bs = _bgp.bgState || {};
+      bgSave.disabled = true; bgSave.textContent = 'Saving…';
+      try {
+        await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}/${encodeURIComponent(_bgp.heroId)}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            mode,
+            color,
+            image:              bs.image    || null,
+            position:           bs.position || '50% 50%',
+            zoom:               bs.zoom     || 1.0,
+            gradient_type:      bs.gradient_type      || null,
+            gradient_tint:      bs.gradient_tint      || null,
+            gradient_opacity:   bs.gradient_opacity   != null ? bs.gradient_opacity   : null,
+            gradient_direction: bs.gradient_direction || null,
+            gradient_distance:  bs.gradient_distance  != null ? bs.gradient_distance  : null,
+            hero_text_align:    bs.hero_text_align    || null,
+            hero_cta_visible:   bs.hero_cta_visible   || null,
+            hero_text_color:    bs.hero_text_color     || null,
+            hero_cta_align:     bs.hero_cta_align      || null,
+            hero_cta_primary:   bs.hero_cta_primary    || null,
+            hero_cta_secondary: bs.hero_cta_secondary  || null
+          })
+        });
+        bgSave.textContent = '✓ Saved';
+        // Update local state so subsequent saves preserve the choice
+        _bgp.bgState = Object.assign({}, _bgp.bgState, { mode, color });
+        setTimeout(() => { bgSave.textContent = 'Save Background'; bgSave.disabled = false; }, 1500);
+      } catch(err) {
+        bgSave.textContent = 'Error'; bgSave.disabled = false;
+      }
+    });
+
+    function _close() { panel.classList.remove('open'); _bgp = null; }
+    bgClose.addEventListener('click', _close);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && panel.classList.contains('open')) _close(); });
+    document.addEventListener('mousedown', e => { if (panel.classList.contains('open') && !panel.contains(e.target)) _close(); });
+
+    window._bgpOpen = function(d) {
+      _bgp = d;
+      const bs = d.bgState || {};
+      const mode = bs.mode || 'color';
+      _seg(bgModeRow, mode);
+      const color = bs.color || '#1c1c1c';
+      bgColorPicker.value = /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#1c1c1c';
+      bgColorHex.value = color;
+      _updateModeVis();
+      // Position near target element
+      const r = d.rect || {};
+      const pw = 220, ph = 200;
+      let left = (r.left || 0) + (r.width || 0) - pw;
+      let top  = (r.top  || 0) + (r.height || 0) + 8;
+      if (left < 8) left = 8;
+      if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+      if (top + ph > window.innerHeight - 8) top = (r.top || 0) - ph - 8;
+      if (top < 8) top = 8;
+      panel.style.left = left + 'px';
+      panel.style.top  = top  + 'px';
+      panel.classList.add('open');
+      bgSave.disabled = false; bgSave.textContent = 'Save Background';
+    };
+  })();
+
   // Called by render modal (global scope) when a version is made active from a page edit context
   window._notifyRenderActivated = function(newActivePath) {
     const cardId = window._rdRenderCardId;
@@ -3707,6 +3915,7 @@
     pickerBackdrop.classList.remove('open');  // display:none via CSS — no invisible overlay
     pendingPick = null;
     pendingCardPick = null;
+    pendingBgPick = null;
     selectedImage = null;
     pickerActiveTab = 'all';
     pickerTabs.innerHTML = '';
@@ -3730,6 +3939,56 @@
       editStatus.textContent = 'Card image updated';
       editStatus.className = 'edit-status ready';
       closePicker();
+      return;
+    }
+
+    // BG panel image pick — saves image to card_settings + updates pages table + live preview
+    if (pendingBgPick) {
+      const { heroId, bgState } = pendingBgPick;
+      pickerUse.disabled = true; pickerUse.textContent = 'Saving…';
+      try {
+        // Save image to pages table (hero_image)
+        await API(`/admin/api/pages/${encodeURIComponent(currentSlug)}`, {
+          method: 'PUT',
+          body: JSON.stringify({ hero_image: newImage })
+        });
+        // Save mode=image + image path to card_settings
+        const bs = bgState || {};
+        await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}/${encodeURIComponent(heroId)}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            mode: 'image',
+            color: bs.color || '#1c1c1c',
+            image: newImage,
+            position: bs.position || '50% 50%',
+            zoom: bs.zoom || 1.0,
+            gradient_type: bs.gradient_type || null,
+            gradient_tint: bs.gradient_tint || null,
+            gradient_opacity: bs.gradient_opacity != null ? bs.gradient_opacity : null,
+            gradient_direction: bs.gradient_direction || null,
+            gradient_distance: bs.gradient_distance != null ? bs.gradient_distance : null,
+            hero_text_align: bs.hero_text_align || null,
+            hero_cta_visible: bs.hero_cta_visible || null,
+            hero_text_color: bs.hero_text_color || null,
+            hero_cta_align: bs.hero_cta_align || null,
+            hero_cta_primary: bs.hero_cta_primary || null,
+            hero_cta_secondary: bs.hero_cta_secondary || null
+          })
+        });
+        // Live-preview the new image in the iframe
+        siteFrame.contentWindow.postMessage({
+          type: 'rd_set_hero_bg', heroId, mode: 'image', image: newImage, color: null
+        }, window.location.origin);
+        editStatus.textContent = 'Saved — hero image updated';
+        editStatus.className = 'edit-status ready';
+      } catch(e) {
+        editStatus.textContent = 'Error saving — try again';
+        editStatus.className = 'edit-status';
+      } finally {
+        pickerUse.textContent = 'Use Image';
+        pickerUse.disabled = false;
+        closePicker();
+      }
       return;
     }
 
