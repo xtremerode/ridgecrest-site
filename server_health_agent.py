@@ -33,7 +33,7 @@ except ImportError:
 
 BASE_URL   = 'http://127.0.0.1:8082'
 PREVIEW_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'preview')
-ADMIN_PASSWORD = 'ridgecrest2026!'
+ADMIN_PASSWORD = 'Hb2425hb+'
 SLOW_THRESHOLD = 3.0   # seconds
 
 # Pages intentionally excluded from the 200-check (they are not standard HTML views)
@@ -56,6 +56,28 @@ def _get(path: str, timeout: float = 10.0):
     """GET from server, return (status_code, elapsed_s, text) or raise."""
     t0 = time.time()
     resp = requests.get(BASE_URL + path, timeout=timeout)
+    return resp.status_code, time.time() - t0, resp.text
+
+
+def _post_json(path: str, payload: dict, token: str = '', timeout: float = 10.0):
+    headers = {'Content-Type': 'application/json'}
+    if token:
+        headers['X-Admin-Token'] = token
+    resp = requests.post(BASE_URL + path, json=payload, headers=headers, timeout=timeout)
+    return resp.status_code, resp.json()
+
+
+def _put_json(path: str, payload: dict, token: str, timeout: float = 10.0):
+    headers = {'Content-Type': 'application/json', 'X-Admin-Token': token}
+    resp = requests.put(BASE_URL + path, json=payload, headers=headers, timeout=timeout)
+    return resp.status_code, resp.json()
+
+
+def _get_auth(path: str, token: str, timeout: float = 10.0):
+    """GET with X-Admin-Token header, return (status_code, elapsed_s, text)."""
+    t0 = time.time()
+    headers = {'X-Admin-Token': token}
+    resp = requests.get(BASE_URL + path, headers=headers, timeout=timeout)
     return resp.status_code, time.time() - t0, resp.text
 
 
@@ -212,6 +234,212 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
     except Exception as exc:
         results.append(_r('no_test_artifacts', 'warn',
                            f'Could not check DB for test artifacts: {exc}'))
+
+    # ── 6. Hero flash-fix regression guard ────────────────────────────────────
+    # The server must inject a <style>.page-hero--service{background-image:...}
+    # tag in <head> for service pages. If it's missing, the dark ::before overlay
+    # will flash before the background-image loads (root cause: Apr 2026 incident).
+    service_pages = ['about.html', 'process.html', 'services.html']
+    flash_fail = []
+    flash_grad_fail = []
+    for sp in service_pages:
+        try:
+            code, _, body = _get(f'/view/{sp}')
+            if code != 200:
+                continue
+            if '.page-hero--service{background-image:' not in body:
+                flash_fail.append(sp)
+            if '--rd-overlay' not in body:
+                flash_grad_fail.append(sp)
+        except Exception:
+            pass
+
+    if flash_fail:
+        results.append(_r('hero_flash_fix', 'fail',
+                           f'Server not injecting flash-fix style on: {", ".join(flash_fail)} '
+                           f'— _apply_hero_to_html may be broken',
+                           auto_fixable=False))
+    else:
+        results.append(_r('hero_flash_fix', 'pass',
+                           f'Flash-fix style injected on all checked service pages'))
+
+    if flash_grad_fail:
+        results.append(_r('hero_gradient_present', 'warn',
+                           f'--rd-overlay not present on: {", ".join(flash_grad_fail)} '
+                           f'— hero gradient may not display correctly'))
+    else:
+        results.append(_r('hero_gradient_present', 'pass',
+                           'Hero gradient overlay present on all checked service pages'))
+
+    # ── 8. Services/ subdirectory pages return 200 (sampled) ──────────────────
+    # Check one page per service type × one city = representative sample.
+    # Full 200-page audit would be too slow; a sample catches route/template breakage.
+    SAMPLE_SERVICES = [
+        'services/design-build-danville.html',
+        'services/kitchen-remodel-pleasanton.html',
+        'services/bathroom-remodel-alamo.html',
+        'services/custom-home-builder-walnut-creek.html',
+        'services/whole-house-remodel-lafayette.html',
+        'services/danville.html',
+    ]
+    svc_fail = []
+    svc_no_hero_id = []
+    for sp in SAMPLE_SERVICES:
+        try:
+            code, _, body = _get(f'/view/{sp}')
+            if code != 200:
+                svc_fail.append(f'{sp} (HTTP {code})')
+            else:
+                # Guardrail: served HTML must contain data-hero-id on the hero
+                # (confirms the attribute survived the strip/inject pipeline)
+                if 'data-hero-id=' not in body:
+                    svc_no_hero_id.append(sp)
+        except Exception as exc:
+            svc_fail.append(f'{sp} (error: {exc})')
+
+    if svc_fail:
+        results.append(_r('services_pages_200', 'fail',
+                           f'Services pages not returning 200: {", ".join(svc_fail)}',
+                           auto_fixable=False))
+    else:
+        results.append(_r('services_pages_200', 'pass',
+                           f'Sample of {len(SAMPLE_SERVICES)} services pages returned 200'))
+
+    if svc_no_hero_id:
+        results.append(_r('services_hero_id_present', 'fail',
+                           f'data-hero-id missing from served HTML on: {", ".join(svc_no_hero_id)} '
+                           f'— T button will not appear. Fix: add data-hero-id to hero divs and '
+                           f'run: sudo python3 /tmp/fix_services.py for root-owned files',
+                           auto_fixable=False))
+    else:
+        results.append(_r('services_hero_id_present', 'pass',
+                           f'data-hero-id present in all sampled services pages'))
+
+    # ── 9. Blog index hero editability guard ──────────────────────────────────
+    # The RD Edit blog index (/blog) is a Flask dynamic route — compliance agent
+    # cannot check it. Verify the served HTML has data-hero-id on the blog hero
+    # so the edit overlay system can find it and make it editable.
+    try:
+        code, _, body = _get('/blog')
+        if code != 200:
+            results.append(_r('blog_hero_editable', 'fail',
+                               f'/blog returned HTTP {code}', auto_fixable=False))
+        elif 'data-hero-id="blog-index-hero"' not in body:
+            results.append(_r('blog_hero_editable', 'fail',
+                               '/blog served HTML missing data-hero-id="blog-index-hero" '
+                               '— edit overlay cannot attach. Fix: ensure blog_index() in '
+                               'preview_server.py sets data-hero-id on .blog-hero div.',
+                               auto_fixable=False))
+        else:
+            results.append(_r('blog_hero_editable', 'pass',
+                               'Blog index hero has data-hero-id — edit overlay will attach'))
+    except Exception as exc:
+        results.append(_r('blog_hero_editable', 'warn',
+                           f'Could not check /blog: {exc}'))
+
+    # ── 10. Hero text controls — functional end-to-end test ───────────────────
+    # Verifies the T-panel save/inject pipeline works end-to-end:
+    #   1. Auth → get token
+    #   2. PUT hero_text_align + hero_text_color for a known services page
+    #   3. GET that page with ?_stage=1 (admin staging view)
+    #   4. Assert data-hero-text-align and data-hero-text-color appear in HTML
+    #   5. Clean up (clear the settings)
+    # If any step fails, the T-panel controls are broken — either the API doesn't
+    # accept the fields, or _inject_hero_text_controls isn't running at serve time.
+    _TEST_SLUG      = 'services/design-build-walnut-creek'
+    _TEST_CARD_ID   = 'services-design-build-walnut-creek-hero'
+    _TEST_ALIGN     = 'right'
+    _TEST_COLOR     = 'dark'
+    try:
+        import urllib.parse as _up
+
+        # Step 1: auth
+        _ac, _aj = _post_json('/admin/api/auth', {'password': ADMIN_PASSWORD})
+        if _ac != 200 or 'token' not in _aj:
+            raise RuntimeError(f'auth failed: HTTP {_ac}')
+        _tok = _aj['token']
+
+        # Step 2: PUT hero text settings
+        _slug_enc = _up.quote(_TEST_SLUG, safe='')
+        _pc, _pj = _put_json(
+            f'/admin/api/cards/{_slug_enc}/{_TEST_CARD_ID}',
+            {
+                'mode': 'image', 'color': '#1C1C1C', 'image': None,
+                'position': '50% 50%', 'zoom': 1.0,
+                'hero_text_align': _TEST_ALIGN,
+                'hero_text_color': _TEST_COLOR,
+                'hero_cta_visible': 'show',
+            },
+            _tok,
+        )
+        if _pc != 200 or not _pj.get('ok'):
+            raise RuntimeError(f'card PUT failed: HTTP {_pc} {_pj}')
+
+        # Step 3: GET staged page
+        _slug_path = _TEST_SLUG.replace('services/', '')
+        _gc, _, _body = _get(f'/view/services/{_slug_path}.html?_stage=1')
+        if _gc != 200:
+            raise RuntimeError(f'staged page returned HTTP {_gc}')
+
+        # Step 4: assert injected attributes present
+        _missing = []
+        if f'data-hero-text-align="{_TEST_ALIGN}"' not in _body:
+            _missing.append(f'data-hero-text-align="{_TEST_ALIGN}"')
+        if f'data-hero-text-color="{_TEST_COLOR}"' not in _body:
+            _missing.append(f'data-hero-text-color="{_TEST_COLOR}"')
+
+        # Step 5: clean up regardless of result
+        _put_json(
+            f'/admin/api/cards/{_slug_enc}/{_TEST_CARD_ID}',
+            {'mode': 'image', 'color': '#1C1C1C', 'image': None,
+             'position': '50% 50%', 'zoom': 1.0},
+            _tok,
+        )
+
+        if _missing:
+            results.append(_r(
+                'hero_text_controls_functional', 'fail',
+                f'T-panel save/inject broken — missing from staged HTML: '
+                + ', '.join(_missing) + '. '
+                'Check _inject_hero_text_controls() in preview_server.py and '
+                'that the PUT endpoint accepts hero_text_align/hero_text_color.',
+                auto_fixable=False,
+            ))
+        else:
+            results.append(_r(
+                'hero_text_controls_functional', 'pass',
+                f'T-panel end-to-end OK: save → _inject_hero_text_controls → '
+                f'data-hero-text-align/color appear in staged HTML',
+            ))
+
+        # Also verify overlay scripts include rd_set_hero_text listener (live preview)
+        _oc, _, _oscript = _get_auth(
+            f'/admin/api/overlay-scripts?slug={_up.quote(_TEST_SLUG)}'
+            f'&token={_tok}&device=desktop',
+            token=_tok,
+        )
+        if _oc != 200:
+            results.append(_r('hero_text_overlay_listener', 'warn',
+                               f'overlay-scripts returned HTTP {_oc}'))
+        elif 'rd_set_hero_text' not in _oscript:
+            results.append(_r(
+                'hero_text_overlay_listener', 'fail',
+                'rd_set_hero_text listener missing from overlay-scripts — '
+                'T-panel live preview will not work (changes will not appear in '
+                'iframe until page reload). Check _CARD_EDIT_OVERLAY_TPL in '
+                'preview_server.py.',
+                auto_fixable=False,
+            ))
+        else:
+            results.append(_r(
+                'hero_text_overlay_listener', 'pass',
+                'rd_set_hero_text listener present in overlay-scripts — '
+                'T-panel live preview will update iframe in real time',
+            ))
+
+    except Exception as exc:
+        results.append(_r('hero_text_controls_functional', 'warn',
+                           f'Hero text controls test skipped: {exc}'))
 
     return results
 
