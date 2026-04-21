@@ -988,6 +988,31 @@
       <button data-tv="hide">Hide</button>
     </div>
   </div>
+  <div class="tp-row" id="tpCtaSubRows">
+    <div class="tp-row" style="margin-top:6px">
+      <label class="tp-label">CTA Alignment</label>
+      <div class="tp-seg" id="tpCtaAlignRow">
+        <button data-tv="left">Left</button>
+        <button data-tv="center" class="active">Center</button>
+        <button data-tv="right">Right</button>
+        <button data-tv="split">Split</button>
+      </div>
+    </div>
+    <div class="tp-row" style="margin-top:6px">
+      <label class="tp-label">Primary CTA</label>
+      <div class="tp-seg" id="tpCtaPrimaryRow">
+        <button data-tv="show" class="active">Show</button>
+        <button data-tv="hide">Hide</button>
+      </div>
+    </div>
+    <div class="tp-row" id="tpCtaSecondaryWrap" style="margin-top:6px">
+      <label class="tp-label">Secondary CTA</label>
+      <div class="tp-seg" id="tpCtaSecondaryRow">
+        <button data-tv="show" class="active">Show</button>
+        <button data-tv="hide">Hide</button>
+      </div>
+    </div>
+  </div>
   <button class="tp-save" id="tpSave">Save Text Settings</button>
 </div>
 
@@ -3366,6 +3391,11 @@
     const tpColorRow = document.getElementById('tpColorRow');
     const tpCtaRow  = document.getElementById('tpCtaRow');
     const tpCtaSeg  = document.getElementById('tpCtaSeg');
+    const tpCtaSubRows    = document.getElementById('tpCtaSubRows');
+    const tpCtaAlignRow   = document.getElementById('tpCtaAlignRow');
+    const tpCtaPrimaryRow = document.getElementById('tpCtaPrimaryRow');
+    const tpCtaSecondaryRow = document.getElementById('tpCtaSecondaryRow');
+    const tpCtaSecondaryWrap = document.getElementById('tpCtaSecondaryWrap');
     const tpSave    = document.getElementById('tpSave');
     let _tp = null; // current open panel state
 
@@ -3378,11 +3408,19 @@
         b.classList.toggle('active', b.getAttribute('data-tv') === val);
       });
     }
+    function _updateCtaSubVisibility() {
+      // Show sub-rows only when CTA master is "show"
+      const ctaVisible = _getSeg(tpCtaSeg);
+      if (tpCtaSubRows) tpCtaSubRows.style.display = (ctaVisible === 'hide') ? 'none' : '';
+    }
     function _read() {
       return {
-        hero_text_align:  _getSeg(tpAlignRow),
-        hero_text_color:  _getSeg(tpColorRow),
-        hero_cta_visible: _getSeg(tpCtaSeg)
+        hero_text_align:      _getSeg(tpAlignRow),
+        hero_text_color:      _getSeg(tpColorRow),
+        hero_cta_visible:     _getSeg(tpCtaSeg),
+        hero_cta_align:       _getSeg(tpCtaAlignRow),
+        hero_cta_primary:     _getSeg(tpCtaPrimaryRow),
+        hero_cta_secondary:   _getSeg(tpCtaSecondaryRow)
       };
     }
     function _preview() {
@@ -3391,17 +3429,22 @@
       siteFrame.contentWindow.postMessage({
         type: 'rd_set_hero_text',
         heroId: _tp.heroId,
-        hero_text_align:  v.hero_text_align,
-        hero_text_color:  v.hero_text_color,
-        hero_cta_visible: v.hero_cta_visible
+        hero_text_align:    v.hero_text_align,
+        hero_text_color:    v.hero_text_color,
+        hero_cta_visible:   v.hero_cta_visible,
+        hero_cta_align:     v.hero_cta_align,
+        hero_cta_primary:   v.hero_cta_primary,
+        hero_cta_secondary: v.hero_cta_secondary
       }, window.location.origin);
     }
 
-    [tpAlignRow, tpColorRow, tpCtaSeg].forEach(row => {
+    [tpAlignRow, tpColorRow, tpCtaSeg, tpCtaAlignRow, tpCtaPrimaryRow, tpCtaSecondaryRow].forEach(row => {
+      if (!row) return;
       row.querySelectorAll('button').forEach(btn => {
         btn.addEventListener('click', () => {
           row.querySelectorAll('button').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
+          if (row === tpCtaSeg) _updateCtaSubVisibility();
           _preview();
         });
       });
@@ -3426,9 +3469,12 @@
             gradient_opacity: cs.gradient_opacity != null ? cs.gradient_opacity : null,
             gradient_direction: cs.gradient_direction || null,
             gradient_distance: cs.gradient_distance != null ? cs.gradient_distance : null,
-            hero_text_align:  v.hero_text_align,
-            hero_text_color:  v.hero_text_color,
-            hero_cta_visible: v.hero_cta_visible
+            hero_text_align:    v.hero_text_align,
+            hero_text_color:    v.hero_text_color,
+            hero_cta_visible:   v.hero_cta_visible,
+            hero_cta_align:     v.hero_cta_align,
+            hero_cta_primary:   v.hero_cta_primary,
+            hero_cta_secondary: v.hero_cta_secondary
           })
         });
         tpSave.textContent = '✓ Saved';
@@ -3450,11 +3496,22 @@
       _seg(tpAlignRow, t.hero_text_align || null);
       _seg(tpColorRow, t.hero_text_color || 'light');
       _seg(tpCtaSeg, t.hero_cta_visible || 'show');
+      // CTA sub-controls
+      _seg(tpCtaAlignRow,   t.hero_cta_align     || 'center');
+      _seg(tpCtaPrimaryRow, t.hero_cta_primary   || 'show');
+      _seg(tpCtaSecondaryRow, t.hero_cta_secondary || 'show');
       // Show/hide CTA row based on whether this hero has a CTA element
-      tpCtaRow.style.display = (d.hasCta === false) ? 'none' : '';
+      const hasCta = (d.hasCta !== false);
+      const hasSecondary = (d.hasSecondary !== false);
+      tpCtaRow.style.display = hasCta ? '' : 'none';
+      if (tpCtaSubRows) tpCtaSubRows.style.display = hasCta ? '' : 'none';
+      // Hide secondary row for single-button heroes
+      if (tpCtaSecondaryWrap) tpCtaSecondaryWrap.style.display = hasSecondary ? '' : 'none';
+      // Within the CTA row, collapse sub-rows if master is "hide"
+      _updateCtaSubVisibility();
       // Position near target element
       const r = d.rect || {};
-      const pw = 220, ph = 220;
+      const pw = 220, ph = 320;
       let left = (r.left || 0) + (r.width || 0) - pw;
       let top  = (r.top  || 0) + (r.height || 0) + 8;
       if (left < 8) left = 8;

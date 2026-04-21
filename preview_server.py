@@ -372,7 +372,9 @@ def _snapshot_page(cur, slug):
     # Card settings (active versions resolved — same logic as _get_card_settings)
     cur.execute(
         "SELECT card_id, mode, color, image, position, zoom,"
-        " gradient_type, gradient_tint, gradient_opacity, gradient_direction, gradient_distance"
+        " gradient_type, gradient_tint, gradient_opacity, gradient_direction, gradient_distance,"
+        " hero_text_align, hero_cta_visible, hero_text_color,"
+        " hero_cta_align, hero_cta_primary, hero_cta_secondary"
         " FROM card_settings WHERE page_slug = %s",
         (slug,))
     cards = [dict(r) for r in cur.fetchall()]
@@ -438,6 +440,9 @@ def _ensure_card_settings_table(cur):
     cur.execute("ALTER TABLE card_settings ADD COLUMN IF NOT EXISTS hero_text_align TEXT DEFAULT NULL")
     cur.execute("ALTER TABLE card_settings ADD COLUMN IF NOT EXISTS hero_cta_visible TEXT DEFAULT NULL")
     cur.execute("ALTER TABLE card_settings ADD COLUMN IF NOT EXISTS hero_text_color TEXT DEFAULT NULL")
+    cur.execute("ALTER TABLE card_settings ADD COLUMN IF NOT EXISTS hero_cta_align TEXT DEFAULT NULL")
+    cur.execute("ALTER TABLE card_settings ADD COLUMN IF NOT EXISTS hero_cta_primary TEXT DEFAULT NULL")
+    cur.execute("ALTER TABLE card_settings ADD COLUMN IF NOT EXISTS hero_cta_secondary TEXT DEFAULT NULL")
 
 def _compute_gradient_css(gradient_type, gradient_tint, gradient_opacity, gradient_direction, gradient_distance):
     """Return a CSS background value string from gradient parameters, or None if disabled."""
@@ -810,7 +815,8 @@ def _get_card_settings(slug):
         cur.execute(
             "SELECT card_id, mode, color, image, position, zoom,"
             " gradient_type, gradient_tint, gradient_opacity, gradient_direction, gradient_distance,"
-            " hero_text_align, hero_cta_visible, hero_text_color"
+            " hero_text_align, hero_cta_visible, hero_text_color,"
+            " hero_cta_align, hero_cta_primary, hero_cta_secondary"
             " FROM card_settings WHERE page_slug = %s",
             (slug,))
         rows = cur.fetchall()
@@ -912,19 +918,21 @@ def _inject_gradient_id_overlays(content: bytes, cards: list) -> bytes:
 
 
 def _inject_hero_text_controls(content: bytes, cards: list) -> bytes:
-    """Server-side inject data-hero-text-align, data-hero-text-color, and --hero-cta-display
-    onto elements that carry data-hero-id attributes, based on saved card settings."""
+    """Server-side inject hero text/CTA data attributes onto elements with data-hero-id."""
     hero_map = {}
     for c in cards:
         cid = c.get('card_id')
         if not cid:
             continue
-        align = c.get('hero_text_align')    # 'left'|'center'|'right'|None
-        color = c.get('hero_text_color')    # 'light'|'dark'|None
-        cta   = c.get('hero_cta_visible')   # 'show'|'hide'|None
-        if align or color or cta:
-            hero_map[cid] = {'align': align, 'color': color, 'cta': cta}
-    if not hero_map:
+        hero_map[cid] = {
+            'align':         c.get('hero_text_align'),     # 'left'|'center'|'right'|None
+            'color':         c.get('hero_text_color'),     # 'light'|'dark'|None
+            'cta':           c.get('hero_cta_visible'),    # 'show'|'hide'|None
+            'cta_align':     c.get('hero_cta_align'),      # 'left'|'center'|'right'|'split'|None
+            'cta_primary':   c.get('hero_cta_primary'),    # 'show'|'hide'|None
+            'cta_secondary': c.get('hero_cta_secondary'),  # 'show'|'hide'|None
+        }
+    if not any(any(v for v in s.values()) for s in hero_map.values()):
         return content
     try:
         s = content.decode('utf-8', errors='replace')
@@ -937,38 +945,32 @@ def _inject_hero_text_controls(content: bytes, cards: list) -> bytes:
             settings = hero_map.get(id_match.group(1))
             if not settings:
                 return tag
-            # Build data attribute additions
             extra_attrs = ''
             if settings['align']:
-                # Remove existing attr first
                 tag = re.sub(r'\s*data-hero-text-align="[^"]*"', '', tag)
                 extra_attrs += f' data-hero-text-align="{settings["align"]}"'
             if settings['color']:
                 tag = re.sub(r'\s*data-hero-text-color="[^"]*"', '', tag)
                 extra_attrs += f' data-hero-text-color="{settings["color"]}"'
-            # CTA visibility via inline CSS var
-            if settings['cta']:
-                cta_val = 'none' if settings['cta'] == 'hide' else ''
-                css_prop = f'--hero-cta-display:{cta_val}' if cta_val else None
-                style_match = re.search(r'\bstyle="([^"]*)"', tag)
-                if css_prop:
-                    if style_match:
-                        existing = re.sub(r'--hero-cta-display:[^;]*;?\s*', '', style_match.group(1)).strip().rstrip(';')
-                        new_style = f'{css_prop};{existing}' if existing else css_prop
-                        tag = tag[:style_match.start()] + f'style="{new_style}"' + tag[style_match.end():]
-                    else:
-                        tag = tag[:-1] + f' style="{css_prop}">'
-                else:
-                    # cta=show: remove --hero-cta-display if present
-                    if style_match:
-                        cleaned = re.sub(r'--hero-cta-display:[^;]*;?\s*', '', style_match.group(1)).strip().rstrip(';')
-                        tag = tag[:style_match.start()] + f'style="{cleaned}"' + tag[style_match.end():]
+            # CTA overall visibility
+            tag = re.sub(r'\s*data-hero-cta="[^"]*"', '', tag)
+            if settings['cta'] == 'hide':
+                extra_attrs += ' data-hero-cta="hide"'
+            # CTA row alignment
+            tag = re.sub(r'\s*data-hero-cta-align="[^"]*"', '', tag)
+            if settings['cta_align']:
+                extra_attrs += f' data-hero-cta-align="{settings["cta_align"]}"'
+            # Individual button visibility
+            tag = re.sub(r'\s*data-hero-cta-primary="[^"]*"', '', tag)
+            if settings['cta_primary'] == 'hide':
+                extra_attrs += ' data-hero-cta-primary="hide"'
+            tag = re.sub(r'\s*data-hero-cta-secondary="[^"]*"', '', tag)
+            if settings['cta_secondary'] == 'hide':
+                extra_attrs += ' data-hero-cta-secondary="hide"'
             if extra_attrs:
-                # Insert before closing >
                 tag = tag[:-1] + extra_attrs + '>'
             return tag
 
-        # Match any opening tag that carries data-hero-id
         s = re.sub(r'<(?:section|div|header)\b[^>]*\bdata-hero-id="[^"]*"[^>]*>', _inject, s)
         return s.encode('utf-8')
     except Exception:
@@ -2558,20 +2560,40 @@ _CARD_EDIT_OVERLAY_TPL = """\
       var heroEl = document.querySelector('[data-hero-id="' + hid + '"]');
       if (!heroEl) return;
       var d = ev.data;
+      // Text alignment
       if (d.hero_text_align) {{
         heroEl.setAttribute('data-hero-text-align', d.hero_text_align);
       }} else {{
         heroEl.removeAttribute('data-hero-text-align');
       }}
+      // Text color
       if (d.hero_text_color) {{
         heroEl.setAttribute('data-hero-text-color', d.hero_text_color);
       }} else {{
         heroEl.removeAttribute('data-hero-text-color');
       }}
+      // CTA overall visibility
       if (d.hero_cta_visible === 'hide') {{
-        heroEl.style.setProperty('--hero-cta-display', 'none');
+        heroEl.setAttribute('data-hero-cta', 'hide');
       }} else {{
-        heroEl.style.removeProperty('--hero-cta-display');
+        heroEl.removeAttribute('data-hero-cta');
+      }}
+      // CTA row alignment
+      if (d.hero_cta_align) {{
+        heroEl.setAttribute('data-hero-cta-align', d.hero_cta_align);
+      }} else {{
+        heroEl.removeAttribute('data-hero-cta-align');
+      }}
+      // Individual button visibility
+      if (d.hero_cta_primary === 'hide') {{
+        heroEl.setAttribute('data-hero-cta-primary', 'hide');
+      }} else {{
+        heroEl.removeAttribute('data-hero-cta-primary');
+      }}
+      if (d.hero_cta_secondary === 'hide') {{
+        heroEl.setAttribute('data-hero-cta-secondary', 'hide');
+      }} else {{
+        heroEl.removeAttribute('data-hero-cta-secondary');
       }}
     }});
   }})();
@@ -2873,13 +2895,15 @@ _EDIT_OVERLAY_TPL = """\
             if (window.__RD_CARDS[_hi].card_id === _hid) {{ _heroCardData = window.__RD_CARDS[_hi]; break; }}
           }}
         }}
-        // Detect if this hero has a CTA element
-        var _hasCta = !!_heroEl.querySelector('.hero__actions, .project-hero__right');
+        // Detect if this hero has CTA elements and which ones
+        var _ctaEl = _heroEl.querySelector('.hero__actions, .project-hero__right');
+        var _hasCta = !!_ctaEl;
+        var _hasSecondary = _hasCta && !!(_ctaEl.querySelector('[data-cta-id="secondary"]') || _ctaEl.querySelectorAll('.btn').length > 1);
         var heroTextBtn = document.createElement('button');
         heroTextBtn.textContent = 'T';
         heroTextBtn.title = 'Hero text controls';
         heroTextBtn.style.cssText = 'background:rgba(13,148,136,.85);color:#fff;border:none;border-left:1px solid rgba(255,255,255,.15);font-family:system-ui,sans-serif;font-size:12px;font-weight:700;padding:5px 11px;border-radius:4px;cursor:pointer;white-space:nowrap;pointer-events:auto';
-        heroTextBtn.addEventListener('click', (function(_hid2, _heroEl2, _heroCardData2, _hasCta2) {{ return function(e) {{
+        heroTextBtn.addEventListener('click', (function(_hid2, _heroEl2, _heroCardData2, _hasCta2, _hasSecondary2) {{ return function(e) {{
           e.stopPropagation();
           var rect = _heroEl2.getBoundingClientRect();
           var iframe = window.frameElement;
@@ -2888,10 +2912,14 @@ _EDIT_OVERLAY_TPL = """\
             type: 'rd_hero_text_open',
             heroId: _hid2,
             hasCta: _hasCta2,
+            hasSecondary: _hasSecondary2,
             heroText: {{
-              hero_text_align:  (_heroCardData2 && _heroCardData2.hero_text_align)  || null,
-              hero_cta_visible: (_heroCardData2 && _heroCardData2.hero_cta_visible) || null,
-              hero_text_color:  (_heroCardData2 && _heroCardData2.hero_text_color)  || null
+              hero_text_align:     (_heroCardData2 && _heroCardData2.hero_text_align)     || null,
+              hero_cta_visible:    (_heroCardData2 && _heroCardData2.hero_cta_visible)    || null,
+              hero_text_color:     (_heroCardData2 && _heroCardData2.hero_text_color)     || null,
+              hero_cta_align:      (_heroCardData2 && _heroCardData2.hero_cta_align)      || null,
+              hero_cta_primary:    (_heroCardData2 && _heroCardData2.hero_cta_primary)    || null,
+              hero_cta_secondary:  (_heroCardData2 && _heroCardData2.hero_cta_secondary)  || null
             }},
             cardState: {{
               mode:     (_heroCardData2 && _heroCardData2.mode)     || 'color',
@@ -2907,7 +2935,7 @@ _EDIT_OVERLAY_TPL = """\
             }},
             rect: {{ left: iRect.left + rect.left, top: iRect.top + rect.top, width: rect.width, height: rect.height }}
           }}, window.location.origin);
-        }}; }}(_hid, _heroEl, _heroCardData, _hasCta)));
+        }}; }}(_hid, _heroEl, _heroCardData, _hasCta, _hasSecondary)));
         badge.appendChild(heroTextBtn);
       }}
     }})();
@@ -7734,6 +7762,9 @@ def admin_card_update(slug, card_id):
     hero_text_align    = data.get('hero_text_align') or None
     hero_cta_visible   = data.get('hero_cta_visible') or None
     hero_text_color    = data.get('hero_text_color') or None
+    hero_cta_align     = data.get('hero_cta_align') or None
+    hero_cta_primary   = data.get('hero_cta_primary') or None
+    hero_cta_secondary = data.get('hero_cta_secondary') or None
     try:
         gradient_opacity  = int(gradient_opacity)  if gradient_opacity  is not None else None
     except (TypeError, ValueError):
@@ -7748,6 +7779,12 @@ def admin_card_update(slug, card_id):
         hero_cta_visible = None
     if hero_text_color and hero_text_color not in ('light', 'dark'):
         hero_text_color = None
+    if hero_cta_align and hero_cta_align not in ('left', 'center', 'right', 'split'):
+        hero_cta_align = None
+    if hero_cta_primary and hero_cta_primary not in ('show', 'hide'):
+        hero_cta_primary = None
+    if hero_cta_secondary and hero_cta_secondary not in ('show', 'hide'):
+        hero_cta_secondary = None
 
     if mode not in ('color', 'image'):
         return jsonify({'error': 'mode must be color or image'}), 400
@@ -7774,8 +7811,9 @@ def admin_card_update(slug, card_id):
             INSERT INTO card_settings (page_slug, card_id, mode, color, image, position, zoom,
                 gradient_type, gradient_tint, gradient_opacity, gradient_direction, gradient_distance,
                 hero_text_align, hero_cta_visible, hero_text_color,
+                hero_cta_align, hero_cta_primary, hero_cta_secondary,
                 updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
             ON CONFLICT (page_slug, card_id) DO UPDATE SET
                 mode = EXCLUDED.mode,
                 color = EXCLUDED.color,
@@ -7790,10 +7828,14 @@ def admin_card_update(slug, card_id):
                 hero_text_align = EXCLUDED.hero_text_align,
                 hero_cta_visible = EXCLUDED.hero_cta_visible,
                 hero_text_color = EXCLUDED.hero_text_color,
+                hero_cta_align = EXCLUDED.hero_cta_align,
+                hero_cta_primary = EXCLUDED.hero_cta_primary,
+                hero_cta_secondary = EXCLUDED.hero_cta_secondary,
                 updated_at = NOW()
         """, (slug, card_id, mode, color, image, position, zoom,
               gradient_type, gradient_tint, gradient_opacity, gradient_direction, gradient_distance,
-              hero_text_align, hero_cta_visible, hero_text_color))
+              hero_text_align, hero_cta_visible, hero_text_color,
+              hero_cta_align, hero_cta_primary, hero_cta_secondary))
         conn.commit()
         conn.close()
         return jsonify({'ok': True, 'page_slug': slug, 'card_id': card_id})

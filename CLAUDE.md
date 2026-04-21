@@ -640,7 +640,92 @@ Two-path bifurcation in the existing rerender route in `preview_server.py`:
 - Mime type: `image/png`
 - Prompt suffix appended at call time: instructs model to preserve focal length, hardware edges, wood/stone grain, and not to re-center or re-crop
 
-### Commits (2026-04-19)
+### Display Path Fix (2026-04-20)
+After a surgical render, the result panel was displaying blurry because the server returned the full base file (e.g., 6131×6161px) as `hero_path`. The panel loaded it as `background-size: cover` on a small container, causing ~15× downscaling by the browser.
+
+**Fix:** Server now returns two values:
+- `hero_path` = base file (unchanged — used for versioning/activation)
+- `display_path` = `_1920w` variant — used only for the result panel background-image and filmstrip thumbnail
+
+Frontend updated in `pages.html` to use `d.display_path` for visual display while keeping `_rerenderResultPath = d.hero_path` for all logic.
+
+**Always-render-from-master rule:** Even if the source passed to the server is a `_1920w` variant, the server silently upgrades to the base master file before opening. Prevents accidental blurry source selection.
+
+### Clamping + Race Condition Fixes (2026-04-20)
+- **Python clamping:** `x1 = max(0, min(master_w - 1, crop_x))` — prevents negative `actual_w`/`actual_h` when crop origin lands outside image
+- **Race condition guard:** `cropMouseDown` bails early if `_rerenderActualDims.w === 0` (dims not loaded yet) — toast message explains
+- **JS size guard:** After computing native coords, checks `w < 4 || h < 4` — shows toast "Selection too small (Nx Mpx) — draw a larger region" before any server call
+
+### G Button — All 15 Pages (2026-04-20)
+The gradient control G button was only appearing on the home page. Root cause: `_EDIT_OVERLAY_TPL` showed the G button only when `el.classList.contains('hero__bg')`. All other pages use different class names.
+
+**Fix in `preview_server.py`:** Condition broadened — if the hovered element itself has `data-gradient-id`, use it; otherwise check if its parent contains a child with `data-gradient-id`. One condition change covers all page types.
+
+**CSS fix:** Added `var(--rd-overlay, ...)` to `.project-hero__overlay` in `main.css` so `--rd-overlay` changes actually take effect on project pages.
+
+**HTML fix:** Added `data-gradient-id` to all 9 project page hero overlay divs.
+
+### Commits (2026-04-19–20)
 - PNG + prompt suffix: pre `9e134bc`, post `b9990ce`
 - Surgical mode implementation: pre `f5400cb`, post `777da29`
 - Surgical bug fixes (context image removed + cover-fit math): pre `ff6ef74`, post `46be506`
+- Clamping + race condition fixes: pre `ff393ea`, post `daaf09c`
+- JS size guard + negative x2 clamp: `0334ee2`
+- Always render from master: `3b25d73`
+- Display path fix (blurry result panel): `736871f`
+- G button all 15 pages: `97b845d`
+- Hero text controls (alignment + color + CTA): `d848827`, `369f1b3`
+
+---
+
+## 31. Hero Text Controls — T Button (2026-04-20–21)
+
+### Overview
+A "T button" (teal) was added to the edit overlay badge on all 16 hero images site-wide. It opens a Hero Text Panel in the admin for controlling:
+- **Text alignment:** left / center / right
+- **Text color:** light / dark
+- **CTA visible:** show / hide (auto-hides on pages with no CTA element — services, team)
+
+### DB Schema
+Three new columns on `card_settings` table:
+- `hero_text_align` (text, nullable) — "left" / "center" / "right"
+- `hero_text_color` (text, default "light") — "light" / "dark"
+- `hero_cta_visible` (text, default "show") — "show" / "hide"
+
+### Server-Side Injection (`preview_server.py`)
+`_inject_hero_text_controls()` reads DB and stamps attributes on hero root elements at serve time:
+- `data-hero-text-align="left|center|right"` on hero root
+- `data-hero-text-color="light|dark"` on hero root
+- `data-hero-cta="show|hide"` on hero root (NOT CSS var — switched from `--hero-cta-display` which was fragile)
+
+**Snapshot fix (critical):** `_snapshot_page()` SELECT query was NOT including the 3 new columns, so changes never appeared on the live site after publish. Fixed.
+
+### CSS Architecture (`main.css`)
+Three separate selector blocks (3 hero types have different class names):
+
+**Home hero:** `[data-hero-text-align="left"] .hero__content` → `text-align`
+**Inner page heroes:** `[data-hero-text-align="left"].page-hero--service .page-hero__title` → `text-align + margin override`
+**Project heroes:** `[data-hero-text-align="left"] .project-hero__left` → `text-align`
+
+**Critical CSS fix (2026-04-21):**
+- CSS selector was wrong: `[data-hero-text-align="left"] .page-hero--service` (descendant, space) should be `[data-hero-text-align="left"].page-hero--service` (same element, no space — attribute is on the container itself)
+- `.page-hero__title` and `.page-hero__sub` have `margin: 0 auto` in base rules — must be overridden to `margin-left: 0; margin-right: auto` (left) or `margin: 0 auto` (center) or `margin-left: auto; margin-right: 0` (right) or text-align is visually defeated by auto-centering
+- `width: 100%` required on child elements so `text-align` has space to work
+
+**CTA toggle:** Switched from CSS var to data-attribute approach:
+- `[data-hero-cta="hide"] .hero__actions { display: none !important; }`
+- `[data-hero-cta="hide"] .project-hero__right { display: none !important; }`
+
+### Services Page — CTA Buttons Added (2026-04-21)
+Services hero had no CTA buttons in HTML. Added `<div class="page-hero__actions hero__actions">` with "Start a Project" and "View Our Work" buttons so the CTA toggle row appears in the T panel.
+
+### HTML — data-hero-id Added to All 16 Pages
+Every hero root element now has `data-hero-id="[slug]-hero"` — used by the T button lookup logic.
+
+### Commits
+- `d848827` — data-hero-id added to all 16 hero root elements
+- `369f1b3` — full hero text controls implementation
+- Ongoing CSS/selector/snapshot fixes in working tree (uncommitted as of 2026-04-21 session end)
+
+### Status (2026-04-21)
+Text alignment partially working — selector and margin fixes applied in working tree but NOT yet committed. CTA toggle logic in working tree (switched from CSS var to data-attribute). Henry confirmed surgical renders and gradient G button are working correctly on all pages.

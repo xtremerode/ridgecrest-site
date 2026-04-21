@@ -1916,10 +1916,22 @@ p { line-height: 1.8; }
 
 /* ── Hero Text Controls ────────────────────────────────────────────────────── */
 
-/* CTA visibility — controlled via --hero-cta-display CSS var set on the hero root.
-   Fallback preserves original display value when var is not set. */
-.hero__actions           { display: var(--hero-cta-display, flex); }
-.project-hero__right     { display: var(--hero-cta-display, block); }
+/* CTA visibility — hide all when data-hero-cta="hide" on the hero root element */
+[data-hero-cta="hide"] .hero__actions      { display: none !important; }
+[data-hero-cta="hide"] .project-hero__right { display: none !important; }
+
+/* CTA row alignment — width:100% required on all variants so justify-content has room to act
+   (parent is align-items:center so the row shrinks to content width by default) */
+[data-hero-cta-align="left"]   .hero__actions { justify-content: flex-start !important;    width: 100% !important; }
+[data-hero-cta-align="center"] .hero__actions { justify-content: center !important;        width: 100% !important; }
+[data-hero-cta-align="right"]  .hero__actions { justify-content: flex-end !important;      width: 100% !important; }
+[data-hero-cta-align="split"]  .hero__actions { justify-content: space-between !important; width: 100% !important; }
+
+/* Individual CTA button visibility — covers both hero__actions and project-hero__right */
+[data-hero-cta-primary="hide"]   .hero__actions [data-cta-id="primary"],
+[data-hero-cta-primary="hide"]   .project-hero__right [data-cta-id="primary"]   { display: none !important; }
+[data-hero-cta-secondary="hide"] .hero__actions [data-cta-id="secondary"],
+[data-hero-cta-secondary="hide"] .project-hero__right [data-cta-id="secondary"] { display: none !important; }
 
 /* Text alignment — home hero */
 [data-hero-text-align="left"]   .hero__content  { text-align: left; }
@@ -1931,16 +1943,21 @@ p { line-height: 1.8; }
 [data-hero-text-align="right"]  .hero__headline { margin-left: auto; margin-right: 0; }
 [data-hero-text-align="right"]  .hero__actions  { justify-content: flex-end; }
 
-/* Text alignment — inner page heroes */
-[data-hero-text-align="left"]   .page-hero__eyebrow,
-[data-hero-text-align="left"]   .page-hero__title,
-[data-hero-text-align="left"]   .page-hero__sub  { text-align: left;   margin-left: 0;    margin-right: 0; }
-[data-hero-text-align="center"] .page-hero__eyebrow,
-[data-hero-text-align="center"] .page-hero__title,
-[data-hero-text-align="center"] .page-hero__sub  { text-align: center; margin-left: auto; margin-right: auto; }
-[data-hero-text-align="right"]  .page-hero__eyebrow,
-[data-hero-text-align="right"]  .page-hero__title,
-[data-hero-text-align="right"]  .page-hero__sub  { text-align: right;  margin-left: auto; margin-right: 0; }
+/* Text alignment — inner page heroes
+   .page-hero__title and .page-hero__sub have margin:0 auto + max-width in base rules.
+   Must override margin-left/right to prevent auto-centering from overriding the alignment. */
+[data-hero-text-align="left"].page-hero--service   .page-hero__eyebrow,
+[data-hero-text-align="left"].page-hero--service   .page-hero__title,
+[data-hero-text-align="left"].page-hero--service   .page-hero__sub   { text-align: left   !important; width: 100%; margin-left: 0 !important; margin-right: auto !important; }
+[data-hero-text-align="center"].page-hero--service .page-hero__eyebrow,
+[data-hero-text-align="center"].page-hero--service .page-hero__title,
+[data-hero-text-align="center"].page-hero--service .page-hero__sub  { text-align: center !important; width: 100%; margin-left: auto !important; margin-right: auto !important; }
+[data-hero-text-align="right"].page-hero--service  .page-hero__eyebrow,
+[data-hero-text-align="right"].page-hero--service  .page-hero__title,
+[data-hero-text-align="right"].page-hero--service  .page-hero__sub  { text-align: right  !important; width: 100%; margin-left: auto !important; margin-right: 0 !important; }
+[data-hero-text-align="left"].page-hero--service   .page-hero__actions { justify-content: flex-start; }
+[data-hero-text-align="center"].page-hero--service .page-hero__actions { justify-content: center; }
+[data-hero-text-align="right"].page-hero--service  .page-hero__actions { justify-content: flex-end; }
 
 /* Text alignment — project heroes */
 [data-hero-text-align="left"]   .project-hero__content-inner { justify-content: flex-start; }
