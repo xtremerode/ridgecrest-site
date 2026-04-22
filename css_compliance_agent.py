@@ -159,6 +159,75 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
                                f'main.css missing CSS custom property definition: {var}',
                                'main.css'))
 
+    # ── Admin-owned CSS variable hardcoding guard ─────────────────────────────
+    # Catches the commit-5dc69c7 class of bug: code hardcodes an admin-owned
+    # CSS variable with a wrong value, overriding whatever the admin saved in DB.
+    # Rule: if a CSS var is injected at serve-time from DB (server writes
+    # document.documentElement.style.setProperty or injects a <style> block),
+    # it must NOT be hardcoded in main.css with a conflicting value.
+    #
+    # These CSS vars are owned by DB (system_settings) and injected at serve time.
+    # The CSS file may define them as fallbacks only — the value must match DB.
+    _CSS_DB_VARS = [
+        # (css_var_name,  regex_to_extract_css_value,  db_key,  approved_value)
+        ('--nav-band-opacity',
+         r'--nav-band-opacity\s*:\s*([0-9.]+)',
+         'nav_band_opacity',
+         '0.6'),
+        ('--nav-blur',
+         r'--nav-blur\s*:\s*([0-9.]+)',
+         'nav_blur_radius',
+         '8'),
+        ('--nav-scrolled-opacity',
+         r'--nav-scrolled-opacity\s*:\s*([0-9.]+)',
+         'nav_scrolled_opacity',
+         '0.94'),
+    ]
+    _db_settings = {}
+    try:
+        import db as _db_mod
+        with _db_mod.get_db() as (_conn, _cur):
+            _cur.execute("SELECT key, value FROM system_settings WHERE key = ANY(%s)",
+                         (['nav_band_opacity', 'nav_blur_radius', 'nav_scrolled_opacity'],))
+            for _row in _cur.fetchall():
+                _db_settings[_row['key']] = _row['value']
+    except Exception:
+        pass  # DB unavailable — skip cross-check, rely on page_state_guard
+
+    for _css_var, _css_re, _db_key, _approved in _CSS_DB_VARS:
+        _css_m = re.search(_css_re, main_css)
+        if not _css_m:
+            continue  # var not hardcoded in CSS — no conflict possible
+        _css_val = _css_m.group(1)
+        _db_val = _db_settings.get(_db_key)
+
+        if _db_val is not None:
+            # Compare as floats to handle '8' vs '8.0' etc.
+            try:
+                _css_f = float(_css_val)
+                _db_f  = float(_db_val)
+                if abs(_css_f - _db_f) > 0.001:
+                    results.append(_r('css_var_db_mismatch', 'fail',
+                                       f'{_css_var} hardcoded in main.css as {_css_val} '
+                                       f'but DB (system_settings.{_db_key}) = {_db_val}. '
+                                       f'Code must not override admin-owned settings. '
+                                       f'Either remove the hardcoded value or align it to DB.',
+                                       'main.css', auto_fixable=False))
+                else:
+                    results.append(_r('css_var_db_mismatch', 'pass',
+                                       f'{_css_var} in CSS ({_css_val}) matches DB ({_db_val}) ✓',
+                                       'main.css'))
+            except ValueError:
+                pass  # non-numeric — skip numeric comparison
+        else:
+            # DB unavailable — check against known approved value
+            if _css_val != _approved:
+                results.append(_r('css_var_db_mismatch', 'warn',
+                                   f'{_css_var} hardcoded in main.css as {_css_val} '
+                                   f'(approved production value: {_approved}) — '
+                                   f'could not verify against DB (unavailable)',
+                                   'main.css'))
+
     # ── Check split panel CSS classes are complete pairs ─────────────────────
     split_pairs = [
         ('diff__visual--one', 'diff__visual--two'),

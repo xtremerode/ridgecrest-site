@@ -78,6 +78,7 @@ AGENTS = [
     ('js_compliance_agent',   'JS Compliance'),
     ('admin_panel_agent',     'Admin Panel'),
     ('page_state_guard',      'Page State Guard'),
+    ('db_approved_state',     'DB Approved State'),
 ]
 
 # ANSI colours
