@@ -404,6 +404,7 @@ def render_page(city_slug, city, service):
   svc_name    = service['name']
   filename    = f"{service['slug']}-{city_slug}.html"
   page_slug   = f"/services/{service['slug']}-{city_slug}"
+  hero_id     = f"services-{service['slug']}-{city_slug}-hero"
   canonical   = BASE_URL + page_slug
   title       = service['title_template'].format(city=city_name)
   meta_desc   = service['meta_template'].format(city=city_name)
@@ -520,13 +521,13 @@ def render_page(city_slug, city, service):
   </nav>
 
   <!-- PAGE HERO -->
-  <div class="page-hero page-hero--service">
+  <div class="page-hero page-hero--service" data-hero-id="{hero_id}" data-gradient-id="{hero_id}">
     <p class="page-hero__eyebrow">{eyebrow} · {city_name}, CA</p>
     <h1 class="page-hero__title">{h1}</h1>
     <p class="page-hero__sub">{tagline}</p>
     <div class="page-hero__actions">
-      <a href="{INQUIRY}" class="btn btn--primary btn--lg">Start Your Project Inquiry</a>
-      <a href="../portfolio.html" class="btn btn--ghost">View Our Work</a>
+      <a href="{INQUIRY}" class="btn btn--primary btn--lg" data-cta-id="primary">Start Your Project Inquiry</a>
+      <a href="../portfolio.html" class="btn btn--ghost" data-cta-id="secondary">View Our Work</a>
     </div>
   </div>
 

@@ -14,6 +14,20 @@ Checks (critical = blocks commit):
     • preview_server.py: rd_set_hero_bg postMessage handler present
     • preview_server.py: rd_hero_bg_open postMessage handler present
 
+  HERO FLASH PREVENTION (critical — blocks commit):
+    • main.js: _HERO_CLASSES array present (hero exclusion list for responsive swap)
+    • main.js: _HERO_CLASSES contains all 5 required class names:
+        page-hero--service, hero__bg, project-hero__img, blog-hero, post-hero
+    • main.js: _swapAll() checks _HERO_CLASSES before calling _pickVariant
+      (if missing, responsive swap runs on heroes → dark-gray flash on navigation)
+    • preview_server.py: _hero_display_path() function present
+      (converts hero paths to _1920w variant — full-res images are 2-5MB and cause flash)
+    • preview_server.py: _HERO_FALLBACK_PATH constant present
+    • preview_server.py: _NAV_PREFETCH_SLUGS constant present
+    • preview_server.py: _get_nav_hero_paths() function present
+    • preview_server.py: rel="prefetch" as="image" injection present
+      (cross-page cache warm — only guaranteed way to eliminate flash on MPA)
+
   WARNING
     • main.js: responsive image swap IIFE present (_pickVariant)
     • main.js: fade-in IntersectionObserver present
@@ -22,6 +36,13 @@ Checks (critical = blocks commit):
     • admin/pages.html: heroBgPanel element referenced
     • No console.log left in production JS (main.js, lightbox.js)
     • No alert() calls in production JS
+
+GUARDRAIL POLICY:
+  Any change to main.js that touches _swapAll, _pickVariant, or hero injection
+  MUST be verified to preserve _HERO_CLASSES exclusion. Any change to
+  preview_server.py that touches view(), blog_index(), or blog_post() MUST
+  preserve _hero_display_path(), preload injection, and prefetch injection.
+  Run web_dev_orchestrator.py after every such change.
 """
 import os
 import re
@@ -98,6 +119,48 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
         for token, desc in warn_tokens:
             _check_token(main_js, token, 'main.js', desc, 'warn', results)
 
+        # ── HERO FLASH PREVENTION: _HERO_CLASSES exclusion list ─────────────────
+        # _HERO_CLASSES must exist and must contain all 5 hero class names.
+        # If any class is missing, _swapAll() will run the responsive URL swap on
+        # that hero element → forces a new image fetch on DOMContentLoaded → dark flash.
+        _REQUIRED_HERO_CLASSES = [
+            'page-hero--service', 'hero__bg', 'project-hero__img',
+            'blog-hero', 'post-hero'
+        ]
+        if '_HERO_CLASSES' not in main_js:
+            results.append(_r('hero_classes_array', 'fail',
+                               'main.js missing _HERO_CLASSES array — responsive swap will '
+                               'run on hero elements and cause dark-background flash on navigation',
+                               'main.js'))
+        else:
+            results.append(_r('hero_classes_array', 'pass',
+                               '_HERO_CLASSES array present in main.js', 'main.js'))
+            for _hc in _REQUIRED_HERO_CLASSES:
+                if _hc not in main_js:
+                    results.append(_r('hero_classes_content', 'fail',
+                                       f'_HERO_CLASSES missing required class: "{_hc}" — '
+                                       f'add it or the responsive swap will flash this hero type',
+                                       'main.js'))
+                else:
+                    results.append(_r('hero_classes_content', 'pass',
+                                       f'_HERO_CLASSES contains "{_hc}"', 'main.js'))
+
+        # _swapAll must guard against _HERO_CLASSES
+        if '_HERO_CLASSES' in main_js and '_swapAll' in main_js:
+            _swap_block = re.search(
+                r'function _swapAll\(\).*?(?=\n\s*(?:function|\};\s*\n|\Z))',
+                main_js, re.DOTALL
+            )
+            if _swap_block and '_HERO_CLASSES' not in _swap_block.group(0):
+                results.append(_r('swap_hero_guard', 'fail',
+                                   '_swapAll() does not check _HERO_CLASSES — '
+                                   'hero elements will be swapped → dark flash',
+                                   'main.js'))
+            else:
+                results.append(_r('swap_hero_guard', 'pass',
+                                   '_swapAll() checks _HERO_CLASSES before swapping',
+                                   'main.js'))
+
         # HERO_FALLBACK must reference HERO_POOL[0], not a literal undefined/null
         if 'HERO_FALLBACK' in main_js:
             if re.search(r'HERO_FALLBACK\s*=\s*[`\'"][^`\'"]*undefined', main_js):
@@ -139,12 +202,21 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
         server = _read(SERVER_FILE)
 
         server_tokens = [
-            ('rd_set_hero_bg',       'rd_set_hero_bg postMessage handler (BG panel save)'),
-            ('rd_hero_bg_open',      'rd_hero_bg_open postMessage sender (BG button)'),
-            ('rd_set_hero_text',     'rd_set_hero_text postMessage handler (text panel)'),
-            ('_apply_hero_color_mode', '_apply_hero_color_mode() server-side function'),
-            ('_strip_hero_card_ids', '_strip_hero_card_ids() service hero protection'),
-            ('data-hero-id',         'data-hero-id attribute injection'),
+            ('rd_set_hero_bg',          'rd_set_hero_bg postMessage handler (BG panel save)'),
+            ('rd_hero_bg_open',         'rd_hero_bg_open postMessage sender (BG button)'),
+            ('rd_set_hero_text',        'rd_set_hero_text postMessage handler (text panel)'),
+            ('_apply_hero_color_mode',  '_apply_hero_color_mode() server-side function'),
+            ('_strip_hero_card_ids',    '_strip_hero_card_ids() service hero protection'),
+            ('data-hero-id',            'data-hero-id attribute injection'),
+            # Hero flash prevention — these must always be present
+            ('_hero_display_path',      '_hero_display_path() — converts hero to _1920w variant (7x smaller, eliminates flash)'),
+            ('_HERO_FALLBACK_PATH',     '_HERO_FALLBACK_PATH constant — server-side fallback matching HERO_POOL[0] in main.js'),
+            ('_NAV_PREFETCH_SLUGS',     '_NAV_PREFETCH_SLUGS — list of nav slugs for cross-page prefetch'),
+            ('_get_nav_hero_paths',     '_get_nav_hero_paths() — batch DB query for prefetch hero URLs'),
+            ('fetchpriority="high"',    'fetchpriority=high on preload — ensures hero fetch starts at head parse time'),
+            # Critical: __RD_HERO must use display_path (not hero_path) so main.js
+            # doesn't override the CSS class rule with a full-res URL and trigger a re-download.
+            ('window.__RD_HERO={_safe_js(display_path)', '__RD_HERO uses display_path (_1920w) — prevents JS re-download flash'),
         ]
         for token, desc in server_tokens:
             _check_token(server, token, 'preview_server.py', desc, 'fail', results)

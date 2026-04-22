@@ -184,6 +184,7 @@ p { line-height: 1.8; }
   justify-content: space-between;
   padding: 1.8rem clamp(1rem, calc(10vw - 112px), 2rem);
   transition: var(--transition);
+  --nav-band-opacity: 0.3;
 }
 .nav--scrolled {
   background: rgba(17,17,17,var(--nav-scrolled-opacity, 0.94));
@@ -439,6 +440,8 @@ p { line-height: 1.8; }
 .team-card__photo.rd-card--image-mode::before { display: none !important; }
 .team-card__photo.rd-card--image-mode:hover::before { display: none !important; }
 .team-card__photo[data-card-id]:hover { filter: none !important; }
+/* ── Color-mode card: JS applies when admin sets card to solid background color ── */
+.rd-card--color-mode { background-image: none !important; }
 /* ── Portfolio featured image panels: overlay div handles hover, no brightness filter ── */
 .portfolio-featured__img[data-card-id] { transition: transform 0.6s ease !important; }
 .portfolio-featured__img[data-card-id]:hover { filter: none !important; }
@@ -1935,18 +1938,23 @@ p { line-height: 1.8; }
 [data-hero-cta-secondary="hide"] .project-hero__right [data-cta-id="secondary"] { display: none !important; }
 
 /* Text alignment — home hero */
-[data-hero-text-align="left"]   .hero__content  { text-align: left; }
+[data-hero-text-align="left"]   .hero__content  { text-align: left !important; }
 [data-hero-text-align="left"]   .hero__headline { margin-left: 0; margin-right: 0; }
-[data-hero-text-align="center"] .hero__content  { text-align: center; }
+[data-hero-text-align="center"] .hero__content  { text-align: center !important; }
 [data-hero-text-align="center"] .hero__headline { margin-left: auto; margin-right: auto; }
 [data-hero-text-align="center"] .hero__actions  { justify-content: center; }
-[data-hero-text-align="right"]  .hero__content  { text-align: right; }
+[data-hero-text-align="right"]  .hero__content  { text-align: right !important; }
 [data-hero-text-align="right"]  .hero__headline { margin-left: auto; margin-right: 0; }
 [data-hero-text-align="right"]  .hero__actions  { justify-content: flex-end; }
 
-/* Text alignment — inner page heroes
-   .page-hero__title and .page-hero__sub have margin:0 auto + max-width in base rules.
-   Must override margin-left/right to prevent auto-centering from overriding the alignment. */
+/* Text alignment — inner page heroes (service pages, blog, any page-hero--service variant)
+   Apply alignment at the CONTAINER level so ALL descendants inherit regardless of class name.
+   Also change align-items so flex children actually move left/center/right.
+   The specific-child rules below provide additional reinforcement for standard class names. */
+[data-hero-text-align="left"].page-hero--service   { align-items: flex-start !important; text-align: left   !important; }
+[data-hero-text-align="center"].page-hero--service { align-items: center      !important; text-align: center !important; }
+[data-hero-text-align="right"].page-hero--service  { align-items: flex-end   !important; text-align: right  !important; }
+/* Reinforce for standard service-page child class names (.page-hero__*) */
 [data-hero-text-align="left"].page-hero--service   .page-hero__eyebrow,
 [data-hero-text-align="left"].page-hero--service   .page-hero__title,
 [data-hero-text-align="left"].page-hero--service   .page-hero__sub   { text-align: left   !important; width: 100%; margin-left: 0 !important; margin-right: auto !important; }
@@ -1956,17 +1964,27 @@ p { line-height: 1.8; }
 [data-hero-text-align="right"].page-hero--service  .page-hero__eyebrow,
 [data-hero-text-align="right"].page-hero--service  .page-hero__title,
 [data-hero-text-align="right"].page-hero--service  .page-hero__sub  { text-align: right  !important; width: 100%; margin-left: auto !important; margin-right: 0 !important; }
-[data-hero-text-align="left"].page-hero--service   .page-hero__actions { justify-content: flex-start; }
-[data-hero-text-align="center"].page-hero--service .page-hero__actions { justify-content: center; }
-[data-hero-text-align="right"].page-hero--service  .page-hero__actions { justify-content: flex-end; }
+[data-hero-text-align="left"].page-hero--service   .page-hero__actions { justify-content: flex-start !important; }
+[data-hero-text-align="center"].page-hero--service .page-hero__actions { justify-content: center !important; }
+[data-hero-text-align="right"].page-hero--service  .page-hero__actions { justify-content: flex-end !important; }
+/* Reinforce for blog hero child class names (.blog-hero__*) — blog uses different class names */
+[data-hero-text-align="left"].page-hero--service   .blog-hero__eyebrow,
+[data-hero-text-align="left"].page-hero--service   .blog-hero__title,
+[data-hero-text-align="left"].page-hero--service   .blog-hero__sub   { text-align: left   !important; width: 100%; margin-left: 0 !important; margin-right: auto !important; }
+[data-hero-text-align="center"].page-hero--service .blog-hero__eyebrow,
+[data-hero-text-align="center"].page-hero--service .blog-hero__title,
+[data-hero-text-align="center"].page-hero--service .blog-hero__sub  { text-align: center !important; width: 100%; margin-left: auto !important; margin-right: auto !important; }
+[data-hero-text-align="right"].page-hero--service  .blog-hero__eyebrow,
+[data-hero-text-align="right"].page-hero--service  .blog-hero__title,
+[data-hero-text-align="right"].page-hero--service  .blog-hero__sub  { text-align: right  !important; width: 100%; margin-left: auto !important; margin-right: 0 !important; }
 
 /* Text alignment — project heroes */
-[data-hero-text-align="left"]   .project-hero__content-inner { justify-content: flex-start; }
-[data-hero-text-align="left"]   .project-hero__left          { text-align: left; }
-[data-hero-text-align="center"] .project-hero__content-inner { justify-content: center; }
-[data-hero-text-align="center"] .project-hero__left          { text-align: center; }
-[data-hero-text-align="right"]  .project-hero__content-inner { justify-content: flex-end; }
-[data-hero-text-align="right"]  .project-hero__left          { text-align: right; }
+[data-hero-text-align="left"]   .project-hero__content-inner { justify-content: flex-start !important; }
+[data-hero-text-align="left"]   .project-hero__left          { text-align: left !important; }
+[data-hero-text-align="center"] .project-hero__content-inner { justify-content: center !important; }
+[data-hero-text-align="center"] .project-hero__left          { text-align: center !important; }
+[data-hero-text-align="right"]  .project-hero__content-inner { justify-content: flex-end !important; }
+[data-hero-text-align="right"]  .project-hero__left          { text-align: right !important; }
 
 /* Text color override — dark mode (light text → dark text) */
 [data-hero-text-color="dark"] .hero__eyebrow,

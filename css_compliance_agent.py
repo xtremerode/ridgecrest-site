@@ -13,6 +13,15 @@ Checks (critical = blocks commit):
     • CSS custom properties (--var) not redefined inline with fixed px values
       in a way that breaks theming (spot-check for known vars)
 
+  HERO FLASH PREVENTION (critical — blocks commit):
+    • .page-hero--service rule has background-color: #0d1a22
+      (without this, the ::before overlay renders on the white body = dark gray flash)
+    • .hero__bg rule has background-color defined
+      (without this, homepage hero shows white body before image loads)
+    • No background-image set statically in CSS for hero elements
+      (hero images must be injected by server/JS so preload and prefetch work correctly;
+       static CSS background-image bypasses the server injection pipeline)
+
   WARNING
     • hero__actions, page-hero--service, project-hero selectors present
     • nav--scrolled transition rule present
@@ -20,6 +29,12 @@ Checks (critical = blocks commit):
     • diff__visual--one / diff__visual--two selectors present (split panel)
     • about-visual--one / about-visual--two selectors present (split panel)
     • No TODO/FIXME/HACK comments left in production CSS files
+
+GUARDRAIL POLICY:
+  Never remove background-color from .page-hero--service or .hero__bg.
+  Never add a background-image to any hero class in main.css — images are
+  injected by the server (_apply_hero_to_html, if-not-hero block) and must
+  go through that pipeline to get the preload, _1920w variant, and prefetch.
 """
 import os
 import re
@@ -185,6 +200,39 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
         results.append(_r('hero_bg_color_fallback', 'warn',
                            '.page-hero--service rule not found in main.css',
                            'main.css'))
+
+    # ── Hero flash prevention: .hero__bg must have background-color ──────────────
+    _bghomehero = _re.search(r'\.hero__bg\s*\{[^}]*\}', main_css, _re.DOTALL)
+    if _bghomehero:
+        if 'background-color' not in _bghomehero.group(0):
+            results.append(_r('hero_bg_home_color', 'fail',
+                               '.hero__bg rule in main.css has no background-color — '
+                               'homepage hero will flash white body while image loads. '
+                               'Add background-color: #0d1a22.',
+                               'main.css', auto_fixable=False))
+        else:
+            results.append(_r('hero_bg_home_color', 'pass',
+                               '.hero__bg has background-color — no white flash on homepage hero',
+                               'main.css'))
+
+    # ── Hero flash prevention: no static background-image on hero classes in CSS ─
+    # Hero images must be injected by the server (_apply_hero_to_html / if-not-hero
+    # block) to get the preload hint, _1920w size optimization, and prefetch links.
+    # If main.css sets background-image statically on a hero class, those benefits
+    # are bypassed and the image will flash on every navigation.
+    _HERO_CSS_CLASSES = ['.hero__bg', '.page-hero--service', '.project-hero__img',
+                          '.blog-hero', '.post-hero']
+    for _hcc in _HERO_CSS_CLASSES:
+        _hcc_block = _re.search(
+            re.escape(_hcc) + r'\s*\{[^}]*background-image\s*:[^}]*\}',
+            main_css, _re.DOTALL
+        )
+        if _hcc_block:
+            results.append(_r('no_static_hero_bg_image', 'fail',
+                               f'{_hcc} in main.css has a static background-image — '
+                               f'hero images must be server-injected (not CSS) to get '
+                               f'preload, _1920w optimization, and prefetch.',
+                               'main.css', auto_fixable=False))
 
     # ── overrides.css: page-hero__actions CTA guardrail (Apr 2026) ───────────────
     # Services/ subdirectory pages use .page-hero__actions instead of .hero__actions.

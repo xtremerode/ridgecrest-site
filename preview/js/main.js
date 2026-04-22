@@ -125,10 +125,15 @@ document.querySelectorAll('.page-hero--service').forEach(el => {
 
 // Homepage hero (.hero__bg)
 // Use DB-stored hero if server injected window.__RD_HERO; otherwise fixed fallback.
+// Only set inline style if it isn't already set — the flash-fix <style> in <head> may
+// have already applied the image via class rule. Setting the same URL inline triggers
+// no additional load but ensures position/zoom JS can read it for applyHeroTransform.
 const heroBg = document.querySelector('.hero__bg');
 if (heroBg) {
-  const heroSrc = window.__RD_HERO || HERO_FALLBACK;
-  heroBg.style.backgroundImage = `url('${heroSrc}')`;
+  if (!heroBg.style.backgroundImage) {
+    const heroSrc = window.__RD_HERO || HERO_FALLBACK;
+    heroBg.style.backgroundImage = `url('${heroSrc}')`;
+  }
   applyHeroTransform(heroBg);
 }
 
@@ -204,9 +209,22 @@ document.querySelectorAll('.service-card, .step, .portfolio-card, .portfolio-ite
     );
   }
 
+  // Hero classes excluded from the responsive swap.
+  // Hero elements are full-viewport; swapping their URL on DOMContentLoaded forces
+  // the browser to load a second image file, causing the dark-gray flash on navigation.
+  // The server already injects the correct URL via _apply_hero_to_html().
+  var _HERO_CLASSES = [
+    'page-hero--service', 'hero__bg', 'project-hero__img',
+    'blog-hero', 'post-hero'
+  ];
+
   function _swapAll() {
     document.querySelectorAll('[style]').forEach(function(el) {
       if (el.style.backgroundImage && el.style.backgroundImage.indexOf('/assets/images-opt/') >= 0) {
+        // Never swap hero background elements — would cause dark-gray flash on navigation
+        for (var i = 0; i < _HERO_CLASSES.length; i++) {
+          if (el.classList.contains(_HERO_CLASSES[i])) return;
+        }
         _pickVariant(el);
       }
     });

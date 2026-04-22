@@ -72,3 +72,17 @@
   image-rendering: -webkit-optimize-contrast;
   image-rendering: high-quality;
 }
+
+/* ── Hero T-panel: extend CTA/alignment controls to .page-hero__actions ──────
+   services/ pages use .page-hero__actions instead of .hero__actions.
+   These rules mirror the hero CTA visibility / alignment rules in main.css
+   so the T button panel works identically on services pages.
+   Added: 2026-04-21
+*/
+[data-hero-cta="hide"] .page-hero__actions           { display: none !important; }
+[data-hero-cta-primary="hide"]   .page-hero__actions [data-cta-id="primary"]   { display: none !important; }
+[data-hero-cta-secondary="hide"] .page-hero__actions [data-cta-id="secondary"] { display: none !important; }
+[data-hero-cta-align="left"]   .page-hero__actions { justify-content: flex-start  !important; width: 100% !important; }
+[data-hero-cta-align="center"] .page-hero__actions { justify-content: center      !important; width: 100% !important; }
+[data-hero-cta-align="right"]  .page-hero__actions { justify-content: flex-end    !important; width: 100% !important; }
+[data-hero-cta-align="split"]  .page-hero__actions { justify-content: space-between !important; width: 100% !important; }

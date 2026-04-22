@@ -729,3 +729,130 @@ Every hero root element now has `data-hero-id="[slug]-hero"` — used by the T b
 
 ### Status (2026-04-21)
 Text alignment partially working — selector and margin fixes applied in working tree but NOT yet committed. CTA toggle logic in working tree (switched from CSS var to data-attribute). Henry confirmed surgical renders and gradient G button are working correctly on all pages.
+
+## 32. Hero Flash Fix — Service Pages (2026-04-22)
+
+### Problem
+`.page-hero--service` had no `background-color`. While a hero image loads, the browser shows through to the body (`#FAFAF8`) beneath the `::before` dark overlay (`rgba(8,12,18,0.72)`), producing a dark gray (~#363D42) flash that matches "the gray background that was previously there before the image was added."
+
+`.hero__bg` and `.project-hero__img` already had `background-color: #0d1a22` defined. Only `.page-hero--service` was missing it.
+
+### Fix (committed 2026-04-22)
+Added `background-color: #0d1a22` to `.page-hero--service` in `main.css`. Also added `background-color: #0d1a22` to `.hero__bg` and `.page-hero--service` baseline to make the rule explicit for all three hero types.
+
+### QA Guardrails Added
+Three new checks in the Web Dev QA Agency:
+- `hero_flash_fix` — `server_health_agent.py`: verifies home page hero injects flash-fix script
+- `hero_flash_bgcolor` — `css_compliance_agent.py`: verifies `.page-hero--service` has `background-color: #0d1a22`
+- `home_hero_flash_fix` — `server_health_agent.py`: verifies home hero `::before` background property present
+
+**QA result after fix:** 80 passed, 0 warnings, 0 critical failures.
+
+---
+
+## 33. Photo Studio — AI Color Grading App (2026-04-22)
+
+### Overview
+A completely isolated Flask web app for batch AI photo color grading. Zero shared code, venv, or config with any Ridgecrest project.
+
+**Use case:** Henry had a photo shoot with blown-out/wrong color grading. Re-rendered one reference image via ChatGPT to get the desired look. This app batch-processes all remaining photos to match the reference.
+
+### Location & Stack
+- Path: `/home/claudeuser/photo_studio/`
+- Port: 8090 (internal Flask)
+- Models: `gpt-4o` (style analysis) + `gpt-image-1` (editing)
+- Config: `/home/claudeuser/photo_studio/.env` (OpenAI API key)
+- URL prefix: `/studio/` (nginx sub-path — see nginx command below)
+
+### Architecture
+```
+photo_studio/
+├── app.py                    Flask app factory
+├── config.py                 Constants (port, limits, models)
+├── guardrails.py             File validation (type, size, dimensions)
+├── run.py                    Startup script
+├── routes/
+│   ├── upload.py             POST /upload — photos + reference
+│   ├── process.py            POST /process/<job_id>
+│   ├── jobs.py               GET /jobs, GET /jobs/<id>
+│   └── download.py           GET /download/<job_id>/<filename>
+├── agents/
+│   ├── style_analyzer_agent.py   GPT-4o style extraction
+│   ├── photo_processor_agent.py  gpt-image-1 editing per photo
+│   └── batch_manager_agent.py    Parallel processing + rate limiting
+└── jobs/                     Per-job state JSON files
+```
+
+### Photo Studio QA Agency (built 2026-04-22)
+Four QA files in `/home/claudeuser/photo_studio/`:
+
+| File | Purpose |
+|---|---|
+| `ps_health_agent.py` | Server reachable, all API endpoints work, upload guardrails enforce (rejects non-images, accepts JPEG) |
+| `ps_jobs_agent.py` | All jobs valid `status.json` schema, no stuck-processing jobs >30min, input files match manifest |
+| `ps_config_agent.py` | Constants match guardrails, batch abort logic present, API key set, model constants correct |
+| `ps_orchestrator.py` | Runs all three, unified pass/warn/fail output |
+
+**Run:** `cd ~/photo_studio && venv/bin/python ps_orchestrator.py`
+**Quiet mode:** `venv/bin/python ps_orchestrator.py --quiet`
+**Last result:** 34 passed, 1 warning (stale test job from initial build — not a real problem), 0 critical failures.
+
+### Nginx Setup (PENDING — Henry must run in DO console)
+```bash
+sudo cp /tmp/nginx_ridgecrest.conf /etc/nginx/sites-available/ridgecrest && sudo nginx -t && sudo systemctl reload nginx
+```
+If `/tmp/nginx_ridgecrest.conf` no longer exists, recreate it (it was prepared in a previous session).
+
+### Pending Before Production-Ready
+1. File upload click bug — z-index issue in the UI prevents clicking the upload area
+2. End-to-end smoke test with a real photo to confirm OpenAI API calls work end-to-end
+
+### Claude Code Project Context
+To work on Photo Studio in a new Claude session:
+```bash
+cd ~/photo_studio && claude --dangerously-skip-permissions
+```
+The status bar will show `ai-photo-color-grading` (the git repo name detected by Claude Code).
+
+To work on RMA (as always):
+```bash
+cd ~/agent && claude --dangerously-skip-permissions
+```
+
+---
+
+## 34. Three Separate Projects — Agency Structure (2026-04-22)
+
+Henry confirmed from a screenshot that there are **3 separate projects/agencies**:
+
+1. **Ridgecrest Marketing Agency (RMA)** — `/home/claudeuser/agent/` — main marketing command center (orchestrator, Meta/MSFT/Google agents, compliance, website)
+2. **Ridgecrest Agency API** — `/home/claudeuser/agent/ridgecrest-agency/` — Flask file API on port 8765, knowledge base for the RMA (campaigns, keywords, handoffs, scripts, assets)
+3. **Photo Studio** — `/home/claudeuser/photo_studio/` — standalone AI photo color grading app, port 8090
+
+The Web Dev QA agents (`server_health_agent.py`, `html_compliance_agent.py`, etc.) are NOT a separate agency — they are QA tooling that lives inside the RMA directory and tests the RMA website.
+
+The Slack AI Bot (`/home/claudeuser/agent/slack_ai_bot/`) is a sub-project within the RMA, not a standalone agency.
+
+---
+
+## 35. Blog Page — Hero Controls Gold Standard Parity (2026-04-22 Session 2)
+
+### Problem
+The blog index page (`/blog` / "The RD Edit") and individual blog post pages were missing all hero control injections that every other page type receives. Specifically:
+- `_inject_gradient_id_overlays()` was NOT called → saved gradient CSS variable (`--rd-overlay`) never injected → gradient changes made via G button had zero effect on blog pages
+- `_apply_hero_color_mode()` was NOT called → solid color backgrounds set via admin never applied
+- `_inject_hero_text_controls()` was NOT called → saved text alignment, color, and CTA visibility never persisted after page load
+- `_EDIT_OVERLAY_TPL` was NOT injected in admin_edit mode → T/G/BG edit buttons completely absent from blog hero (no way to edit it)
+
+### Fix Applied
+Both `blog()` and `blog_post()` server routes in `preview_server.py` now call the full injection chain:
+1. `_inject_gradient_id_overlays(soup, slug)` — CSS variable injection for gradient overlay
+2. `_apply_hero_color_mode(soup, slug)` — solid color background application
+3. `_inject_hero_text_controls(soup, slug)` — text alignment/color/CTA persistence
+4. `_EDIT_OVERLAY_TPL` injection in admin_edit mode — T/G/BG edit badge on blog hero
+
+### QA Coverage
+23 QA checks pass after fix. Blog pages now have full feature parity with portfolio and all other page types.
+
+### Blog Backend Status (unchanged — still deferred)
+The blog editor UI exists in the admin panel. The publishing workflow (wiring blog posts to live pages) is not yet built. This fix ensures that when the blog goes live, the hero will be fully editable and all persisted hero settings will apply correctly.

@@ -6,9 +6,9 @@ Mirrors the RMA orchestrator pattern but focused on the website build.
 
 Agents run (in order):
   1. server_health_agent   — dev server up, all pages 200
-  2. html_compliance_agent — hero IDs, card IDs, CTA attributes
-  3. css_compliance_agent  — required selectors, no baked CDN URLs
-  4. js_compliance_agent   — postMessage handlers, hero injection tokens
+  2. html_compliance_agent — hero IDs, card IDs, CTA attributes, hero flash prevention
+  3. css_compliance_agent  — required selectors, no baked CDN URLs, hero bg-color guardrails
+  4. js_compliance_agent   — postMessage handlers, hero injection tokens, _HERO_CLASSES
   5. admin_panel_agent     — BG panel wiring, picker API saves
 
 Exit codes:
@@ -23,6 +23,37 @@ Usage:
 Pre-commit mode (invoked by .git/hooks/pre-commit):
   python web_dev_orchestrator.py --pre-commit
   Exits 1 on any critical fail, prints compact summary.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GUARDRAIL POLICY — HERO FLASH PREVENTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The dark-background flash before hero images load has been reported and
+"fixed" multiple times. Every agent now enforces a layer of the fix.
+ANY code change that touches hero-related code MUST re-run this orchestrator
+before being considered complete.
+
+Four layers — ALL must pass:
+
+Layer 1 — JS: _HERO_CLASSES in main.js (js_compliance_agent)
+  _swapAll() must skip all 5 hero class names. Checked by js_compliance_agent.
+
+Layer 2 — Server: _hero_display_path() in preview_server.py (js_compliance_agent)
+  Hero images served as _1920w variants (~500KB vs 2-5MB full-res).
+  Functions _HERO_FALLBACK_PATH, _NAV_PREFETCH_SLUGS, _get_nav_hero_paths must exist.
+
+Layer 3 — CSS: background-color on hero elements (css_compliance_agent)
+  .page-hero--service and .hero__bg must have background-color: #0d1a22.
+  No static background-image on hero classes in CSS (bypasses server pipeline).
+
+Layer 4 — Live server: preload + css_bg + prefetch on served pages (html_compliance_agent)
+  Every served page must have fetchpriority="high" preload, CSS background-image
+  in <style> before JS, and <link rel="prefetch"> for all nav pages' heroes.
+  This is checked by hitting the live server on http://147.182.242.54:8081.
+
+Rule: When any new feature is added that touches heroes, CTAs, or page templates,
+immediately add a corresponding check to the appropriate agent. Guardrails must
+grow with the codebase. Never ship a hero-related change without re-running this.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 import argparse
 import sys
@@ -46,6 +77,7 @@ AGENTS = [
     ('css_compliance_agent',  'CSS Compliance'),
     ('js_compliance_agent',   'JS Compliance'),
     ('admin_panel_agent',     'Admin Panel'),
+    ('page_state_guard',      'Page State Guard'),
 ]
 
 # ANSI colours

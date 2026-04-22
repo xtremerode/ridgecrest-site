@@ -167,25 +167,33 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
                 results.append(_r('admin_page_title', 'warn',
                                    f'{filename} has no <title> tag', filename))
 
-            css_links = [lnk.get('href', '') for lnk in soup.find_all('link', rel='stylesheet')]
-            has_admin_css = any('admin.css' in h for h in css_links)
-            if not has_admin_css:
-                results.append(_r('admin_css_linked', 'warn',
-                                   f'{filename} does not link admin.css', filename))
+            # Skip internal tooling/mockup files — they don't need admin.css
+            _SKIP_CSS_CHECK = {'logo-mockup.html', 'mockup.html'}
+            if filename not in _SKIP_CSS_CHECK:
+                css_links = [lnk.get('href', '') for lnk in soup.find_all('link', rel='stylesheet')]
+                has_admin_css = any('admin.css' in h for h in css_links)
+                if not has_admin_css:
+                    results.append(_r('admin_css_linked', 'warn',
+                                       f'{filename} does not link admin.css', filename))
 
-    # ── admin/index.html: KPI dashboard structure ─────────────────────────────
+    # ── admin/index.html: login page (redirects to dashboard.html) ───────────
+    # KPI cards live in dashboard.html, not index.html — check dashboard instead.
     index_path = os.path.join(ADMIN_DIR, 'index.html')
     if os.path.exists(index_path):
         index = _read(index_path)
-        kpi_tokens = [
-            ('kpi',        'KPI card element'),
-            ('dashboard',  'dashboard section reference'),
-        ]
-        for token, desc in kpi_tokens:
-            _check(index, token, 'admin/index.html', desc, 'warn', results)
+        _check(index, 'dashboard',  'admin/index.html', 'dashboard section reference', 'warn', results)
     else:
         results.append(_r('admin_index_exists', 'fail',
                            'admin/index.html not found'))
+
+    # ── admin/dashboard.html: KPI cards ──────────────────────────────────────
+    dashboard_path = os.path.join(ADMIN_DIR, 'dashboard.html')
+    if os.path.exists(dashboard_path):
+        dash = _read(dashboard_path)
+        _check(dash, 'kpi', 'admin/dashboard.html', 'KPI card element', 'warn', results)
+    else:
+        results.append(_r('admin_dashboard_exists', 'warn',
+                           'admin/dashboard.html not found'))
 
     # ── admin/settings.html: exists ───────────────────────────────────────────
     settings_path = os.path.join(ADMIN_DIR, 'settings.html')

@@ -285,6 +285,38 @@ def _get_page_data(slug):
     except Exception:
         return None, '50% 50%', 1.0, 0.0, 0.0
 
+
+# Server-side hero fallback — must match HERO_POOL[0] in main.js
+_HERO_FALLBACK_PATH = '/assets/images-opt/ff5b18_c520c9ca384d4c3ebe02707d0c8f45ab_mv2.webp'
+
+# Main nav slugs — hero images for these are prefetched on every page load so
+# navigating to any of them never shows the dark-background flash.
+_NAV_PREFETCH_SLUGS = [
+    'home', 'about', 'process', 'portfolio', 'contact', 'team',
+    'custom-homes', 'kitchen-remodels', 'bathroom-remodels',
+    'whole-home-remodels', 'therdedit',
+]
+
+
+def _get_nav_hero_paths(slugs):
+    """Batch-query hero_image for a list of page slugs. Returns {slug: path}."""
+    conn = _db_conn()
+    if not conn:
+        return {}
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT slug, hero_image FROM pages WHERE slug = ANY(%s)"
+            " AND hero_image IS NOT NULL AND hero_image != ''",
+            (list(slugs),)
+        )
+        return {row['slug']: row['hero_image'] for row in cur.fetchall()}
+    except Exception:
+        return {}
+    finally:
+        conn.close()
+
+
 def _get_device_override(slug, device):
     """Return (pos, zoom, tx, ty) for a device override row, or None if none exists."""
     if device not in ('tablet', 'mobile'):
@@ -1251,6 +1283,21 @@ def _apply_section_heights(content: bytes, slug: str, device: str, preloaded_row
         return content
 
 
+def _hero_display_path(hero_path: str) -> str:
+    """Return the _1920w responsive variant of a hero image if it exists on disk.
+    Full-res base images (_mv2.webp, upload_*.webp) are 2–5MB — the _1920w variant
+    is 500–700KB and indistinguishable at hero scale. Using it eliminates the dark-
+    background flash on navigation by loading the image ~7x faster."""
+    if not hero_path or not hero_path.startswith('/assets/images-opt/'):
+        return hero_path
+    base = hero_path[:-5] if hero_path.endswith('.webp') else hero_path
+    variant = base + '_1920w.webp'
+    disk_path = os.path.join(PREVIEW_DIR, variant.lstrip('/'))
+    if os.path.isfile(disk_path):
+        return variant
+    return hero_path
+
+
 def _apply_hero_to_html(content: bytes, hero_path: str,
                          hero_position: str = '50% 50%', hero_zoom: float = 1.0) -> bytes:
     """Swap the first inline background-image URL in HTML with hero_path.
@@ -1258,44 +1305,51 @@ def _apply_hero_to_html(content: bytes, hero_path: str,
     so main.js can apply them (home page + any element set by JS).
 
     Also injects a <style> tag that pre-sets background-image on .page-hero--service
-    so the browser applies it before JS runs, eliminating the dark-overlay flash."""
+    so the browser applies it before JS runs, eliminating the dark-overlay flash.
+
+    FLASH PREVENTION GUARDRAIL:
+    The responsive-image swap in main.js (_swapAll) is permanently excluded from
+    running on hero elements (.page-hero--service, .hero__bg, .project-hero__img,
+    .blog-hero, .post-hero). If you add new hero class names, add them to _HERO_CLASSES
+    in main.js too — otherwise the swap will re-trigger a hero image load on
+    DOMContentLoaded and cause the dark-gray flash on every navigation."""
+    # Use _1920w variant for display (CSS/preload) — ~7x smaller than full-res base.
+    # JS vars keep the original path so the admin editor saves/reads the correct key.
+    display_path = _hero_display_path(hero_path)
     text = content.decode('utf-8', errors='replace')
     new_text, _ = re.subn(
         r"(background-image\s*:\s*url\(['\"]?)(/assets/[^'\")\s]+)(['\"]?\))",
-        lambda m: m.group(1) + hero_path + m.group(3),
+        lambda m: m.group(1) + display_path + m.group(3),
         text, count=1
     )
-    # Always inject script vars — main.js reads these for all hero types
+    # Always inject script vars — main.js reads these for all hero types.
+    # Use display_path (_1920w variant) so main.js references the same fast image
+    # as the CSS injection — if hero_path (full-res) were used here, main.js would
+    # override the CSS class rule with a different URL on DOMContentLoaded, triggering
+    # a new 2–5MB download and causing the dark flash to re-appear.
     script = (
-        f'<script>window.__RD_HERO={_safe_js(hero_path)};'
+        f'<script>window.__RD_HERO={_safe_js(display_path)};'
         f'window.__RD_HERO_POSITION={_safe_js(hero_position)};'
         f'window.__RD_HERO_ZOOM={_safe_js(hero_zoom)};</script>'
     )
-    # Also inject a <style> that pre-sets the background-image on .page-hero--service
-    # so it is applied before JS runs, eliminating the ::before dark-overlay flash.
-    # Also sets --rd-overlay as a CSS var fallback so the hero always has a readable
-    # text gradient even when no card_settings record exists for this page's hero.
-    # If _inject_gradient_id_overlays later injects a specific value via inline style
-    # on the element, that inline style takes precedence over this class-level rule.
     zoom_css = f'{round(hero_zoom * 100)}%' if hero_zoom > 1.001 else 'cover'
     pos_css  = hero_position or '50% 50%'
-    # Covers all hero types in one <style> block — each page only has one hero type,
-    # so the other rules are harmless no-ops.
-    #   .page-hero--service — about, process, contact, team, all services/ pages
-    #   .hero__bg           — home page (image applied by JS otherwise; pre-set here eliminates flash)
-    # background-color: #0d1a22 on .page-hero--service ensures the dark navy shows while the
-    # image is loading, so the ::before overlay never renders on white body background (= gray flash).
+    # Use display_path (smaller _1920w variant) for preload and CSS so the browser
+    # fetches a ~500KB file instead of a 2–5MB full-res image.
+    preload = f'<link rel="preload" as="image" href="{display_path}" fetchpriority="high">\n'
     flash_fix = (
         f'<style>'
-        f'.page-hero--service{{background-image:url("{hero_path}");'
+        f'.page-hero--service{{background-image:url("{display_path}");'
         f'background-position:{pos_css};background-size:{zoom_css};'
         f'background-color:#0d1a22;'
         f'--rd-overlay:linear-gradient(to top,rgba(0,0,0,0.55) 0%,transparent 75%);}}'
-        f'.hero__bg{{background-image:url("{hero_path}");'
+        f'.hero__bg{{background-image:url("{display_path}");'
+        f'background-position:{pos_css};background-size:{zoom_css};}}'
+        f'.project-hero__img{{background-image:url("{display_path}");'
         f'background-position:{pos_css};background-size:{zoom_css};}}'
         f'</style>'
     )
-    inject = flash_fix + script
+    inject = preload + flash_fix + script
     if '</head>' in new_text:
         new_text = new_text.replace('</head>', inject + '</head>', 1)
     else:
@@ -4391,6 +4445,32 @@ def view(filename):
                     content = content.replace(b'</head>', script + b'</head>', 1)
                 else:
                     content = script + content
+            # No saved hero: inject a preload for the inline background-image already
+            # in the static HTML (service pages have this). Without a preload, the
+            # browser only discovers the image when it paints the element → visible
+            # No saved hero: inject CSS background-image from HERO_FALLBACK + preload.
+            # Static HTML has NO inline background-image on hero elements — only a CSS class.
+            # Without this injection, JS sets the image on DOMContentLoaded (late), causing
+            # the dark-navy (#0d1a22) background-color to show for the full JS startup time
+            # plus image download time — a very visible flash. By injecting a <style> here,
+            # the browser sets background-image at CSS-parse time (before any JS runs),
+            # the same as pages that DO have a saved hero via _apply_hero_to_html().
+            if not hero and b'</head>' in content:
+                _fb = _hero_display_path(_HERO_FALLBACK_PATH)
+                # Set window.__RD_HERO to the same _1920w variant used in CSS so main.js
+                # does not override the CSS class rule with a different (full-res) URL.
+                _fb_inject = (
+                    f'<link rel="preload" as="image" href="{_fb}" fetchpriority="high">\n'
+                    f'<style>'
+                    f'.page-hero--service{{background-image:url("{_fb}");background-color:#0d1a22;}}'
+                    f'.hero__bg{{background-image:url("{_fb}");}}'
+                    f'.project-hero__img{{background-image:url("{_fb}");}}'
+                    f'.blog-hero{{background-image:url("{_fb}");}}'
+                    f'.post-hero{{background-image:url("{_fb}");}}'
+                    f'</style>\n'
+                    f'<script>window.__RD_HERO={_safe_js(_fb)};</script>\n'
+                ).encode('utf-8')
+                content = content.replace(b'</head>', _fb_inject + b'</head>', 1)
             # Inject text offset vars if non-zero
             if hero_tx or hero_ty:
                 txt_script = (
@@ -4401,6 +4481,25 @@ def view(filename):
                     content = content.replace(b'</head>', txt_script + b'</head>', 1)
                 else:
                     content = txt_script + content
+
+        # Hero prefetch via JS (hover-intent) — injected as a data map into every page.
+        # Firing 8+ <link rel="prefetch"> tags unconditionally consumed background
+        # bandwidth and made other images load slowly. Instead we embed a JSON map of
+        # {url: heroImagePath} and let nav-transition.js prefetch only on hover intent.
+        if HAS_DB and b'</head>' in content:
+            _nav_hero_map = _get_nav_hero_paths(_NAV_PREFETCH_SLUGS)
+            _hero_map_entries = {}
+            for _pslug in _NAV_PREFETCH_SLUGS:
+                _phero = _nav_hero_map.get(_pslug, _HERO_FALLBACK_PATH)
+                _pdisplay = _hero_display_path(_phero)
+                # Map by the URL that nav links use (e.g. /view/about.html)
+                _purl = '/view/index.html' if _pslug == 'home' else f'/view/{_pslug}.html'
+                _hero_map_entries[_purl] = _pdisplay
+            _hero_map_script = (
+                f'<script>window.__RD_HERO_MAP={json.dumps(_hero_map_entries)};</script>\n'
+            ).encode('utf-8')
+            if _hero_map_script:
+                content = content.replace(b'</head>', _hero_map_script + b'</head>', 1)
 
         # Strip data-card-id from page-hero--service divs so hero overlay owns them.
         # Must run before _apply_cards_to_html so the card script never finds these elements.
@@ -4580,7 +4679,7 @@ def view(filename):
 
     resp = Response(content, mimetype=mime)
     if mime and mime.startswith('image/'):
-        resp.headers['Cache-Control'] = 'public, max-age=3600'
+        resp.headers['Cache-Control'] = 'public, max-age=86400'
     else:
         resp.headers['Cache-Control'] = 'no-cache'
     return resp
@@ -4710,7 +4809,7 @@ def serve_assets(filename):
         if request.args.get('v'):
             resp.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
         else:
-            resp.headers['Cache-Control'] = 'public, max-age=3600'
+            resp.headers['Cache-Control'] = 'public, max-age=86400'
     else:
         resp.headers['Cache-Control'] = 'no-cache'
     return resp
@@ -6454,6 +6553,7 @@ _BLOG_HEAD = '''<!DOCTYPE html>
 <body>'''
 
 _BLOG_SCRIPTS = '''  <script src="/view/js/main.js"></script>
+  <script src="/view/js/nav-transition.js" defer></script>
 </body>
 </html>'''
 
@@ -6615,7 +6715,51 @@ def blog_index():
   {_BLOG_FOOTER}
   {_BLOG_SCRIPTS}'''
 
-    return head + body
+    html = head + body
+
+    # Apply the same hero injection pipeline as view() so gradients, color mode,
+    # and saved text alignment all work on the blog index page.
+    if HAS_DB:
+        _bi_cards = _get_card_settings('blog')
+        if _bi_cards:
+            _bi_cards = _upgrade_card_images(_bi_cards)
+            _bi_bytes = html.encode('utf-8')
+            _bi_bytes = _inject_hero_text_controls(_bi_bytes, _bi_cards)
+            _bi_bytes = _apply_hero_color_mode(_bi_bytes, _bi_cards)
+            _bi_bytes = _inject_gradient_id_overlays(_bi_bytes, _bi_cards)
+            html = _bi_bytes.decode('utf-8', errors='replace')
+        else:
+            # Always inject gradient overlay even with no card settings
+            _bi_bytes = _inject_gradient_id_overlays(html.encode('utf-8'), [])
+            html = _bi_bytes.decode('utf-8', errors='replace')
+
+    # Inject hero map for hover-intent prefetch (blog index never goes through view())
+    if HAS_DB and '</head>' in html:
+        _bi_nav_heroes = _get_nav_hero_paths(_NAV_PREFETCH_SLUGS)
+        _bi_map = {}
+        for _pslug in _NAV_PREFETCH_SLUGS:
+            _phero = _bi_nav_heroes.get(_pslug, _HERO_FALLBACK_PATH)
+            _pdisplay = _hero_display_path(_phero)
+            _purl = '/view/index.html' if _pslug == 'home' else f'/view/{_pslug}.html'
+            _bi_map[_purl] = _pdisplay
+        html = html.replace('</head>',
+            f'<script>window.__RD_HERO_MAP={json.dumps(_bi_map)};</script>\n</head>', 1)
+
+    # Edit overlays (admin_edit=1) — same as view(): hero overlay + card overlay
+    _ae_token = request.args.get('token', '')
+    if request.args.get('admin_edit') == '1' and _valid_token(_ae_token):
+        _bi_overlay = _EDIT_OVERLAY_TPL.format(
+            slug_json=json.dumps('blog'),
+            token_json=json.dumps(_ae_token)
+        )
+        html = html.replace('</body>', _bi_overlay + '</body>', 1)
+        card_overlay = _CARD_EDIT_OVERLAY_TPL.format(
+            slug_json=json.dumps('blog'),
+            token_json=json.dumps(_ae_token)
+        )
+        html = html.replace('</body>', card_overlay + '</body>', 1)
+
+    return html
 
 
 @app.route('/blog/<slug>')
@@ -6731,21 +6875,66 @@ def blog_post(slug):
   {_BLOG_SCRIPTS}'''
 
     page = head + body
-    # Inject card edit overlay when admin_edit=1 (same system as /view/ pages)
+
+    # Apply hero injection pipeline (gradient, color mode, text alignment)
+    if HAS_DB:
+        _bp_slug = f'blog/{slug}'
+        _bp_cards = _get_card_settings(_bp_slug)
+        if _bp_cards:
+            _bp_cards = _upgrade_card_images(_bp_cards)
+            _bp_bytes = page.encode('utf-8')
+            _bp_bytes = _inject_hero_text_controls(_bp_bytes, _bp_cards)
+            _bp_bytes = _apply_hero_color_mode(_bp_bytes, _bp_cards)
+            _bp_bytes = _inject_gradient_id_overlays(_bp_bytes, _bp_cards)
+            page = _bp_bytes.decode('utf-8', errors='replace')
+        else:
+            _bp_bytes = _inject_gradient_id_overlays(page.encode('utf-8'), [])
+            page = _bp_bytes.decode('utf-8', errors='replace')
+
+    # Edit overlays (admin_edit=1) — same as view(): hero overlay + card overlay
     _ae_token = request.args.get('token', '')
     if request.args.get('admin_edit') == '1' and _valid_token(_ae_token):
-        _blog_slug = f'blog/{slug}'
-        _blog_cards = _get_card_settings(_blog_slug) if HAS_DB else []
-        if _blog_cards:
-            _blog_content = page.encode('utf-8')
-            _blog_content = _inject_hero_text_controls(_blog_content, _blog_cards)
-            page = _blog_content.decode('utf-8', errors='replace')
+        _bp_ae_slug = f'blog/{slug}'
+        _bp_overlay = _EDIT_OVERLAY_TPL.format(
+            slug_json=json.dumps(_bp_ae_slug),
+            token_json=json.dumps(_ae_token)
+        )
+        page = page.replace('</body>', _bp_overlay + '</body>', 1)
         card_overlay = _CARD_EDIT_OVERLAY_TPL.format(
-            slug_json=json.dumps(_blog_slug),
+            slug_json=json.dumps(_bp_ae_slug),
             token_json=json.dumps(_ae_token)
         )
         page = page.replace('</body>', card_overlay + '</body>', 1)
-    return page
+
+    # Hero flash prevention: inject preload + CSS + nav prefetch links.
+    # blog_post() never goes through view() so this must be done here explicitly.
+    page_bytes = page.encode('utf-8')
+    if b'</head>' in page_bytes:
+        # Preload the post's featured image (or fallback) at high priority
+        _fi = post.get('featured_image') or ''
+        if _fi and _fi.startswith('/assets/'):
+            _fi_display = _hero_display_path(_fi)
+        elif _fi:
+            _fi_display = _fi  # external URL — use as-is
+        else:
+            _fi_display = _hero_display_path(_HERO_FALLBACK_PATH)
+        _bp_preload = (
+            f'<link rel="preload" as="image" href="{_fi_display}" fetchpriority="high">\n'
+            f'<style>.post-hero{{background-image:url("{_fi_display}");background-color:#0d1a22;}}</style>\n'
+        ).encode('utf-8')
+        page_bytes = page_bytes.replace(b'</head>', _bp_preload + b'</head>', 1)
+        # Inject hero map for hover-intent prefetch
+        if HAS_DB:
+            _bp_nav_heroes = _get_nav_hero_paths(_NAV_PREFETCH_SLUGS)
+            _bp_map = {}
+            for _pslug in _NAV_PREFETCH_SLUGS:
+                _phero = _bp_nav_heroes.get(_pslug, _HERO_FALLBACK_PATH)
+                _pdisplay = _hero_display_path(_phero)
+                _purl = '/view/index.html' if _pslug == 'home' else f'/view/{_pslug}.html'
+                _bp_map[_purl] = _pdisplay
+            _bp_map_script = f'<script>window.__RD_HERO_MAP={json.dumps(_bp_map)};</script>\n'.encode()
+            page_bytes = page_bytes.replace(b'</head>', _bp_map_script + b'</head>', 1)
+    return page_bytes.decode('utf-8', errors='replace')
 
 
 # ── Blog admin API ─────────────────────────────────────────────────────────────

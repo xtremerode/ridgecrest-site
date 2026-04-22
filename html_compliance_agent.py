@@ -82,12 +82,26 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
                    'Run: pip install beautifulsoup4')]
 
     results: List[Dict[str, Any]] = []
-    html_files = sorted(
+
+    # Root-level pages
+    _root_files = sorted(
         f for f in os.listdir(PREVIEW_DIR)
         if f.endswith('.html')
         and f not in NO_HERO_PAGES
         and not f.startswith('admin')
     )
+
+    # services/ subdirectory pages (guardrail: every services/ hero must have data-hero-id)
+    _svc_dir = os.path.join(PREVIEW_DIR, 'services')
+    _svc_files = []
+    if os.path.isdir(_svc_dir):
+        _svc_files = sorted(
+            os.path.join('services', f)
+            for f in os.listdir(_svc_dir)
+            if f.endswith('.html') and '.bak_' not in f
+        )
+
+    html_files = _root_files + _svc_files
 
     # Global card-id registry: id → list of pages
     card_id_registry: Dict[str, List[str]] = {}
@@ -97,7 +111,8 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
     for filename in html_files:
         path = os.path.join(PREVIEW_DIR, filename)
         page = filename
-        is_project = bool(PROJECT_PAGE_PATTERN.match(filename))
+        is_project = bool(PROJECT_PAGE_PATTERN.match(os.path.basename(filename)))
+        is_service = filename.startswith('services/')
 
         with open(path, 'r', encoding='utf-8', errors='replace') as fh:
             html = fh.read()
@@ -105,20 +120,30 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
         soup = BeautifulSoup(html, 'html.parser')
 
         # ── Card ID uniqueness ──────────────────────────────────────────────
+        # For services/ pages, skip data-card-id on the hero element itself —
+        # it is stripped by _strip_hero_card_ids() at serve time and is not
+        # a "real" card for uniqueness purposes.
         for el in soup.find_all(attrs={'data-card-id': True}):
+            if is_service and 'page-hero--service' in el.get('class', []):
+                continue  # hero card-id stripped at serve time
             cid = el['data-card-id']
             card_id_registry.setdefault(cid, []).append(page)
 
         # ── data-card-id on .page-hero--service (architectural violation) ──
-        for el in soup.find_all(class_='page-hero--service'):
-            if el.get('data-card-id'):
-                results.append(_r(
-                    'no_card_id_on_service_hero', 'fail',
-                    f"data-card-id='{el['data-card-id']}' on .page-hero--service "
-                    f"(must be stripped by server — will shadow hero overlay)",
-                    page, auto_fixable=True
-                ))
-                hero_pass = False
+        # Root-level pages: hero must NOT have data-card-id — card system and hero
+        # overlay are separate and having both causes conflicts.
+        # services/ pages: data-card-id may co-exist with data-hero-id in static HTML
+        # because _strip_hero_card_ids() removes it at serve time. Not a violation.
+        if not is_service:
+            for el in soup.find_all(class_='page-hero--service'):
+                if el.get('data-card-id'):
+                    results.append(_r(
+                        'no_card_id_on_service_hero', 'fail',
+                        f"data-card-id='{el['data-card-id']}' on .page-hero--service "
+                        f"(must be stripped by server — will shadow hero overlay)",
+                        page, auto_fixable=True
+                    ))
+                    hero_pass = False
 
         # ── Find hero container elements ────────────────────────────────────
         heroes = [tag for tag in soup.find_all(True) if _is_hero_container(tag)]
@@ -141,7 +166,9 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
                 continue  # can't do further checks without the ID
 
             # ── data-hero-id + data-card-id on same element (critical) ───
-            if hero.get('data-card-id'):
+            # services/ pages are exempt: data-card-id is stripped by the server at
+            # serve time via _strip_hero_card_ids(). In static HTML both may coexist.
+            if hero.get('data-card-id') and not is_service:
                 results.append(_r(
                     'no_dual_id', 'fail',
                     f"hero '{hero_id}' has both data-hero-id AND "
@@ -151,14 +178,18 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
                 hero_pass = False
 
             # ── hero__actions class present ───────────────────────────────
+            # services/ pages use .page-hero__actions; main/project pages use
+            # .hero__actions or .project-hero__right
             actions_el = (
                 hero.find(class_='hero__actions') or
-                hero.find(class_='project-hero__right')
+                hero.find(class_='project-hero__right') or
+                hero.find(class_='page-hero__actions')
             )
             if not actions_el:
                 results.append(_r(
                     'hero_has_actions', 'warn',
-                    f"hero '{hero_id}' has no .hero__actions or .project-hero__right",
+                    f"hero '{hero_id}' has no .hero__actions, .page-hero__actions, "
+                    f"or .project-hero__right",
                     page, auto_fixable=False
                 ))
             else:
@@ -184,7 +215,8 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
 
             # ── data-gradient-id on overlay ───────────────────────────────
             gradient_el = (
-                hero.find(attrs={'data-gradient-id': True}) or
+                (hero if hero.get('data-gradient-id') else None) or  # on element itself
+                hero.find(attrs={'data-gradient-id': True}) or        # inside element
                 (hero.parent and hero.parent.find(attrs={'data-gradient-id': True}))
             )
             if not gradient_el:
@@ -226,15 +258,85 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
             dup_found = True
             hero_pass = False
 
+    # ── Global: undo_log gradient coverage check ─────────────────────────────
+    # Catches a repeat of the Apr 2026 gradient-loss incident: the undo_log SELECT
+    # query did not include gradient columns, so gradient edits were lost when
+    # test-artifact records were deleted. This check reads preview_server.py and
+    # verifies that the SELECT in admin_card_update captures gradient fields.
+    server_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'preview_server.py')
+    if os.path.exists(server_path):
+        with open(server_path, 'r', encoding='utf-8', errors='replace') as fh:
+            server_src = fh.read()
+        # The SELECT that precedes _log_undo in admin_card_update must include gradient_type
+        # Look for SELECT ... gradient_type near _log_undo
+        import re as _re
+        has_grad_in_undo = bool(_re.search(
+            r'SELECT[^;]*gradient_type[^;]*FROM card_settings[^;]*\n[^\n]*_log_undo',
+            server_src, _re.DOTALL
+        ))
+        if not has_grad_in_undo:
+            results.append(_r(
+                'undo_log_gradient_coverage', 'warn',
+                'preview_server.py admin_card_update SELECT before _log_undo may not include '
+                'gradient_type — gradient edits may not be recoverable via undo. '
+                'Ensure SELECT captures gradient_type, gradient_tint, gradient_opacity, '
+                'gradient_direction, gradient_distance.',
+                auto_fixable=False
+            ))
+        else:
+            results.append(_r(
+                'undo_log_gradient_coverage', 'pass',
+                'admin_card_update undo_log SELECT includes gradient columns'
+            ))
+
     # ── Summary pass entries (one per check category if no failures) ───────────
     if hero_pass and not any(r['check'] == 'hero_has_id' and r['status'] == 'fail'
                              for r in results):
         results.append(_r('hero_attributes', 'pass',
-                          f"All hero elements have data-hero-id ({len(html_files)} pages checked)"))
+                          f"All hero elements have data-hero-id "
+                          f"({len(_root_files)} root + {len(_svc_files)} services pages checked)"))
     if not dup_found:
         total_ids = sum(len(v) for v in card_id_registry.values())
         results.append(_r('card_id_unique', 'pass',
                           f"{len(card_id_registry)} card IDs across {len(html_files)} pages — all unique"))
+
+    # ── Hero flash prevention: live server check ─────────────────────────────────
+    # Every served page must have: preload, CSS background-image in <style>, and
+    # cross-page prefetch links. This is the only way to guarantee no dark-navy flash.
+    import urllib.request as _urlreq
+    _SERVER = 'http://147.182.242.54:8081'
+    _FLASH_PAGES = [
+        ('index', f'{_SERVER}/view/index.html'),
+        ('about', f'{_SERVER}/view/about.html'),
+        ('process', f'{_SERVER}/view/process.html'),
+        ('contact', f'{_SERVER}/view/contact.html'),
+        ('blog', f'{_SERVER}/blog'),
+    ]
+    _flash_fails = []
+    _flash_checked = 0
+    for _fpslug, _fpurl in _FLASH_PAGES:
+        try:
+            _req = _urlreq.Request(_fpurl, headers={'User-Agent': 'Mozilla/5.0'})
+            with _urlreq.urlopen(_req, timeout=4) as _resp:
+                _fhtml = _resp.read().decode('utf-8', errors='replace')
+            _has_preload  = 'rel="preload" as="image"' in _fhtml
+            _has_css_bg   = 'background-image:url(' in _fhtml and '<style>' in _fhtml
+            _has_prefetch = 'rel="prefetch" as="image"' in _fhtml
+            _flash_checked += 1
+            if not (_has_preload and _has_css_bg):
+                _flash_fails.append(_fpslug)
+                results.append(_r('hero_flash_prevention', 'fail',
+                                   f'{_fpslug}: missing preload={not _has_preload} '
+                                   f'css_bg={not _has_css_bg}', _fpslug))
+            elif not _has_prefetch:
+                results.append(_r('hero_flash_prevention', 'warn',
+                                   f'{_fpslug}: missing prefetch links (cross-page cache warm)', _fpslug))
+        except Exception as _fe:
+            results.append(_r('hero_flash_prevention', 'warn',
+                               f'{_fpslug}: server unreachable ({_fe})', _fpslug))
+    if _flash_checked > 0 and not _flash_fails:
+        results.append(_r('hero_flash_prevention', 'pass',
+                           f'All {_flash_checked} sampled pages have preload + CSS bg-image'))
 
     return results
 
