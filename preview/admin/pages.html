@@ -2400,6 +2400,26 @@
     try {
       // Flush any pending unsaved hero edits before the snapshot runs
       if (editMode && _heroTouched) await saveNow();
+      // Flush unsaved text edits — equivalent to clicking "Save Text ✓"
+      if (textEditCount > 0) {
+        const cw = siteFrame.contentWindow;
+        if (cw && cw.__rdTextEdits && Object.keys(cw.__rdTextEdits).length && currentSlug) {
+          editStatus.textContent = 'Saving text edits…';
+          const _tedits = Object.assign({}, cw.__rdTextEdits);
+          const _tr = await API(`/admin/api/pages/${currentSlug}/text-edits`, {
+            method: 'PATCH',
+            body: JSON.stringify({ edits: _tedits })
+          });
+          if (_tr && _tr.ok) {
+            cw.__rdTextEdits = {};
+            textEditCount = 0;
+            saveTextBtn.style.display = 'none';
+          }
+        }
+      }
+      // Flush open T panel state — equivalent to clicking "Save Text Settings"
+      if (typeof window._tpFlush === 'function') await window._tpFlush();
+      editStatus.textContent = 'Publishing…';
       const res = await API('/admin/api/pages/publish', { method: 'POST', body: JSON.stringify({ all: true }) });
       if (res && res.ok) {
         publishBtnText.textContent = `Published ✓ (${res.count})`;
@@ -3605,6 +3625,36 @@
       panel.style.top  = top  + 'px';
       panel.classList.add('open');
       tpSave.disabled = false; tpSave.textContent = 'Save Text Settings';
+    };
+
+    // Called by publish handler to flush open T panel state before snapshotting
+    window._tpFlush = async function() {
+      if (!_tp || !currentSlug) return;
+      const v = _read();
+      const cs = _tp.cardState || {};
+      try {
+        await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}/${encodeURIComponent(_tp.heroId)}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            mode: cs.mode || 'color',
+            color: cs.color || '#1C1C1C',
+            image: cs.image || null,
+            position: cs.position || '50% 50%',
+            zoom: cs.zoom || 1.0,
+            gradient_type: cs.gradient_type || null,
+            gradient_tint: cs.gradient_tint || null,
+            gradient_opacity: cs.gradient_opacity != null ? cs.gradient_opacity : null,
+            gradient_direction: cs.gradient_direction || null,
+            gradient_distance: cs.gradient_distance != null ? cs.gradient_distance : null,
+            hero_text_align:    v.hero_text_align,
+            hero_text_color:    v.hero_text_color,
+            hero_cta_visible:   v.hero_cta_visible,
+            hero_cta_align:     v.hero_cta_align,
+            hero_cta_primary:   v.hero_cta_primary,
+            hero_cta_secondary: v.hero_cta_secondary
+          })
+        });
+      } catch(e) {}
     };
   })();
 
