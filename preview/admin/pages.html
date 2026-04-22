@@ -1933,7 +1933,7 @@
   const _sectionHeightOverrides = {};
 
   function _updateViewportFix() {
-    console.log('%c[RD] _updateViewportFix called', 'color:#ff9800', new Error().stack.split('\n')[1].trim());
+    console.log('%c[RD] _updateViewportFix called', 'color:#ff9800', new Error().stack.split('\n').slice(2,5).map(s=>s.trim()).join(' ← '));
     try {
       const doc = siteFrame.contentDocument;
       if (!doc) return;
