@@ -889,9 +889,106 @@ Henry expressed frustration that the same issues keep breaking after being fixed
 - CTAs are broken on all pages again (reported by Henry — not yet investigated as of session end)
 
 ### Proposed Workflow Fixes (Not Yet Implemented)
-1. **Pre-commit QA gate** — git pre-commit hook that runs the QA orchestrator; blocks commit if any check fails
-2. **QA must cover all page types** — every hero page type (all 15+), every CTA button, all shared-file behaviors
+1. **Pre-commit QA gate** — git pre-commit hook that runs the QA orchestrator; blocks commit if any check fails ✅ CONFIRMED ALREADY IN PLACE (2026-04-22 Session 4)
+2. **QA must cover all page types** — every hero page type (all 15+), every CTA button, all shared-file behaviors ✅ EXPANDED to 15 pages (2026-04-22 Session 4)
 3. **Behavior locks** — when a feature is marked `stable`, its QA check becomes a hard gate (blocking, not advisory)
-4. **Shared file change protocol** — any edit to `preview_server.py`, `main.css`, or `main.js` must be followed immediately by full QA suite before committing; QA result count in commit message
+4. **Shared file change protocol** — any edit to `preview_server.py`, `main.css`, or `main.js` must be followed immediately by full QA suite before committing; QA result count in commit message ✅ PRE-COMMIT GATE ENFORCES THIS
 
-**Status:** Discussion only — no changes made this session. Pending Henry's approval to implement.
+**Status:** Pre-commit gate active. 172 checks / 0 critical failures. See §37–§40 for full implementation details.
+
+---
+
+## 37. Pre-Commit QA Gate — Systemic Regression Prevention (2026-04-22 Session 4)
+
+### What Was Implemented
+The pre-commit QA gate was confirmed already in place and working. During this session it was expanded and tested. The gate runs automatically before every `git commit` via `.git/hooks/pre-commit`.
+
+### QA Suite — Current State (as of session end)
+- **Total checks:** 172 passing, 0 critical failures
+- **Agents:** 7 total — `server_health_agent.py`, `html_compliance_agent.py`, `css_compliance_agent.py`, `page_state_guard.py`, `nav_prefetch_guard.py`, `db_test_scope.py`, `db_approved_state.py`
+- **Coverage:** 15 page types (up from 5) — home, about, process, contact, portfolio, services.html, team.html, kitchen-remodels, bathroom-remodels, whole-house-remodels, custom-homes, allprojects, a project page, a services subpage, blog
+- **Pre-commit gate behavior:** Blocks commit if any check fails. Passes automatically when all 172 checks pass.
+
+### Root Cause of Recurring Regressions (Documented)
+Three failure modes identified:
+1. **Code hardcodes an admin-owned value** — e.g., CSS var `--nav-band-opacity: 0.3` in `main.css` overrides the DB-controlled value
+2. **Test artifact left in DB** — e.g., `mode='color'` with `#1C1C1C` set on services/team/blog heroes during testing; never cleaned up
+3. **QA covers only a subset of pages** — regressions on unchecked pages are invisible until Henry manually discovers them
+
+All three now have active guards in the pre-commit gate.
+
+---
+
+## 38. DB Approved State Agent — `db_approved_state.py` (2026-04-22 Session 4)
+
+### Location
+`/home/claudeuser/agent/ridgecrest-agency/qa/db_approved_state.py` (runs as part of `web_dev_orchestrator.py`)
+
+### What It Checks
+1. **`system_settings` approved production values:**
+   - `nav_band_opacity` = 0.6 (floor: 0.5 — anything below fails critical)
+   - `nav_blur_radius` = 8.0 (floor: 4.0)
+   - `nav_scrolled_opacity` = 0.94 (floor: 0.8)
+   - `about_visual_mode` = "one" (acceptable: "one" or "two")
+   - `home_diff_mode` = "one" (acceptable: "one" or "two")
+
+2. **Test artifact detection in `card_settings`:**
+   - Any row with `mode='color'` AND `image_path IS NULL` → CRITICAL (the exact pattern that blacked out services/team/blog heroes)
+
+3. **Base-file path detection in `card_settings`:**
+   - Any row with a path ending in `_mv2.webp` (bare base file, not a responsive variant) → WARNING with exact `UPDATE` SQL to fix
+   - Gallery cards excluded from this check (gallery images are `<img>` elements, not CSS backgrounds)
+
+### CSS/DB Mismatch Guard
+Added to `css_compliance_agent.py`: reads `--nav-band-opacity`, `--nav-blur`, `--nav-scrolled-opacity` from `main.css` and cross-checks each against the DB value. **Fails critical if they differ.** This would have caught the commit `5dc69c7` regression before it shipped.
+
+### Commits
+- `44f1847` — Add DB approved state agent + CSS/DB mismatch guard
+- `266dc45` — Restore approved nav settings + add nav QA guard
+
+---
+
+## 39. Nav Bar Regression — Root Cause and Fix (2026-04-22 Session 4)
+
+### What the Approved State Was
+`overrides.css` documents: *"Approved: 2026-04-08 — opacity 0.6 after testing 0.95 (too heavy) and 0.4 (too light)"*
+
+**Approved nav values:** opacity 0.6, blur 8px, scrolled-opacity 0.94
+
+### What Broke It
+During admin nav control feature build (April 16, commits `7afe145`, `dd76c61`, `ac86623`), values were written to DB within 2 minutes: `nav_band_opacity=0.3`, `nav_blur_radius=1.0`, `nav_scrolled_opacity=0.8`. Additionally, commit `5dc69c7` hardcoded `--nav-band-opacity: 0.3` directly in `main.css`, bypassing the DB.
+
+### Fix Applied
+1. DB values restored via direct SQL UPDATE
+2. `main.css` hardcoded `0.3` corrected back to `0.6`
+3. `page_state_guard.py` now includes a nav settings QA check
+
+---
+
+## 40. Base-File Card Image Audit — Complete (2026-04-22 Session 4)
+
+### Problem
+Several `card_settings` DB rows had bare `_mv2.webp` paths (full-resolution base files) instead of responsive variants. Cards were loading 18MB, 480K, 624K files where `_960w` or `_1920w` variants exist.
+
+### Cards Fixed
+| Card | Was | Now |
+|---|---|---|
+| `about-visual-main` | Base file (18MB) | `_960w` (219K) — **82× smaller** |
+| `portfolio-featured-1` | Base file (480K) | `_960w` → upgraded to `_1920w` |
+| `portfolio-featured-2` | Base file (624K) | `_960w` → upgraded to `_1920w` |
+| 16 additional cards | Base file | Corrected across bathroom-remodels, kitchen-remodels, whole-house-remodels, team, home service cards, services/alamo |
+
+### Prevention
+- `_upgrade_card_images` in `preview_server.py` extended: if path ends in `_mv2.webp` (bare base), server normalizes to `_960w` at serve time (previously only handled `_960w → _1920w` upgrade)
+- `db_approved_state.py` warns on any `card_settings` row with bare `_mv2.webp` path — caught before next publish snapshot
+
+### Commit
+`31d246b` — Fix base-file card images + add QA guard + server-side normalization
+
+---
+
+## 41. About Page — `about_visual_mode` Pending (2026-04-22 Session 4)
+
+`about_visual_mode` in `system_settings` is currently `"one"` (single card zone). The two-zone split is implemented and ready. Henry confirmed he will set it to `"two"` himself via the admin panel to test that both zones render correctly, both admin controls (image swap, position, gradient) work independently on each zone, and the `about-visual-bottom` image (`ff5b18_017e7503..._mv2_ai_2.webp`, 133K AI render variant) looks correct in the bottom zone.
+
+The `db_approved_state.py` QA check accepts both `"one"` and `"two"` for `about_visual_mode` — no QA failure when Henry switches it.
