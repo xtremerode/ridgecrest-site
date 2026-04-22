@@ -184,7 +184,7 @@ p { line-height: 1.8; }
   justify-content: space-between;
   padding: 1.8rem clamp(1rem, calc(10vw - 112px), 2rem);
   transition: var(--transition);
-  --nav-band-opacity: 0.3;
+  --nav-band-opacity: 0.6; /* approved 2026-04-08; matches DB nav_band_opacity */
 }
 .nav--scrolled {
   background: rgba(17,17,17,var(--nav-scrolled-opacity, 0.94));

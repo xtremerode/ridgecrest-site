@@ -119,11 +119,54 @@ def check_page(slug: str, path: str, hero_pattern: str, description: str, server
     return results
 
 
+# ── Approved nav settings ─────────────────────────────────────────────────────
+# These were approved/confirmed working. Any value outside these ranges indicates
+# a test artifact or accidental change that will make the nav hard to read.
+# Source: overrides.css comment (opacity 0.6 approved 2026-04-08), original
+# CSS default blur(8px), and Henry's confirmation 2026-04-22.
+NAV_APPROVED = {
+    '__RD_NAV_OPACITY':         {'min': 0.4, 'approved': 0.6,  'label': 'nav band opacity (pre-scroll)'},
+    '__RD_NAV_SCROLLED_OPACITY':{'min': 0.7, 'approved': 0.94, 'label': 'nav scrolled opacity'},
+    '__RD_NAV_BLUR':            {'min': 4.0, 'approved': 8.0,  'label': 'nav backdrop blur (px)'},
+}
+
+
+def check_nav_settings(server: str) -> List[Dict]:
+    """Verify nav opacity/blur injected by server match approved values."""
+    results = []
+    html = _fetch(server + '/view/')
+    if not html:
+        results.append(_r('nav_settings', 'warn', 'Could not fetch home page to verify nav settings'))
+        return results
+    all_ok = True
+    for var, spec in NAV_APPROVED.items():
+        m = re.search(rf'window\.{re.escape(var)}=([0-9.]+)', html)
+        if not m:
+            results.append(_r('nav_settings', 'warn', f'{var} not found in page — nav JS may not apply'))
+            continue
+        val = float(m.group(1))
+        label = spec['label']
+        approved = spec['approved']
+        if val < spec['min']:
+            all_ok = False
+            results.append(_r('nav_settings', 'fail',
+                f'{label}: value is {val} — below minimum {spec["min"]}. '
+                f'Approved value is {approved}. Likely a test artifact in system_settings.'))
+        elif val != approved:
+            results.append(_r('nav_settings', 'warn',
+                f'{label}: value is {val} (approved {approved}) — intentional change or drift?'))
+        else:
+            results.append(_r('nav_settings', 'pass',
+                f'{label}: {val} ✓ (approved value)'))
+    return results
+
+
 def run(fix: bool = False, server: str = SERVER) -> List[Dict]:
     all_results = []
     for slug, path, pattern, desc in EXPECTED_HEROES:
         results = check_page(slug, path, pattern, desc, server)
         all_results.extend(results)
+    all_results.extend(check_nav_settings(server))
     return all_results
 
 
