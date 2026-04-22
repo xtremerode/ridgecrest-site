@@ -856,3 +856,42 @@ Both `blog()` and `blog_post()` server routes in `preview_server.py` now call th
 
 ### Blog Backend Status (unchanged — still deferred)
 The blog editor UI exists in the admin panel. The publishing workflow (wiring blog posts to live pages) is not yet built. This fix ensures that when the blog goes live, the hero will be fully editable and all persisted hero settings will apply correctly.
+
+---
+
+## 36. Adversarial Hero Flash Review — Gaps Found (2026-04-22 Session 3)
+
+### What the Current Fix Covers (Confirmed Working)
+- `.page-hero--service { background-color: #0d1a22 }` — `main.css:1848` ✅
+- `.hero__bg { background-color: #0d1a22 }` — `main.css:276` ✅
+- `.project-hero__img { background-color: #0d1a22 }` — `main.css:1524` ✅
+- `_apply_hero_to_html()` injects CSS + preload + `window.__RD_HERO` into `<head>` for all `view()` pages with a saved hero ✅
+- `blog_post()` and `blog_index()` flash injection ✅ (added in §35)
+
+### Three Confirmed Gaps (NOT yet fixed — session was discussion only)
+
+**Gap 1: 72 Services Subpages (`services/*.html`)**
+These static files have the hero image hardcoded as the full-resolution base file (5–6 MB). There is no `<link rel="preload">` and no early CSS injection — the image is applied by the server injection chain, but the base file is referenced instead of the `_1920w` variant. On slow connections, the dark flash lasts noticeably longer on these pages than on others. Fix: update `services/*.html` to reference `_1920w` variants + ensure preload is injected for all 72 files.
+
+**Gap 2: Blog Index — No Preload When No Hero Saved**
+When no hero has been saved via the admin for the blog index page, the `blog_index()` route doesn't inject a `<link rel="preload">`. The image is applied by JS after DOMContentLoaded, causing a visible dark flash on every load until a hero is saved.
+
+**Gap 3: `main.js` Fallback Uses Base File**
+The JS fallback path (when `window.__RD_HERO` is not set by the server) loads the base file instead of the `_1920w` variant. This is the worst-case path — it triggers when the server injection chain fails entirely.
+
+### Root Cause of Recurring Regressions (Henry's Concern — 2026-04-22)
+Henry expressed frustration that the same issues keep breaking after being fixed. Root cause analysis:
+
+- The lock system protects **HTML and DB state** but does NOT protect **behavior**
+- `preview_server.py`, `main.css`, and `main.js` are single shared files affecting 100+ pages simultaneously
+- Every fix to a shared file can silently break unchecked pages
+- QA currently checks only 3–5 pages per check — regressions on unchecked pages are invisible
+- CTAs are broken on all pages again (reported by Henry — not yet investigated as of session end)
+
+### Proposed Workflow Fixes (Not Yet Implemented)
+1. **Pre-commit QA gate** — git pre-commit hook that runs the QA orchestrator; blocks commit if any check fails
+2. **QA must cover all page types** — every hero page type (all 15+), every CTA button, all shared-file behaviors
+3. **Behavior locks** — when a feature is marked `stable`, its QA check becomes a hard gate (blocking, not advisory)
+4. **Shared file change protocol** — any edit to `preview_server.py`, `main.css`, or `main.js` must be followed immediately by full QA suite before committing; QA result count in commit message
+
+**Status:** Discussion only — no changes made this session. Pending Henry's approval to implement.

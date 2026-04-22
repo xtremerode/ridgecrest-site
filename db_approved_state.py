@@ -185,6 +185,56 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
         results.append(_r('card_test_artifacts', 'pass',
                            'No test-artifact card_settings rows (mode=color, image=NULL)'))
 
+    # ── card_settings: base file path detection ───────────────────────────────
+    # Cards should use _960w variants (§20 image serving rules). If the admin
+    # image picker saved a plain base path (_mv2.webp), _upgrade_card_images
+    # will catch it at serve time, but the DB stays dirty and future publishes
+    # will snapshot the wrong path. Flag rows where image ends in _mv2.webp
+    # (the bare base file, no size suffix) so they can be corrected in DB.
+    import os as _os
+    PREVIEW_DIR_HERE = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'preview')
+    try:
+        with _db.get_db() as (conn, cur):
+            cur.execute(
+                """SELECT card_id, image, updated_at
+                   FROM card_settings
+                   WHERE mode = 'image'
+                     AND image IS NOT NULL
+                     AND card_id NOT LIKE '%-gal-%'
+                     AND image LIKE '%_mv2.webp'
+                   ORDER BY card_id"""
+            )
+            base_file_rows = cur.fetchall()
+    except Exception as exc:
+        results.append(_r('card_base_file_paths', 'warn',
+                           f'Could not query card_settings for base paths: {exc}'))
+        base_file_rows = []
+
+    base_file_issues = []
+    for row in base_file_rows:
+        img = row['image']
+        # Only flag plain _mv2.webp (no _ai_ version variant, no size suffix)
+        # Pattern: ends in _mv2.webp (not _mv2_960w.webp, _mv2_1920w.webp etc.)
+        import re as _re
+        if _re.search(r'_mv2\.webp$', img):
+            candidate_960 = img.replace('_mv2.webp', '_mv2_960w.webp')
+            abs_960 = _os.path.join(PREVIEW_DIR_HERE, candidate_960.lstrip('/'))
+            if _os.path.isfile(abs_960):
+                base_file_issues.append((row['card_id'], img, candidate_960))
+
+    if base_file_issues:
+        for cid, current, suggested in base_file_issues:
+            results.append(_r('card_base_file_paths', 'warn',
+                               f"card_settings['{cid}'] uses base file path (no size suffix). "
+                               f"_upgrade_card_images will fix at serve time, but DB path should "
+                               f"be updated to prevent stale snapshots. "
+                               f"Current: {current.split('/')[-1]} — Suggested: {suggested.split('/')[-1]}. "
+                               f"Fix: UPDATE card_settings SET image='{suggested}' WHERE card_id='{cid}';",
+                               page=cid))
+    else:
+        results.append(_r('card_base_file_paths', 'pass',
+                           'No card_settings rows using plain base file paths (_mv2.webp without size suffix)'))
+
     return results
 
 

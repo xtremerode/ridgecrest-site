@@ -1148,6 +1148,20 @@ def _upgrade_card_images(cards: list) -> list:
                 abs_path = _os.path.join(PREVIEW_DIR, rel)
                 if _os.path.isfile(abs_path):
                     c['image'] = candidate
+            elif img_path.endswith('_mv2.webp'):
+                # Base file saved by admin picker — normalize to _960w first,
+                # then the _960w → _1920w branch above will handle it on the
+                # next pass. Since we process in a single pass, promote directly
+                # to _960w here (the caller may invoke this again if needed, but
+                # in practice _960w is sufficient for card display at 350-720px).
+                candidate_960 = img_path.replace('_mv2.webp', '_mv2_960w.webp')
+                abs_960 = _os.path.join(PREVIEW_DIR, candidate_960.lstrip('/'))
+                if _os.path.isfile(abs_960):
+                    # Also try to jump straight to _1920w for consistency with
+                    # cards that already stored _960w (they get upgraded above).
+                    candidate_1920 = img_path.replace('_mv2.webp', '_mv2_1920w.webp')
+                    abs_1920 = _os.path.join(PREVIEW_DIR, candidate_1920.lstrip('/'))
+                    c['image'] = candidate_1920 if _os.path.isfile(abs_1920) else candidate_960
         upgraded.append(c)
     return upgraded
 
