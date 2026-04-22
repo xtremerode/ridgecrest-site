@@ -2853,6 +2853,35 @@
       } catch(e) {}
     }
 
+    // ── Pre-stamp ?_stage=1 on all internal links to prevent double-load ──────
+    // Without this, clicking a nav/footer/card link navigates the iframe without
+    // ?_stage=1. The page fully renders, siteFrame.load fires, detects the missing
+    // param, and calls location.replace — causing a second complete render cycle
+    // (the dark navy flash + reload Henry sees on every nav click).
+    // Pre-stamping after each load means all links already carry ?_stage=1, so
+    // the enforcer above becomes a no-op and only one render cycle fires.
+    if (!_publicViewMode) {
+      try {
+        const _iDoc = siteFrame.contentDocument ||
+                      (siteFrame.contentWindow && siteFrame.contentWindow.document);
+        if (_iDoc) {
+          _iDoc.querySelectorAll('a[href]').forEach(function(a) {
+            const raw = a.getAttribute('href');
+            if (!raw || raw.startsWith('#') || raw.startsWith('javascript') ||
+                raw.startsWith('mailto:') || raw.startsWith('tel:')) return;
+            try {
+              const _u = new URL(raw, siteFrame.contentWindow.location.href);
+              if (_u.origin !== window.location.origin) return; // external — leave alone
+              if (!_u.searchParams.has('_stage')) {
+                _u.searchParams.set('_stage', '1');
+                a.setAttribute('href', _u.pathname + _u.search + _u.hash);
+              }
+            } catch (_) {}
+          });
+        }
+      } catch (_) {}
+    }
+
     // ── Fix viewport-height to match standard desktop (100vh → 900px) ────────
     // Without this, 100vh inside the iframe equals the iframe's declared height
     // which is taller than a real browser window, causing the hero to crop
