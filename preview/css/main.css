@@ -1986,6 +1986,22 @@ p { line-height: 1.8; }
 [data-hero-text-align="right"]  .project-hero__content-inner { justify-content: flex-end !important; }
 [data-hero-text-align="right"]  .project-hero__left          { text-align: right !important; }
 
+/* CTA row alignment — service/inner pages (.page-hero__actions)
+   Must come AFTER all [data-hero-text-align] rules above because text-align rules
+   also set justify-content on .page-hero__actions with !important, and the later
+   rule wins. CTA alignment is independent of text alignment and must override it. */
+[data-hero-cta-align="left"]   .page-hero__actions { justify-content: flex-start !important;    width: 100% !important; }
+[data-hero-cta-align="center"] .page-hero__actions { justify-content: center !important;        width: 100% !important; }
+[data-hero-cta-align="right"]  .page-hero__actions { justify-content: flex-end !important;      width: 100% !important; }
+[data-hero-cta-align="split"]  .page-hero__actions { justify-content: space-between !important; width: 100% !important; }
+
+/* CTA row alignment — project pages (.project-hero__right)
+   project-hero__right is a flex row; alignment controls button grouping within it. */
+[data-hero-cta-align="left"]   .project-hero__right { justify-content: flex-start !important;    width: 100% !important; }
+[data-hero-cta-align="center"] .project-hero__right { justify-content: center !important;        width: 100% !important; }
+[data-hero-cta-align="right"]  .project-hero__right { justify-content: flex-end !important;      width: 100% !important; }
+[data-hero-cta-align="split"]  .project-hero__right { justify-content: space-between !important; width: 100% !important; }
+
 /* Text color override — dark mode (light text → dark text) */
 [data-hero-text-color="dark"] .hero__eyebrow,
 [data-hero-text-color="dark"] .hero__headline,
