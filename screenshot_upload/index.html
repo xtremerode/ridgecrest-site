@@ -43,8 +43,60 @@
       font-size: 14px;
       min-height: 20px;
     }
-    .status.success { color: #16a34a; font-weight: 600; }
     .status.error { color: #dc2626; }
+
+    /* Tell Claude box */
+    .tell-claude {
+      display: none;
+      margin-top: 16px;
+      background: #f0fdf4;
+      border: 2px solid #16a34a;
+      border-radius: 10px;
+      padding: 16px 18px;
+      text-align: left;
+    }
+    .tell-claude .tc-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #15803d;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    .tell-claude .tc-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .tell-claude .tc-filename {
+      flex: 1;
+      font-family: monospace;
+      font-size: 16px;
+      font-weight: 700;
+      color: #1a1a1a;
+      background: white;
+      border: 1px solid #d1fae5;
+      border-radius: 6px;
+      padding: 8px 12px;
+    }
+    .tell-claude .tc-copy {
+      background: #16a34a;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .tell-claude .tc-copy:hover { background: #15803d; }
+    .tell-claude .tc-copy.copied { background: #4f46e5; }
+    .tell-claude .tc-hint {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 6px;
+    }
 
     /* File list */
     .list-header {
@@ -186,6 +238,15 @@
     </div>
     <div class="status" id="status"></div>
 
+    <div class="tell-claude" id="tellClaude">
+      <div class="tc-label">&#10003; Saved — Tell Claude the filename:</div>
+      <div class="tc-row">
+        <div class="tc-filename" id="tcFilename"></div>
+        <button class="tc-copy" id="tcCopy" onclick="copyFilename()">Copy</button>
+      </div>
+      <div class="tc-hint">Type this filename in the chat so Claude can find your screenshot.</div>
+    </div>
+
     <div class="list-header">
       <span id="listLabel">Recent screenshots</span>
       <button class="show-all-btn" id="showAllBtn" onclick="toggleAll()">Show all</button>
@@ -215,21 +276,37 @@
     const fileList = document.getElementById("fileList");
     const showAllBtn = document.getElementById("showAllBtn");
     const listLabel = document.getElementById("listLabel");
+    const tellClaude = document.getElementById("tellClaude");
+    const tcFilename = document.getElementById("tcFilename");
+    const tcCopy = document.getElementById("tcCopy");
 
     let allFiles = [];
     let showingAll = false;
     let newestFile = null;
 
-    function formatAge(filename) {
-      // filename: YYYYMMDD_HHMMSS.ext
-      const m = filename.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
-      if (!m) return "";
-      const d = new Date(m[1], m[2]-1, m[3], m[4], m[5], m[6]);
-      const diff = Math.floor((Date.now() - d) / 1000);
-      if (diff < 60) return "just now";
-      if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
-      if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
-      return `${Math.floor(diff/86400)}d ago`;
+    function copyFilename() {
+      const name = tcFilename.textContent;
+      navigator.clipboard.writeText(name).then(() => {
+        tcCopy.textContent = "Copied!";
+        tcCopy.classList.add("copied");
+        setTimeout(() => {
+          tcCopy.textContent = "Copy";
+          tcCopy.classList.remove("copied");
+        }, 2000);
+      }).catch(() => {
+        // fallback: select text
+        const range = document.createRange();
+        range.selectNode(tcFilename);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+      });
+    }
+
+    function showTellClaude(filename) {
+      tcFilename.textContent = filename;
+      tcCopy.textContent = "Copy";
+      tcCopy.classList.remove("copied");
+      tellClaude.style.display = "block";
     }
 
     function renderList(files) {
@@ -244,7 +321,6 @@
           <span>${f}</span>
           <span style="display:flex;gap:8px;align-items:center;">
             ${f === newestFile ? '<span class="new-badge">NEW</span>' : ''}
-            <span class="age">${formatAge(f)}</span>
           </span>
         </div>
       `).join("");
@@ -291,8 +367,9 @@
               });
               const data = await res.json();
               newestFile = data.filename;
-              status.className = "status success";
-              status.textContent = `Saved: ${data.filename}`;
+              showTellClaude(data.filename);
+              status.className = "status";
+              status.textContent = "";
               pasteZone.classList.remove("active");
               pasteZone.textContent = "Press Ctrl+V to paste another screenshot";
               await loadList();
