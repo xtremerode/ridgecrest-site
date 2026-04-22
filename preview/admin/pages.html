@@ -1933,7 +1933,6 @@
   const _sectionHeightOverrides = {};
 
   function _updateViewportFix() {
-    console.log('%c[RD] _updateViewportFix called', 'color:#ff9800', new Error().stack.split('\n').slice(2,5).map(s=>s.trim()).join(' ← '));
     try {
       const doc = siteFrame.contentDocument;
       if (!doc) return;
@@ -2187,7 +2186,6 @@
     const _lpSrc = (path === 'blog.html')
       ? '/blog'
       : (_dbDev ? `/view/${path}?preview_device=${_dbDev}&_stage=1` : `/view/${path}?_stage=1`);
-    console.log(`%c[RD] loadPage → siteFrame.src = "${_lpSrc}"`, 'color:#9c27b0;font-weight:bold');
     siteFrame.src = _lpSrc;
     // Exit public view when navigating to a new page
     if (_publicViewMode) _exitPublicView();
@@ -2735,7 +2733,6 @@
 
     // ── Edit mode toggle (no reload — inject/remove overlay in live iframe) ──
   async function toggleEditOverlay() {
-    console.log(`%c[RD] toggleEditOverlay called — editMode=${editMode}`, 'color:#e91e63', new Error().stack.split('\n')[1].trim());
     if (!currentSlug) return;
     const iframeDoc = siteFrame.contentDocument;
     if (!iframeDoc) return;
@@ -2832,13 +2829,9 @@
   });
 
   // ── Frame load events ────────────────────────────────────────────────────
-  let _rdLoadCount = 0;
   siteFrame.addEventListener('load', () => {
     // Don't hide the tree when iframe resets to about:blank
     if (!currentSlug) return;
-    _rdLoadCount++;
-    const _rdUrl = (siteFrame.contentWindow && siteFrame.contentWindow.location && siteFrame.contentWindow.location.href) || '(unknown)';
-    console.log(`%c[RD] siteFrame.load #${_rdLoadCount}: ${_rdUrl}`, 'color:#00bcd4;font-weight:bold');
 
     // ── Enforce ?_stage=1 on all iframe loads ─────────────────────────────────
     // loadPage() always sets ?_stage=1, but internal link clicks (nav, footer,
@@ -2853,7 +2846,6 @@
         if (iLoc && iLoc.pathname && iLoc.pathname.startsWith('/view/')) {
           const hasStage = iLoc.search && iLoc.search.includes('_stage=1');
           if (!hasStage) {
-            console.log(`%c[RD] ⚠ location.replace FIRED — missing _stage=1: ${iLoc.href}`, 'color:#f44336;font-weight:bold');
             const sep = iLoc.search ? '&' : '?';
             siteFrame.contentWindow.location.replace(iLoc.href + sep + '_stage=1');
             return; // load event will fire again with _stage=1
@@ -2914,16 +2906,6 @@
           const href = a.getAttribute('href') || '';
           // Only intercept same-frame navigation (no target="_blank", no hash-only, no javascript:)
           if (a.target === '_blank' || href.startsWith('#') || href.startsWith('javascript:')) return;
-          console.log(`%c[RD] click intercepted: href="${href}" editMode=${editMode} publicView=${_publicViewMode}`, 'color:#4caf50;font-weight:bold');
-          // Dedicated nav overlay — separate from frameLoading (which IS the page tree)
-          let _rdOvl = document.getElementById('_rdNavOverlay');
-          if (!_rdOvl) {
-            _rdOvl = document.createElement('div');
-            _rdOvl.id = '_rdNavOverlay';
-            _rdOvl.style.cssText = 'position:absolute;inset:0;background:#111b27;z-index:3;pointer-events:none;display:none';
-            siteFrame.parentElement.appendChild(_rdOvl);
-          }
-          _rdOvl.style.display = 'block';
           siteFrame.style.height = PREVIEW_H + 'px';
           // Enforce ?_stage=1 on destination URL so location.replace redirect never fires
           if (!_publicViewMode) {
@@ -2931,13 +2913,10 @@
               const _u = new URL(href, siteFrame.contentWindow.location.href);
               if (_u.origin === window.location.origin && !_u.searchParams.has('_stage')) {
                 _u.searchParams.set('_stage', '1');
-                console.log(`%c[RD] click: adding ?_stage=1 → ${_u.pathname + _u.search}`, 'color:#4caf50');
                 e.preventDefault();
                 siteFrame.contentWindow.location.assign(_u.pathname + _u.search + _u.hash);
-              } else {
-                console.log(`%c[RD] click: _stage already present or external — not intercepting`, 'color:#9e9e9e');
               }
-            } catch (_err) { console.log('[RD] click: URL parse error', _err); }
+            } catch (_) {}
           }
         }, true); // capture phase so it fires before the link's default action
       }
@@ -2952,8 +2931,6 @@
     }
 
     frameLoading.classList.add('hidden');
-    const _rdOvl = document.getElementById('_rdNavOverlay');
-    if (_rdOvl) _rdOvl.style.display = 'none';
 
     // ── Sync currentSlug when iframe navigates internally (e.g. footer links) ─
     // Without this, currentSlug stays stale after footer navigation, causing
