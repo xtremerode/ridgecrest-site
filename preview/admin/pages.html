@@ -131,6 +131,8 @@
     }
     .frame-loading.hidden { opacity: 0; pointer-events: none; }
     .frame-loading.has-tree { align-items: flex-start; justify-content: flex-start; padding: 0; }
+    /* nav-transitioning: shows the dark background overlay during click-nav without revealing the page tree */
+    .frame-loading.nav-transitioning .pg-tree { visibility: hidden; }
     /* Page select base style */
     .header-actions select {
       background: var(--surface-2, #1e2d3d);
@@ -2915,6 +2917,7 @@
           // Only intercept same-frame navigation (no target="_blank", no hash-only, no javascript:)
           if (a.target === '_blank' || href.startsWith('#') || href.startsWith('javascript:')) return;
           console.log(`%c[RD] click intercepted: href="${href}" editMode=${editMode} publicView=${_publicViewMode}`, 'color:#4caf50;font-weight:bold');
+          frameLoading.classList.add('nav-transitioning');
           frameLoading.classList.remove('hidden');
           siteFrame.style.height = PREVIEW_H + 'px';
           // Enforce ?_stage=1 on destination URL so location.replace redirect never fires
@@ -2944,6 +2947,7 @@
     }
 
     frameLoading.classList.add('hidden');
+    frameLoading.classList.remove('nav-transitioning');
 
     // ── Sync currentSlug when iframe navigates internally (e.g. footer links) ─
     // Without this, currentSlug stays stale after footer navigation, causing
