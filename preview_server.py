@@ -6711,9 +6711,9 @@ def blog_index():
       <p class="blog-hero__eyebrow">The RD Edit</p>
       <h1 class="blog-hero__title">Design Ideas, Project Stories &amp; Expert Advice</h1>
       <p class="blog-hero__sub">From the Ridgecrest Designs team in Pleasanton, California</p>
-      <div class="page-hero__actions">
+      <div class="page-hero__actions hero__actions">
         <a href="/start-a-project.html" class="btn btn--primary" data-cta-id="primary">Start a Project</a>
-        <a href="/process.html" class="btn btn--outline" data-cta-id="secondary">Our Process</a>
+        <a href="/process.html" class="btn btn--ghost" data-cta-id="secondary">Our Process</a>
       </div>
     </div>
   </div>
