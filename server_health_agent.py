@@ -247,7 +247,12 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
     #      - --rd-overlay present (hero gradient)
     #   B. Home page must have .hero__bg{background-image:...} in flash-fix style
     #      (home hero is JS-applied otherwise; CSS rule eliminates the flash)
-    service_pages = ['about.html', 'process.html', 'services.html']
+    service_pages = [
+        'about.html', 'process.html', 'services.html',
+        'contact.html', 'portfolio.html', 'team.html',
+        'kitchen-remodels.html', 'bathroom-remodels.html',
+        'whole-house-remodels.html', 'custom-homes.html',
+    ]
     flash_fail = []
     flash_bgcolor_fail = []
     flash_grad_fail = []

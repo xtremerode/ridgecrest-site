@@ -306,11 +306,24 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
     import urllib.request as _urlreq
     _SERVER = 'http://147.182.242.54:8081'
     _FLASH_PAGES = [
-        ('index', f'{_SERVER}/view/index.html'),
-        ('about', f'{_SERVER}/view/about.html'),
-        ('process', f'{_SERVER}/view/process.html'),
-        ('contact', f'{_SERVER}/view/contact.html'),
-        ('blog', f'{_SERVER}/blog'),
+        # Root pages — every hero type must be represented
+        ('index',               f'{_SERVER}/view/index.html'),
+        ('about',               f'{_SERVER}/view/about.html'),
+        ('process',             f'{_SERVER}/view/process.html'),
+        ('contact',             f'{_SERVER}/view/contact.html'),
+        ('portfolio',           f'{_SERVER}/view/portfolio.html'),
+        ('services',            f'{_SERVER}/view/services.html'),
+        ('team',                f'{_SERVER}/view/team.html'),
+        ('kitchen-remodels',    f'{_SERVER}/view/kitchen-remodels.html'),
+        ('bathroom-remodels',   f'{_SERVER}/view/bathroom-remodels.html'),
+        ('whole-house-remodels',f'{_SERVER}/view/whole-house-remodels.html'),
+        ('custom-homes',        f'{_SERVER}/view/custom-homes.html'),
+        # Project page (project-hero__img type)
+        ('danville-dream',      f'{_SERVER}/view/danville-dream.html'),
+        # Services subpage (inline-style hero type)
+        ('services/danville',   f'{_SERVER}/view/services/danville.html'),
+        # Blog
+        ('blog',                f'{_SERVER}/blog'),
     ]
     _flash_fails = []
     _flash_checked = 0

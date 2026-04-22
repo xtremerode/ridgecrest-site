@@ -37,9 +37,13 @@ EXPECTED_HEROES = [
     ('process',           '/view/process.html',            'd2d0371f',        'Process page hero'),
     ('contact',           '/view/contact.html',            '75a9ba9c',        'Contact page hero'),
     ('team',              '/view/team.html',               '8f25d193',        'Team page hero'),
-    ('custom-homes',      '/view/custom-homes.html',       '71ff636f',        'Custom homes hero'),
-    ('kitchen-remodels',  '/view/kitchen-remodels.html',   '53f46b46',        'Kitchen remodels hero'),
-    ('bathroom-remodels', '/view/bathroom-remodels.html',  'cfe52d2b',        'Bathroom remodels hero'),
+    ('custom-homes',        '/view/custom-homes.html',             '71ff636f',  'Custom homes hero'),
+    ('kitchen-remodels',    '/view/kitchen-remodels.html',         '53f46b46',  'Kitchen remodels hero'),
+    ('bathroom-remodels',   '/view/bathroom-remodels.html',        'cfe52d2b',  'Bathroom remodels hero'),
+    ('services',            '/view/services.html',                 '0f8e248f',  'Services page hero'),
+    ('whole-house-remodels','/view/whole-house-remodels.html',     '1939fb8d',  'Whole-house remodels hero'),
+    ('danville-dream',      '/view/danville-dream.html',           'f406990c',  'Project page hero (danville-dream)'),
+    ('services/danville',   '/view/services/danville.html',        '9192e5d3',  'Services subpage hero (danville)'),
 ]
 
 # ── CSS/JS consistency checks ─────────────────────────────────────────────────
