@@ -2853,35 +2853,6 @@
       } catch(e) {}
     }
 
-    // ── Pre-stamp ?_stage=1 on all internal links to prevent double-load ──────
-    // Without this, clicking a nav/footer/card link navigates the iframe without
-    // ?_stage=1. The page fully renders, siteFrame.load fires, detects the missing
-    // param, and calls location.replace — causing a second complete render cycle
-    // (the dark navy flash + reload Henry sees on every nav click).
-    // Pre-stamping after each load means all links already carry ?_stage=1, so
-    // the enforcer above becomes a no-op and only one render cycle fires.
-    if (!_publicViewMode) {
-      try {
-        const _iDoc = siteFrame.contentDocument ||
-                      (siteFrame.contentWindow && siteFrame.contentWindow.document);
-        if (_iDoc) {
-          _iDoc.querySelectorAll('a[href]').forEach(function(a) {
-            const raw = a.getAttribute('href');
-            if (!raw || raw.startsWith('#') || raw.startsWith('javascript') ||
-                raw.startsWith('mailto:') || raw.startsWith('tel:')) return;
-            try {
-              const _u = new URL(raw, siteFrame.contentWindow.location.href);
-              if (_u.origin !== window.location.origin) return; // external — leave alone
-              if (!_u.searchParams.has('_stage')) {
-                _u.searchParams.set('_stage', '1');
-                a.setAttribute('href', _u.pathname + _u.search + _u.hash);
-              }
-            } catch (_) {}
-          });
-        }
-      } catch (_) {}
-    }
-
     // ── Fix viewport-height to match standard desktop (100vh → 900px) ────────
     // Without this, 100vh inside the iframe equals the iframe's declared height
     // which is taller than a real browser window, causing the hero to crop
@@ -2913,13 +2884,15 @@
     // Resize iframe to actual page content (enables full-page scrolling)
     scaleFrame();
 
-    // ── Intercept in-iframe link clicks to reset height before navigation ─────
-    // When the user clicks a link inside the iframe (e.g. a project card on the
-    // portfolio page), the iframe navigates internally — loadPage() never runs,
-    // so siteFrame.style.height stays at the previous page's tall value. The new
-    // page then renders with 70vh = 70% × tallHeight → ginormous hero flash.
-    // Fix: reset height to PREVIEW_H on any same-frame link click BEFORE the
-    // navigation fires, so the new page always sees the correct vh baseline.
+    // ── Intercept in-iframe link clicks: reset height + enforce ?_stage=1 ──────
+    // Two problems solved here in capture phase (fires before browser navigates):
+    // 1. Height reset: iframe height stays at previous page's tall value without this,
+    //    causing 70vh = 70% × tallHeight → oversized hero on the new page.
+    // 2. ?_stage=1 enforcement: clicking a nav link navigates without ?_stage=1,
+    //    causing siteFrame.load to call location.replace → two full render cycles
+    //    → the dark navy flash + reload visible on every nav click in admin.
+    //    Fix: intercept the click, add ?_stage=1 to the destination URL, and
+    //    navigate manually — one render cycle, no redirect.
     try {
       const doc = siteFrame.contentDocument;
       if (doc && !doc._rdHeightResetAttached) {
@@ -2933,6 +2906,17 @@
           // Only intercept same-frame navigation (no target="_blank", no hash-only, no javascript:)
           if (a.target === '_blank' || href.startsWith('#') || href.startsWith('javascript:')) return;
           siteFrame.style.height = PREVIEW_H + 'px';
+          // Enforce ?_stage=1 on destination URL so location.replace redirect never fires
+          if (!_publicViewMode) {
+            try {
+              const _u = new URL(href, siteFrame.contentWindow.location.href);
+              if (_u.origin === window.location.origin && !_u.searchParams.has('_stage')) {
+                _u.searchParams.set('_stage', '1');
+                e.preventDefault();
+                siteFrame.contentWindow.location.assign(_u.pathname + _u.search + _u.hash);
+              }
+            } catch (_) {}
+          }
         }, true); // capture phase so it fires before the link's default action
       }
     } catch(e) {}
