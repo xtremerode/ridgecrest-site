@@ -111,7 +111,7 @@ function applyHeroTransform(el) {
 
 // Fixed fallback hero used when DB has no stored image for a page.
 // Must be deterministic — never random — so the page looks the same on every load.
-const HERO_FALLBACK = `/assets/images-opt/${HERO_POOL[0]}.webp`;
+const HERO_FALLBACK = `/assets/images-opt/${HERO_POOL[0]}_1920w.webp`;
 
 // Inner page heroes (.page-hero--service)
 // Use DB-stored hero (window.__RD_HERO) if server injected it; otherwise fixed fallback.
