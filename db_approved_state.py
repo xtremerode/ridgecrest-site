@@ -268,6 +268,15 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
         ('home', 'home-portfolio-4'),
         # start-a-project.html background
         ('start-a-project', 'sap-bg-main'),
+        # service page investment section diff panels
+        ('custom-homes',         'custom-homes-diff-top'),
+        ('custom-homes',         'custom-homes-diff-bottom'),
+        ('whole-house-remodels', 'whole-house-diff-top'),
+        ('whole-house-remodels', 'whole-house-diff-bottom'),
+        ('kitchen-remodels',     'kitchen-diff-top'),
+        ('kitchen-remodels',     'kitchen-diff-bottom'),
+        ('bathroom-remodels',    'bathroom-diff-top'),
+        ('bathroom-remodels',    'bathroom-diff-bottom'),
     ]
     try:
         with _db.get_db() as (conn, cur):
