@@ -237,6 +237,65 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
         results.append(_r('card_base_file_paths', 'pass',
                            'No card_settings rows using plain base file paths (_mv2.webp without size suffix)'))
 
+    # ── required card_settings records ───────────────────────────────────────
+    # These structural cards MUST have DB records so set-version propagation
+    # and serve-time injection work correctly. A missing record means image
+    # edits via admin or AI re-renders will never appear on the public page.
+    REQUIRED_CARDS = [
+        # allprojects.html — all 18 project thumbnails
+        ('allprojects', 'allproj-sierra-mountain-ranch'),
+        ('allprojects', 'allproj-pleasanton-custom-home'),
+        ('allprojects', 'allproj-sunol-homestead'),
+        ('allprojects', 'allproj-danville-hilltop-hideaway'),
+        ('allprojects', 'allproj-napa-retreat'),
+        ('allprojects', 'allproj-lafayette-laid-back-luxury'),
+        ('allprojects', 'allproj-orinda-urban-modern-kitchen'),
+        ('allprojects', 'allproj-danville-dream-home'),
+        ('allprojects', 'allproj-alamo-luxury-remodel'),
+        ('allprojects', 'allproj-lafayette-modern-bistro'),
+        ('allprojects', 'allproj-san-ramon-transitional-kitchen'),
+        ('allprojects', 'allproj-pleasanton-garage-renovation'),
+        ('allprojects', 'allproj-livermore-farmhouse-chic'),
+        ('allprojects', 'allproj-pleasanton-cottage-kitchen'),
+        ('allprojects', 'allproj-san-ramon-eclectic-bath'),
+        ('allprojects', 'allproj-castro-valley-villa'),
+        ('allprojects', 'allproj-lakeside-cozy-cabin'),
+        ('allprojects', 'allproj-newark-minimalist-kitchen'),
+        # index.html — home portfolio cards
+        ('home', 'home-portfolio-1'),
+        ('home', 'home-portfolio-2'),
+        ('home', 'home-portfolio-3'),
+        ('home', 'home-portfolio-4'),
+        # start-a-project.html background
+        ('start-a-project', 'sap-bg-main'),
+    ]
+    try:
+        with _db.get_db() as (conn, cur):
+            placeholders = ','.join(['(%s,%s)'] * len(REQUIRED_CARDS))
+            params = [v for pair in REQUIRED_CARDS for v in pair]
+            cur.execute(
+                f"SELECT page_slug, card_id FROM card_settings "
+                f"WHERE (page_slug, card_id) IN ({placeholders})",
+                params
+            )
+            found = {(r['page_slug'], r['card_id']) for r in cur.fetchall()}
+    except Exception as exc:
+        results.append(_r('required_card_records', 'warn',
+                           f'Could not query card_settings for required records: {exc}'))
+        found = set()
+
+    missing_required = [cid for (slug, cid) in REQUIRED_CARDS if (slug, cid) not in found]
+    if missing_required:
+        for cid in missing_required:
+            results.append(_r('required_card_records', 'fail',
+                               f"card_settings missing required record for '{cid}' — "
+                               f"image edits and AI re-renders will not appear on the public page. "
+                               f"Run the card_settings seed script to restore.",
+                               page=cid))
+    else:
+        results.append(_r('required_card_records', 'pass',
+                           f'All {len(REQUIRED_CARDS)} required card_settings records present'))
+
     return results
 
 
