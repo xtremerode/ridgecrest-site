@@ -334,7 +334,7 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
                 _fhtml = _resp.read().decode('utf-8', errors='replace')
             _has_preload  = 'rel="preload" as="image"' in _fhtml
             _has_css_bg   = 'background-image:url(' in _fhtml and '<style>' in _fhtml
-            _has_prefetch = 'rel="prefetch" as="image"' in _fhtml
+            _has_prefetch = '__RD_HERO_MAP' in _fhtml
             _flash_checked += 1
             if not (_has_preload and _has_css_bg):
                 _flash_fails.append(_fpslug)
@@ -343,7 +343,7 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
                                    f'css_bg={not _has_css_bg}', _fpslug))
             elif not _has_prefetch:
                 results.append(_r('hero_flash_prevention', 'warn',
-                                   f'{_fpslug}: missing prefetch links (cross-page cache warm)', _fpslug))
+                                   f'{_fpslug}: missing __RD_HERO_MAP (hover-intent prefetch)', _fpslug))
         except Exception as _fe:
             results.append(_r('hero_flash_prevention', 'warn',
                                f'{_fpslug}: server unreachable ({_fe})', _fpslug))
