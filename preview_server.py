@@ -8345,6 +8345,16 @@ def admin_overlay_scripts():
         end = tpl.rindex('</script>')
         return tpl[start:end]
 
+    # Prepend a fresh window.__RD_CARDS from DB so cardMap re-initializes
+    # from current state, not the stale snapshot baked into the page at load.
+    # This fixes the "card reverts on Edit Mode re-entry" bug: saves write to DB
+    # but never update window.__RD_CARDS; without this refresh, toggling Edit
+    # Mode off and back on overwrites the saved image with the page-load value.
+    _fresh_cards = _get_card_settings(slug)
+    if _fresh_cards:
+        _fresh_cards = _upgrade_card_images(_fresh_cards)
+    _cards_refresh_js = 'window.__RD_CARDS=' + json.dumps(_fresh_cards) + ';\n'
+
     card_js = strip_script(_CARD_EDIT_OVERLAY_TPL).format(
         slug_json=json.dumps(slug), token_json=json.dumps(token))
     edit_js = strip_script(_EDIT_OVERLAY_TPL).format(
@@ -8352,7 +8362,7 @@ def admin_overlay_scripts():
     section_js = strip_script(_SECTION_RESIZE_TPL).format(
         slug_json=json.dumps(slug), token_json=json.dumps(token),
         device_json=json.dumps(device))
-    return card_js + '\n' + edit_js + '\n' + section_js, 200, {
+    return _cards_refresh_js + card_js + '\n' + edit_js + '\n' + section_js, 200, {
         'Content-Type': 'application/javascript',
         'Cache-Control': 'no-store'
     }
