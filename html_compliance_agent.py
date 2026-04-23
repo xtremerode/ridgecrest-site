@@ -246,6 +246,38 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
                 hero_pass = False
                 break
 
+    # ── Global: primary CTA must link to start-a-project.html ────────────────
+    # Any [data-cta-id="primary"] anchor that does NOT href to start-a-project.html
+    # (or ../start-a-project.html for services subpages) is a critical failure.
+    # Exempt: start-a-project.html itself.
+    VALID_PRIMARY_CTA_HREFS = {'start-a-project.html', '../start-a-project.html'}
+    # Pages where primary CTA legitimately points elsewhere:
+    #   start-a-project.html — embeds the inquiry iframe intentionally
+    #   project-inquiry.html — primary CTA scrolls to the on-page form (#inquiry-form)
+    PRIMARY_CTA_EXEMPT = {'start-a-project.html', 'project-inquiry.html'}
+    for filename in html_files:
+        if filename in PRIMARY_CTA_EXEMPT:
+            continue
+        path = os.path.join(PREVIEW_DIR, filename)
+        with open(path, 'r', encoding='utf-8', errors='replace') as fh:
+            raw = fh.read()
+        # Quick bail if no primary CTA on page
+        if 'data-cta-id="primary"' not in raw:
+            continue
+        from bs4 import BeautifulSoup as _BS
+        _soup = _BS(raw, 'html.parser')
+        for btn in _soup.find_all(attrs={'data-cta-id': 'primary'}):
+            href = btn.get('href', '')
+            # Normalize: strip query string / fragment
+            href_clean = href.split('?')[0].split('#')[0]
+            if href_clean not in VALID_PRIMARY_CTA_HREFS:
+                results.append(_r(
+                    'primary_cta_destination', 'fail',
+                    f"[data-cta-id=primary] href='{href}' — must be start-a-project.html",
+                    filename, auto_fixable=True
+                ))
+                hero_pass = False
+
     # ── Global: card-id duplicates ─────────────────────────────────────────────
     dup_found = False
     for cid, pages in card_id_registry.items():
