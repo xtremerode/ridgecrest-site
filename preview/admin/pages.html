@@ -3428,9 +3428,16 @@
     gpSave.addEventListener('click', async () => {
       if (!_gp) return;
       const g = _read();
-      const cs = _gp.cardState || {};
       gpSave.disabled = true; gpSave.textContent = 'Saving…';
       try {
+        // Fetch fresh card state so non-gradient fields (mode, image, text settings)
+        // are never overwritten with stale overlay data
+        let cs = _gp.cardState || {};
+        try {
+          const allCards = await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}`);
+          const fresh = Array.isArray(allCards) && allCards.find(c => c.card_id === _gp.cardId);
+          if (fresh) { cs = fresh; _gp.cardState = fresh; }
+        } catch(_) {}
         await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}/${encodeURIComponent(_gp.cardId)}`, {
           method: 'PUT',
           body: JSON.stringify({
@@ -3756,9 +3763,16 @@
       if (!_bgp) return;
       const mode = _getSeg(bgModeRow) || 'color';
       const color = mode === 'color' ? _getColor() : (_bgp.bgState.color || '#1c1c1c');
-      const bs = _bgp.bgState || {};
       bgSave.disabled = true; bgSave.textContent = 'Saving…';
       try {
+        // Fetch fresh card state so gradient and text fields are never overwritten
+        // with stale overlay data — BG panel only owns mode/color/image/position/zoom
+        let bs = _bgp.bgState || {};
+        try {
+          const allCards = await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}`);
+          const fresh = Array.isArray(allCards) && allCards.find(c => c.card_id === _bgp.heroId);
+          if (fresh) { bs = fresh; _bgp.bgState = fresh; }
+        } catch(_) {}
         await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}/${encodeURIComponent(_bgp.heroId)}`, {
           method: 'PUT',
           body: JSON.stringify({
@@ -3781,8 +3795,8 @@
           })
         });
         bgSave.textContent = '✓ Saved';
-        // Update local state so subsequent saves preserve the choice
-        _bgp.bgState = Object.assign({}, _bgp.bgState, { mode, color });
+        // Update local state so subsequent saves in same session preserve the choice
+        _bgp.bgState = Object.assign({}, bs, { mode, color });
         setTimeout(() => { bgSave.textContent = 'Save Background'; bgSave.disabled = false; }, 1500);
       } catch(err) {
         bgSave.textContent = 'Error'; bgSave.disabled = false;
@@ -4030,16 +4044,22 @@
 
     // BG panel image pick — saves image to card_settings + updates pages table + live preview
     if (pendingBgPick) {
-      const { heroId, bgState } = pendingBgPick;
+      const { heroId } = pendingBgPick;
       pickerUse.disabled = true; pickerUse.textContent = 'Saving…';
       try {
+        // Fetch fresh card state so gradient/text fields are preserved
+        let bs = pendingBgPick.bgState || {};
+        try {
+          const allCards = await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}`);
+          const fresh = Array.isArray(allCards) && allCards.find(c => c.card_id === heroId);
+          if (fresh) bs = fresh;
+        } catch(_) {}
         // Save image to pages table (hero_image)
         await API(`/admin/api/pages/${encodeURIComponent(currentSlug)}`, {
           method: 'PUT',
           body: JSON.stringify({ hero_image: newImage })
         });
         // Save mode=image + image path to card_settings
-        const bs = bgState || {};
         await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}/${encodeURIComponent(heroId)}`, {
           method: 'PUT',
           body: JSON.stringify({
