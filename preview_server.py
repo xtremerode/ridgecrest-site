@@ -1550,6 +1550,8 @@ _CARD_EDIT_OVERLAY_TPL = """\
       el.style.background = state.color || '#1C1C1C';
       el.classList.remove('rd-card--image-mode');
     }}
+    if (state.gradient_css) {{ el.style.setProperty('--rd-overlay', state.gradient_css); }}
+    else {{ el.style.removeProperty('--rd-overlay'); }}
   }}
 
   function _doSaveCard(cardId, state) {{
