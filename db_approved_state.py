@@ -68,9 +68,9 @@ APPROVED = {
     },
     'home_diff_mode': {
         'type': 'string',
-        'approved': 'one',
+        'approved': 'two',
         'label': 'Home differentiator zone mode (one|two)',
-        'source': 'Production default — split panel is dev-only',
+        'source': 'Henry confirmed two is intentional 2026-04-23',
     },
 }
 
