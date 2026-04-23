@@ -439,6 +439,9 @@ p { line-height: 1.8; }
 /* ── Team headshots: no gradient overlay, no brightness hover ── */
 .team-card__photo.rd-card--image-mode::before { display: none !important; }
 .team-card__photo.rd-card--image-mode:hover::before { display: none !important; }
+/* ── Diff zone panels (investment section): no ::before overlay needed ── */
+.diff__zone.rd-card--image-mode::before { display: none !important; }
+.diff__zone.rd-card--image-mode:hover::before { display: none !important; }
 .team-card__photo[data-card-id]:hover { filter: none !important; }
 /* ── Color-mode card: JS applies when admin sets card to solid background color ── */
 .rd-card--color-mode { background-image: none !important; }
