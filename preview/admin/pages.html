@@ -1195,46 +1195,6 @@
       <div id="rerenderStripScroll" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin;scrollbar-color:var(--border) transparent"></div>
       <div id="rerenderResWarn" style="display:none;margin-top:8px;padding:7px 10px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);border-radius:5px;font-size:11px;color:#fbbf24;line-height:1.5"></div>
     </div>
-    <!-- Adjustment sliders (always visible) -->
-    <div id="rerenderAdjustRow" style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:12px">
-      <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Adjustments</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-        <label style="font-size:12px;color:var(--text-2)">
-          Brightness <span id="brightnessVal">100</span>%
-          <input type="range" min="50" max="150" value="100" id="adjBrightness" oninput="applyAdjust()" style="width:100%;margin-top:4px;accent-color:var(--accent)">
-        </label>
-        <label style="font-size:12px;color:var(--text-2)">
-          Contrast <span id="contrastVal">100</span>%
-          <input type="range" min="50" max="150" value="100" id="adjContrast" oninput="applyAdjust()" style="width:100%;margin-top:4px;accent-color:var(--accent)">
-        </label>
-        <label style="font-size:12px;color:var(--text-2)">
-          Saturation <span id="saturationVal">100</span>%
-          <input type="range" min="0" max="200" value="100" id="adjSaturation" oninput="applyAdjust()" style="width:100%;margin-top:4px;accent-color:var(--accent)">
-        </label>
-        <label style="font-size:12px;color:var(--text-2)">
-          Red <span id="colorRVal">0</span>
-          <input type="range" min="-100" max="100" value="0" id="adjColorR" oninput="applyAdjust()" style="width:100%;margin-top:4px;accent-color:#ef4444">
-        </label>
-        <label style="font-size:12px;color:var(--text-2)">
-          Green <span id="colorGVal">0</span>
-          <input type="range" min="-100" max="100" value="0" id="adjColorG" oninput="applyAdjust()" style="width:100%;margin-top:4px;accent-color:#22c55e">
-        </label>
-        <label style="font-size:12px;color:var(--text-2)">
-          Blue <span id="colorBVal">0</span>
-          <input type="range" min="-100" max="100" value="0" id="adjColorB" oninput="applyAdjust()" style="width:100%;margin-top:4px;accent-color:#3b82f6">
-        </label>
-      </div>
-      <div style="margin-top:10px">
-        <label style="font-size:12px;color:var(--text-2);display:block">
-          <span style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-            <span>White Point &nbsp;<span id="kelvinVal">6500</span>K</span>
-            <span style="display:flex;gap:16px;font-size:11px;color:var(--text-muted)"><span>◀ Warm</span><span>Cool ▶</span></span>
-          </span>
-          <input type="range" min="2000" max="10000" value="6500" id="adjKelvin" oninput="applyAdjust()" style="width:100%;accent-color:var(--accent)">
-        </label>
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="resetAdjust()" style="margin-top:8px;font-size:11px">Reset adjustments</button>
-    </div>
     <!-- Prompt -->
     <div style="margin-bottom:12px">
       <label style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">Prompt</label>
@@ -4413,67 +4373,6 @@ async function _activateVersion(baseFilename, versionFilename) {
   return d; // { ok, new_active_path, active_version, projects_regenning, ... }
 }
 
-function applyAdjust() {
-  const b  = document.getElementById('adjBrightness').value;
-  const c  = document.getElementById('adjContrast').value;
-  const s  = document.getElementById('adjSaturation').value;
-  const cr = document.getElementById('adjColorR').value;
-  const cg = document.getElementById('adjColorG').value;
-  const cb = document.getElementById('adjColorB').value;
-  const kv = parseInt(document.getElementById('adjKelvin').value);
-  document.getElementById('brightnessVal').textContent = b;
-  document.getElementById('contrastVal').textContent   = c;
-  document.getElementById('saturationVal').textContent = s;
-  document.getElementById('colorRVal').textContent     = cr;
-  document.getElementById('colorGVal').textContent     = cg;
-  document.getElementById('colorBVal').textContent     = cb;
-  document.getElementById('kelvinVal').textContent     = kv;
-
-  // Build CSS filter preview (approximate — real adjustments are server-side)
-  let f = `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
-  // Kelvin: approximate warm with sepia, cool with hue-rotate
-  if (kv < 6500) {
-    const t = (6500 - kv) / 4500;
-    f += ` sepia(${Math.round(t * 35)}%)`;
-  } else if (kv > 6500) {
-    const t = (kv - 6500) / 3500;
-    f += ` hue-rotate(${Math.round(t * 25)}deg)`;
-  }
-  // RGB channel preview via SVG feColorMatrix (matches server: scale = 1.0 + val*0.005)
-  const rScale = (1.0 + parseInt(cr) * 0.005).toFixed(4);
-  const gScale = (1.0 + parseInt(cg) * 0.005).toFixed(4);
-  const bScale = (1.0 + parseInt(cb) * 0.005).toFixed(4);
-  if (parseInt(cr) !== 0 || parseInt(cg) !== 0 || parseInt(cb) !== 0) {
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg'><filter id='c'><feColorMatrix type='matrix' values='${rScale} 0 0 0 0 0 ${gScale} 0 0 0 0 0 ${bScale} 0 0 0 0 0 1 0'/></filter></svg>`;
-    f += ` url("data:image/svg+xml,${encodeURIComponent(svg)}#c")`;
-  }
-
-  // Apply to the active image panel
-  const target = _rerenderResultPath
-    ? document.getElementById('rerenderResult')
-    : document.getElementById('rerenderOriginal');
-  target.style.filter = f;
-}
-
-function resetAdjust(silent) {
-  ['adjBrightness','adjContrast','adjSaturation'].forEach(id => {
-    document.getElementById(id).value = 100;
-  });
-  ['adjColorR','adjColorG','adjColorB'].forEach(id => {
-    document.getElementById(id).value = 0;
-  });
-  document.getElementById('adjKelvin').value = 6500;
-  document.getElementById('brightnessVal').textContent = '100';
-  document.getElementById('contrastVal').textContent   = '100';
-  document.getElementById('saturationVal').textContent = '100';
-  document.getElementById('colorRVal').textContent     = '0';
-  document.getElementById('colorGVal').textContent     = '0';
-  document.getElementById('colorBVal').textContent     = '0';
-  document.getElementById('kelvinVal').textContent     = '6500';
-  document.getElementById('rerenderResult').style.filter   = '';
-  document.getElementById('rerenderOriginal').style.filter = '';
-}
-
 function openRerender(baseFilename, label, sourceFilename) {
   _rerenderFilename = baseFilename;
   _rerenderSourceFilename = sourceFilename || baseFilename;
@@ -4515,7 +4414,6 @@ function openRerender(baseFilename, label, sourceFilename) {
   if (selBtn) { selBtn.textContent = 'Select'; selBtn.style.color = 'var(--text-2)'; selBtn.style.borderColor = 'var(--border)'; }
   document.getElementById('rerenderBulkDeleteBtn').style.display = 'none';
   document.getElementById('rerenderStatus').textContent = '';
-  resetAdjust(true);
   // Reset surgical mode on every open
   _rerenderSurgical = false;
   _rerenderCropCoords = null;
@@ -4734,7 +4632,6 @@ function restartRerender() {
   document.getElementById('rerenderRunBtn').disabled = false;
   document.getElementById('rerenderPassBadge').style.display = 'none';
   document.getElementById('rerenderStatus').textContent = '';
-  resetAdjust(true);
   document.querySelectorAll('#rerenderStripScroll .rrstrip-item').forEach(el => {
     el.style.borderColor = 'var(--border)';
   });
@@ -4958,7 +4855,6 @@ function stripSelectSource(filename, heroPath, isOriginal) {
   document.getElementById('rerenderRefineBtn').style.display = 'none';
   document.getElementById('rerenderRestartBtn').style.display = 'none';
   document.getElementById('rerenderStatus').textContent = '';
-  resetAdjust(true);
   const stripItem = _rerenderStrip.find(s => s.filename === filename);
   const promptEl = document.getElementById('rerenderPrompt');
   if (stripItem && stripItem.prompt) {
@@ -5053,23 +4949,14 @@ async function runRerender(refine) {
 async function rerenderUseVersion() {
   const hasResult = !!_rerenderResultPath;
 
-  const brightness = parseInt(document.getElementById('adjBrightness').value);
-  const contrast   = parseInt(document.getElementById('adjContrast').value);
-  const saturation = parseInt(document.getElementById('adjSaturation').value);
-  const colorR     = parseInt(document.getElementById('adjColorR').value);
-  const colorG     = parseInt(document.getElementById('adjColorG').value);
-  const colorB     = parseInt(document.getElementById('adjColorB').value);
-  const kelvin     = parseInt(document.getElementById('adjKelvin').value);
-  const hasAdjust  = brightness !== 100 || contrast !== 100 || saturation !== 100
-                  || colorR !== 0 || colorG !== 0 || colorB !== 0 || kelvin !== 6500;
   // Case C: user clicked a filmstrip version thumbnail then clicked Use This Version
   const hasStripSelect = !!_rerenderSourceFilename && _rerenderSourceFilename !== _rerenderFilename;
 
-  console.log('[RD] rerenderUseVersion: hasResult=%s hasAdjust=%s hasStripSelect=%s _rerenderFilename=%s _rerenderSourceFilename=%s',
-    hasResult, hasAdjust, hasStripSelect, _rerenderFilename, _rerenderSourceFilename);
+  console.log('[RD] rerenderUseVersion: hasResult=%s hasStripSelect=%s _rerenderFilename=%s _rerenderSourceFilename=%s',
+    hasResult, hasStripSelect, _rerenderFilename, _rerenderSourceFilename);
 
   // Allow all cases through — Case D handles original-selected (no-op or revert-to-original)
-  if (!hasResult && !hasAdjust && !hasStripSelect && !_rerenderFilename) {
+  if (!hasResult && !hasStripSelect && !_rerenderFilename) {
     console.log('[RD] rerenderUseVersion: early return — no base filename');
     return;
   }
@@ -5088,58 +4975,11 @@ async function rerenderUseVersion() {
       activeFilename = _rerenderResultPath.split('/').pop();
       newActivePath  = _rerenderResultPath;
 
-      if (hasAdjust) {
-        // Bake all sliders into the _ai_N.webp file in-place
-        const adjRes = await fetch('/admin/api/images/adjust', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Admin-Token': _rrToken },
-          body: JSON.stringify({ filename: activeFilename, brightness, contrast, saturation,
-                                 color_r: colorR, color_g: colorG, color_b: colorB, kelvin })
-        });
-        const adjData = await adjRes.json();
-        if (!adjData.ok) throw new Error(adjData.error || 'adjust failed');
-        resetAdjust(true);
-        const ts = Date.now();
-        document.getElementById('rerenderResult').style.backgroundImage = `url('${newActivePath}?v=${ts}')`;
-        const stripEl = document.querySelector(`#rerenderStripScroll .rrstrip-item[data-filename="${CSS.escape(activeFilename)}"] div`);
-        if (stripEl) stripEl.style.backgroundImage = `url('${newActivePath}?v=${ts}')`;
-      }
-
-    } else if (hasStripSelect && !hasAdjust) {
+    } else if (hasStripSelect) {
       // ── Case C: filmstrip version directly selected — activate without new render
       activeFilename = _rerenderSourceFilename;
       console.log('[RD] Case C: activeFilename=%s', activeFilename);
 
-    } else if (hasAdjust) {
-      // ── Case B: No render result but sliders set — create new AI version ─────
-      const srcFilename = _rerenderSourceFilename;
-      const adjRes = await fetch('/admin/api/images/adjust', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': _rrToken },
-        body: JSON.stringify({ filename: srcFilename, brightness, contrast, saturation,
-                               color_r: colorR, color_g: colorG, color_b: colorB, kelvin,
-                               create_version: true, base_filename: _rerenderFilename })
-      });
-      const adjData = await adjRes.json();
-      if (!adjData.ok) throw new Error(adjData.error || 'adjust failed');
-
-      activeFilename = adjData.filename;
-      newActivePath  = adjData.hero_path;
-
-      // Show the new version in the result panel
-      _rerenderResultPath = newActivePath;
-      const resultEl = document.getElementById('rerenderResult');
-      resultEl.style.backgroundImage  = `url('${newActivePath}?v=${Date.now()}')`;
-      resultEl.style.backgroundSize   = 'cover';
-      resultEl.style.backgroundPosition = 'center';
-      document.getElementById('rerenderPlaceholder').style.display = 'none';
-      document.getElementById('rerenderPassBadge').textContent = _versionLabel(activeFilename);
-      document.getElementById('rerenderPassBadge').style.display = '';
-      document.getElementById('rerenderRefineBtn').style.display = '';
-      document.getElementById('rerenderRestartBtn').style.display = '';
-      resetAdjust(true);
-      _stripAppend(activeFilename, newActivePath, '', srcFilename);
-      _stripHighlight(_rerenderSourceFilename);
     } else {
       // ── Case D: Original thumbnail selected (or no thumbnail clicked) — activate original
       activeFilename = '';  // empty string = reset to original
