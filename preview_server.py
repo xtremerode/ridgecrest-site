@@ -5642,7 +5642,7 @@ def admin_toggle_automation():
 # ══════════════════════════════════════════════════════════════════════════════
 
 _OPT_DIR   = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
-_INQUIRY_URL = 'https://elevate-scheduling-6b2fdec8.base44.app/ProjectInquiryForm'
+_INQUIRY_URL = 'https://elevate-scheduling-6b2fdec8.base44.app/'
 
 # ── 18 canonical projects (seed data — only used once when DB is empty) ───────
 _SEED_PROJECTS = [
