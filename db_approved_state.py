@@ -178,9 +178,11 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
                                f"card_settings['{row['card_id']}'] has mode='color', image=NULL, "
                                f"color={row['color']!r} (updated {row['updated_at']}) — "
                                f"this overrides the hero/card image with a solid color. "
-                               f"Test artifact — delete or reset to image mode before ship. "
-                               f"Fix: DELETE FROM card_settings WHERE card_id='{row['card_id']}';",
-                               page=row['card_id'], auto_fixable=True))
+                               f"Test artifact — reset to image mode before ship. "
+                               f"Fix: UPDATE card_settings SET mode='image', image=(SELECT hero_image FROM pages WHERE slug=page_slug) "
+                               f"WHERE card_id='{row['card_id']}'; "
+                               f"DO NOT use DELETE — deleting disables the entire injection chain for the page.",
+                               page=row['card_id'], auto_fixable=False))
     else:
         results.append(_r('card_test_artifacts', 'pass',
                            'No test-artifact card_settings rows (mode=color, image=NULL)'))

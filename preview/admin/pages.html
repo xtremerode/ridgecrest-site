@@ -3556,9 +3556,16 @@
     tpSave.addEventListener('click', async () => {
       if (!_tp) return;
       const v = _read();
-      const cs = _tp.cardState || {};
       tpSave.disabled = true; tpSave.textContent = 'Saving…';
       try {
+        // Always fetch fresh card state from DB — prevents stale overlay cardState
+        // from overwriting mode/image set by the BG panel
+        let cs = _tp.cardState || {};
+        try {
+          const allCards = await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}`);
+          const fresh = Array.isArray(allCards) && allCards.find(c => c.card_id === _tp.heroId);
+          if (fresh) { cs = fresh; _tp.cardState = fresh; }
+        } catch(_) {}
         await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}/${encodeURIComponent(_tp.heroId)}`, {
           method: 'PUT',
           body: JSON.stringify({
@@ -3631,7 +3638,14 @@
     window._tpFlush = async function() {
       if (!_tp || !currentSlug) return;
       const v = _read();
-      const cs = _tp.cardState || {};
+      // Always fetch fresh card state from DB — prevents stale overlay cardState
+      // from overwriting mode/image set by the BG panel
+      let cs = _tp.cardState || {};
+      try {
+        const allCards = await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}`);
+        const fresh = Array.isArray(allCards) && allCards.find(c => c.card_id === _tp.heroId);
+        if (fresh) { cs = fresh; _tp.cardState = fresh; }
+      } catch(_) {}
       try {
         await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}/${encodeURIComponent(_tp.heroId)}`, {
           method: 'PUT',
