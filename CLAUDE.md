@@ -504,3 +504,38 @@ Must be placed **after** all text-align rules in `main.css`. See §46 in `CLAUDE
 ### Photo Studio Reference
 Standalone AI photo color grading app at `/home/claudeuser/photo_studio/` — port 8090, separate venv, zero shared code with RMA. To work on it: `cd ~/photo_studio && claude --dangerously-skip-permissions`
 
+---
+
+### GitHub Remote — LIVE (2026-04-24)
+- Repo: `git@github.com:xtremerode/ridgecrest-site.git` (SSH)
+- SSH key: `ridgecrest-do-server` (ed25519, added to GitHub account-wide)
+- Both `master` and `ridgecrest-audit` pushed successfully
+- All future commits should also push to GitHub: `git push origin <branch>`
+- `.gitignore` updated — `images/`, `images-opt/`, `preview/assets/images/`, `*.mp4`, `*.pdf`, `*.zip` excluded from git
+- **Never commit binary image/video assets to git** — they blow up repo size; serve from disk only
+
+---
+
+### CRITICAL: `git filter-repo` Requires Working Tree Backup First
+- `git filter-repo` rewrites history AND updates the working tree — tracked files that are removed from history get **deleted from disk**
+- On 2026-04-24: running `git filter-repo --path images/ --invert-paths` deleted all ~1,761 WebP variants from disk (they were tracked in git)
+- Site went down site-wide — hero images and gallery thumbnails missing everywhere
+- Full regeneration took ~30 minutes; all images were restored from source JPG/PNG
+- **Rule:** Before EVER running `git filter-repo` or any history-rewriting command:
+  1. `cp -r /home/claudeuser/agent/images-opt/ /tmp/images-opt-backup/`
+  2. `cp -r /home/claudeuser/agent/images/ /tmp/images-backup/`
+  3. Verify backup is complete, THEN run the rewrite
+- **Simpler alternative:** Adding `.gitignore` entries is all that's needed to stop future commits of binary files — history rewriting is rarely required
+
+---
+
+### Screenshot Server — Updated 2026-04-24
+- **Old system (deprecated):** Port 8080 root process, saved to `/root/screenshots/` — inaccessible to claudeuser
+- **New system (live):** Native routes in `preview_server.py` (port 8081) — no root dependency
+  - Henry uploads at: `http://147.182.242.54:8081/paste` (POST multipart or raw body)
+  - Files save to: `/home/claudeuser/agent/downloads/screenshot_001.jpg`, `_002.jpg`, etc. (sequential, resets on server restart)
+  - Claude reads directly: `Read("/home/claudeuser/agent/downloads/screenshot_001.jpg")`
+  - Compression: server compresses to max 1920px JPEG — no more 400 API crashes
+- **When Henry says a 3-digit number (e.g. "001"):** read `/home/claudeuser/agent/downloads/screenshot_001.jpg` directly
+- **Do NOT** use the old `/screenshots/<filename>` path or fetch via URL — read the file directly
+
