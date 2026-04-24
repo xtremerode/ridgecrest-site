@@ -4963,26 +4963,59 @@ def paste_index():
 
 @app.route('/paste/upload', methods=['POST'])
 def paste_upload():
-    from flask import Response as _Resp
-    body, ct, sc = _fwd_8080('/upload', method='POST',
-                              data=request.get_data(),
-                              content_type=request.content_type)
-    return _Resp(body, status=sc, mimetype=ct.split(';')[0].strip())
+    """Receive base64 screenshot, compress to JPEG ≤1920px, save with sequential naming."""
+    import base64 as _b64, re as _re, io as _io
+    from PIL import Image as _PILImage
+    data = (request.json or {}).get('image', '')
+    m = _re.match(r'data:image/(\w+);base64,(.+)', data)
+    if not m:
+        return jsonify({'error': 'Invalid image data'}), 400
+    img_bytes = _b64.b64decode(m.group(2))
+    img = _PILImage.open(_io.BytesIO(img_bytes)).convert('RGB')
+    if img.width > 1920:
+        ratio = 1920 / img.width
+        img = img.resize((1920, int(img.height * ratio)), _PILImage.LANCZOS)
+    dl_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloads')
+    existing = [f for f in os.listdir(dl_dir) if _re.match(r'screenshot_\d+\.jpg', f)]
+    nums = [int(_re.search(r'screenshot_(\d+)', f).group(1)) for f in existing]
+    n = max(nums) + 1 if nums else 1
+    filename = f'screenshot_{n:03d}.jpg'
+    out = _io.BytesIO()
+    img.save(out, format='JPEG', quality=85, optimize=True)
+    with open(os.path.join(dl_dir, filename), 'wb') as fh:
+        fh.write(out.getvalue())
+    return jsonify({'filename': filename})
 
 @app.route('/paste/list', methods=['GET'])
 def paste_list():
-    from flask import Response as _Resp
-    body, ct, sc = _fwd_8080('/list')
-    return _Resp(body, status=sc, mimetype=ct.split(';')[0].strip())
+    import re as _re
+    dl_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloads')
+    files = sorted(
+        [f for f in os.listdir(dl_dir) if _re.match(r'screenshot_\d+\.\w+', f)],
+        key=lambda f: int(_re.search(r'screenshot_(\d+)', f).group(1)),
+        reverse=True
+    )
+    return jsonify(files)
 
 @app.route('/paste/files', methods=['GET'])
 def paste_files():
-    from flask import Response as _Resp
-    body, ct, sc = _fwd_8080('/files')
-    return _Resp(body, status=sc, mimetype=ct.split(';')[0].strip())
+    dl_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloads')
+    files = sorted(os.listdir(dl_dir), reverse=True)
+    result = []
+    for f in files:
+        path = os.path.join(dl_dir, f)
+        size = os.path.getsize(path)
+        modified = datetime.fromtimestamp(os.path.getmtime(path)).strftime('%Y-%m-%d %H:%M')
+        result.append({'name': f, 'size': size, 'modified': modified})
+    return jsonify(result)
 
 @app.route('/paste/screenshot/<filename>', methods=['GET'])
 def paste_screenshot_proxy(filename):
+    safe = os.path.basename(filename)
+    dl_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloads')
+    local_path = os.path.join(dl_dir, safe)
+    if os.path.isfile(local_path):
+        return send_file(local_path)
     from flask import Response as _Resp
     body, ct, sc = _fwd_8080(f'/screenshot/{filename}')
     return _Resp(body, status=sc, mimetype=ct.split(';')[0].strip())
