@@ -1703,6 +1703,18 @@ _CARD_EDIT_OVERLAY_TPL = """\
         _attachEl = _par;
       }}
     }}
+    // diff__zone inside diff__visual--one: pill/ov must attach to diff__visual (the parent)
+    // so they participate in diff__visual's stacking context (z-index 9991 > diff__visual-inner's
+    // z-index 5). Without this, pill is trapped inside diff__zone's stacking context (z-index 1)
+    // and rendered below diff__visual-inner, making it invisible and unclickable.
+    // Only applies to --one mode (single zone). --two mode (home page, side-by-side zones) is
+    // excluded to prevent both pills firing when either zone is hovered.
+    if (!isGalleryItem && el.classList.contains('diff__zone')) {{
+      var _dv = el.parentElement;
+      if (_dv && _dv.classList.contains('diff__visual') && _dv.classList.contains('diff__visual--one')) {{
+        _attachEl = _dv;
+      }}
+    }}
 
     if (window.getComputedStyle(el).position === 'static') el.style.position = 'relative';
     el.style.overflow = 'hidden';
@@ -12432,4 +12444,4 @@ if __name__ == '__main__':
     print(f'Preview server starting on http://0.0.0.0:{PORT}')
     print(f'Watching: {PREVIEW_DIR}')
     print(f'Access at: http://147.182.242.54:{PORT}/')
-    app.run(host='0.0.0.0', port=PORT, threaded=True, debug=False, use_reloader=True)
+    app.run(host='0.0.0.0', port=PORT, threaded=True, debug=False, use_reloader=False)

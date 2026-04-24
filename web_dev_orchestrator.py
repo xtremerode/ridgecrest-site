@@ -5,11 +5,13 @@ Runs all web-dev QA agents and produces a unified report.
 Mirrors the RMA orchestrator pattern but focused on the website build.
 
 Agents run (in order):
-  1. server_health_agent   — dev server up, all pages 200
-  2. html_compliance_agent — hero IDs, card IDs, CTA attributes, hero flash prevention
-  3. css_compliance_agent  — required selectors, no baked CDN URLs, hero bg-color guardrails
-  4. js_compliance_agent   — postMessage handlers, hero injection tokens, _HERO_CLASSES
-  5. admin_panel_agent     — BG panel wiring, picker API saves
+  1. server_health_agent    — dev server up, all pages 200
+  2. html_compliance_agent  — hero IDs, card IDs, CTA attributes, hero flash prevention
+  3. css_compliance_agent   — required selectors, no baked CDN URLs, hero bg-color guardrails
+  4. js_compliance_agent    — postMessage handlers, hero injection tokens, _HERO_CLASSES
+  5. admin_panel_agent      — BG panel wiring, picker API saves
+  6. server_currency_agent  — server restarted after last edit to preview_server.py/main.css/main.js
+  7. visual_overlay_agent   — Playwright: edit pill visible & not occluded on hover (Rule 11)
 
 Exit codes:
   0  — all clear (zero critical fails)
@@ -72,13 +74,15 @@ def _import_agent(name: str):
 
 
 AGENTS = [
-    ('server_health_agent',   'Server Health'),
-    ('html_compliance_agent', 'HTML Compliance'),
-    ('css_compliance_agent',  'CSS Compliance'),
-    ('js_compliance_agent',   'JS Compliance'),
-    ('admin_panel_agent',     'Admin Panel'),
-    ('page_state_guard',      'Page State Guard'),
-    ('db_approved_state',     'DB Approved State'),
+    ('server_health_agent',    'Server Health'),
+    ('html_compliance_agent',  'HTML Compliance'),
+    ('css_compliance_agent',   'CSS Compliance'),
+    ('js_compliance_agent',    'JS Compliance'),
+    ('admin_panel_agent',      'Admin Panel'),
+    ('page_state_guard',       'Page State Guard'),
+    ('db_approved_state',      'DB Approved State'),
+    ('server_currency_agent',  'Server Currency'),
+    ('visual_overlay_agent',   'Visual Overlay (Playwright)'),
 ]
 
 # ANSI colours

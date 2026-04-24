@@ -1,13 +1,13 @@
 """
 Server Health Agent — Web Development QA Agency
 ================================================
-Verifies the dev preview server (port 8082) is up and serving correctly.
+Verifies the dev preview server (port 8081) is up and serving correctly.
 Checks every HTML page returns 200, key admin API endpoints respond,
 and the DB is reachable.
 
 Checks (critical = blocks commit):
   CRITICAL
-    • Dev server is reachable at http://127.0.0.1:8082/
+    • Dev server is reachable at http://127.0.0.1:8081/
     • Every HTML page in preview/ returns HTTP 200
     • Admin auth endpoint responds (POST /admin/api/auth)
     • DB tables endpoint responds (GET /admin/api/db/tables)
@@ -31,7 +31,7 @@ try:
 except ImportError:
     _HAS_REQUESTS = False
 
-BASE_URL   = 'http://127.0.0.1:8082'
+BASE_URL   = 'http://127.0.0.1:8081'
 PREVIEW_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'preview')
 ADMIN_PASSWORD = 'Hb2425hb+'
 SLOW_THRESHOLD = 3.0   # seconds
