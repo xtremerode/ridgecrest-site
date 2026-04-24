@@ -1572,26 +1572,15 @@ p { line-height: 1.8; }
 }
 .project-hero__cta { white-space: nowrap; }
 .breadcrumb-back--hero { margin-bottom: 1rem; }
-.breadcrumb-back.breadcrumb-back--hero a {
-  display: inline-flex;
-  align-items: center;
-  color: #fff;
+.breadcrumb-back--hero a {
+  color: rgba(255,255,255,0.6);
   text-decoration: none;
   font-size: 11px;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   font-family: var(--font-body);
-  background: rgba(96,123,142,1);
-  padding: 1px 4px;
-  line-height: 1;
-  border-radius: 20px;
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
 }
-.breadcrumb-back.breadcrumb-back--hero a:hover {
-  opacity: 1;
-  color: #fff;
-}
+.breadcrumb-back--hero a:hover { color: #fff; }
 
 .project-meta {
   padding: 3rem 0 0;
