@@ -11,3 +11,11 @@ downloads/
 screenshots/
 *.backup*
 /var/backups/
+
+# Large binary assets — served from disk, not version controlled
+preview/assets/images/
+preview/assets/images-opt/
+downloads/*.mp4
+downloads/*.zip
+app.db
+backups/
