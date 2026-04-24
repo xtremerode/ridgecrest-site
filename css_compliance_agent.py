@@ -332,6 +332,33 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
             results.append(_r('overrides_services_cta', 'pass',
                                f'overrides.css has {description}', 'overrides.css'))
 
+    # ── No repeating background patterns on image-card pseudo-elements ───────────
+    # Repeating background-size on ::before/::after of photo-card containers creates
+    # horizontal line artifacts (moiré with photo texture) that look like compression
+    # banding. Removed from .portfolio-card__img::after 2026-04-24. Guard against reintroduction.
+    CARD_PSEUDO_PATTERN_BANNED = [
+        'portfolio-card__img::after',
+        'portfolio-card__img::before',
+        'gallery-item__img::after',
+        'gallery-item__img::before',
+        'diff__zone::after',
+        'proj-card__img::after',
+        'proj-card__img::before',
+    ]
+    for selector in CARD_PSEUDO_PATTERN_BANNED:
+        pattern = re.compile(
+            re.escape(selector) + r'[^}]*background-(?:image|size)\s*:', re.DOTALL
+        )
+        if pattern.search(css):
+            results.append(_r('no_card_pseudo_bg_pattern', 'fail',
+                               f'main.css has background-image or background-size on {selector}. '
+                               f'Repeating backgrounds on photo-card pseudo-elements cause horizontal '
+                               f'line artifacts (moire). Remove the background property.',
+                               'main.css', auto_fixable=False))
+        else:
+            results.append(_r('no_card_pseudo_bg_pattern', 'pass',
+                               f'No repeating background pattern on {selector}', 'main.css'))
+
     return results
 
 
