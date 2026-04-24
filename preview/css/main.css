@@ -441,6 +441,11 @@ p { line-height: 1.8; }
 .team-card__photo.rd-card--image-mode:hover::before { display: none !important; }
 /* ── Diff zone panels: transparent default so gradient renders when set, no dark flash ── */
 .diff__zone.rd-card--image-mode::before { background: var(--rd-overlay, transparent) !important; }
+/* ── Service page 4-up gallery grid: no overlay by default, 0.3 on hover ── */
+.gallery-grid .gallery-item__img.rd-card--image-mode::before { background: transparent !important; }
+@media (hover: hover) {
+  .gallery-grid .gallery-item__img.rd-card--image-mode:hover::before { background: rgba(0,0,0,0.3) !important; }
+}
 .team-card__photo[data-card-id]:hover { filter: none !important; }
 /* ── Color-mode card: JS applies when admin sets card to solid background color ── */
 .rd-card--color-mode { background-image: none !important; }
