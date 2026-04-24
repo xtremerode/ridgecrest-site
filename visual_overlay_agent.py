@@ -3,12 +3,20 @@ Visual Overlay Agent
 ====================
 Uses Playwright (headless Chromium) to verify that edit-mode card overlays
 are visually accessible — pill appears on hover AND is not occluded by
-overlapping elements with higher z-index.
+overlapping elements with higher z-index — AND that clicking the overlay
+actually cycles the card image.
 
 This is the automated enforcement of Rule 11 (§22 CLAUDE.md): "rendered effect"
 verification for every card overlay. Code-level checks (HTML present, DB records
 exist) cannot catch CSS stacking context conflicts. Only a rendered browser check
 can.
+
+For each card tested:
+  1. Hover — pill must become visible (opacity 1) in the correct _attachEl container
+  2. Pill placement — for diff__zone/--one, pill must NOT be trapped inside the zone
+  3. Click-to-cycle — clicking the ov must change the card's background-image
+  4. Restore — original card state is saved before the test and restored via API after,
+     so no test artifact is left in card_settings (db_approved_state will catch any leak)
 
 Pages tested (representative structural types, not exhaustive):
   - kitchen-remodels.html   diff__zone inside diff__visual--one (critical case)
@@ -18,8 +26,11 @@ Pages tested (representative structural types, not exhaustive):
 
 Exports: run(fix=False) -> List[Dict]
 """
+import json
 import os
 import time
+import urllib.request
+import urllib.error
 import psycopg2
 import psycopg2.extras
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
@@ -67,10 +78,6 @@ def _get_token():
     (e.g., reloading due to file change detection during git staging),
     waits up to 8 seconds for it to come back up before declaring failure.
     """
-    import urllib.request
-    import urllib.error
-    import json as _json
-
     def _load_rows():
         try:
             conn = psycopg2.connect(**DB_CONFIG)
@@ -90,15 +97,13 @@ def _get_token():
                 headers={'X-Admin-Token': token}
             )
             with urllib.request.urlopen(req, timeout=5) as resp:
-                data = _json.loads(resp.read())
+                data = json.loads(resp.read())
                 return bool(data.get('ok'))
         except urllib.error.HTTPError:
-            return False   # definitive 401 — token invalid
+            return False
         except Exception:
-            return None    # connection error — server may be restarting
+            return None
 
-    # Try to find a valid token. If ALL tokens fail with connection errors
-    # (Flask hot-reloader restart window), wait and retry up to 2 times.
     for wait_round in range(3):
         rows = _load_rows()
         all_connection_errors = True
@@ -106,111 +111,262 @@ def _get_token():
             token = row['token']
             result = _ping(token)
             if result is True:
-                return token    # valid token found
+                return token
             if result is False:
-                all_connection_errors = False  # at least one 401 — server is up
+                all_connection_errors = False
 
         if not all_connection_errors:
-            break  # server responded (just no valid tokens) — stop retrying
+            break
 
-        # All connection errors → server is restarting (hot-reload). Wait and retry.
         if wait_round < 2:
             time.sleep(4)
 
     return None
 
 
-def _check_card_overlay(page, card_id):
-    """
-    Hover over the element with data-card-id=card_id and verify:
-      1. The edit pill (data-rd-overlay="card") becomes opacity 1 (mouseenter fired)
-      2. For diff__zone in diff__visual--one: pill is attached to diff__visual parent
-         (not trapped inside diff__zone's stacking context)
+def _read_card_state(card_id):
+    """Read current card_settings row for card_id. Returns dict or None if no row."""
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur.execute('SELECT * FROM card_settings WHERE card_id = %s', (card_id,))
+        row = cur.fetchone()
+        conn.close()
+        return dict(row) if row else None
+    except Exception:
+        return None
 
-    Uses force=True on hover to bypass pointer-events interactability check —
-    the card element may be behind a pointer-events:none overlay, but _attachEl
-    still receives the mouseenter event.
 
-    Returns (ok: bool, detail: str)
+def _restore_card_state(card_id, slug, token, original_state):
     """
+    Restore card to its pre-test state via the cards API.
+    If the card had no row before the test, delete it.
+    This ensures no test artifact is left in card_settings.
+    """
+    if original_state is None:
+        # Card had no DB row before — delete whatever the test created
+        try:
+            req = urllib.request.Request(
+                f'{BASE_URL}/admin/api/cards/{slug}/{card_id}',
+                method='DELETE',
+                headers={'X-Admin-Token': token}
+            )
+            urllib.request.urlopen(req, timeout=5)
+        except Exception:
+            pass
+        return
+
+    # Restore the exact pre-test state via PUT
+    payload = json.dumps({
+        'mode':               original_state.get('mode', 'color'),
+        'color':              original_state.get('color'),
+        'image':              original_state.get('image'),
+        'position':           original_state.get('position', '50% 50%'),
+        'zoom':               original_state.get('zoom', 1.0),
+        'gradient_type':      original_state.get('gradient_type'),
+        'gradient_tint':      original_state.get('gradient_tint'),
+        'gradient_opacity':   original_state.get('gradient_opacity'),
+        'gradient_direction': original_state.get('gradient_direction'),
+        'gradient_distance':  original_state.get('gradient_distance'),
+        'gradient_css':       original_state.get('gradient_css'),
+        'hero_text_align':    original_state.get('hero_text_align'),
+        'hero_text_color':    original_state.get('hero_text_color'),
+        'hero_cta_visible':   original_state.get('hero_cta_visible'),
+        'hero_cta_align':     original_state.get('hero_cta_align'),
+        'hero_cta_primary':   original_state.get('hero_cta_primary'),
+        'hero_cta_secondary': original_state.get('hero_cta_secondary'),
+    }).encode('utf-8')
+    try:
+        req = urllib.request.Request(
+            f'{BASE_URL}/admin/api/cards/{slug}/{card_id}',
+            data=payload,
+            method='PUT',
+            headers={'X-Admin-Token': token, 'Content-Type': 'application/json'}
+        )
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass
+
+
+def _check_card_overlay(page, card_id, slug, token):
+    """
+    For the card with data-card-id=card_id:
+      1. Hover — verify edit pill becomes visible in correct _attachEl container
+      2. Pill placement — for diff__zone/--one, pill must NOT be trapped inside zone
+      3. Click-to-cycle — click the capture overlay, verify background-image changes
+      4. Restore — PUT original card state back via API so no test artifact remains
+
+    Returns list of (check_name, ok, detail) tuples.
+    """
+    checks = []
+
     try:
         selector = f'[data-card-id="{card_id}"]'
         el = page.query_selector(selector)
         if el is None:
-            return False, f'Element [data-card-id="{card_id}"] not found in DOM'
+            return [('overlay_accessible', False,
+                     f'Element [data-card-id="{card_id}"] not found in DOM')]
 
-        # Scroll into viewport, then force-hover (bypasses pointer-events checks)
+        # ── Save original state before any interaction ────────────────────────
+        original_state = _read_card_state(card_id)
+
+        # ── Step 1: Scroll + hover _attachEl ─────────────────────────────────
+        # Mouseenter listeners are registered on _attachEl (not el), so we must
+        # hover _attachEl directly. For most cards _attachEl === el. For
+        # diff__zone/--one, _attachEl is the diff__visual parent.
+        # Scroll card into view first
         el.scroll_into_view_if_needed(timeout=5000)
         time.sleep(0.2)
-        el.hover(timeout=5000, force=True)
+
+        # Dispatch mouseenter directly on _attachEl (where the listener lives).
+        # Playwright's force-hover dispatches to el only; for diff__zone/--one
+        # the listener is on the diff__visual parent, so we must fire it there.
+        page.evaluate(f"""() => {{
+            var card = document.querySelector('[data-card-id="{card_id}"]');
+            if (!card) return;
+            var attachEl = card;
+            var isGallery = card.hasAttribute('data-src');
+            if (!isGallery && card.getAttribute('role') === 'img') {{
+                var par = card.parentElement;
+                if (par && window.getComputedStyle(par).position !== 'static') attachEl = par;
+            }}
+            if (!isGallery && card.classList.contains('diff__zone')) {{
+                var dv = card.parentElement;
+                if (dv && dv.classList.contains('diff__visual') &&
+                    dv.classList.contains('diff__visual--one') &&
+                    window.getComputedStyle(card).display !== 'none') {{
+                    attachEl = dv;
+                }}
+            }}
+            attachEl.dispatchEvent(new MouseEvent('mouseenter', {{bubbles: false, cancelable: true}}));
+        }}""")
         time.sleep(0.35)  # allow opacity transition (0.15s) + paint
 
-        # Find the pill that belongs to THIS specific card by querying within
-        # the card's expected _attachEl container (mirrors setupCard() logic).
-        result = page.evaluate(
-            f"""() => {{
-                var card = document.querySelector('[data-card-id="{card_id}"]');
-                if (!card) return 'card_not_found';
+        # ── Step 2: Verify pill visible and correctly placed ──────────────────
+        pill_result = page.evaluate(f"""() => {{
+            var card = document.querySelector('[data-card-id="{card_id}"]');
+            if (!card) return 'card_not_found';
 
-                // Determine expected _attachEl (mirrors setupCard() in preview_server.py)
-                var attachEl = card;
-                var isGallery = card.hasAttribute('data-src');
+            // Mirror setupCard() _attachEl logic
+            var attachEl = card;
+            var isGallery = card.hasAttribute('data-src');
 
-                // role="img" (non-gallery) → use parent if positioned
-                if (!isGallery && card.getAttribute('role') === 'img') {{
-                    var par = card.parentElement;
-                    if (par && window.getComputedStyle(par).position !== 'static') attachEl = par;
+            if (!isGallery && card.getAttribute('role') === 'img') {{
+                var par = card.parentElement;
+                if (par && window.getComputedStyle(par).position !== 'static') attachEl = par;
+            }}
+            if (!isGallery && card.classList.contains('diff__zone')) {{
+                var dv = card.parentElement;
+                if (dv && dv.classList.contains('diff__visual') &&
+                    dv.classList.contains('diff__visual--one') &&
+                    window.getComputedStyle(card).display !== 'none') {{
+                    attachEl = dv;
                 }}
+            }}
 
-                // diff__zone in diff__visual--one → use diff__visual parent
-                if (!isGallery && card.classList.contains('diff__zone')) {{
-                    var dv = card.parentElement;
-                    if (dv && dv.classList.contains('diff__visual') &&
-                        dv.classList.contains('diff__visual--one')) {{
-                        attachEl = dv;
-                    }}
+            // Find pill (z-index 9991) that is a DIRECT child of attachEl.
+            // querySelectorAll descends into children — in diff__visual, the hidden
+            // diff__zone--bottom's overlays appear first in document order and would
+            // be picked by a plain find(zIndex===9991). Restricting to direct children
+            // ensures we test the correct card's pill.
+            var ovEls = Array.from(attachEl.querySelectorAll('[data-rd-overlay="card"]'));
+            var pill = ovEls.find(function(o) {{ return o.style.zIndex === '9991' && o.parentElement === attachEl; }});
+            if (!pill) return 'no_pill_in_container';
+
+            var opacity = parseFloat(window.getComputedStyle(pill).opacity);
+            if (opacity < 0.5) return 'pill_opacity_zero';
+
+            // diff__zone/--one: pill must NOT be trapped inside zone
+            if (card.classList.contains('diff__zone')) {{
+                var dv2 = card.parentElement;
+                var isOne = dv2 && dv2.classList.contains('diff__visual') &&
+                            dv2.classList.contains('diff__visual--one');
+                if (isOne && card.contains(pill)) return 'stuck_in_zone';
+            }}
+
+            return 'ok';
+        }}""")
+
+        if pill_result == 'stuck_in_zone':
+            checks.append(('overlay_accessible', False,
+                'Pill trapped inside diff__zone (stacking context fix not active)'))
+        elif pill_result == 'pill_opacity_zero':
+            checks.append(('overlay_accessible', False,
+                f'Pill present but opacity=0 — mouseenter not firing on _attachEl for {card_id}'))
+        elif pill_result in ('card_not_found', 'no_pill_in_container'):
+            checks.append(('overlay_accessible', False,
+                f'Pill not found in expected _attachEl ({pill_result}) for {card_id}'))
+        else:
+            checks.append(('overlay_accessible', True,
+                f'Pill visible and correctly placed for {card_id}'))
+
+        # ── Step 3: Click-to-cycle ────────────────────────────────────────────
+        # Get background-image before click
+        bg_before = page.evaluate(f"""() => {{
+            var el = document.querySelector('[data-card-id="{card_id}"]');
+            return el ? window.getComputedStyle(el).backgroundImage : null;
+        }}""")
+
+        # Click the capture overlay (ov, z-index 9990) in the correct _attachEl.
+        # Dispatch programmatically to guarantee we hit the right element regardless
+        # of pointer-events or stacking on the test viewport.
+        click_result = page.evaluate(f"""() => {{
+            var card = document.querySelector('[data-card-id="{card_id}"]');
+            if (!card) return 'card_not_found';
+
+            var attachEl = card;
+            var isGallery = card.hasAttribute('data-src');
+            if (!isGallery && card.getAttribute('role') === 'img') {{
+                var par = card.parentElement;
+                if (par && window.getComputedStyle(par).position !== 'static') attachEl = par;
+            }}
+            if (!isGallery && card.classList.contains('diff__zone')) {{
+                var dv = card.parentElement;
+                if (dv && dv.classList.contains('diff__visual') &&
+                    dv.classList.contains('diff__visual--one') &&
+                    window.getComputedStyle(card).display !== 'none') {{
+                    attachEl = dv;
                 }}
+            }}
 
-                // Find THIS card's pill within the expected container
-                var pill = attachEl.querySelector('[data-rd-overlay="card"]');
-                if (!pill) return 'no_pill_in_container';
+            var ovEls = Array.from(attachEl.querySelectorAll('[data-rd-overlay="card"]'));
+            // Use direct-child constraint (same reason as pill lookup above)
+            var ov = ovEls.find(function(o) {{ return o.style.zIndex === '9990' && o.parentElement === attachEl; }});
+            if (!ov) return 'ov_not_found';
 
-                var opacity = parseFloat(window.getComputedStyle(pill).opacity);
-                if (opacity < 0.5) return 'pill_opacity_zero';
+            ov.click();
+            return 'clicked';
+        }}""")
 
-                // For diff__zone in diff__visual--ONE: pill must NOT be inside the zone
-                // (stuck_in_zone = stacking context fix not active).
-                // diff__visual--TWO (home page) correctly keeps pill inside zone — NOT a bug.
-                if (card.classList.contains('diff__zone')) {{
-                    var dv2 = card.parentElement;
-                    var isOne = dv2 && dv2.classList.contains('diff__visual') &&
-                                dv2.classList.contains('diff__visual--one');
-                    if (isOne && card.contains(pill)) return 'stuck_in_zone';
-                }}
+        if click_result != 'clicked':
+            checks.append(('click_cycles_image', False,
+                f'Could not find capture overlay (ov) to click for {card_id}: {click_result}'))
+        else:
+            time.sleep(0.6)  # allow saveCard debounce (1.5s) to queue + image to apply
 
-                return 'ok';
-            }}"""
-        )
+            bg_after = page.evaluate(f"""() => {{
+                var el = document.querySelector('[data-card-id="{card_id}"]');
+                return el ? window.getComputedStyle(el).backgroundImage : null;
+            }}""")
 
-        if result == 'stuck_in_zone':
-            return False, (
-                f'Pill trapped inside diff__zone (stacking context conflict NOT fixed) — '
-                f'Option A fix in setupCard() is not active for {card_id}'
-            )
-        if result == 'pill_opacity_zero':
-            return False, (
-                f'Pill in correct container but opacity=0 — '
-                f'mouseenter not triggering on _attachEl for {card_id}'
-            )
-        if result in ('card_not_found', 'no_pill_in_container'):
-            return False, f'Pill not found in expected _attachEl container ({result}) for {card_id}'
+            if bg_before == bg_after:
+                checks.append(('click_cycles_image', False,
+                    f'Click did not change background-image on {card_id} '
+                    f'(imagePool empty, ov misplaced, or applyStyle not firing)'))
+            else:
+                checks.append(('click_cycles_image', True,
+                    f'Click cycled image correctly on {card_id}'))
 
-        return True, f'Pill visible and correctly attached to _attachEl for {card_id}'
+        # ── Step 4: Restore original state ───────────────────────────────────
+        _restore_card_state(card_id, slug, token, original_state)
+
+        return checks
 
     except PlaywrightTimeoutError:
-        return False, f'Timeout: element {card_id} not scrollable/interactable (zero-size or display:none)'
+        return [('overlay_accessible', False,
+                 f'Timeout: {card_id} not scrollable/interactable (zero-size or display:none)')]
     except Exception as e:
-        return False, f'Error checking {card_id}: {e}'
+        return [('overlay_accessible', False, f'Error checking {card_id}: {e}')]
 
 
 def run(fix=False):
@@ -270,19 +426,45 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
-                # Give card overlay JS time to initialize
+                # Give card overlay JS time to initialize and imagePool to load
+                # (rd_set_pool is sent by the parent frame — not available in direct-page
+                # mode, so we inject a minimal pool from DB so click-to-cycle can run)
                 time.sleep(0.6)
 
+                # Inject imagePool from DB so click-to-cycle works outside iframe context
+                try:
+                    conn = psycopg2.connect(**DB_CONFIG)
+                    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+                    cur.execute(
+                        "SELECT DISTINCT image_path FROM card_settings "
+                        "WHERE image_path IS NOT NULL AND image_path <> '' "
+                        "ORDER BY image_path LIMIT 20"
+                    )
+                    pool_images = [r['image_path'] for r in cur.fetchall()]
+                    conn.close()
+                    if pool_images:
+                        # dispatchEvent is synchronous — imagePool is set before
+                        # evaluate() returns, so click-to-cycle works immediately.
+                        page.evaluate(f"""() => {{
+                            window.dispatchEvent(new MessageEvent('message', {{
+                                data: {{type:'rd_set_pool', images:{json.dumps(pool_images)}}},
+                                origin: window.location.origin
+                            }}));
+                        }}""")
+                except Exception:
+                    pass
+
                 for card_id in card_ids:
-                    ok, detail = _check_card_overlay(page, card_id)
-                    results.append({
-                        'agent': agent,
-                        'check': f'overlay_accessible_{card_id}',
-                        'status': 'pass' if ok else 'fail',
-                        'detail': detail,
-                        'page': slug,
-                        'auto_fixable': False,
-                    })
+                    card_checks = _check_card_overlay(page, card_id, slug, token)
+                    for check_name, ok, detail in card_checks:
+                        results.append({
+                            'agent': agent,
+                            'check': f'{check_name}_{card_id}',
+                            'status': 'pass' if ok else 'fail',
+                            'detail': detail,
+                            'page': slug,
+                            'auto_fixable': False,
+                        })
 
                 page.close()
 

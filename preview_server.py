@@ -1709,9 +1709,14 @@ _CARD_EDIT_OVERLAY_TPL = """\
     // and rendered below diff__visual-inner, making it invisible and unclickable.
     // Only applies to --one mode (single zone). --two mode (home page, side-by-side zones) is
     // excluded to prevent both pills firing when either zone is hovered.
+    // CRITICAL: only reparent if el is actually visible. In --one mode, diff__zone--bottom is
+    // display:none. Without this guard, the hidden zone also appends an ov to diff__visual,
+    // covering the visible zone's ov and intercepting all clicks — cycling the hidden card only.
     if (!isGalleryItem && el.classList.contains('diff__zone')) {{
       var _dv = el.parentElement;
-      if (_dv && _dv.classList.contains('diff__visual') && _dv.classList.contains('diff__visual--one')) {{
+      if (_dv && _dv.classList.contains('diff__visual') &&
+          _dv.classList.contains('diff__visual--one') &&
+          window.getComputedStyle(el).display !== 'none') {{
         _attachEl = _dv;
       }}
     }}
