@@ -78,6 +78,16 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
 #action-status.ok{background:#052e16;color:#22c55e;border:1px solid #166534;display:inline-block}
 #action-status.err{background:#2d0707;color:#f87171;border:1px solid #7f1d1d;display:inline-block}
 
+/* Filmstrip */
+#filmstrip{height:84px;overflow-x:auto;overflow-y:hidden;display:flex;gap:6px;padding:6px 10px;background:#061018;border-top:1px solid #1e3040;flex-shrink:0;align-items:center;min-width:0;scrollbar-width:thin;scrollbar-color:#1e3040 #061018}
+#filmstrip:empty{display:none}
+.fs-thumb{flex-shrink:0;width:76px;height:64px;border-radius:5px;border:2px solid #1e3040;cursor:pointer;overflow:hidden;position:relative;background:#091520;transition:border-color .15s}
+.fs-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.fs-thumb.fs-selected{border-color:#3b82f6;box-shadow:0 0 0 1px #3b82f6}
+.fs-thumb:hover:not(.fs-selected){border-color:#2a4050}
+.fs-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.7);color:#94a3b8;font-size:10px;font-weight:700;text-align:center;padding:2px 0;pointer-events:none;letter-spacing:.04em}
+.fs-live-badge{position:absolute;top:2px;right:2px;background:#0ea5e9;color:#fff;font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;letter-spacing:.04em;pointer-events:none;line-height:1.3}
+
 /* Done screen */
 #done-screen{display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:16px}
 #done-screen h2{font-size:32px;font-weight:800;color:#22c55e}
@@ -120,6 +130,7 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
         <p>Render file not on disk.<br>Click Re-render to regenerate.</p>
       </div>
     </div>
+    <div id="filmstrip"></div>
   </div>
 </div>
 
@@ -162,6 +173,8 @@ let setCount   = 0;
 let skipCount  = 0;
 let sourceMode = 'render'; // 'base' | 'render'
 let history    = [];       // [{idx, snapshots: [{...}]}]
+let filmVersions   = []; // all _ai_N filenames on disk for current card
+let filmActiveLive = ''; // active_version from server (what's live right now)
 
 // ── Elements ─────────────────────────────────────────────────────────────────
 const loadingScreen  = document.getElementById('loading-screen');
@@ -191,6 +204,7 @@ const btnSet         = document.getElementById('btn-set');
 const actionStatus   = document.getElementById('action-status');
 const doneScreen     = document.getElementById('done-screen');
 const doneSummary    = document.getElementById('done-summary');
+const filmstrip      = document.getElementById('filmstrip');
 
 // ── Init: load queue from server ──────────────────────────────────────────────
 async function init() {
@@ -279,6 +293,9 @@ function renderCard(i) {
   actionStatus.style.display = 'none';
 
   setControlsEnabled(true);
+
+  // Load filmstrip async (doesn't block card display)
+  loadFilmstrip(i);
 }
 
 function setControlsEnabled(on) {
@@ -476,6 +493,16 @@ async function doRerender() {
     renderImg.onload = () => { renderImg.style.opacity = '1'; renderSpinner.style.display = 'none'; };
     renderImg.src = `/assets/images-opt/${result.filename.replace('.webp', '_1920w.webp')}?t=${Date.now()}`;
     btnSet.disabled = false;
+    // Append to filmstrip (or add if not already there) and auto-select
+    if (!filmVersions.some(v => v.filename === result.filename)) {
+      const base = result.filename.replace('.webp', '');
+      filmVersions.push({
+        filename:   result.filename,
+        thumb_path: `/assets/images-opt/${base}_201w.webp`,
+        hero_path:  `/assets/images-opt/${base}_1920w.webp`,
+      });
+    }
+    buildFilmstrip(c);
     showActionStatus(true, '✓ New render ready');
     setControlsEnabled(true);
   } catch(e) {
@@ -485,6 +512,79 @@ async function doRerender() {
     showActionStatus(false, '✗ Re-render failed: ' + e.message);
     setControlsEnabled(true);
   }
+}
+
+// ── Filmstrip ─────────────────────────────────────────────────────────────────
+// filmVersions: array of {filename, thumb_path, hero_path} for AI versions only
+async function loadFilmstrip(cardIdx) {
+  const c = CARDS[cardIdx];
+  filmstrip.innerHTML = '';
+  filmVersions   = [];
+  filmActiveLive = '';
+  try {
+    const r = await fetch(`/admin/api/images/versions/${encodeURIComponent(c.base_file)}`, {
+      headers: { 'X-Admin-Token': TOKEN }
+    });
+    const d = await r.json();
+    filmActiveLive = d.active_version || '';
+    // Keep only AI versions (exclude the original base image)
+    filmVersions = (d.versions || [])
+      .filter(v => !v.is_original)
+      .map(v => ({ filename: v.filename, thumb_path: v.thumb_path, hero_path: v.hero_path }));
+    buildFilmstrip(c);
+  } catch(e) { /* filmstrip stays empty */ }
+}
+
+function buildFilmstrip(c) {
+  filmstrip.innerHTML = '';
+  if (!filmVersions.length) return;
+  filmVersions.forEach((v, i) => {
+    const isSelected = v.filename === c.render_file;
+    const isLive     = v.filename === filmActiveLive;
+    const thumb = document.createElement('div');
+    thumb.className = 'fs-thumb' + (isSelected ? ' fs-selected' : '');
+    thumb.dataset.fname = v.filename;
+
+    const img = document.createElement('img');
+    img.src = v.thumb_path || v.hero_path; // _201w preferred; fallback to _1920w
+    img.alt = `v${i + 1}`;
+    img.onerror = () => { img.src = v.hero_path; };
+    thumb.appendChild(img);
+
+    const lbl = document.createElement('div');
+    lbl.className = 'fs-label';
+    lbl.textContent = `v${i + 1}`;
+    thumb.appendChild(lbl);
+
+    if (isLive) {
+      const badge = document.createElement('div');
+      badge.className = 'fs-live-badge';
+      badge.textContent = 'LIVE';
+      thumb.appendChild(badge);
+    }
+
+    thumb.addEventListener('click', () => selectFilmVersion(c, v));
+    filmstrip.appendChild(thumb);
+  });
+  // scroll the selected thumb into view
+  const sel = filmstrip.querySelector('.fs-selected');
+  if (sel) sel.scrollIntoView({ inline: 'nearest', behavior: 'smooth' });
+}
+
+function selectFilmVersion(c, v) {
+  c.render_file   = v.filename;
+  c.render_exists = true;
+  // update highlight
+  filmstrip.querySelectorAll('.fs-thumb').forEach(t => {
+    t.classList.toggle('fs-selected', t.dataset.fname === v.filename);
+  });
+  // refresh right panel
+  renderImg.onload = null;
+  renderImg.src = (v.hero_path || `/assets/images-opt/${v.filename.replace('.webp', '_1920w.webp')}`) + `?t=${Date.now()}`;
+  renderImg.style.opacity = '1';
+  renderImg.style.display = '';
+  renderMissing.style.display = 'none';
+  btnSet.disabled = false;
 }
 
 // ── Done screen ───────────────────────────────────────────────────────────────
