@@ -286,6 +286,8 @@ Before editing ANY code, check the lock status:
 - Editing logo API routes (`/admin/api/settings/logo`) → check server-routes
 - Editing main.js logo injection or nav logo code → check frontend-main
 - Editing settings.html admin UI → check server-routes, frontend-main
+- Editing render button click handler inside `setupCard()` or rerender modal → check server-rerender
+- Editing gallery `add-image` endpoint (`gallery_add_image`) → check gallery-add
 
 ---
 
@@ -491,6 +493,28 @@ Must be placed **after** all text-align rules in `main.css`. See §46 in `CLAUDE
 2. **Blog index preload:** No `<link rel="preload">` when no hero is saved — dark flash on first load
 3. **QA blind spot:** Server-rendered CTA URLs in `preview_server.py` templates are NOT caught by pre-commit gate — verify manually whenever editing those templates
 4. **Admin panel SSL:** Admin accessible via IP only; no subdomain/SSL — deferred (see `CLAUDE_HISTORY.md` §27)
+5. **136 corrupt `card_settings` rows — render button broken site-wide (CRITICAL):** `saveCard()` wrote size-suffixed image paths (`_960w`, `_1920w`, etc.) instead of base `_mv2.webp` paths. Render button normalizes `_ai_N` suffixes but NOT size suffixes, so it sends wrong path to re-render modal. Full approved fix plan ready — see section below.
+6. **Rotate button missing from gallery item pill:** Gallery items show ✨ Render + 🗑 Delete but no Rotate. Rotate API exists (`/admin/api/images/rotate`). Pending implementation.
+7. **2 Pleasanton Custom images permanently blocked by Wix CDN:** `ff5b18_98f97a76f69c41dca1e0ddb7a927be32` and `ff5b18_c5cb0ea7b12844efb50e924af0d95a33` — return 403 even with Referer bypass from Henry's laptop. Must be recovered manually from Wix media library: download directly and upload via admin panel.
+8. **Pre-commit hook uses venv Python, not system Python:** System `python3` has Playwright; venv does NOT. Hook may fail Playwright checks. Fix: edit `.git/hooks/pre-commit` to use `/usr/bin/python3` instead of venv path.
+
+---
+
+### CRITICAL Pending Fix — card_settings Corruption (136 rows) — AWAITING "approved"
+
+**Root cause:** `saveCard()` saves whatever `state.image` contains at the time of save. When Browse All was used, `_portfolio_thumb_src()` returns `_960w` variant; that gets stored in DB. Render button strips `_ai_N` suffix but NOT `_960w`/`_1920w` — sends wrong path to modal. Also: gallery items should never write to `card_settings` at all (source of truth is `data-src`).
+
+**Full 10-step plan (unlocks, backup, fix, re-lock, push):**
+1. `pg_dump` (Rule 17 — before any DB change)
+2. `git commit` current state (Rule 19 — before any code change)
+3. Unlock `pages-card` and `server-rerender` (SQL)
+4. DB fix: delete all gallery-item `card_settings` rows; strip size suffix from `image` column on non-gallery rows — all 136 rows
+5. `setupCard` fix: gallery items always init `state.image` from `data-src`, never from DB
+6. `saveCard` guard: gallery items never write to `card_settings`
+7. Render button fix: strip ALL size suffixes (`_960w`, `_1920w`, `_480w`, `_201w`) before sending path to modal — site-wide defensive fix
+8. Add Rotate button to gallery item pill (uses existing `/admin/api/images/rotate` endpoint; extract base hash from `data-src`)
+9. Restart server → Playwright test: click ✨ Render on Pleasanton Custom laundry room item → assert correct image in modal → revert test state
+10. `git commit` (197 QA checks auto-run) + re-lock both features + `git push origin ridgecrest-audit`
 
 ---
 
@@ -538,4 +562,42 @@ Standalone AI photo color grading app at `/home/claudeuser/photo_studio/` — po
   - Compression: server compresses to max 1920px JPEG — no more 400 API crashes
 - **When Henry says a 3-digit number (e.g. "001"):** read `/home/claudeuser/agent/downloads/screenshot_001.jpg` directly
 - **Do NOT** use the old `/screenshots/<filename>` path or fetch via URL — read the file directly
+
+---
+
+## 25. Mandatory Execution Guardrail — REQUIRED FOR ALL CODE CHANGES
+
+**Every code change must go through the two-phase execution guardrail. No exceptions.**
+
+### Scripts
+- `execute_task_pre.sh <feature_key> [feature_key2 ...]` — run BEFORE making any changes
+- `execute_task_post.sh` — run AFTER all changes are made
+
+### What each phase does
+**Pre-phase** (blocks if any gate fails):
+1. Concurrent run check — prevents two tasks running simultaneously
+2. Feature lock check — fails if any named feature is still locked
+3. pg_dump backup — Rule 17 compliance
+4. Baseline git commit — Rule 19 compliance (saves state before edits)
+5. Playwright baseline capture — records visual state before changes
+
+**Post-phase** (guaranteed re-lock on ANY exit, including crash):
+1. Server health check
+2. Playwright after — diffs against baseline, blocks on any new regression
+3. git commit + pre-commit gate (197 checks fire automatically)
+4. git push to GitHub
+5. Audit log written to `ridgecrest-agency/execution_logs/`
+
+### Enforcement
+- `pre` writes `.task_run_context` — `post` refuses to run without it (prevents sequence bypass)
+- Features are re-locked via `trap` on exit — a crash cannot leave features permanently unlocked
+- `post` only pushes after a clean pre-commit gate pass — never on partial success
+- Audit log provides timestamped proof that every agent ran for every task
+
+### Usage example
+```bash
+./execute_task_pre.sh pages-card server-rerender
+# [make code changes here]
+./execute_task_post.sh
+```
 
