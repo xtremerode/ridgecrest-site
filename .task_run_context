@@ -1,7 +1,0 @@
-run_id=run_20260425_033814
-timestamp=20260425_033814
-features=claude-infra
-dump_file=/home/claudeuser/agent/backups/pre_task_20260425_033814.sql
-baseline_commit=64e5607936df17cf7b882ab426839e820aebf888
-playwright_before=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260425_033814_playwright_before.json
-log_pre=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260425_033814_pre.log
