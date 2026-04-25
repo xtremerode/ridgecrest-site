@@ -78,6 +78,16 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
 #action-status.ok{background:#052e16;color:#22c55e;border:1px solid #166534;display:inline-block}
 #action-status.err{background:#2d0707;color:#f87171;border:1px solid #7f1d1d;display:inline-block}
 
+/* Model toggle */
+#model-toggle{display:flex;border-radius:6px;overflow:hidden;border:1px solid #2a4050;flex-shrink:0}
+.model-btn{background:#0a1520;color:#6b8fa6;border:none;padding:6px 11px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;white-space:nowrap;letter-spacing:.03em}
+.model-btn.active{background:#7c3aed;color:#ede9fe}
+.model-btn:hover:not(.active):not(:disabled){background:#152030;color:#94a3b8}
+.model-btn:disabled{opacity:.45;cursor:not-allowed}
+.model-badge{display:inline-block;font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;margin-left:4px;vertical-align:middle;letter-spacing:.04em}
+.model-badge-gemini{background:#1d4ed8;color:#bfdbfe}
+.model-badge-openai{background:#7c3aed;color:#ede9fe}
+
 /* Reference image row */
 #ref-row{display:flex;align-items:center;gap:10px;padding-top:4px}
 #ref-row-label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#6b8fa6;white-space:nowrap;flex-shrink:0}
@@ -158,6 +168,10 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
         <button class="src-btn active" id="btn-src-render">From current render</button>
       </div>
       <button id="btn-rerender">↺ Re-render</button>
+      <div id="model-toggle">
+        <button class="model-btn active" id="btn-model-gemini">Gemini</button>
+        <button class="model-btn" id="btn-model-openai">GPT Image 2</button>
+      </div>
       <a id="surgical-link" href="/view/admin/pages.html" target="_blank">Surgical Edit ↗</a>
     </div>
     <div id="ref-row">
@@ -202,6 +216,7 @@ let history    = [];       // [{idx, snapshots: [{...}]}]
 let filmVersions   = []; // all _ai_N filenames on disk for current card
 let filmActiveLive = ''; // active_version from server (what's live right now)
 let refImageB64    = ''; // base64 data URL of uploaded reference image (or '')
+let renderModel    = 'gemini'; // 'gemini' | 'openai'
 
 // ── Elements ─────────────────────────────────────────────────────────────────
 const loadingScreen  = document.getElementById('loading-screen');
@@ -232,6 +247,8 @@ const actionStatus   = document.getElementById('action-status');
 const doneScreen     = document.getElementById('done-screen');
 const doneSummary    = document.getElementById('done-summary');
 const filmstrip      = document.getElementById('filmstrip');
+const btnModelGemini = document.getElementById('btn-model-gemini');
+const btnModelOpenAI = document.getElementById('btn-model-openai');
 const refInput       = document.getElementById('ref-input');
 const refEmptyLabel  = document.getElementById('ref-empty-label');
 const refLoaded      = document.getElementById('ref-loaded');
@@ -332,12 +349,14 @@ function renderCard(i) {
 }
 
 function setControlsEnabled(on) {
-  btnSet.disabled      = !on || !CARDS[idx]?.render_exists;
-  btnSkip.disabled     = !on;
-  btnRerender.disabled = !on;
-  btnSrcOrig.disabled  = !on;
+  btnSet.disabled       = !on || !CARDS[idx]?.render_exists;
+  btnSkip.disabled      = !on;
+  btnRerender.disabled  = !on;
+  btnSrcOrig.disabled   = !on;
   btnSrcRender.disabled = !on;
-  btnBack.disabled     = !on || history.length === 0;
+  btnModelGemini.disabled = !on;
+  btnModelOpenAI.disabled = !on;
+  btnBack.disabled      = !on || history.length === 0;
   if (on) {
     renderSpinner.style.display = 'none';
     renderImg.style.opacity = '1';
@@ -387,7 +406,7 @@ async function apiPublish(slugs) {
 }
 
 async function apiRerender(sourceFile, baseFile, prompt) {
-  const body = { filename: sourceFile, base_filename: baseFile, prompt, mode: 'new' };
+  const body = { filename: sourceFile, base_filename: baseFile, prompt, mode: 'new', render_model: renderModel };
   if (refImageB64) body.reference_image_b64 = refImageB64;
   const r = await fetch('/admin/api/images/rerender', {
     method: 'POST',
@@ -532,13 +551,15 @@ async function doRerender() {
     if (!filmVersions.some(v => v.filename === result.filename)) {
       const base = result.filename.replace('.webp', '');
       filmVersions.push({
-        filename:   result.filename,
-        thumb_path: `/assets/images-opt/${base}_201w.webp`,
-        hero_path:  `/assets/images-opt/${base}_1920w.webp`,
+        filename:     result.filename,
+        thumb_path:   `/assets/images-opt/${base}_201w.webp`,
+        hero_path:    `/assets/images-opt/${base}_1920w.webp`,
+        render_model: result.render_model || renderModel,
       });
     }
     buildFilmstrip(c);
-    showActionStatus(true, '✓ New render ready');
+    const modelLabel = (result.render_model || renderModel) === 'openai' ? 'GPT Image 2' : 'Gemini';
+    showActionStatus(true, `✓ New render ready (${modelLabel})`);
     setControlsEnabled(true);
   } catch(e) {
     renderImg.style.opacity = '1';
@@ -630,10 +651,17 @@ function buildFilmstrip(c) {
     thumb.appendChild(lbl);
 
     if (isLive) {
-      const badge = document.createElement('div');
-      badge.className = 'fs-live-badge';
-      badge.textContent = 'LIVE';
-      thumb.appendChild(badge);
+      const liveBadge = document.createElement('div');
+      liveBadge.className = 'fs-live-badge';
+      liveBadge.textContent = 'LIVE';
+      thumb.appendChild(liveBadge);
+    }
+    if (v.render_model) {
+      const mBadge = document.createElement('span');
+      mBadge.className = 'model-badge ' + (v.render_model === 'openai' ? 'model-badge-openai' : 'model-badge-gemini');
+      mBadge.textContent = v.render_model === 'openai' ? 'GPT' : 'G';
+      mBadge.style.cssText = 'position:absolute;top:2px;left:2px;pointer-events:none';
+      thumb.appendChild(mBadge);
     }
 
     thumb.addEventListener('click', () => selectFilmVersion(c, v));
@@ -683,6 +711,17 @@ btnSrcRender.addEventListener('click', () => {
   sourceMode = 'render';
   btnSrcRender.classList.add('active');
   btnSrcOrig.classList.remove('active');
+});
+
+btnModelGemini.addEventListener('click', () => {
+  renderModel = 'gemini';
+  btnModelGemini.classList.add('active');
+  btnModelOpenAI.classList.remove('active');
+});
+btnModelOpenAI.addEventListener('click', () => {
+  renderModel = 'openai';
+  btnModelOpenAI.classList.add('active');
+  btnModelGemini.classList.remove('active');
 });
 
 document.addEventListener('keydown', e => {

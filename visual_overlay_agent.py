@@ -30,6 +30,8 @@ Intentionally excluded from Playwright overlay tests (no card edit overlay):
   - _record_render_approval / render_approved_state  DB write helpers — backend only
   - reference_image_b64 / ref_b64  rerender endpoint extension — admin-only file upload,
     exercised only during manual render review sessions, not a card overlay surface
+  - render_model / script_openai   model selector (Gemini vs gpt-image-2) — admin-only
+    rerender path, no interactive card overlay UI surface
 
 Exports: run(fix=False) -> List[Dict]
 """

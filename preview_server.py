@@ -8501,6 +8501,7 @@ def admin_image_rerender():
     surgical      = bool(data.get('surgical', False))
     crop_coords   = data.get('crop_coords') if surgical else None  # {x,y,w,h} in actual image pixels
     ref_b64       = data.get('reference_image_b64', '').strip()   # optional style-reference image (data URL or raw b64)
+    render_model  = data.get('render_model', 'gemini').strip().lower()  # 'gemini' | 'openai'
     _ARCH_SUFFIX  = ' Maintain the original camera perspective and focal length. Preserve all high-frequency details on metallic hardware and cabinetry edges. Do not smooth or blur the textures of the wood grain or stone surfaces.'
     _SURGICAL_SUFFIX = ' This is a surgical edit. Focus exclusively on the selected region. Match the lighting, color, and texture of the surrounding scene. Do not alter any area outside the selection. Maintain sharp edges on hardware and treat specular highlights as light sources, not noise.'
 
@@ -8531,9 +8532,15 @@ def admin_image_rerender():
         if _cw < 4 or _ch < 4:
             return jsonify({'error': 'crop region too small (min 4px)'}), 400
 
-    api_key = os.getenv('GEMINI_API_KEY', '')
-    if not api_key:
-        return jsonify({'error': 'GEMINI_API_KEY not set in .env'}), 500
+    if render_model == 'openai':
+        api_key = os.getenv('OPENAI_API_KEY', '')
+        if not api_key:
+            return jsonify({'error': 'OPENAI_API_KEY not set in .env'}), 500
+    else:
+        render_model = 'gemini'  # normalise any unknown value
+        api_key = os.getenv('GEMINI_API_KEY', '')
+        if not api_key:
+            return jsonify({'error': 'GEMINI_API_KEY not set in .env'}), 500
 
     opt_dir  = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
     # Always render from the master file — never from a responsive-size variant.
@@ -8767,6 +8774,103 @@ for suffix, w in sizes:
 print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
 """
 
+    script_openai = r"""
+import sys, os, base64
+sys.path.insert(0, '/home/claudeuser/.local/lib/python3.12/site-packages')
+from openai import OpenAI
+from PIL import Image
+import io
+
+api_key  = sys.argv[1]
+src_path = sys.argv[2]
+out_path = sys.argv[3]
+prompt   = sys.argv[4]
+ref_path = sys.argv[5] if len(sys.argv) > 5 else ''
+
+# gpt-image-2 images.edit — convert source to PNG (WebP input not guaranteed)
+with Image.open(src_path) as img:
+    img_rgb = img.convert('RGB')
+    # Downscale to max 2048px for input — keeps cost down, quality is maintained
+    img_rgb.thumbnail((2048, 2048), Image.LANCZOS)
+    src_buf = io.BytesIO()
+    img_rgb.save(src_buf, 'PNG')
+    src_buf.seek(0)
+
+# Optional reference image — also convert to PNG
+ref_buf = None
+if ref_path and os.path.isfile(ref_path):
+    with Image.open(ref_path) as ref_img:
+        ref_rgb = ref_img.convert('RGB')
+        ref_rgb.thumbnail((1024, 1024), Image.LANCZOS)
+        ref_buf = io.BytesIO()
+        ref_rgb.save(ref_buf, 'PNG')
+        ref_buf.seek(0)
+    print(f'[OPENAI RENDER] reference image included', file=sys.stderr)
+
+# Determine best output size for this image's aspect ratio
+ar = img_rgb.width / img_rgb.height
+if ar >= 1.3:
+    out_size = '1536x1024'  # landscape
+elif ar <= 0.77:
+    out_size = '1024x1536'  # portrait
+else:
+    out_size = '1024x1024'  # square
+
+client = OpenAI(api_key=api_key)
+kwargs = dict(
+    model='gpt-image-2',
+    image=('source.png', src_buf, 'image/png'),
+    prompt=prompt,
+    size=out_size,
+    quality='high',
+    output_format='png',
+    n=1,
+)
+if ref_buf:
+    # Pass reference as second image via the images list format
+    # gpt-image-2 accepts a list of images; first = source, second = reference
+    src_buf.seek(0)
+    ref_buf.seek(0)
+    kwargs['image'] = [
+        ('source.png', src_buf, 'image/png'),
+        ('reference.png', ref_buf, 'image/png'),
+    ]
+
+result = client.images.edit(**kwargs)
+if not result.data or not result.data[0].b64_json:
+    print('ERROR: no image data in response', file=sys.stderr)
+    sys.exit(1)
+
+result_bytes = base64.b64decode(result.data[0].b64_json)
+img_result = Image.open(io.BytesIO(result_bytes)).convert('RGB')
+print(f'[OPENAI RENDER] output {img_result.width}x{img_result.height} ({out_size})', file=sys.stderr)
+
+# Upscale to ~2x for consistent sizing with Gemini pipeline
+_target_w = max(img_result.width * 2, 1920)
+if img_result.width < _target_w:
+    _ratio = _target_w / img_result.width
+    _target_h = int(img_result.height * _ratio)
+    img_result = img_result.resize((_target_w, _target_h), Image.LANCZOS)
+
+img_result.save(out_path, 'WEBP', quality=92)
+
+sizes = [('_1920w', 1920), ('_960w', 960), ('_480w', 480), ('_201w', 201)]
+base_out = out_path[:-5]
+saved_dims = {}
+for suffix, w in sizes:
+    if img_result.width > w:
+        ratio = w / img_result.width
+        h = int(img_result.height * ratio)
+        resized = img_result.resize((w, h), Image.LANCZOS)
+    else:
+        resized = img_result
+    out_variant = base_out + suffix + '.webp'
+    resized.save(out_variant, 'WEBP', quality=92)
+    saved_dims[suffix] = (resized.width, resized.height)
+
+print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
+"""
+
     _env = os.environ.copy()
     _env.pop('VIRTUAL_ENV', None)
     _env['PYTHONPATH'] = '/home/claudeuser/.local/lib/python3.12/site-packages'
@@ -8788,15 +8892,22 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
 
     try:
         if surgical and crop_coords:
-            # Path B — Surgical: crop patch, single-image Gemini edit, composite graft
+            # Path B — Surgical: Gemini only (crop/composite workflow)
             result = _subp.run(
                 ['/usr/bin/python3', '-c', script_surgical,
                  api_key, src_path, out_path, prompt + _SURGICAL_SUFFIX,
                  str(_cx), str(_cy), str(_cw), str(_ch)],
                 env=_env, capture_output=True, text=True, timeout=300
             )
+        elif render_model == 'openai':
+            # Path C — OpenAI gpt-image-2
+            result = _subp.run(
+                ['/usr/bin/python3', '-c', script_openai,
+                 api_key, src_path, out_path, prompt + _ARCH_SUFFIX, ref_tmp_path],
+                env=_env, capture_output=True, text=True, timeout=300
+            )
         else:
-            # Path A — Full-scene
+            # Path A — Gemini full-scene (default)
             orig_path_arg = src_path
             result = _subp.run(
                 ['/usr/bin/python3', '-c', script, api_key, src_path, out_path,
@@ -8813,11 +8924,15 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
                 err = 'Invalid request — try a different prompt or image'
             elif 'PERMISSION_DENIED' in raw or '403' in raw:
                 err = 'API key does not have permission — check key scopes in Google AI Studio'
+            elif 'insufficient_quota' in raw or 'billing' in raw.lower():
+                err = 'OpenAI quota exceeded — check billing at platform.openai.com'
+            elif 'organization_verification' in raw or 'org_verification' in raw:
+                err = 'OpenAI org verification required for gpt-image-2 — see platform.openai.com/settings'
             else:
                 err = raw.split('\n')[-1] or raw[:200]
             return jsonify({'error': err}), 500
     except _subp.TimeoutExpired:
-        return jsonify({'error': 'timed out after 120s'}), 500
+        return jsonify({'error': 'timed out after 300s'}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -8863,7 +8978,8 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
     except Exception:
         pass
     return jsonify({'ok': True, 'filename': out_filename, 'hero_path': hero_path,
-                    'display_path': display_path, 'width': render_w, 'height': render_h})
+                    'display_path': display_path, 'width': render_w, 'height': render_h,
+                    'render_model': render_model})
 
 
 # ── Save render result (copy _ai_N file to final destination) ────────────────
