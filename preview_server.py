@@ -8793,7 +8793,7 @@ out_path = sys.argv[3]
 prompt   = sys.argv[4]
 ref_path = sys.argv[5] if len(sys.argv) > 5 else ''
 
-# gpt-image-2 images.edit — convert source to PNG (WebP input not guaranteed)
+# gpt-image-1 images.edit — convert source to PNG (WebP input not guaranteed)
 with Image.open(src_path) as img:
     img_rgb = img.convert('RGB')
     # Downscale to max 2048px for input — keeps cost down, quality is maintained
@@ -8824,16 +8824,15 @@ else:
 
 client = OpenAI(api_key=api_key)
 kwargs = dict(
-    model='gpt-image-2',
+    model='gpt-image-1',
     image=('source.png', src_buf, 'image/png'),
     prompt=prompt,
     size=out_size,
     quality='high',
-    output_format='png',
     n=1,
 )
 if ref_buf:
-    # gpt-image-2 accepts a list of images; first = source, second = reference
+    # gpt-image-1 accepts a list of images; first = source, second = reference
     src_buf.seek(0)
     ref_buf.seek(0)
     kwargs['image'] = [
@@ -8907,7 +8906,7 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
                 env=_env, capture_output=True, text=True, timeout=300
             )
         elif render_model == 'openai':
-            # Path C — OpenAI gpt-image-2
+            # Path C — OpenAI gpt-image-1
             result = _subp.run(
                 ['/usr/bin/python3', '-c', script_openai,
                  api_key, src_path, out_path, prompt + _ARCH_SUFFIX, ref_tmp_path],
