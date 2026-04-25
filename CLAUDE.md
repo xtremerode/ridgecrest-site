@@ -159,7 +159,7 @@ When a guardrail execution touches a code path, `visual_overlay_agent.py` MUST i
 4. **Admin panel SSL:** Accessible via IP only; no subdomain/SSL — deferred
 5. **2 Pleasanton Custom images blocked by Wix CDN:** `ff5b18_98f97a76` and `ff5b18_c5cb0ea7` — return 403. Must be recovered from Wix media library manually.
 6. **Tonya Wilson headshot** (team-member-9) — needs re-upload
-7. **AI render history** — 117 of 124 history-log renders lost in filter-repo disaster (alternates never set as active). The 3 renders actively set in `card_settings` (services hero, orinda-kitchen, pleasanton-cottage-kitchen) **survived** in `images-opt/` — no live page is broken. Future Render clicks will lose history comparison but display is fine.
+7. **AI renders lost in filter-repo disaster** — 117 of 124 render files deleted from disk. Per Henry: almost every render session had one set as active, so most cards that ever had a render are now displaying the fallback base image instead of their chosen AI render. Investigation needed: determine how many card_settings were silently reset after filter-repo (server may have fallen back to base image when AI render 404'd). Must re-render per card via ✨ Render button.
 8. **services.html and team.html hero restructure** — still pending (reverted 2026-04-16)
 9. **pre-commit hook python path** — system `python3` has Playwright; venv does NOT. Fix pending in `.git/hooks/pre-commit`
 
@@ -169,6 +169,7 @@ When a guardrail execution touches a code path, `visual_overlay_agent.py` MUST i
 - **Rule 12 — Full Inventory First:** List all files, grep for pattern, read every match, confirm with Henry before touching anything
 - **Rule 13 — No Stale Tasks:** Session summaries are context, not a work queue — only one atomic carry-over per session start, then stop and wait
 - **Rule 14 — Single Source of Truth:** Every element has exactly one owner (DB, JS injection, or static HTML) — check what already controls it before adding new logic
+- **Rule 15 — Audit Findings Must Be Sourced:** Before stating that something is not broken or not referenced, verify against ALL storage locations (`card_settings`, `page_hero_overrides`, rendered HTML files, `page_sections`). Accepting a sub-agent's "all clear" without cross-checking primary sources and reporting it as fact is a violation of this rule.
 
 ---
 
