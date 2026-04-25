@@ -182,3 +182,5 @@ Standalone AI photo color grading app at `/home/claudeuser/photo_studio/` — po
 ## Agent-Added Rules
 
 - render_approved_state QA warning: the db_approved_state.py check in the post-phase QA gate prints 'Could not check render_approved_state: 0' — this is a WARN not a FAIL. Caused by db.get_db() context manager not being available in the standalone QA environment. Does not block commits.
+
+- Session-end protocol step: run 'python3 claude_context_agent.py --outbound "<rule>" --confirm' for any new rules, decisions, or configurations discussed this session. Show dry-run diff first; always write with --confirm. Route to correct directory CLAUDE.md — never dump everything into root CLAUDE.md.

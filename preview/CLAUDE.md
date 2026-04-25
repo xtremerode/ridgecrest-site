@@ -109,3 +109,9 @@ Must be placed **after** all text-align rules in `main.css`. See §46 in `CLAUDE
 ## Agent-Added Rules
 
 - Concurrent render race condition: when admin_image_rerender runs in parallel, use _RENDER_INDEX_LOCK mutex around the _ai_N index allocation and touch a stub file to reserve the slot before spawning the Gemini subprocess. On failure, clean up the stub if it is zero bytes. This prevents two concurrent render requests from claiming the same version index.
+
+- Rotate image API: /admin/api/images/rotate endpoint rotates source file + all 5 size variants in-place (CW or CCW). Used by render-review.html rotate buttons. When editing image rotation code, check server-routes feature lock.
+
+- render-review.html (/view/admin/render-review.html) is the AI render re-do tool. Features: side-by-side Original+AI panel, editable prompt, filmstrip of all _ai_N versions, From-original/From-render source toggle, reference image upload, delete rejected renders, rotate buttons on both panels (CCW/CW), auto-render on arrival (Gemini+GPT), back button. 63 cards in queue. Set It = DB-only, does NOT delete source files.
+
+- Image quality degradation rule: If Gemini renders look cartoonish/non-photorealistic, check image_render_api.py for model version changes. Previously generated photorealistic renders using Gemini imagen; degraded output likely means model or prompt changed. Validate render quality matches 'real photo' standard before accepting.
