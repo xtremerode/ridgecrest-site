@@ -1,7 +1,0 @@
-run_id=run_20260425_051805
-timestamp=20260425_051805
-features=governance-rules
-dump_file=/home/claudeuser/agent/backups/pre_task_20260425_051805.sql
-baseline_commit=d19655a6c1f676ff98e0114e1f5e4a0090e1d6b1
-playwright_before=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260425_051805_playwright_before.json
-log_pre=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260425_051805_pre.log

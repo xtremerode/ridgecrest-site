@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Render Review — Ridgecrest</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;flex-direction:column;overflow:hidden}
+#progress-bar{height:4px;background:#1e3040;position:fixed;top:0;left:0;right:0;z-index:100}
+#progress-fill{height:100%;background:#3b82f6;transition:width .4s ease}
+#header{padding:16px 24px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e3040;flex-shrink:0}
+#counter{font-size:13px;color:#6b8fa6;font-weight:600;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}
+#card-label{font-size:20px;font-weight:700;color:#e8eef2;flex:1;text-align:center;padding:0 20px}
+#page-link{font-size:13px;color:#3b82f6;text-decoration:none;white-space:nowrap}
+#page-link:hover{color:#60a5fa}
+#note-bar{padding:7px 24px;font-size:11px;color:#d97706;background:#1c1400;border-bottom:1px solid #2a1a00;flex-shrink:0;display:none}
+/* Two-panel viewer */
+#viewer{flex:1;display:flex;min-height:0}
+.panel{flex:1;display:flex;flex-direction:column;min-width:0}
+#orig-panel{border-right:1px solid #1e3040}
+.panel-label{padding:7px 0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b8fa6;background:#091520;border-bottom:1px solid #1e3040;flex-shrink:0;text-align:center}
+.render-label{color:#3b82f6}
+.panel-img-wrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#091520;position:relative}
+.panel-img-wrap img{max-width:100%;max-height:100%;object-fit:contain;transition:opacity .2s}
+#render-spinner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:40px;height:40px;border:3px solid #1e3040;border-top-color:#3b82f6;border-radius:50%;animation:spin .65s linear infinite;display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Prompt row */
+#prompt-section{padding:12px 20px;border-top:1px solid #1e3040;display:flex;align-items:flex-end;gap:10px;flex-shrink:0;background:#0d1a22}
+#prompt-label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#6b8fa6;white-space:nowrap;padding-bottom:11px}
+#prompt-textarea{flex:1;background:#091520;color:#e8eef2;border:1px solid #2a4050;border-radius:8px;padding:10px 13px;font-size:13px;font-family:inherit;line-height:1.5;outline:none;resize:vertical;min-height:56px;max-height:130px}
+#prompt-textarea:focus{border-color:#3b82f6}
+#prompt-right{flex:1;display:flex;flex-direction:column;gap:8px}
+#prompt-actions{display:flex;align-items:center;gap:10px}
+#source-toggle{display:flex;border-radius:6px;overflow:hidden;border:1px solid #2a4050;flex-shrink:0}
+.src-btn{background:#0a1520;color:#6b8fa6;border:none;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.src-btn.active{background:#1d4ed8;color:#fff}
+.src-btn:hover:not(.active):not(:disabled){background:#152030;color:#94a3b8}
+.src-btn:disabled{opacity:.45;cursor:not-allowed}
+#btn-rerender{background:#1e3040;color:#60a5fa;border:1px solid #1d4ed8;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;white-space:nowrap;transition:all .15s;flex-shrink:0}
+#btn-rerender:hover:not(:disabled){background:#1a3d6e;color:#93c5fd}
+#btn-rerender:disabled{opacity:.45;cursor:not-allowed}
+/* Footer */
+#footer{padding:13px 20px;border-top:1px solid #1e3040;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.btn{padding:11px 28px;border-radius:8px;border:none;cursor:pointer;font-size:15px;font-weight:700;letter-spacing:.02em;transition:all .15s;white-space:nowrap}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+#btn-skip{background:#1e3040;color:#94a3b8}
+#btn-skip:hover:not(:disabled){background:#243848;color:#e8eef2}
+#btn-set{background:#166534;color:#bbf7d0;padding:11px 42px;font-size:16px}
+#btn-set:hover:not(:disabled){background:#15803d;color:#dcfce7}
+#status-badge{padding:7px 14px;border-radius:6px;font-size:13px;font-weight:700;display:none}
+#status-badge.ok{background:#052e16;color:#22c55e;border:1px solid #166534;display:inline-block}
+#status-badge.err{background:#2d0707;color:#f87171;border:1px solid #7f1d1d;display:inline-block}
+/* Done screen */
+#done-screen{display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+#done-screen h2{font-size:32px;font-weight:800;color:#22c55e}
+#done-screen p{color:#6b8fa6;font-size:16px}
+</style>
+</head>
+<body>
+
+<div id="progress-bar"><div id="progress-fill"></div></div>
+
+<div id="header">
+  <span id="counter"></span>
+  <span id="card-label"></span>
+  <a id="page-link" href="#" target="_blank">View live page ↗</a>
+</div>
+<div id="note-bar"></div>
+
+<div id="viewer">
+  <div class="panel" id="orig-panel">
+    <div class="panel-label">Original</div>
+    <div class="panel-img-wrap">
+      <img id="orig-img" src="" alt="Original image" />
+    </div>
+  </div>
+  <div class="panel" id="render-panel">
+    <div class="panel-label render-label">AI Render</div>
+    <div class="panel-img-wrap">
+      <img id="render-img" src="" alt="AI render" />
+      <div id="render-spinner"></div>
+    </div>
+  </div>
+</div>
+
+<div id="prompt-section">
+  <span id="prompt-label">Prompt</span>
+  <div id="prompt-right">
+    <textarea id="prompt-textarea"></textarea>
+    <div id="prompt-actions">
+      <div id="source-toggle">
+        <button class="src-btn" id="btn-src-orig">From original</button>
+        <button class="src-btn active" id="btn-src-render">From current render</button>
+      </div>
+      <button id="btn-rerender">↺ Re-render</button>
+    </div>
+  </div>
+</div>
+
+<div id="footer">
+  <button class="btn" id="btn-skip">Skip →</button>
+  <div id="status-badge"></div>
+  <button class="btn" id="btn-set">✓ Set It</button>
+</div>
+
+<div id="done-screen">
+  <h2>All Done ✓</h2>
+  <p id="done-summary"></p>
+</div>
+
+<script>
+const TOKEN = 'ea501a45abb967a5fde5feaa14361a230d0eed48bd76a6284d868ab7737e4365';
+
+// ── Card data ─────────────────────────────────────────────────────────────────
+// type "card"    → PUT /admin/api/cards/{slug}/{card_id}
+// type "version" → POST /admin/api/images/set-version
+const CARDS = [
+  {
+    label: 'About Page — Feature Visual',
+    pageUrl: '/view/about.html',
+    renderFile: 'ff5b18_af3d4948b1c349bcaf72ebff882f4ad6_mv2_ai_1.webp',
+    baseFile:   'ff5b18_af3d4948b1c349bcaf72ebff882f4ad6_mv2.webp',
+    prompt: 'make this look like a real photo. Don\'t change anything',
+    note: null,
+    publish: ['about'],
+    actions: [
+      { type: 'card', slug: 'about', cardId: 'about-visual-main', pos: '50% 50%', zoom: 1 }
+    ]
+  },
+  {
+    label: 'Homepage — Portfolio Card 2',
+    pageUrl: '/view/index.html',
+    renderFile: 'ff5b18_1012816bc1d7431cbdba88c8a138d06d_mv2_ai_1.webp',
+    baseFile:   'ff5b18_1012816bc1d7431cbdba88c8a138d06d_mv2.webp',
+    prompt: 'change the color balance from 3000 to 3500 kelvin',
+    note: null,
+    publish: ['home'],
+    actions: [
+      { type: 'version' }
+    ]
+  },
+  {
+    label: 'Homepage — Portfolio Card 4',
+    pageUrl: '/view/index.html',
+    renderFile: 'ff5b18_2aaf8ea933cc4fcc9e59d23197e3b35f_mv2_ai_1.webp',
+    baseFile:   'ff5b18_2aaf8ea933cc4fcc9e59d23197e3b35f_mv2.webp',
+    prompt: 'remove the outlet in between the sinks and stage this scene with props so that it looks more realistic',
+    note: null,
+    publish: ['home'],
+    actions: [
+      { type: 'version' }
+    ]
+  },
+  {
+    label: 'Portfolio Page — Hero',
+    pageUrl: '/view/portfolio.html',
+    renderFile: 'ff5b18_0b701547bc92489cbf3985cef0ed0275_mv2_ai_1.webp',
+    baseFile:   'ff5b18_0b701547bc92489cbf3985cef0ed0275_mv2.webp',
+    prompt: 'make this look like a real photo',
+    note: null,
+    publish: ['portfolio'],
+    actions: [
+      { type: 'card', slug: 'portfolio', cardId: 'portfolio-hero', pos: '50% 50%', zoom: 1 }
+    ]
+  },
+  {
+    label: 'Portfolio — Danville Dream Home Card',
+    pageUrl: '/view/portfolio.html',
+    renderFile: 'ff5b18_f575a25ba7f14e1389d0ae63bb2d356f_mv2_ai_2.webp',
+    baseFile:   'ff5b18_f575a25ba7f14e1389d0ae63bb2d356f_mv2.webp',
+    prompt: 'turn off all artificial light and add rays of light so that the photo looks more realistic. Restage with props so that it looks like a nice kitchen. Don\'t change anything else.',
+    note: 'Updates the Danville Dream Home card only (Pleasanton Cottage Kitchen has its own existing render)',
+    publish: ['allprojects'],
+    actions: [
+      { type: 'card', slug: 'allprojects', cardId: 'allproj-danville-dream-home', pos: '44.3% 46.4%', zoom: 1.9 }
+    ]
+  },
+  {
+    label: 'Bathroom Remodels + Whole House — Diff Section',
+    pageUrl: '/view/bathroom-remodels.html',
+    renderFile: 'ff5b18_0f70516a7a444134986fd175ae6fe9d8_mv2_ai_1.webp',
+    baseFile:   'ff5b18_0f70516a7a444134986fd175ae6fe9d8_mv2.webp',
+    prompt: 'remove glare from tile',
+    note: 'This image appears on both Bathroom Remodels and Whole House Remodels diff sections — both will be updated',
+    publish: ['bathroom-remodels', 'whole-house-remodels'],
+    actions: [
+      { type: 'card', slug: 'bathroom-remodels',    cardId: 'bathroom-diff-top',    pos: '50% 50%', zoom: 1 },
+      { type: 'card', slug: 'whole-house-remodels',  cardId: 'whole-house-diff-top', pos: '50% 50%', zoom: 1 }
+    ]
+  },
+  {
+    label: 'Bathroom Gallery 4 + Napa Retreat Bathtub',
+    pageUrl: '/view/bathroom-remodels.html',
+    renderFile: 'ff5b18_d21a6cfecad9421bb43dbd6d1a63828f_mv2_ai_1.webp',
+    baseFile:   'ff5b18_d21a6cfecad9421bb43dbd6d1a63828f_mv2.webp',
+    prompt: 'remove white wall outlets from the tile wall behind the bathtub',
+    note: 'Same source image in Bathroom Remodels gallery and Napa Retreat gallery — both will be updated',
+    publish: ['bathroom-remodels'],
+    actions: [
+      { type: 'card',    slug: 'bathroom-remodels', cardId: 'bathroom-remodels-gallery-4', pos: '50% 50%', zoom: 1 },
+      { type: 'version' }
+    ]
+  },
+  {
+    label: 'Team Page — Member 2',
+    pageUrl: '/view/team.html',
+    renderFile: 'ff5b18_8db501ff84934a18a831c805b6b5bfe1_mv2_ai_1.webp',
+    baseFile:   'ff5b18_8db501ff84934a18a831c805b6b5bfe1_mv2.webp',
+    prompt: 'zoom out 15%. Generative fill all around.',
+    note: null,
+    publish: ['team'],
+    actions: [
+      { type: 'version' }
+    ]
+  },
+  {
+    label: 'Danville Hilltop — Floating Table (Gallery)',
+    pageUrl: '/view/projects/danville-hilltop-hideaway.html',
+    renderFile: 'ff5b18_4e56d06b0c6e4c80aabe636642bf8346_mv2_ai_1.webp',
+    baseFile:   'ff5b18_4e56d06b0c6e4c80aabe636642bf8346_mv2.webp',
+    prompt: 'there is a floating wood table top in the middle of the room above the dining room table. Remove that and keep everything else the same.',
+    note: null,
+    actions: [
+      { type: 'version' }
+    ]
+  },
+  {
+    label: 'Danville Hilltop — Kitchen / Walnut Cabinetry (Gallery)',
+    pageUrl: '/view/projects/danville-hilltop-hideaway.html',
+    renderFile: 'ff5b18_c0e8f9e9008c498eac5efafae3c46b04_mv2_ai_1.webp',
+    baseFile:   'ff5b18_c0e8f9e9008c498eac5efafae3c46b04_mv2.webp',
+    prompt: 'Make this kitchen look like a high quality real photograph, not a render. The brown cabinetry should look like rich brown walnut wood.',
+    note: null,
+    actions: [
+      { type: 'version' }
+    ]
+  },
+  {
+    label: 'Lafayette Luxury — Staging (Gallery)',
+    pageUrl: '/view/projects/lafayette-laid-back-luxury.html',
+    renderFile: 'ff5b18_8f94e57d36c84799bacb3aec32cd1418_mv2_ai_1.webp',
+    baseFile:   'ff5b18_8f94e57d36c84799bacb3aec32cd1418_mv2.webp',
+    prompt: 'make this look like a real photo a high-quality photo. Improve staging',
+    note: null,
+    actions: [
+      { type: 'version' }
+    ]
+  },
+  {
+    label: 'Lafayette Luxury — Window Covering (Gallery)',
+    pageUrl: '/view/projects/lafayette-laid-back-luxury.html',
+    renderFile: 'ff5b18_969f8423ceba4f5ab338f4ec820f8851_mv2_ai_1.webp',
+    baseFile:   'ff5b18_969f8423ceba4f5ab338f4ec820f8851_mv2.webp',
+    prompt: 'add a nice subtle window covering, minimal. I want to partially block the view through the windows. No heavy drapery, just minimal well-staged window covering.',
+    note: null,
+    actions: [
+      { type: 'version' }
+    ]
+  },
+  {
+    label: 'Napa Retreat — Towel Bars / Vanity (Gallery)',
+    pageUrl: '/view/projects/napa-retreat.html',
+    renderFile: 'ff5b18_41d97144818e40e09ddddd7357704009_mv2_ai_1.webp',
+    baseFile:   'ff5b18_41d97144818e40e09ddddd7357704009_mv2.webp',
+    prompt: 'remove the towel bars from the side of the vanity',
+    note: null,
+    actions: [
+      { type: 'version' }
+    ]
+  },
+  {
+    label: 'Napa Retreat — Flat Panel Cabinets (Gallery)',
+    pageUrl: '/view/projects/napa-retreat.html',
+    renderFile: 'ff5b18_76ec6d9dbc3b4d29ab02bc08c56cf7e5_mv2_ai_1.webp',
+    baseFile:   'ff5b18_76ec6d9dbc3b4d29ab02bc08c56cf7e5_mv2.webp',
+    prompt: 'make it look like a real photo. Change the cabinet face drawer faces to flat panel and small knobs on the top drawer. Change nothing else',
+    note: null,
+    actions: [
+      { type: 'version' }
+    ]
+  },
+  {
+    label: 'Napa Retreat — Shaker → Flat Panel Kitchen (Gallery)',
+    pageUrl: '/view/projects/napa-retreat.html',
+    renderFile: 'ff5b18_8d75523812e941f2a37fafd4d1f65557_mv2_ai_1.webp',
+    baseFile:   'ff5b18_8d75523812e941f2a37fafd4d1f65557_mv2.webp',
+    prompt: 'recreate this image so it looks like a real photo. Change the shaker doors on all the cabinets to flat panel. Change nothing else',
+    note: null,
+    actions: [
+      { type: 'version' }
+    ]
+  },
+  {
+    label: 'Napa Retreat — Wine Room (Gallery)',
+    pageUrl: '/view/projects/napa-retreat.html',
+    renderFile: 'ff5b18_bee090a1db814d60844aed6337fc984d_mv2_ai_1.webp',
+    baseFile:   'ff5b18_bee090a1db814d60844aed6337fc984d_mv2.webp',
+    prompt: 'make this image look like a real photograph, with real brick. And in a real wine room, stage it with props accordingly',
+    note: null,
+    actions: [
+      { type: 'version' }
+    ]
+  },
+  {
+    label: 'Sunol Homestead — Golden Hour (Gallery)',
+    pageUrl: '/view/projects/sunol-homestead.html',
+    renderFile: 'ff5b18_4d337f2682cc4aa682f48fcba262108a_mv2_ai_1.webp',
+    baseFile:   'ff5b18_4d337f2682cc4aa682f48fcba262108a_mv2.webp',
+    prompt: 'Even out the shadows and lighting. Make it look like it is shot during the golden hour with perfect lighting.',
+    note: null,
+    actions: [
+      { type: 'version' }
+    ]
+  },
+  {
+    label: 'Sunol Homestead — Walk-in Pantry (Gallery)',
+    pageUrl: '/view/projects/sunol-homestead.html',
+    renderFile: 'ff5b18_7e7176ba86d043e7a79be3fcd53aa7c0_mv2_ai_1.webp',
+    baseFile:   'ff5b18_7e7176ba86d043e7a79be3fcd53aa7c0_mv2.webp',
+    prompt: 'make this look like a real photo not a render. Try playing with rays of light coming in to the space. High-fidelity cinematic photo that would fool anyone into thinking it is an actual photograph of a walk-in pantry.',
+    note: null,
+    actions: [
+      { type: 'version' }
+    ]
+  },
+  {
+    label: 'Sunol Homestead — Cinematic Rays (Gallery)',
+    pageUrl: '/view/projects/sunol-homestead.html',
+    renderFile: 'ff5b18_8263a2cdc43a4f9d9f5b0b6945039c77_mv2_ai_1.webp',
+    baseFile:   'ff5b18_8263a2cdc43a4f9d9f5b0b6945039c77_mv2.webp',
+    prompt: 'make this look like a real photo not a render. Try playing with rays of light coming in to the space. High-fidelity cinematic photo.',
+    note: null,
+    actions: [
+      { type: 'version' }
+    ]
+  },
+  {
+    label: 'Sunol Homestead — Exposure Balance (Gallery)',
+    pageUrl: '/view/projects/sunol-homestead.html',
+    renderFile: 'ff5b18_86e17388126b47e3b08d204ff3f39b68_mv2_ai_1.webp',
+    baseFile:   'ff5b18_86e17388126b47e3b08d204ff3f39b68_mv2.webp',
+    prompt: 'reduce exposure 25%, balance lighting, remove shadows',
+    note: null,
+    actions: [
+      { type: 'version' }
+    ]
+  },
+  {
+    label: 'Sunol Homestead — Remove Wall Sconces (Gallery)',
+    pageUrl: '/view/projects/sunol-homestead.html',
+    renderFile: 'ff5b18_de323270e3574f2582de93c63a85e584_mv2_ai_1.webp',
+    baseFile:   'ff5b18_de323270e3574f2582de93c63a85e584_mv2.webp',
+    prompt: 'remove the wall sconce from the left side wall by the robe hook and the right side wall by the robe hook. Change nothing else',
+    note: null,
+    actions: [
+      { type: 'version' }
+    ]
+  },
+  {
+    label: 'Service Pages — Diff Hero (Bathroom + Whole House header)',
+    pageUrl: '/view/bathroom-remodels.html',
+    renderFile: 'ff5b18_5b97bf4ab5144c2da7f3e3aa80fb8532_mv2_ai_2.webp',
+    baseFile:   'ff5b18_5b97bf4ab5144c2da7f3e3aa80fb8532_mv2.webp',
+    prompt: 'make this look like a real photo and fully stage it so that it looks like it could be in Architectural Digest magazine',
+    note: null,
+    publish: ['home', 'index'],
+    actions: [
+      { type: 'version' }
+    ]
+  },
+  {
+    label: 'Custom Homes — Service Card',
+    pageUrl: '/view/services/custom-homes.html',
+    renderFile: 'ff5b18_6f6dc7ef92684e7e8af496c4f83f06be_mv2_ai_1.webp',
+    baseFile:   'ff5b18_6f6dc7ef92684e7e8af496c4f83f06be_mv2.webp',
+    prompt: 'make this look like a real photograph. High-fidelity cinematic quality that looks like a professional architectural photo shoot.',
+    note: 'This image is shared by the Portfolio page and two Sierra Mountain Ranch allprojects cards — all three will be updated',
+    publish: ['portfolio', 'allprojects'],
+    actions: [
+      { type: 'version' }
+    ]
+  }
+];
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let idx        = 0;
+let setCount   = 0;
+let skipCount  = 0;
+let sourceMode = 'render'; // 'base' | 'render'
+const total    = CARDS.length;
+
+// ── Elements ─────────────────────────────────────────────────────────────────
+const progressFill  = document.getElementById('progress-fill');
+const counter       = document.getElementById('counter');
+const cardLabel     = document.getElementById('card-label');
+const pageLink      = document.getElementById('page-link');
+const noteBar       = document.getElementById('note-bar');
+const origImg       = document.getElementById('orig-img');
+const renderImg     = document.getElementById('render-img');
+const renderSpinner = document.getElementById('render-spinner');
+const promptTA      = document.getElementById('prompt-textarea');
+const btnRerender   = document.getElementById('btn-rerender');
+const btnSrcOrig    = document.getElementById('btn-src-orig');
+const btnSrcRender  = document.getElementById('btn-src-render');
+const statusBadge   = document.getElementById('status-badge');
+const btnSkip       = document.getElementById('btn-skip');
+const btnSet        = document.getElementById('btn-set');
+const viewer        = document.getElementById('viewer');
+const promptSection = document.getElementById('prompt-section');
+const footer        = document.getElementById('footer');
+const header        = document.getElementById('header');
+const doneScreen    = document.getElementById('done-screen');
+const doneSummary   = document.getElementById('done-summary');
+
+function renderCard(i) {
+  if (i >= total) { showDone(); return; }
+  const c = CARDS[i];
+  idx = i;
+
+  progressFill.style.width = ((i / total) * 100) + '%';
+  counter.textContent = `${i + 1} / ${total}`;
+  cardLabel.textContent = c.label;
+  pageLink.href = c.pageUrl;
+
+  // Note bar
+  if (c.note) {
+    noteBar.textContent = '⚠ ' + c.note;
+    noteBar.style.display = 'block';
+  } else {
+    noteBar.style.display = 'none';
+  }
+
+  // Images — use _1920w for quality display
+  origImg.src   = `/assets/images-opt/${c.baseFile.replace('.webp', '_1920w.webp')}`;
+  renderImg.src = `/assets/images-opt/${c.renderFile.replace('.webp', '_1920w.webp')}`;
+  renderImg.style.opacity = '1';
+  renderSpinner.style.display = 'none';
+
+  // Prompt
+  promptTA.value = c.prompt;
+
+  // Status
+  statusBadge.className = '';
+  statusBadge.textContent = '';
+  statusBadge.style.display = 'none';
+
+  setButtons(true);
+}
+
+function setButtons(enabled) {
+  btnSkip.disabled     = !enabled;
+  btnSet.disabled      = !enabled;
+  btnRerender.disabled = !enabled;
+  btnSrcOrig.disabled  = !enabled;
+  btnSrcRender.disabled = !enabled;
+  if (enabled) {
+    renderSpinner.style.display = 'none';
+    renderImg.style.opacity = '1';
+  }
+}
+
+function showStatus(ok, msg) {
+  statusBadge.className = ok ? 'ok' : 'err';
+  statusBadge.textContent = msg;
+  if (ok) setTimeout(() => { statusBadge.className = ''; statusBadge.textContent = ''; statusBadge.style.display = 'none'; }, 2500);
+}
+
+// ── API helpers ───────────────────────────────────────────────────────────────
+async function apiPut(slug, cardId, imageFile, pos, zoom) {
+  const r = await fetch(`/admin/api/cards/${encodeURIComponent(slug)}/${encodeURIComponent(cardId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': TOKEN },
+    body: JSON.stringify({ mode: 'image', image: `/assets/images-opt/${imageFile}`, position: pos, zoom })
+  });
+  if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || r.status); }
+  return r.json();
+}
+
+async function apiSetVersion(baseFile, versionFile) {
+  const r = await fetch('/admin/api/images/set-version', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': TOKEN },
+    body: JSON.stringify({ base_filename: baseFile, version_filename: versionFile })
+  });
+  if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || r.status); }
+  return r.json();
+}
+
+async function apiPublish(slugs) {
+  if (!slugs || !slugs.length) return;
+  const r = await fetch('/admin/api/pages/publish', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': TOKEN },
+    body: JSON.stringify({ slugs })
+  });
+  if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error('publish: ' + (j.error || r.status)); }
+  return r.json();
+}
+
+async function apiRerender(sourceFile, baseFile, prompt) {
+  // sourceFile = what Gemini receives as input (base or current render)
+  // baseFile   = used to generate the output filename (_ai_N.webp family)
+  const r = await fetch('/admin/api/images/rerender', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': TOKEN },
+    body: JSON.stringify({ filename: sourceFile, base_filename: baseFile, prompt, mode: 'new' })
+  });
+  if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || r.status); }
+  return r.json();
+}
+
+// ── Set action ────────────────────────────────────────────────────────────────
+async function doSet() {
+  const c = CARDS[idx];
+  setButtons(false);
+  statusBadge.style.display = 'none';
+  try {
+    for (const a of c.actions) {
+      if (a.type === 'card') {
+        await apiPut(a.slug, a.cardId, c.renderFile, a.pos, a.zoom);
+      } else if (a.type === 'version') {
+        await apiSetVersion(c.baseFile, c.renderFile);
+      }
+    }
+    if (c.publish && c.publish.length) {
+      await apiPublish(c.publish);
+    }
+    setCount++;
+    showStatus(true, '✓ Set & published!');
+    setTimeout(() => { renderCard(idx + 1); }, 900);
+  } catch (e) {
+    showStatus(false, '✗ Error: ' + e.message);
+    setButtons(true);
+  }
+}
+
+// ── Re-render action ──────────────────────────────────────────────────────────
+async function doRerender() {
+  const c = CARDS[idx];
+  const newPrompt = promptTA.value.trim();
+  if (!newPrompt) return;
+  setButtons(false);
+  renderImg.style.opacity = '0.15';
+  renderSpinner.style.display = 'block';
+  statusBadge.className = '';
+  statusBadge.textContent = '';
+  statusBadge.style.display = 'none';
+  try {
+    const sourceFile = sourceMode === 'render' ? c.renderFile : c.baseFile;
+    const result = await apiRerender(sourceFile, c.baseFile, newPrompt);
+    if (!result.ok || !result.filename) throw new Error(result.error || 'No filename returned');
+    c.renderFile = result.filename;
+    c.prompt     = newPrompt;
+    const newUrl = `/assets/images-opt/${result.filename.replace('.webp', '_1920w.webp')}?t=${Date.now()}`;
+    renderImg.onload = () => { renderImg.style.opacity = '1'; renderSpinner.style.display = 'none'; };
+    renderImg.src = newUrl;
+    showStatus(true, '✓ New render ready');
+    setButtons(true);
+  } catch (e) {
+    renderImg.style.opacity = '1';
+    renderSpinner.style.display = 'none';
+    showStatus(false, '✗ Re-render failed: ' + e.message);
+    setButtons(true);
+  }
+}
+
+// ── Event listeners ───────────────────────────────────────────────────────────
+btnSet.addEventListener('click', doSet);
+btnRerender.addEventListener('click', doRerender);
+
+btnSrcOrig.addEventListener('click', () => {
+  sourceMode = 'base';
+  btnSrcOrig.classList.add('active');
+  btnSrcRender.classList.remove('active');
+});
+btnSrcRender.addEventListener('click', () => {
+  sourceMode = 'render';
+  btnSrcRender.classList.add('active');
+  btnSrcOrig.classList.remove('active');
+});
+
+btnSkip.addEventListener('click', () => {
+  skipCount++;
+  renderCard(idx + 1);
+});
+
+// ── Done screen ───────────────────────────────────────────────────────────────
+function showDone() {
+  progressFill.style.width = '100%';
+  header.style.display        = 'none';
+  noteBar.style.display       = 'none';
+  viewer.style.display        = 'none';
+  promptSection.style.display = 'none';
+  footer.style.display        = 'none';
+  doneScreen.style.display    = 'flex';
+  doneSummary.textContent = `${setCount} render${setCount !== 1 ? 's' : ''} activated · ${skipCount} skipped`;
+}
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.target === promptTA) return; // don't hijack textarea input
+  if (e.key === 'Enter' || e.key === 'y') btnSet.click();
+  if (e.key === 'ArrowRight' || e.key === 'n') btnSkip.click();
+});
+
+// ── Start ─────────────────────────────────────────────────────────────────────
+renderCard(0);
+</script>
+</body>
+</html>
