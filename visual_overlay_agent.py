@@ -24,6 +24,11 @@ Pages tested (representative structural types, not exhaustive):
   - allprojects.html        proj-card__img allproj-* cards
   - portfolio.html          portfolio-featured cards
 
+Intentionally excluded from Playwright overlay tests (no card edit overlay):
+  - admin/render-review.html      standalone admin review tool — no hover/pill overlay UI
+  - GET /admin/api/renders/review-queue  backend data endpoint — no interactive UI surface
+  - _record_render_approval / render_approved_state  DB write helpers — backend only
+
 Exports: run(fix=False) -> List[Dict]
 """
 import json

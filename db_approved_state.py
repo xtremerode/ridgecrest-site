@@ -305,6 +305,78 @@ def run(fix: bool = False) -> List[Dict[str, Any]]:
         results.append(_r('required_card_records', 'pass',
                            f'All {len(REQUIRED_CARDS)} required card_settings records present'))
 
+    # ── render_approved_state: regression detection ───────────────────────────
+    # When a render is approved (Set It in render-review or admin panel), the approved
+    # filename is written to render_approved_state. This check fails if anything has
+    # since reset that card/label back to a base (non-AI) image — catches Playwright
+    # overwrites, accidental admin saves, and migration regressions.
+    try:
+        with _db.get_db() as (conn, cur):
+            # Check table exists
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_name = 'render_approved_state'
+                )
+            """)
+            if not cur.fetchone()[0]:
+                results.append(_r('render_approved_state', 'warn',
+                                   'render_approved_state table does not exist — no render approvals recorded yet'))
+            else:
+                cur.execute("SELECT storage_type, identifier, approved_filename, approved_at FROM render_approved_state")
+                approved = cur.fetchall()
+
+                if not approved:
+                    results.append(_r('render_approved_state', 'pass',
+                                       'render_approved_state: no approvals recorded yet'))
+                else:
+                    fails_found = 0
+                    for row in approved:
+                        stype    = row['storage_type']
+                        ident    = row['identifier']
+                        approved_file = row['approved_filename']
+                        approved_at   = str(row['approved_at'])[:10]
+
+                        if stype == 'card_settings':
+                            cur.execute(
+                                "SELECT image FROM card_settings WHERE card_id = %s", (ident,))
+                            cs = cur.fetchone()
+                            current = (cs['image'] or '') if cs else ''
+                            current_bare = current.split('/')[-1] if current else ''
+                            if current_bare != approved_file:
+                                results.append(_r('render_approved_state', 'fail',
+                                                   f"Render regression on '{ident}': "
+                                                   f"approved {approved_file!r} (set {approved_at}) "
+                                                   f"but card_settings now has {current_bare!r}. "
+                                                   f"Likely overwritten by Playwright or admin test. "
+                                                   f"Fix: re-run Set It in render-review, or "
+                                                   f"UPDATE card_settings SET image='/assets/images-opt/{approved_file}' "
+                                                   f"WHERE card_id='{ident}';",
+                                                   page=ident))
+                                fails_found += 1
+
+                        elif stype == 'image_labels':
+                            cur.execute(
+                                "SELECT active_version FROM image_labels WHERE filename = %s", (ident,))
+                            il = cur.fetchone()
+                            current = (il['active_version'] or '') if il else ''
+                            if current != approved_file:
+                                results.append(_r('render_approved_state', 'fail',
+                                                   f"Render regression on image_labels['{ident}']: "
+                                                   f"approved {approved_file!r} (set {approved_at}) "
+                                                   f"but active_version is now {current!r}. "
+                                                   f"Fix: POST /admin/api/images/set-version with "
+                                                   f"base_filename={ident}, version_filename={approved_file}",
+                                                   page=ident))
+                                fails_found += 1
+
+                    if fails_found == 0:
+                        results.append(_r('render_approved_state', 'pass',
+                                           f'All {len(approved)} approved render(s) still active — no regressions'))
+    except Exception as exc:
+        results.append(_r('render_approved_state', 'warn',
+                           f'Could not check render_approved_state: {exc}'))
+
     return results
 
 

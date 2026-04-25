@@ -8385,6 +8385,9 @@ def admin_card_update(slug, card_id):
               gradient_type, gradient_tint, gradient_opacity, gradient_direction, gradient_distance,
               hero_text_align, hero_cta_visible, hero_text_color,
               hero_cta_align, hero_cta_primary, hero_cta_secondary))
+        # Persist approved render state so the QA guardrail can detect future regressions
+        if image and '_ai_' in image:
+            _record_render_approval(cur, 'card_settings', card_id, image, via='admin')
         conn.commit()
         conn.close()
         return jsonify({'ok': True, 'page_slug': slug, 'card_id': card_id})
@@ -9179,6 +9182,10 @@ def admin_set_version():
         """, (f'%{base_stem}%', base_stem))
         affected_pids = [r['id'] for r in cur.fetchall()]
 
+        # Persist approved render state for QA guardrail regression detection
+        if version_filename and '_ai_' in version_filename:
+            _record_render_approval(cur, 'image_labels', base_filename, version_filename, via='admin')
+
         conn.commit()
 
         # 5. Synchronously regenerate affected project pages so their gallery HTML reflects
@@ -9291,6 +9298,195 @@ def admin_page_hero_set(slug):
         })
     except Exception as e:
         conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
+
+# ── Render review queue ───────────────────────────────────────────────────────
+
+@app.route('/admin/api/renders/review-queue', methods=['GET'])
+def admin_renders_review_queue():
+    """Return the full AI render review queue.
+    For each source image that has been rendered, returns the latest render file,
+    prompt, card/gallery mapping, and current approval/active status.
+    Results are sorted: unapproved+inactive first, then active, then fully approved."""
+    auth = _require_admin()
+    if auth: return auth
+
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'no db'}), 503
+    try:
+        cur = conn.cursor()
+        _ensure_render_approved_state_table(cur)
+        _ensure_render_prompts_table(cur)
+        _ensure_image_labels_table(cur)
+
+        # Project name map
+        try:
+            cur.execute("SELECT slug, name FROM portfolio_projects")
+            project_names = {r['slug']: r['name'] for r in cur.fetchall()}
+        except Exception:
+            project_names = {}
+
+        # Page URL overrides for non-gallery cards
+        PAGE_URLS = {
+            'home': '/view/index.html', 'index': '/view/index.html',
+            'about': '/view/about.html', 'portfolio': '/view/portfolio.html',
+            'allprojects': '/view/allprojects.html', 'team': '/view/team.html',
+            'services': '/view/services.html', 'process': '/view/process.html',
+            'bathroom-remodels': '/view/bathroom-remodels.html',
+            'whole-house-remodels': '/view/whole-house-remodels.html',
+            'kitchen-remodels': '/view/kitchen-remodels.html',
+            'custom-homes': '/view/services/custom-homes.html',
+        }
+
+        # Get latest render per canonical base file
+        cur.execute("""
+            WITH ranked AS (
+                SELECT
+                    filename       AS render_file,
+                    source_filename,
+                    prompt,
+                    created_at,
+                    regexp_replace(
+                      regexp_replace(
+                        regexp_replace(source_filename, '(_mv2)(_ai_\\d+)+', '\\1'),
+                        '_mv2_(1920|960|480|201)w\\.webp', '_mv2.webp'
+                      ),
+                      '_mv2_1920w_ai_\\d+\\.webp', '_mv2.webp'
+                    ) AS base_file,
+                    ROW_NUMBER() OVER (
+                      PARTITION BY regexp_replace(
+                        regexp_replace(
+                          regexp_replace(source_filename, '(_mv2)(_ai_\\d+)+', '\\1'),
+                          '_mv2_(1920|960|480|201)w\\.webp', '_mv2.webp'
+                        ),
+                        '_mv2_1920w_ai_\\d+\\.webp', '_mv2.webp'
+                      )
+                      ORDER BY created_at DESC
+                    ) AS rn
+                FROM image_render_prompts
+                WHERE filename LIKE '%%_ai_%%'
+            )
+            SELECT * FROM ranked WHERE rn = 1
+            ORDER BY base_file
+        """)
+        renders = cur.fetchall()
+
+        # Approval lookup
+        cur.execute("SELECT storage_type, identifier, approved_filename, approved_at FROM render_approved_state")
+        approvals = {(r['storage_type'], r['identifier']): r for r in cur.fetchall()}
+
+        # Verify render files exist on disk
+        opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+        results = []
+
+        for r in renders:
+            base_file   = r['base_file']
+            render_file = r['render_file']
+            prompt      = r['prompt']
+
+            # Check if render file exists on disk (don't skip — just flag)
+            render_1920 = render_file.replace('.webp', '_1920w.webp')
+            render_exists = (
+                os.path.isfile(os.path.join(opt_dir, render_1920)) or
+                os.path.isfile(os.path.join(opt_dir, render_file))
+            )
+            # Also verify the base (original) image exists — skip entirely if source is gone
+            if not os.path.isfile(os.path.join(opt_dir, base_file)):
+                continue
+
+            # ── Gallery (image_labels) ─────────────────────────────────────────
+            cur.execute("""
+                SELECT filename, gallery_project_slug, gallery_image_type, active_version
+                FROM image_labels WHERE filename = %s
+            """, (base_file,))
+            il = cur.fetchone()
+
+            if il and il['gallery_project_slug']:
+                slug      = il['gallery_project_slug']
+                proj_name = project_names.get(slug, slug.replace('-', ' ').title())
+                img_type  = (il.get('gallery_image_type') or 'Project').replace('_', ' ').title()
+                label     = f'{proj_name} — {img_type}'
+                page_url  = f'/view/projects/{slug}.html'
+                approval  = approvals.get(('image_labels', base_file))
+                active_v  = il.get('active_version') or ''
+                is_active = '_ai_' in active_v
+                is_approved = approval is not None
+
+                results.append({
+                    'label':         label,
+                    'base_file':     base_file,
+                    'render_file':   render_file,
+                    'prompt':        prompt,
+                    'page_url':      page_url,
+                    'publish':       [slug],
+                    'actions':       [{'type': 'version'}],
+                    'note':          None,
+                    'is_approved':   is_approved,
+                    'is_active':     is_active,
+                    'render_exists': render_exists,
+                    'approved_at':   approval['approved_at'].isoformat() if (approval and approval.get('approved_at')) else None,
+                    'surgical_ok':   True,
+                })
+                continue  # gallery images matched — don't also check card_settings
+
+            # ── Non-gallery (card_settings) ───────────────────────────────────
+            base_stem_  = base_file[:-5]
+            cur.execute("""
+                SELECT card_id, page_slug, image FROM card_settings
+                WHERE mode = 'image'
+                  AND (image LIKE %s OR image LIKE %s)
+                  AND card_id NOT LIKE '%%-gal-%%'
+                ORDER BY card_id
+            """, (
+                f'/assets/images-opt/{base_stem_}%%',
+                f'/assets/images-opt/{base_stem_}_%%',
+            ))
+            cs_rows = cur.fetchall()
+
+            for cs in cs_rows:
+                card_id   = cs['card_id']
+                page_slug = cs['page_slug']
+                page_url  = PAGE_URLS.get(page_slug, f'/view/{page_slug}.html')
+                approval  = approvals.get(('card_settings', card_id))
+                cur_img   = cs.get('image') or ''
+                is_active = '_ai_' in cur_img
+                is_approved = approval is not None
+                card_label = card_id.replace('-', ' ').title()
+
+                results.append({
+                    'label':         card_label,
+                    'base_file':     base_file,
+                    'render_file':   render_file,
+                    'prompt':        prompt,
+                    'page_url':      page_url,
+                    'publish':       [page_slug],
+                    'actions':       [{'type': 'card', 'slug': page_slug, 'card_id': card_id,
+                                       'pos': '50% 50%', 'zoom': 1}],
+                    'note':          None,
+                    'is_approved':   is_approved,
+                    'is_active':     is_active,
+                    'render_exists': render_exists,
+                    'approved_at':   approval['approved_at'].isoformat() if (approval and approval.get('approved_at')) else None,
+                    'surgical_ok':   True,
+                })
+
+        # Sort: pending+exists first → active → approved → render_missing last
+        def _sort_key(e):
+            if not e.get('render_exists', True): return 3
+            if e['is_approved']:                 return 2
+            if e['is_active']:                   return 1
+            return 0
+
+        results.sort(key=_sort_key)
+        return jsonify({'ok': True, 'queue': results, 'total': len(results)})
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     finally:
         try: conn.close()
@@ -9837,6 +10033,41 @@ def _ensure_image_labels_table(cur):
     cur.execute("ALTER TABLE image_labels ADD COLUMN IF NOT EXISTS active_version TEXT")
     cur.execute("ALTER TABLE image_labels ADD COLUMN IF NOT EXISTS gallery_project_slug TEXT")
     cur.execute("ALTER TABLE image_labels ADD COLUMN IF NOT EXISTS gallery_image_type TEXT")
+
+
+def _ensure_render_approved_state_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS render_approved_state (
+            id SERIAL PRIMARY KEY,
+            storage_type TEXT NOT NULL CHECK (storage_type IN ('card_settings','image_labels')),
+            identifier   TEXT NOT NULL,
+            approved_filename TEXT NOT NULL,
+            approved_at  TIMESTAMPTZ DEFAULT NOW(),
+            approved_via TEXT DEFAULT 'admin'
+        )
+    """)
+    cur.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS render_approved_state_identifier_idx
+        ON render_approved_state (storage_type, identifier)
+    """)
+
+
+def _record_render_approval(cur, storage_type, identifier, filename, via='admin'):
+    """Record (or update) the approved AI render for a card or image label.
+    Only records when the filename actually contains _ai_ — silently skips otherwise."""
+    bare = os.path.basename(filename) if filename else ''
+    if '_ai_' not in bare:
+        return
+    _ensure_render_approved_state_table(cur)
+    cur.execute("""
+        INSERT INTO render_approved_state
+            (storage_type, identifier, approved_filename, approved_at, approved_via)
+        VALUES (%s, %s, %s, NOW(), %s)
+        ON CONFLICT (storage_type, identifier) DO UPDATE SET
+            approved_filename = EXCLUDED.approved_filename,
+            approved_at       = NOW(),
+            approved_via      = EXCLUDED.approved_via
+    """, (storage_type, identifier, bare, via))
 
 def _sync_image_gallery_label(filename, project_slug, gallery_type, cur):
     """Write gallery categorization into image_labels so the media library stays in sync.

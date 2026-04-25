@@ -10,48 +10,74 @@ html,body{height:100%}
 body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;flex-direction:column;overflow:hidden}
 #progress-bar{height:4px;background:#1e3040;position:fixed;top:0;left:0;right:0;z-index:100}
 #progress-fill{height:100%;background:#3b82f6;transition:width .4s ease}
-#header{padding:16px 24px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e3040;flex-shrink:0}
-#counter{font-size:13px;color:#6b8fa6;font-weight:600;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}
-#card-label{font-size:20px;font-weight:700;color:#e8eef2;flex:1;text-align:center;padding:0 20px}
-#page-link{font-size:13px;color:#3b82f6;text-decoration:none;white-space:nowrap}
+
+/* Loading */
+#loading-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#6b8fa6}
+#loading-screen .spinner{width:36px;height:36px;border:3px solid #1e3040;border-top-color:#3b82f6;border-radius:50%;animation:spin .65s linear infinite}
+#loading-screen p{font-size:14px}
+
+/* Header */
+#header{padding:14px 20px 10px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e3040;flex-shrink:0;display:none}
+#counter{font-size:12px;color:#6b8fa6;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+#card-label{font-size:18px;font-weight:700;color:#e8eef2;flex:1;text-align:center;padding:0 16px}
+#page-link{font-size:12px;color:#3b82f6;text-decoration:none;white-space:nowrap}
 #page-link:hover{color:#60a5fa}
-#note-bar{padding:7px 24px;font-size:11px;color:#d97706;background:#1c1400;border-bottom:1px solid #2a1a00;flex-shrink:0;display:none}
+
+/* Status bar */
+#status-bar{padding:5px 20px;border-bottom:1px solid #1e3040;flex-shrink:0;display:none;align-items:center;gap:10px;min-height:30px}
+.card-badge{font-size:11px;font-weight:700;letter-spacing:.06em;padding:3px 9px;border-radius:4px}
+.badge-active{background:#0c2b42;color:#38bdf8;border:1px solid #0e4c6e}
+.badge-approved{background:#052e16;color:#22c55e;border:1px solid #166534}
+.badge-missing{background:#2a1800;color:#f59e0b;border:1px solid #78350f}
+#note-text{font-size:11px;color:#d97706}
+
 /* Two-panel viewer */
-#viewer{flex:1;display:flex;min-height:0}
+#viewer{flex:1;display:flex;min-height:0;display:none}
 .panel{flex:1;display:flex;flex-direction:column;min-width:0}
 #orig-panel{border-right:1px solid #1e3040}
-.panel-label{padding:7px 0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b8fa6;background:#091520;border-bottom:1px solid #1e3040;flex-shrink:0;text-align:center}
+.panel-label{padding:6px 0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b8fa6;background:#091520;border-bottom:1px solid #1e3040;flex-shrink:0;text-align:center}
 .render-label{color:#3b82f6}
 .panel-img-wrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#091520;position:relative}
 .panel-img-wrap img{max-width:100%;max-height:100%;object-fit:contain;transition:opacity .2s}
 #render-spinner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:40px;height:40px;border:3px solid #1e3040;border-top-color:#3b82f6;border-radius:50%;animation:spin .65s linear infinite;display:none}
+#render-missing-msg{position:absolute;top:0;left:0;right:0;bottom:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#f59e0b;background:#091520}
+#render-missing-msg .icon{font-size:36px;opacity:.6}
+#render-missing-msg p{font-size:13px;color:#6b8fa6;text-align:center;line-height:1.5;max-width:200px}
 @keyframes spin{to{transform:rotate(360deg)}}
-/* Prompt row */
-#prompt-section{padding:12px 20px;border-top:1px solid #1e3040;display:flex;align-items:flex-end;gap:10px;flex-shrink:0;background:#0d1a22}
-#prompt-label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#6b8fa6;white-space:nowrap;padding-bottom:11px}
-#prompt-textarea{flex:1;background:#091520;color:#e8eef2;border:1px solid #2a4050;border-radius:8px;padding:10px 13px;font-size:13px;font-family:inherit;line-height:1.5;outline:none;resize:vertical;min-height:56px;max-height:130px}
+
+/* Prompt section */
+#prompt-section{padding:11px 20px;border-top:1px solid #1e3040;display:none;align-items:flex-end;gap:10px;flex-shrink:0;background:#0d1a22}
+#prompt-label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#6b8fa6;white-space:nowrap;padding-bottom:32px}
+#prompt-right{flex:1;display:flex;flex-direction:column;gap:7px}
+#prompt-textarea{background:#091520;color:#e8eef2;border:1px solid #2a4050;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;line-height:1.5;outline:none;resize:vertical;min-height:52px;max-height:120px;width:100%}
 #prompt-textarea:focus{border-color:#3b82f6}
-#prompt-right{flex:1;display:flex;flex-direction:column;gap:8px}
 #prompt-actions{display:flex;align-items:center;gap:10px}
 #source-toggle{display:flex;border-radius:6px;overflow:hidden;border:1px solid #2a4050;flex-shrink:0}
-.src-btn{background:#0a1520;color:#6b8fa6;border:none;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.src-btn{background:#0a1520;color:#6b8fa6;border:none;padding:6px 13px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
 .src-btn.active{background:#1d4ed8;color:#fff}
 .src-btn:hover:not(.active):not(:disabled){background:#152030;color:#94a3b8}
 .src-btn:disabled{opacity:.45;cursor:not-allowed}
-#btn-rerender{background:#1e3040;color:#60a5fa;border:1px solid #1d4ed8;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;white-space:nowrap;transition:all .15s;flex-shrink:0}
+#btn-rerender{background:#1e3040;color:#60a5fa;border:1px solid #1d4ed8;padding:9px 16px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;white-space:nowrap;transition:all .15s;flex-shrink:0}
 #btn-rerender:hover:not(:disabled){background:#1a3d6e;color:#93c5fd}
 #btn-rerender:disabled{opacity:.45;cursor:not-allowed}
+#surgical-link{font-size:12px;color:#6b8fa6;text-decoration:none;white-space:nowrap;margin-left:auto;padding:6px 0}
+#surgical-link:hover{color:#94a3b8}
+
 /* Footer */
-#footer{padding:13px 20px;border-top:1px solid #1e3040;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.btn{padding:11px 28px;border-radius:8px;border:none;cursor:pointer;font-size:15px;font-weight:700;letter-spacing:.02em;transition:all .15s;white-space:nowrap}
+#footer{padding:12px 20px;border-top:1px solid #1e3040;display:none;align-items:center;justify-content:space-between;flex-shrink:0}
+.btn{padding:10px 24px;border-radius:8px;border:none;cursor:pointer;font-size:14px;font-weight:700;letter-spacing:.02em;transition:all .15s;white-space:nowrap}
 .btn:disabled{opacity:.45;cursor:not-allowed}
+#footer-left{display:flex;align-items:center;gap:8px}
+#btn-back{background:#1e3040;color:#6b8fa6;border:1px solid #1e3040}
+#btn-back:hover:not(:disabled){background:#243848;color:#94a3b8;border-color:#2a4050}
 #btn-skip{background:#1e3040;color:#94a3b8}
 #btn-skip:hover:not(:disabled){background:#243848;color:#e8eef2}
-#btn-set{background:#166534;color:#bbf7d0;padding:11px 42px;font-size:16px}
+#btn-set{background:#166534;color:#bbf7d0;padding:10px 38px;font-size:15px}
 #btn-set:hover:not(:disabled){background:#15803d;color:#dcfce7}
-#status-badge{padding:7px 14px;border-radius:6px;font-size:13px;font-weight:700;display:none}
-#status-badge.ok{background:#052e16;color:#22c55e;border:1px solid #166534;display:inline-block}
-#status-badge.err{background:#2d0707;color:#f87171;border:1px solid #7f1d1d;display:inline-block}
+#action-status{padding:6px 12px;border-radius:6px;font-size:12px;font-weight:700;display:none}
+#action-status.ok{background:#052e16;color:#22c55e;border:1px solid #166534;display:inline-block}
+#action-status.err{background:#2d0707;color:#f87171;border:1px solid #7f1d1d;display:inline-block}
+
 /* Done screen */
 #done-screen{display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:16px}
 #done-screen h2{font-size:32px;font-weight:800;color:#22c55e}
@@ -62,12 +88,20 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
 
 <div id="progress-bar"><div id="progress-fill"></div></div>
 
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <p>Loading render queue…</p>
+</div>
+
 <div id="header">
   <span id="counter"></span>
   <span id="card-label"></span>
   <a id="page-link" href="#" target="_blank">View live page ↗</a>
 </div>
-<div id="note-bar"></div>
+<div id="status-bar">
+  <span id="card-badge"></span>
+  <span id="note-text"></span>
+</div>
 
 <div id="viewer">
   <div class="panel" id="orig-panel">
@@ -81,6 +115,10 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
     <div class="panel-img-wrap">
       <img id="render-img" src="" alt="AI render" />
       <div id="render-spinner"></div>
+      <div id="render-missing-msg">
+        <div class="icon">⚠</div>
+        <p>Render file not on disk.<br>Click Re-render to regenerate.</p>
+      </div>
     </div>
   </div>
 </div>
@@ -95,13 +133,17 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
         <button class="src-btn active" id="btn-src-render">From current render</button>
       </div>
       <button id="btn-rerender">↺ Re-render</button>
+      <a id="surgical-link" href="/view/admin/pages.html" target="_blank">Surgical Edit ↗</a>
     </div>
   </div>
 </div>
 
 <div id="footer">
-  <button class="btn" id="btn-skip">Skip →</button>
-  <div id="status-badge"></div>
+  <div id="footer-left">
+    <button class="btn" id="btn-back" disabled>← Back</button>
+    <button class="btn" id="btn-skip">Skip →</button>
+  </div>
+  <span id="action-status"></span>
   <button class="btn" id="btn-set">✓ Set It</button>
 </div>
 
@@ -113,358 +155,153 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
 <script>
 const TOKEN = 'ea501a45abb967a5fde5feaa14361a230d0eed48bd76a6284d868ab7737e4365';
 
-// ── Card data ─────────────────────────────────────────────────────────────────
-// type "card"    → PUT /admin/api/cards/{slug}/{card_id}
-// type "version" → POST /admin/api/images/set-version
-const CARDS = [
-  {
-    label: 'About Page — Feature Visual',
-    pageUrl: '/view/about.html',
-    renderFile: 'ff5b18_af3d4948b1c349bcaf72ebff882f4ad6_mv2_ai_1.webp',
-    baseFile:   'ff5b18_af3d4948b1c349bcaf72ebff882f4ad6_mv2.webp',
-    prompt: 'make this look like a real photo. Don\'t change anything',
-    note: null,
-    publish: ['about'],
-    actions: [
-      { type: 'card', slug: 'about', cardId: 'about-visual-main', pos: '50% 50%', zoom: 1 }
-    ]
-  },
-  {
-    label: 'Homepage — Portfolio Card 2',
-    pageUrl: '/view/index.html',
-    renderFile: 'ff5b18_1012816bc1d7431cbdba88c8a138d06d_mv2_ai_1.webp',
-    baseFile:   'ff5b18_1012816bc1d7431cbdba88c8a138d06d_mv2.webp',
-    prompt: 'change the color balance from 3000 to 3500 kelvin',
-    note: null,
-    publish: ['home'],
-    actions: [
-      { type: 'version' }
-    ]
-  },
-  {
-    label: 'Homepage — Portfolio Card 4',
-    pageUrl: '/view/index.html',
-    renderFile: 'ff5b18_2aaf8ea933cc4fcc9e59d23197e3b35f_mv2_ai_1.webp',
-    baseFile:   'ff5b18_2aaf8ea933cc4fcc9e59d23197e3b35f_mv2.webp',
-    prompt: 'remove the outlet in between the sinks and stage this scene with props so that it looks more realistic',
-    note: null,
-    publish: ['home'],
-    actions: [
-      { type: 'version' }
-    ]
-  },
-  {
-    label: 'Portfolio Page — Hero',
-    pageUrl: '/view/portfolio.html',
-    renderFile: 'ff5b18_0b701547bc92489cbf3985cef0ed0275_mv2_ai_1.webp',
-    baseFile:   'ff5b18_0b701547bc92489cbf3985cef0ed0275_mv2.webp',
-    prompt: 'make this look like a real photo',
-    note: null,
-    publish: ['portfolio'],
-    actions: [
-      { type: 'card', slug: 'portfolio', cardId: 'portfolio-hero', pos: '50% 50%', zoom: 1 }
-    ]
-  },
-  {
-    label: 'Portfolio — Danville Dream Home Card',
-    pageUrl: '/view/portfolio.html',
-    renderFile: 'ff5b18_f575a25ba7f14e1389d0ae63bb2d356f_mv2_ai_2.webp',
-    baseFile:   'ff5b18_f575a25ba7f14e1389d0ae63bb2d356f_mv2.webp',
-    prompt: 'turn off all artificial light and add rays of light so that the photo looks more realistic. Restage with props so that it looks like a nice kitchen. Don\'t change anything else.',
-    note: 'Updates the Danville Dream Home card only (Pleasanton Cottage Kitchen has its own existing render)',
-    publish: ['allprojects'],
-    actions: [
-      { type: 'card', slug: 'allprojects', cardId: 'allproj-danville-dream-home', pos: '44.3% 46.4%', zoom: 1.9 }
-    ]
-  },
-  {
-    label: 'Bathroom Remodels + Whole House — Diff Section',
-    pageUrl: '/view/bathroom-remodels.html',
-    renderFile: 'ff5b18_0f70516a7a444134986fd175ae6fe9d8_mv2_ai_1.webp',
-    baseFile:   'ff5b18_0f70516a7a444134986fd175ae6fe9d8_mv2.webp',
-    prompt: 'remove glare from tile',
-    note: 'This image appears on both Bathroom Remodels and Whole House Remodels diff sections — both will be updated',
-    publish: ['bathroom-remodels', 'whole-house-remodels'],
-    actions: [
-      { type: 'card', slug: 'bathroom-remodels',    cardId: 'bathroom-diff-top',    pos: '50% 50%', zoom: 1 },
-      { type: 'card', slug: 'whole-house-remodels',  cardId: 'whole-house-diff-top', pos: '50% 50%', zoom: 1 }
-    ]
-  },
-  {
-    label: 'Bathroom Gallery 4 + Napa Retreat Bathtub',
-    pageUrl: '/view/bathroom-remodels.html',
-    renderFile: 'ff5b18_d21a6cfecad9421bb43dbd6d1a63828f_mv2_ai_1.webp',
-    baseFile:   'ff5b18_d21a6cfecad9421bb43dbd6d1a63828f_mv2.webp',
-    prompt: 'remove white wall outlets from the tile wall behind the bathtub',
-    note: 'Same source image in Bathroom Remodels gallery and Napa Retreat gallery — both will be updated',
-    publish: ['bathroom-remodels'],
-    actions: [
-      { type: 'card',    slug: 'bathroom-remodels', cardId: 'bathroom-remodels-gallery-4', pos: '50% 50%', zoom: 1 },
-      { type: 'version' }
-    ]
-  },
-  {
-    label: 'Team Page — Member 2',
-    pageUrl: '/view/team.html',
-    renderFile: 'ff5b18_8db501ff84934a18a831c805b6b5bfe1_mv2_ai_1.webp',
-    baseFile:   'ff5b18_8db501ff84934a18a831c805b6b5bfe1_mv2.webp',
-    prompt: 'zoom out 15%. Generative fill all around.',
-    note: null,
-    publish: ['team'],
-    actions: [
-      { type: 'version' }
-    ]
-  },
-  {
-    label: 'Danville Hilltop — Floating Table (Gallery)',
-    pageUrl: '/view/projects/danville-hilltop-hideaway.html',
-    renderFile: 'ff5b18_4e56d06b0c6e4c80aabe636642bf8346_mv2_ai_1.webp',
-    baseFile:   'ff5b18_4e56d06b0c6e4c80aabe636642bf8346_mv2.webp',
-    prompt: 'there is a floating wood table top in the middle of the room above the dining room table. Remove that and keep everything else the same.',
-    note: null,
-    actions: [
-      { type: 'version' }
-    ]
-  },
-  {
-    label: 'Danville Hilltop — Kitchen / Walnut Cabinetry (Gallery)',
-    pageUrl: '/view/projects/danville-hilltop-hideaway.html',
-    renderFile: 'ff5b18_c0e8f9e9008c498eac5efafae3c46b04_mv2_ai_1.webp',
-    baseFile:   'ff5b18_c0e8f9e9008c498eac5efafae3c46b04_mv2.webp',
-    prompt: 'Make this kitchen look like a high quality real photograph, not a render. The brown cabinetry should look like rich brown walnut wood.',
-    note: null,
-    actions: [
-      { type: 'version' }
-    ]
-  },
-  {
-    label: 'Lafayette Luxury — Staging (Gallery)',
-    pageUrl: '/view/projects/lafayette-laid-back-luxury.html',
-    renderFile: 'ff5b18_8f94e57d36c84799bacb3aec32cd1418_mv2_ai_1.webp',
-    baseFile:   'ff5b18_8f94e57d36c84799bacb3aec32cd1418_mv2.webp',
-    prompt: 'make this look like a real photo a high-quality photo. Improve staging',
-    note: null,
-    actions: [
-      { type: 'version' }
-    ]
-  },
-  {
-    label: 'Lafayette Luxury — Window Covering (Gallery)',
-    pageUrl: '/view/projects/lafayette-laid-back-luxury.html',
-    renderFile: 'ff5b18_969f8423ceba4f5ab338f4ec820f8851_mv2_ai_1.webp',
-    baseFile:   'ff5b18_969f8423ceba4f5ab338f4ec820f8851_mv2.webp',
-    prompt: 'add a nice subtle window covering, minimal. I want to partially block the view through the windows. No heavy drapery, just minimal well-staged window covering.',
-    note: null,
-    actions: [
-      { type: 'version' }
-    ]
-  },
-  {
-    label: 'Napa Retreat — Towel Bars / Vanity (Gallery)',
-    pageUrl: '/view/projects/napa-retreat.html',
-    renderFile: 'ff5b18_41d97144818e40e09ddddd7357704009_mv2_ai_1.webp',
-    baseFile:   'ff5b18_41d97144818e40e09ddddd7357704009_mv2.webp',
-    prompt: 'remove the towel bars from the side of the vanity',
-    note: null,
-    actions: [
-      { type: 'version' }
-    ]
-  },
-  {
-    label: 'Napa Retreat — Flat Panel Cabinets (Gallery)',
-    pageUrl: '/view/projects/napa-retreat.html',
-    renderFile: 'ff5b18_76ec6d9dbc3b4d29ab02bc08c56cf7e5_mv2_ai_1.webp',
-    baseFile:   'ff5b18_76ec6d9dbc3b4d29ab02bc08c56cf7e5_mv2.webp',
-    prompt: 'make it look like a real photo. Change the cabinet face drawer faces to flat panel and small knobs on the top drawer. Change nothing else',
-    note: null,
-    actions: [
-      { type: 'version' }
-    ]
-  },
-  {
-    label: 'Napa Retreat — Shaker → Flat Panel Kitchen (Gallery)',
-    pageUrl: '/view/projects/napa-retreat.html',
-    renderFile: 'ff5b18_8d75523812e941f2a37fafd4d1f65557_mv2_ai_1.webp',
-    baseFile:   'ff5b18_8d75523812e941f2a37fafd4d1f65557_mv2.webp',
-    prompt: 'recreate this image so it looks like a real photo. Change the shaker doors on all the cabinets to flat panel. Change nothing else',
-    note: null,
-    actions: [
-      { type: 'version' }
-    ]
-  },
-  {
-    label: 'Napa Retreat — Wine Room (Gallery)',
-    pageUrl: '/view/projects/napa-retreat.html',
-    renderFile: 'ff5b18_bee090a1db814d60844aed6337fc984d_mv2_ai_1.webp',
-    baseFile:   'ff5b18_bee090a1db814d60844aed6337fc984d_mv2.webp',
-    prompt: 'make this image look like a real photograph, with real brick. And in a real wine room, stage it with props accordingly',
-    note: null,
-    actions: [
-      { type: 'version' }
-    ]
-  },
-  {
-    label: 'Sunol Homestead — Golden Hour (Gallery)',
-    pageUrl: '/view/projects/sunol-homestead.html',
-    renderFile: 'ff5b18_4d337f2682cc4aa682f48fcba262108a_mv2_ai_1.webp',
-    baseFile:   'ff5b18_4d337f2682cc4aa682f48fcba262108a_mv2.webp',
-    prompt: 'Even out the shadows and lighting. Make it look like it is shot during the golden hour with perfect lighting.',
-    note: null,
-    actions: [
-      { type: 'version' }
-    ]
-  },
-  {
-    label: 'Sunol Homestead — Walk-in Pantry (Gallery)',
-    pageUrl: '/view/projects/sunol-homestead.html',
-    renderFile: 'ff5b18_7e7176ba86d043e7a79be3fcd53aa7c0_mv2_ai_1.webp',
-    baseFile:   'ff5b18_7e7176ba86d043e7a79be3fcd53aa7c0_mv2.webp',
-    prompt: 'make this look like a real photo not a render. Try playing with rays of light coming in to the space. High-fidelity cinematic photo that would fool anyone into thinking it is an actual photograph of a walk-in pantry.',
-    note: null,
-    actions: [
-      { type: 'version' }
-    ]
-  },
-  {
-    label: 'Sunol Homestead — Cinematic Rays (Gallery)',
-    pageUrl: '/view/projects/sunol-homestead.html',
-    renderFile: 'ff5b18_8263a2cdc43a4f9d9f5b0b6945039c77_mv2_ai_1.webp',
-    baseFile:   'ff5b18_8263a2cdc43a4f9d9f5b0b6945039c77_mv2.webp',
-    prompt: 'make this look like a real photo not a render. Try playing with rays of light coming in to the space. High-fidelity cinematic photo.',
-    note: null,
-    actions: [
-      { type: 'version' }
-    ]
-  },
-  {
-    label: 'Sunol Homestead — Exposure Balance (Gallery)',
-    pageUrl: '/view/projects/sunol-homestead.html',
-    renderFile: 'ff5b18_86e17388126b47e3b08d204ff3f39b68_mv2_ai_1.webp',
-    baseFile:   'ff5b18_86e17388126b47e3b08d204ff3f39b68_mv2.webp',
-    prompt: 'reduce exposure 25%, balance lighting, remove shadows',
-    note: null,
-    actions: [
-      { type: 'version' }
-    ]
-  },
-  {
-    label: 'Sunol Homestead — Remove Wall Sconces (Gallery)',
-    pageUrl: '/view/projects/sunol-homestead.html',
-    renderFile: 'ff5b18_de323270e3574f2582de93c63a85e584_mv2_ai_1.webp',
-    baseFile:   'ff5b18_de323270e3574f2582de93c63a85e584_mv2.webp',
-    prompt: 'remove the wall sconce from the left side wall by the robe hook and the right side wall by the robe hook. Change nothing else',
-    note: null,
-    actions: [
-      { type: 'version' }
-    ]
-  },
-  {
-    label: 'Service Pages — Diff Hero (Bathroom + Whole House header)',
-    pageUrl: '/view/bathroom-remodels.html',
-    renderFile: 'ff5b18_5b97bf4ab5144c2da7f3e3aa80fb8532_mv2_ai_2.webp',
-    baseFile:   'ff5b18_5b97bf4ab5144c2da7f3e3aa80fb8532_mv2.webp',
-    prompt: 'make this look like a real photo and fully stage it so that it looks like it could be in Architectural Digest magazine',
-    note: null,
-    publish: ['home', 'index'],
-    actions: [
-      { type: 'version' }
-    ]
-  },
-  {
-    label: 'Custom Homes — Service Card',
-    pageUrl: '/view/services/custom-homes.html',
-    renderFile: 'ff5b18_6f6dc7ef92684e7e8af496c4f83f06be_mv2_ai_1.webp',
-    baseFile:   'ff5b18_6f6dc7ef92684e7e8af496c4f83f06be_mv2.webp',
-    prompt: 'make this look like a real photograph. High-fidelity cinematic quality that looks like a professional architectural photo shoot.',
-    note: 'This image is shared by the Portfolio page and two Sierra Mountain Ranch allprojects cards — all three will be updated',
-    publish: ['portfolio', 'allprojects'],
-    actions: [
-      { type: 'version' }
-    ]
-  }
-];
-
 // ── State ─────────────────────────────────────────────────────────────────────
+let CARDS      = [];
 let idx        = 0;
 let setCount   = 0;
 let skipCount  = 0;
 let sourceMode = 'render'; // 'base' | 'render'
-const total    = CARDS.length;
+let history    = [];       // [{idx, snapshots: [{...}]}]
 
 // ── Elements ─────────────────────────────────────────────────────────────────
-const progressFill  = document.getElementById('progress-fill');
-const counter       = document.getElementById('counter');
-const cardLabel     = document.getElementById('card-label');
-const pageLink      = document.getElementById('page-link');
-const noteBar       = document.getElementById('note-bar');
-const origImg       = document.getElementById('orig-img');
-const renderImg     = document.getElementById('render-img');
-const renderSpinner = document.getElementById('render-spinner');
-const promptTA      = document.getElementById('prompt-textarea');
-const btnRerender   = document.getElementById('btn-rerender');
-const btnSrcOrig    = document.getElementById('btn-src-orig');
-const btnSrcRender  = document.getElementById('btn-src-render');
-const statusBadge   = document.getElementById('status-badge');
-const btnSkip       = document.getElementById('btn-skip');
-const btnSet        = document.getElementById('btn-set');
-const viewer        = document.getElementById('viewer');
-const promptSection = document.getElementById('prompt-section');
-const footer        = document.getElementById('footer');
-const header        = document.getElementById('header');
-const doneScreen    = document.getElementById('done-screen');
-const doneSummary   = document.getElementById('done-summary');
+const loadingScreen  = document.getElementById('loading-screen');
+const progressFill   = document.getElementById('progress-fill');
+const header         = document.getElementById('header');
+const counter        = document.getElementById('counter');
+const cardLabel      = document.getElementById('card-label');
+const pageLink       = document.getElementById('page-link');
+const statusBar      = document.getElementById('status-bar');
+const cardBadge      = document.getElementById('card-badge');
+const noteText       = document.getElementById('note-text');
+const viewer         = document.getElementById('viewer');
+const origImg        = document.getElementById('orig-img');
+const renderImg      = document.getElementById('render-img');
+const renderSpinner  = document.getElementById('render-spinner');
+const renderMissing  = document.getElementById('render-missing-msg');
+const promptSection  = document.getElementById('prompt-section');
+const promptTA       = document.getElementById('prompt-textarea');
+const btnSrcOrig     = document.getElementById('btn-src-orig');
+const btnSrcRender   = document.getElementById('btn-src-render');
+const btnRerender    = document.getElementById('btn-rerender');
+const surgicalLink   = document.getElementById('surgical-link');
+const footer         = document.getElementById('footer');
+const btnBack        = document.getElementById('btn-back');
+const btnSkip        = document.getElementById('btn-skip');
+const btnSet         = document.getElementById('btn-set');
+const actionStatus   = document.getElementById('action-status');
+const doneScreen     = document.getElementById('done-screen');
+const doneSummary    = document.getElementById('done-summary');
 
+// ── Init: load queue from server ──────────────────────────────────────────────
+async function init() {
+  try {
+    const r = await fetch('/admin/api/renders/review-queue', {
+      headers: { 'X-Admin-Token': TOKEN }
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Failed to load queue');
+    CARDS = d.queue;
+    loadingScreen.style.display = 'none';
+    [header, statusBar, viewer, promptSection, footer].forEach(el => el.style.display = '');
+    // Fix flex display for elements that need it
+    viewer.style.display = 'flex';
+    promptSection.style.display = 'flex';
+    footer.style.display = 'flex';
+    statusBar.style.display = 'flex';
+    header.style.display = 'flex';
+    renderCard(0);
+  } catch(e) {
+    loadingScreen.querySelector('p').textContent = 'Error loading queue: ' + e.message;
+    loadingScreen.querySelector('p').style.color = '#f87171';
+  }
+}
+
+// ── Render a card ─────────────────────────────────────────────────────────────
 function renderCard(i) {
-  if (i >= total) { showDone(); return; }
+  if (i >= CARDS.length) { showDone(); return; }
   const c = CARDS[i];
   idx = i;
+  const total = CARDS.length;
 
   progressFill.style.width = ((i / total) * 100) + '%';
   counter.textContent = `${i + 1} / ${total}`;
   cardLabel.textContent = c.label;
-  pageLink.href = c.pageUrl;
+  pageLink.href = c.page_url;
 
-  // Note bar
-  if (c.note) {
-    noteBar.textContent = '⚠ ' + c.note;
-    noteBar.style.display = 'block';
+  // Status badge
+  noteText.textContent = c.note ? ('⚠ ' + c.note) : '';
+  if (c.is_approved) {
+    cardBadge.textContent = '✓ Approved';
+    cardBadge.className = 'card-badge badge-approved';
+  } else if (c.is_active) {
+    cardBadge.textContent = '◉ Currently Live';
+    cardBadge.className = 'card-badge badge-active';
+  } else if (!c.render_exists) {
+    cardBadge.textContent = '⚠ Render Missing';
+    cardBadge.className = 'card-badge badge-missing';
   } else {
-    noteBar.style.display = 'none';
+    cardBadge.textContent = '';
+    cardBadge.className = 'card-badge';
   }
 
-  // Images — use _1920w for quality display
-  origImg.src   = `/assets/images-opt/${c.baseFile.replace('.webp', '_1920w.webp')}`;
-  renderImg.src = `/assets/images-opt/${c.renderFile.replace('.webp', '_1920w.webp')}`;
-  renderImg.style.opacity = '1';
+  // Images
+  const origUrl = `/assets/images-opt/${c.base_file.replace('.webp', '_1920w.webp')}`;
+  origImg.src = origUrl;
+
+  if (c.render_exists) {
+    const renderUrl = `/assets/images-opt/${c.render_file.replace('.webp', '_1920w.webp')}`;
+    renderImg.src = renderUrl;
+    renderImg.style.opacity = '1';
+    renderImg.style.display = '';
+    renderMissing.style.display = 'none';
+  } else {
+    renderImg.src = '';
+    renderImg.style.display = 'none';
+    renderMissing.style.display = 'flex';
+  }
   renderSpinner.style.display = 'none';
 
   // Prompt
-  promptTA.value = c.prompt;
+  promptTA.value = c.prompt || '';
 
-  // Status
-  statusBadge.className = '';
-  statusBadge.textContent = '';
-  statusBadge.style.display = 'none';
+  // Set It disabled if render missing
+  btnSet.disabled = !c.render_exists;
 
-  setButtons(true);
+  // Surgical edit link
+  surgicalLink.href = '/view/admin/pages.html';
+
+  // Back button
+  btnBack.disabled = history.length === 0;
+
+  // Clear status
+  actionStatus.className = '';
+  actionStatus.textContent = '';
+  actionStatus.style.display = 'none';
+
+  setControlsEnabled(true);
 }
 
-function setButtons(enabled) {
-  btnSkip.disabled     = !enabled;
-  btnSet.disabled      = !enabled;
-  btnRerender.disabled = !enabled;
-  btnSrcOrig.disabled  = !enabled;
-  btnSrcRender.disabled = !enabled;
-  if (enabled) {
+function setControlsEnabled(on) {
+  btnSet.disabled      = !on || !CARDS[idx]?.render_exists;
+  btnSkip.disabled     = !on;
+  btnRerender.disabled = !on;
+  btnSrcOrig.disabled  = !on;
+  btnSrcRender.disabled = !on;
+  btnBack.disabled     = !on || history.length === 0;
+  if (on) {
     renderSpinner.style.display = 'none';
     renderImg.style.opacity = '1';
   }
 }
 
-function showStatus(ok, msg) {
-  statusBadge.className = ok ? 'ok' : 'err';
-  statusBadge.textContent = msg;
-  if (ok) setTimeout(() => { statusBadge.className = ''; statusBadge.textContent = ''; statusBadge.style.display = 'none'; }, 2500);
+function showActionStatus(ok, msg) {
+  actionStatus.className = ok ? 'ok' : 'err';
+  actionStatus.textContent = msg;
+  if (ok) setTimeout(() => {
+    actionStatus.className = '';
+    actionStatus.textContent = '';
+    actionStatus.style.display = 'none';
+  }, 2200);
 }
 
 // ── API helpers ───────────────────────────────────────────────────────────────
@@ -500,8 +337,6 @@ async function apiPublish(slugs) {
 }
 
 async function apiRerender(sourceFile, baseFile, prompt) {
-  // sourceFile = what Gemini receives as input (base or current render)
-  // baseFile   = used to generate the output filename (_ai_N.webp family)
   const r = await fetch('/admin/api/images/rerender', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Admin-Token': TOKEN },
@@ -511,64 +346,160 @@ async function apiRerender(sourceFile, baseFile, prompt) {
   return r.json();
 }
 
-// ── Set action ────────────────────────────────────────────────────────────────
-async function doSet() {
-  const c = CARDS[idx];
-  setButtons(false);
-  statusBadge.style.display = 'none';
-  try {
-    for (const a of c.actions) {
-      if (a.type === 'card') {
-        await apiPut(a.slug, a.cardId, c.renderFile, a.pos, a.zoom);
-      } else if (a.type === 'version') {
-        await apiSetVersion(c.baseFile, c.renderFile);
+// ── Snapshot helpers (for Back button) ───────────────────────────────────────
+async function captureSnapshot(card) {
+  const snaps = [];
+  for (const a of card.actions) {
+    if (a.type === 'card') {
+      try {
+        const r = await fetch(`/admin/api/cards/${encodeURIComponent(a.slug)}`, {
+          headers: { 'X-Admin-Token': TOKEN }
+        });
+        const rows = await r.json();
+        const found = Array.isArray(rows) ? rows.find(c => c.card_id === a.cardId) : null;
+        snaps.push({
+          type: 'card', slug: a.slug, cardId: a.cardId,
+          prevImage:    found?.image    || `/assets/images-opt/${card.base_file}`,
+          prevPosition: found?.position || '50% 50%',
+          prevZoom:     found?.zoom     || 1,
+        });
+      } catch(e) {
+        // Can't snapshot — use base file as safe fallback
+        snaps.push({
+          type: 'card', slug: a.slug, cardId: a.cardId,
+          prevImage: `/assets/images-opt/${card.base_file}`,
+          prevPosition: '50% 50%', prevZoom: 1,
+        });
+      }
+    } else if (a.type === 'version') {
+      try {
+        const r = await fetch(`/admin/api/images/versions/${encodeURIComponent(card.base_file)}`, {
+          headers: { 'X-Admin-Token': TOKEN }
+        });
+        const d = await r.json();
+        snaps.push({ type: 'version', baseFile: card.base_file, prevVersion: d.active_version || '' });
+      } catch(e) {
+        snaps.push({ type: 'version', baseFile: card.base_file, prevVersion: '' });
       }
     }
-    if (c.publish && c.publish.length) {
-      await apiPublish(c.publish);
+  }
+  return snaps;
+}
+
+async function restoreSnapshot(snaps) {
+  for (const s of snaps) {
+    if (s.type === 'card') {
+      const imgFile = s.prevImage.split('/').pop();
+      await apiPut(s.slug, s.cardId, imgFile, s.prevPosition, s.prevZoom);
+    } else if (s.type === 'version') {
+      await apiSetVersion(s.baseFile, s.prevVersion || '');
     }
-    setCount++;
-    showStatus(true, '✓ Set & published!');
-    setTimeout(() => { renderCard(idx + 1); }, 900);
-  } catch (e) {
-    showStatus(false, '✗ Error: ' + e.message);
-    setButtons(true);
   }
 }
 
-// ── Re-render action ──────────────────────────────────────────────────────────
+// ── Set It ────────────────────────────────────────────────────────────────────
+async function doSet() {
+  const c = CARDS[idx];
+  setControlsEnabled(false);
+  actionStatus.style.display = 'none';
+
+  // Capture current state BEFORE overwriting (enables Back)
+  let snaps;
+  try { snaps = await captureSnapshot(c); }
+  catch(e) { snaps = []; }
+
+  try {
+    for (const a of c.actions) {
+      if (a.type === 'card') {
+        await apiPut(a.slug, a.cardId, c.render_file, a.pos, a.zoom);
+      } else if (a.type === 'version') {
+        await apiSetVersion(c.base_file, c.render_file);
+      }
+    }
+    if (c.publish && c.publish.length) await apiPublish(c.publish);
+
+    // Mark approved in local state and push to history
+    c.is_approved = true;
+    c.is_active   = true;
+    history.push({ idx, snaps, prevApproved: false });
+    setCount++;
+
+    showActionStatus(true, '✓ Set & published!');
+    setTimeout(() => renderCard(idx + 1), 900);
+  } catch(e) {
+    showActionStatus(false, '✗ ' + e.message);
+    setControlsEnabled(true);
+  }
+}
+
+// ── Back (undo last Set) ──────────────────────────────────────────────────────
+async function doBack() {
+  if (!history.length) return;
+  setControlsEnabled(false);
+  const entry = history[history.length - 1];
+  try {
+    await restoreSnapshot(entry.snaps);
+    history.pop();
+    // Revert local card state
+    const prevCard = CARDS[entry.idx];
+    if (prevCard) { prevCard.is_approved = entry.prevApproved; }
+    setCount = Math.max(0, setCount - 1);
+    renderCard(entry.idx);
+  } catch(e) {
+    showActionStatus(false, '✗ Undo failed: ' + e.message);
+    setControlsEnabled(true);
+  }
+}
+
+// ── Re-render ─────────────────────────────────────────────────────────────────
 async function doRerender() {
   const c = CARDS[idx];
   const newPrompt = promptTA.value.trim();
   if (!newPrompt) return;
-  setButtons(false);
+  setControlsEnabled(false);
   renderImg.style.opacity = '0.15';
+  renderImg.style.display = '';
+  renderMissing.style.display = 'none';
   renderSpinner.style.display = 'block';
-  statusBadge.className = '';
-  statusBadge.textContent = '';
-  statusBadge.style.display = 'none';
+  actionStatus.className = '';
+  actionStatus.textContent = '';
+  actionStatus.style.display = 'none';
   try {
-    const sourceFile = sourceMode === 'render' ? c.renderFile : c.baseFile;
-    const result = await apiRerender(sourceFile, c.baseFile, newPrompt);
+    const sourceFile = (!c.render_exists || sourceMode === 'base') ? c.base_file : c.render_file;
+    const result = await apiRerender(sourceFile, c.base_file, newPrompt);
     if (!result.ok || !result.filename) throw new Error(result.error || 'No filename returned');
-    c.renderFile = result.filename;
-    c.prompt     = newPrompt;
-    const newUrl = `/assets/images-opt/${result.filename.replace('.webp', '_1920w.webp')}?t=${Date.now()}`;
+    // Update card data
+    c.render_file   = result.filename;
+    c.render_exists = true;
+    c.prompt        = newPrompt;
+    // Refresh right panel
     renderImg.onload = () => { renderImg.style.opacity = '1'; renderSpinner.style.display = 'none'; };
-    renderImg.src = newUrl;
-    showStatus(true, '✓ New render ready');
-    setButtons(true);
-  } catch (e) {
+    renderImg.src = `/assets/images-opt/${result.filename.replace('.webp', '_1920w.webp')}?t=${Date.now()}`;
+    btnSet.disabled = false;
+    showActionStatus(true, '✓ New render ready');
+    setControlsEnabled(true);
+  } catch(e) {
     renderImg.style.opacity = '1';
     renderSpinner.style.display = 'none';
-    showStatus(false, '✗ Re-render failed: ' + e.message);
-    setButtons(true);
+    if (!c.render_exists) { renderMissing.style.display = 'flex'; renderImg.style.display = 'none'; }
+    showActionStatus(false, '✗ Re-render failed: ' + e.message);
+    setControlsEnabled(true);
   }
+}
+
+// ── Done screen ───────────────────────────────────────────────────────────────
+function showDone() {
+  progressFill.style.width = '100%';
+  [header, statusBar, viewer, promptSection, footer].forEach(el => el.style.display = 'none');
+  doneScreen.style.display = 'flex';
+  doneSummary.textContent = `${setCount} render${setCount !== 1 ? 's' : ''} activated · ${skipCount} skipped`;
 }
 
 // ── Event listeners ───────────────────────────────────────────────────────────
 btnSet.addEventListener('click', doSet);
+btnBack.addEventListener('click', doBack);
 btnRerender.addEventListener('click', doRerender);
+btnSkip.addEventListener('click', () => { skipCount++; renderCard(idx + 1); });
 
 btnSrcOrig.addEventListener('click', () => {
   sourceMode = 'base';
@@ -581,32 +512,15 @@ btnSrcRender.addEventListener('click', () => {
   btnSrcOrig.classList.remove('active');
 });
 
-btnSkip.addEventListener('click', () => {
-  skipCount++;
-  renderCard(idx + 1);
-});
-
-// ── Done screen ───────────────────────────────────────────────────────────────
-function showDone() {
-  progressFill.style.width = '100%';
-  header.style.display        = 'none';
-  noteBar.style.display       = 'none';
-  viewer.style.display        = 'none';
-  promptSection.style.display = 'none';
-  footer.style.display        = 'none';
-  doneScreen.style.display    = 'flex';
-  doneSummary.textContent = `${setCount} render${setCount !== 1 ? 's' : ''} activated · ${skipCount} skipped`;
-}
-
-// ── Keyboard shortcuts ────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  if (e.target === promptTA) return; // don't hijack textarea input
+  if (e.target === promptTA) return;
   if (e.key === 'Enter' || e.key === 'y') btnSet.click();
   if (e.key === 'ArrowRight' || e.key === 'n') btnSkip.click();
+  if (e.key === 'Backspace' && e.metaKey) doBack();
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-renderCard(0);
+init();
 </script>
 </body>
 </html>
