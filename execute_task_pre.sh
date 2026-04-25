@@ -77,8 +77,8 @@ if [ ${#LOCKED_FEATURES[@]} -gt 0 ]; then
 fi
 pass "All features are unlocked"
 
-# ─── GATE 3: pg_dump backup ───────────────────────────────────────────────────
-hdr "[3/5] Database backup (Rule 17)"
+# ─── GATE 3: pg_dump + tracked binary backup ──────────────────────────────────
+hdr "[3/5] Database + binary asset backup (Rule 17)"
 DUMP_FILE="$REPO_DIR/backups/pre_task_${TIMESTAMP}.sql"
 mkdir -p "$REPO_DIR/backups"
 if PGPASSWORD=StrongPass123! pg_dump -h 127.0.0.1 -U agent_user marketing_agent > "$DUMP_FILE" 2>>"$LOG_FILE"; then
@@ -87,6 +87,19 @@ if PGPASSWORD=StrongPass123! pg_dump -h 127.0.0.1 -U agent_user marketing_agent 
 else
   fail "pg_dump failed. Check PostgreSQL connectivity."
 fi
+
+# Backup tracked binary files — prevents repeat of 2026-04-24 filter-repo disaster
+BINARY_BACKUP_DIR="$REPO_DIR/backups/binaries_${TIMESTAMP}"
+mkdir -p "$BINARY_BACKUP_DIR"
+BINARY_COUNT=0
+while IFS= read -r f; do
+  if [ -f "$REPO_DIR/$f" ]; then
+    dest_dir="$BINARY_BACKUP_DIR/$(dirname "$f")"
+    mkdir -p "$dest_dir"
+    cp "$REPO_DIR/$f" "$dest_dir/" && BINARY_COUNT=$((BINARY_COUNT + 1))
+  fi
+done < <(git ls-files | grep -Ei "\.(webp|jpg|jpeg|png|gif)$" 2>/dev/null || true)
+pass "Binary asset backup → $BINARY_BACKUP_DIR ($BINARY_COUNT files)"
 
 # ─── GATE 4: git commit current state (Rule 19) ───────────────────────────────
 hdr "[4/5] Baseline git commit (Rule 19 — save before edits)"

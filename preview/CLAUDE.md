@@ -1,0 +1,104 @@
+# Ridgecrest Designs — Web & Preview Rules
+
+> This file is auto-loaded when working in the `preview/` directory.
+> Marketing strategy lives in `ridgecrest-agency/CLAUDE.md`.
+> Code governance, git rules, and execution guardrail live in the root `agent/CLAUDE.md`.
+
+---
+
+## Image Serving Rules — THREE-TIER SYSTEM (MANDATORY)
+
+**Never use the base file for display. It exists only as a source for the lightbox.**
+
+| Use | Variant | Why |
+|---|---|---|
+| Project page hero (`project-hero__img`) | `_mv2_1920w.webp` | Hero is ~1440px wide; base file (5000-6000px) causes GPU downscale artifacts |
+| Service/blog page hero | `_mv2_1920w.webp` | Same reason |
+| Card/thumbnail backgrounds (`proj-card__img`, `portfolio-featured__img`, `portfolio-item__bg`, `portfolio-card__img`, `gallery-item__img`, `featured-home__img`) | `_mv2_960w.webp` | Cards are 350-720px; base file at 15:1 downscale causes moiré on fine patterns (wire mesh, grilles, tile) |
+| Lightbox / `data-src` / srcset full-res slot | `_mv2.webp` (base) | Full resolution needed for zoomed viewing |
+| `<img srcset>` smallest slot | `_mv2_480w.webp` | Correct |
+
+### Server-side
+- Card thumbnails: use `_portfolio_thumb_src(hash, ext)` — returns `_960w`, falls back to base
+- Hero backgrounds: use `portfolio_projects.hero_img` (already updated to `_1920w` for all 18 projects)
+- Do NOT use `_portfolio_img_src()` for card backgrounds — it returns the base file
+
+### Feature-to-code mapping
+- Editing card/thumbnail background-image URLs → check seo-project-pages, seo-service-pages, frontend-css
+- Editing `_portfolio_thumb_src` or `_portfolio_img_src` → check server-render
+
+---
+
+## Hero Restructure — Pending Pages
+- `services.html` and `team.html` hero restructure still **PENDING** (reverted 2026-04-16)
+- Pattern for secondary pages:
+```html
+<div class="page-hero page-hero--service page-hero--left">
+  <div class="page-hero__inner">
+    <p class="page-hero__eyebrow">...</p>
+    <h1 class="page-hero__title">...</h1>
+    <p class="page-hero__sub">...</p>
+    <div class="hero__actions">
+      <a class="btn btn--primary" href="start-a-project.html">Start Your Project</a>
+    </div>
+  </div>
+</div>
+```
+- Before deploying, check DB for stale offsets: `SELECT slug, hero_text_x, hero_text_y FROM pages WHERE slug IN ('services','team');` — reset both to 0 if non-zero.
+
+---
+
+## Card Editability — Conflict Check (MANDATORY before adding data-card-id)
+1. Does element already have `data-card-id`? → **SKIP**
+2. Does element use `.hero__bg` + `__RD_HERO` injection? → **SKIP** — hero system owns it
+3. Does element have existing JS event listeners? → **Flag first**
+
+---
+
+## Image and Card Rules
+- **Never hardcode `background-image`** in `main.css` for any `data-card-id` element — DB is the single source of truth
+- **`diff__zone::before`:** Never suppress with `display:none` — use `background: var(--rd-overlay, transparent) !important`
+- **Panel saves (T/G/BG):** Always fetch-merge-put — fetch current DB state, merge only UI fields, PUT — never write from stale cardState
+- **Card path normalization:** `_upgrade_card_images()` in `preview_server.py` normalizes bare `_mv2.webp` → `_960w` at serve time
+
+---
+
+## HTML Editing Rules
+- **Never use `sed` for HTML attribute insertion** — corrupts quote characters (curly quotes vs straight); use Edit tool or Python only
+- After any bulk HTML edit, verify: `grep -P '[\x80-\xFF]' file.html`
+
+---
+
+## Project Page Wiring (MANDATORY — enforced by pre-commit gate)
+Every project page HTML must have:
+| Attribute | Element | Value |
+|---|---|---|
+| `data-hero-id` | Hero root div (`.project-hero`) | `"[slug]-hero"` |
+| `data-gradient-id` | Overlay div (`.project-hero__overlay`) | `"[slug]-hero"` |
+| `data-cta-id` | CTA container | `"[slug]-hero"` |
+| All CTA `href` | CTA buttons | `start-a-project.html` (NOT Base44 URL) |
+
+---
+
+## CSS Specificity — CTA Alignment on Service Pages
+CTA-align rules on `.page-hero--service` must score **(0,3,0)**:
+```css
+[data-hero-cta-align="right"].page-hero--service .page-hero__actions { ... }
+```
+Must be placed **after** all text-align rules in `main.css`. See §46 in `CLAUDE_HISTORY.md`.
+
+---
+
+## Pre-Commit QA Gate
+- **197 checks** run automatically before every `git commit` — never skip
+- **System `python3`** has Playwright (Chromium) — the venv does NOT
+- **Pre-commit hook** must prefer system `python3` over venv (one-line fix still pending in `.git/hooks/pre-commit`)
+- Any new `data-card-id` element must pass `visual_overlay_agent.py` Playwright hover check — extend the agent if the page type isn't covered
+
+---
+
+## Screenshot Sharing
+- Henry uploads at: `http://147.182.242.54:8081/paste` (POST multipart or raw body)
+- Files save to: `/home/claudeuser/agent/downloads/screenshot_001.jpg`, `_002.jpg`, etc.
+- Claude reads directly: `Read("/home/claudeuser/agent/downloads/screenshot_001.jpg")`
+- **When Henry says a 3-digit number (e.g. "001"):** read that file directly — do NOT fetch via URL

@@ -1,0 +1,7 @@
+run_id=run_20260425_032924
+timestamp=20260425_032924
+features=claude-infra
+dump_file=/home/claudeuser/agent/backups/pre_task_20260425_032924.sql
+baseline_commit=862c14485f9396e2198255e47a8f405d86ec74eb
+playwright_before=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260425_032924_playwright_before.json
+log_pre=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260425_032924_pre.log
