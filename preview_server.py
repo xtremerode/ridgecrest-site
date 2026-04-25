@@ -8559,9 +8559,11 @@ def admin_image_rerender():
         out_path = os.path.join(opt_dir, out_filename)
     else:
         with _RENDER_INDEX_LOCK:
-            n = 1
-            while os.path.isfile(os.path.join(opt_dir, f'{base_stem}_ai_{n}.webp')):
-                n += 1
+            # Glob-based scan — finds highest existing index even if there are gaps
+            existing = [int(re.search(r'_ai_(\d+)\.webp$', f).group(1))
+                        for f in os.listdir(opt_dir)
+                        if re.match(re.escape(base_stem) + r'_ai_\d+\.webp$', f)]
+            n = (max(existing) + 1) if existing else 1
             out_filename = f'{base_stem}_ai_{n}.webp'
             out_path = os.path.join(opt_dir, out_filename)
             # Touch to reserve slot — prevents a concurrent request from claiming the same index
@@ -9119,15 +9121,14 @@ def admin_image_versions(filename):
     opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
     base    = filename[:-5]
 
-    # Scan filesystem first to collect exact AI render filenames
-    ai_fnames = []
-    n = 1
-    while True:
-        ai_fname = f'{base}_ai_{n}.webp'
-        if not os.path.isfile(os.path.join(opt_dir, ai_fname)):
-            break
-        ai_fnames.append(ai_fname)
-        n += 1
+    # Scan filesystem for all AI render filenames — glob-based to handle gaps in sequence
+    # (gaps occur when a render fails and its 0-byte stub is cleaned up)
+    ai_fnames = sorted(
+        [f for f in os.listdir(opt_dir)
+         if re.match(re.escape(base) + r'_ai_\d+\.webp$', f)
+         and os.path.getsize(os.path.join(opt_dir, f)) > 0],
+        key=lambda x: int(re.search(r'_ai_(\d+)\.webp$', x).group(1))
+    )
 
     # Load active_version and render prompts from DB
     active_version = None

@@ -35,6 +35,8 @@ Intentionally excluded from Playwright overlay tests (no card edit overlay):
     (SDK images.edit multipart only supports dall-e-2; gpt-image-1 requires JSON body)
   - _RENDER_INDEX_LOCK / stub reservation   threading lock around _ai_N index allocation —
     server-side race-condition fix for concurrent auto-renders; no UI surface
+  - glob-based AI render scan in admin_image_versions + admin_image_rerender — replaces
+    sequential while-loop scan; handles gaps from failed-render stub cleanup correctly
 
 Exports: run(fix=False) -> List[Dict]
 """
