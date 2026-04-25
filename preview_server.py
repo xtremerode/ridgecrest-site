@@ -11554,9 +11554,11 @@ def gallery_add_image(slug):
             return jsonify({'error': 'project not found'}), 404
         p = _portfolio_row_to_dict(row)
         gallery = p['gallery']
-        # Don't add duplicates
+        # Don't add duplicates — but if the file is missing from disk, fall through to re-save it
         existing_hashes = set((item[0] if isinstance(item, (list, tuple)) else item) for item in gallery)
-        if final_base in existing_hashes:
+        _opt_dir_check = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+        _file_exists = os.path.isfile(os.path.join(_opt_dir_check, final_base + '.webp'))
+        if final_base in existing_hashes and _file_exists:
             conn.close()
             return jsonify({'ok': True, 'filename': final_base, 'note': 'already in gallery'})
         # Guardrail: refuse to re-add a manually excluded image
