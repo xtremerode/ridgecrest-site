@@ -111,6 +111,12 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
 .fs-thumb:hover:not(.fs-selected){border-color:#2a4050}
 .fs-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.7);color:#94a3b8;font-size:10px;font-weight:700;text-align:center;padding:2px 0;pointer-events:none;letter-spacing:.04em}
 .fs-live-badge{position:absolute;top:2px;right:2px;background:#0ea5e9;color:#fff;font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;letter-spacing:.04em;pointer-events:none;line-height:1.3}
+.fs-del-btn{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:rgba(20,5,5,.9);border:1px solid #7f1d1d;color:#f87171;font-size:10px;font-weight:800;cursor:pointer;display:none;align-items:center;justify-content:center;line-height:1;z-index:10;padding:0;transition:background .1s}
+.fs-thumb:hover .fs-del-btn{display:flex}
+.fs-del-btn:hover:not(:disabled){background:#7f1d1d;color:#fff}
+.fs-thumb.fs-pending{cursor:default;border-color:#1e3040}
+.fs-pending .fs-spin{width:28px;height:28px;border:2px solid #1e3040;border-top-color:#3b82f6;border-radius:50%;animation:spin .65s linear infinite;margin:auto;margin-top:15px}
+.fs-pending-model{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.7);color:#6b8fa6;font-size:10px;font-weight:700;text-align:center;padding:2px 0;letter-spacing:.04em}
 
 /* Done screen */
 #done-screen{display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:16px}
@@ -217,6 +223,7 @@ let filmVersions   = []; // all _ai_N filenames on disk for current card
 let filmActiveLive = ''; // active_version from server (what's live right now)
 let refImageB64    = ''; // base64 data URL of uploaded reference image (or '')
 let renderModel    = 'gemini'; // 'gemini' | 'openai'
+let autoRenderAC   = null;    // AbortController for current card's auto-renders
 
 // ── Elements ─────────────────────────────────────────────────────────────────
 const loadingScreen  = document.getElementById('loading-screen');
@@ -344,7 +351,10 @@ function renderCard(i) {
 
   setControlsEnabled(true);
 
-  // Load filmstrip async (doesn't block card display)
+  // Cancel any running auto-renders from the previous card
+  if (autoRenderAC) { autoRenderAC.abort(); autoRenderAC = null; }
+
+  // Load filmstrip async — also triggers auto-render if no renders exist
   loadFilmstrip(i);
 }
 
@@ -609,7 +619,7 @@ refEmptyLabel.addEventListener('drop', e => {
 });
 
 // ── Filmstrip ─────────────────────────────────────────────────────────────────
-// filmVersions: array of {filename, thumb_path, hero_path} for AI versions only
+// filmVersions: array of {filename, thumb_path, hero_path, render_model?} for AI versions only
 async function loadFilmstrip(cardIdx) {
   const c = CARDS[cardIdx];
   filmstrip.innerHTML = '';
@@ -621,12 +631,35 @@ async function loadFilmstrip(cardIdx) {
     });
     const d = await r.json();
     filmActiveLive = d.active_version || '';
-    // Keep only AI versions (exclude the original base image)
     filmVersions = (d.versions || [])
       .filter(v => !v.is_original)
       .map(v => ({ filename: v.filename, thumb_path: v.thumb_path, hero_path: v.hero_path }));
+
+    // Look-ahead may have pre-rendered something — update card state so panel shows it
+    if (filmVersions.length > 0 && !c.render_exists && idx === cardIdx) {
+      const latest = filmVersions[filmVersions.length - 1];
+      c.render_file   = latest.filename;
+      c.render_exists = true;
+      renderImg.onload = null;
+      renderImg.src = (latest.hero_path || `/assets/images-opt/${latest.filename.replace('.webp','_1920w.webp')}`) + '?t=' + Date.now();
+      renderImg.style.display = '';
+      renderMissing.style.display = 'none';
+      btnSet.disabled = false;
+      cardBadge.textContent = '';
+      cardBadge.className = 'card-badge';
+    }
+
     buildFilmstrip(c);
-  } catch(e) { /* filmstrip stays empty */ }
+
+    // Auto-render both models if still no renders after checking disk
+    if (!c.render_exists && idx === cardIdx && c.prompt) {
+      autoRenderBoth(c, cardIdx);
+    }
+  } catch(e) {
+    if (!c.render_exists && idx === cardIdx && c.prompt) {
+      autoRenderBoth(c, cardIdx);
+    }
+  }
 }
 
 function buildFilmstrip(c) {
@@ -664,6 +697,20 @@ function buildFilmstrip(c) {
       thumb.appendChild(mBadge);
     }
 
+    // Delete button — shown on hover, blocked if this version is live
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'fs-del-btn';
+    delBtn.title = isLive ? 'Set another version live first before deleting this one' : 'Delete this render';
+    delBtn.textContent = '✕';
+    if (isLive) { delBtn.disabled = true; delBtn.style.opacity = '0.35'; delBtn.style.cursor = 'not-allowed'; }
+    delBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (isLive) { showActionStatus(false, '✗ Cannot delete live version — set another first'); return; }
+      deleteFilmVersion(c, v, thumb);
+    });
+    thumb.appendChild(delBtn);
+
     thumb.addEventListener('click', () => selectFilmVersion(c, v));
     filmstrip.appendChild(thumb);
   });
@@ -686,6 +733,144 @@ function selectFilmVersion(c, v) {
   renderImg.style.display = '';
   renderMissing.style.display = 'none';
   btnSet.disabled = false;
+}
+
+// ── Delete a filmstrip version ────────────────────────────────────────────────
+async function deleteFilmVersion(c, v, thumbEl) {
+  thumbEl.style.opacity = '0.35';
+  try {
+    const r = await fetch('/admin/api/images/delete-version', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': TOKEN },
+      body: JSON.stringify({ filename: v.filename })
+    });
+    const result = await r.json();
+    if (!result.ok) throw new Error(result.error || 'Delete failed');
+
+    // Remove from filmVersions array
+    const fi = filmVersions.findIndex(fv => fv.filename === v.filename);
+    if (fi !== -1) filmVersions.splice(fi, 1);
+
+    // If this was the previewed version, switch panel
+    if (c.render_file === v.filename) {
+      if (filmVersions.length > 0) {
+        selectFilmVersion(c, filmVersions[filmVersions.length - 1]);
+      } else {
+        c.render_file   = '';
+        c.render_exists = false;
+        renderImg.src   = '';
+        renderImg.style.display  = 'none';
+        renderMissing.style.display = 'flex';
+        btnSet.disabled = true;
+      }
+    }
+    buildFilmstrip(c);
+    showActionStatus(true, '✓ Render deleted');
+  } catch(e) {
+    thumbEl.style.opacity = '1';
+    showActionStatus(false, '✗ ' + e.message);
+  }
+}
+
+// ── Auto-render both models on arrival (cards with no renders) ────────────────
+async function autoRenderBoth(c, cardIdx) {
+  if (autoRenderAC) autoRenderAC.abort();
+  autoRenderAC = new AbortController();
+  const signal = autoRenderAC.signal;
+
+  // Show two pending placeholder thumbs so Henry sees activity immediately
+  ['Gemini…', 'GPT…'].forEach(lbl => {
+    const ph = document.createElement('div');
+    ph.className = 'fs-thumb fs-pending';
+    ph.dataset.pending = '1';
+    const sp = document.createElement('div');
+    sp.className = 'fs-spin';
+    ph.appendChild(sp);
+    const ml = document.createElement('div');
+    ml.className = 'fs-pending-model';
+    ml.textContent = lbl;
+    ph.appendChild(ml);
+    filmstrip.appendChild(ph);
+  });
+
+  let firstDone = false;
+
+  const renderOne = async (model) => {
+    try {
+      const body = { filename: c.base_file, base_filename: c.base_file, prompt: c.prompt, mode: 'new', render_model: model };
+      const resp = await fetch('/admin/api/images/rerender', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': TOKEN },
+        body: JSON.stringify(body),
+        signal,
+      });
+      if (signal.aborted || idx !== cardIdx) return;
+      const result = await resp.json();
+      if (signal.aborted || idx !== cardIdx || !result.ok || !result.filename) return;
+
+      // Remove one pending placeholder
+      const ph = filmstrip.querySelector('.fs-pending');
+      if (ph) ph.remove();
+
+      if (!filmVersions.some(fv => fv.filename === result.filename)) {
+        const base = result.filename.replace('.webp', '');
+        filmVersions.push({
+          filename:     result.filename,
+          thumb_path:   `/assets/images-opt/${base}_201w.webp`,
+          hero_path:    `/assets/images-opt/${base}_1920w.webp`,
+          render_model: model,
+        });
+      }
+
+      // First result in: show it in the render panel
+      if (!firstDone) {
+        firstDone = true;
+        c.render_file   = result.filename;
+        c.render_exists = true;
+        renderImg.onload = () => { renderImg.style.opacity = '1'; };
+        renderImg.src = `/assets/images-opt/${result.filename.replace('.webp','_1920w.webp')}?t=${Date.now()}`;
+        renderImg.style.display  = '';
+        renderMissing.style.display = 'none';
+        btnSet.disabled = false;
+        cardBadge.textContent = '';
+        cardBadge.className = 'card-badge';
+      }
+      buildFilmstrip(c);
+    } catch(e) {
+      if (e.name === 'AbortError') return;
+      const ph = filmstrip.querySelector('.fs-pending');
+      if (ph) ph.remove();
+      buildFilmstrip(c);
+    }
+  };
+
+  await Promise.allSettled([renderOne('gemini'), renderOne('openai')]);
+
+  // Look-ahead: silently pre-render both models for the next card
+  if (!signal.aborted && idx === cardIdx) {
+    const next = CARDS[cardIdx + 1];
+    if (next && !next.render_exists && next.prompt) preRenderNext(next);
+  }
+}
+
+// ── Silent look-ahead pre-render (no UI, updates card state for instant display) ──
+async function preRenderNext(c) {
+  for (const model of ['gemini', 'openai']) {
+    if (c.render_exists) break; // one success is enough to skip the rest
+    try {
+      const body = { filename: c.base_file, base_filename: c.base_file, prompt: c.prompt, mode: 'new', render_model: model };
+      const resp = await fetch('/admin/api/images/rerender', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': TOKEN },
+        body: JSON.stringify(body),
+      });
+      const result = await resp.json();
+      if (result.ok && result.filename) {
+        c.render_file   = result.filename;
+        c.render_exists = true; // loadFilmstrip will pick this up when Henry navigates there
+      }
+    } catch(e) { /* silent — best-effort */ }
+  }
 }
 
 // ── Done screen ───────────────────────────────────────────────────────────────
