@@ -58,8 +58,101 @@ grow with the codebase. Never ship a hero-related change without re-running this
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 import argparse
+import re
+import subprocess
 import sys
+from pathlib import Path
 from typing import List, Dict, Any
+
+# ── Playwright coverage gate (pre-commit only) ────────────────────────────────
+# Files whose changes require a corresponding visual_overlay_agent.py update.
+_UI_FILES = {
+    'preview_server.py',
+    'preview/js/main.js',
+    'preview/js/gallery.js',
+    'preview/js/lightbox.js',
+}
+_OVERLAY_AGENT = 'visual_overlay_agent.py'
+# Card IDs are kebab-case strings with at least one hyphen, e.g. 'kitchen-diff-top'.
+# Matches new (+) diff lines containing such string literals.
+_CARD_ID_RE = re.compile(r"'[a-z][a-z0-9_-]*-[a-z0-9_-]+'")
+
+
+def _check_playwright_coverage() -> List[Dict[str, Any]]:
+    """
+    Pre-commit gate: block UI code changes that ship without a Playwright test update.
+
+    Two-tier result:
+      CRITICAL — visual_overlay_agent.py not staged at all when UI files changed.
+      WARN     — staged but diff contains no new card-ID string literals
+                 (whitespace/comment-only touch — human must verify).
+
+    Bypass: git commit --no-verify (add a note in the commit message explaining why
+    no test is needed for this change).
+    """
+    repo_root = str(Path(__file__).parent.resolve())
+    _r: Dict = {'agent': 'playwright_coverage', 'page': '', 'auto_fixable': False}
+
+    try:
+        proc = subprocess.run(
+            ['git', 'diff', '--staged', '--name-only'],
+            cwd=repo_root, capture_output=True, text=True, timeout=10,
+        )
+        staged = set(proc.stdout.strip().splitlines())
+    except Exception:
+        return []  # can't determine staged files — don't block
+
+    ui_staged = staged & _UI_FILES
+    if not ui_staged:
+        return []  # no watched UI files changed — check not applicable
+
+    if _OVERLAY_AGENT not in staged:
+        return [{**_r,
+            'check': 'playwright_coverage',
+            'status': 'fail',
+            'detail': (
+                f'UI files modified ({", ".join(sorted(ui_staged))}) but '
+                f'visual_overlay_agent.py was NOT staged. '
+                f'Add a Playwright test for any new interactive UI surface, then stage the file. '
+                f'No new interactive UI in this change? Bypass with: '
+                f'git commit --no-verify  (note why in the commit message).'
+            ),
+        }]
+
+    # visual_overlay_agent.py IS staged — check that it gained substantive test content
+    try:
+        diff_proc = subprocess.run(
+            ['git', 'diff', '--staged', '--', _OVERLAY_AGENT],
+            cwd=repo_root, capture_output=True, text=True, timeout=10,
+        )
+        added_lines = [
+            l for l in diff_proc.stdout.splitlines()
+            if l.startswith('+') and not l.startswith('+++')
+        ]
+        new_card_refs = [l for l in added_lines if _CARD_ID_RE.search(l)]
+    except Exception:
+        new_card_refs = ['unknown']  # can't parse diff — give benefit of the doubt
+
+    if not new_card_refs:
+        return [{**_r,
+            'check': 'playwright_coverage',
+            'status': 'warn',
+            'detail': (
+                f'visual_overlay_agent.py staged but no new card-ID strings found in diff. '
+                f'Confirm that ({", ".join(sorted(ui_staged))}) adds no new interactive UI, '
+                f'or add a test and re-stage.'
+            ),
+        }]
+
+    return [{**_r,
+        'check': 'playwright_coverage',
+        'status': 'pass',
+        'detail': (
+            f'UI files modified and visual_overlay_agent.py updated '
+            f'({len(new_card_refs)} new card-ID reference(s) in diff).'
+        ),
+    }]
+
 
 # ── Agent imports ─────────────────────────────────────────────────────────────
 # Each agent exports run() -> List[Dict[str, Any]]
@@ -105,6 +198,20 @@ def _icon(status: str) -> str:
 def run_all(fix: bool = False, quiet: bool = False,
             pre_commit: bool = False) -> List[Dict[str, Any]]:
     all_results: List[Dict[str, Any]] = []
+
+    # Pre-commit only: enforce that UI code changes include a Playwright test update
+    if pre_commit:
+        if not quiet:
+            print(f"\n{CYAN}{BOLD}── Playwright Coverage Gate ──────────────────────────{RESET}")
+        for r in _check_playwright_coverage():
+            all_results.append(r)
+            status = r.get('status', '?')
+            if status != 'pass' or not quiet:
+                page   = r.get('page', '')
+                detail = r.get('detail', '')
+                check  = r.get('check', '')
+                loc    = f' [{page}]' if page else ''
+                print(f"  {_icon(status)} [{check}]{loc} {detail}")
 
     for module_name, label in AGENTS:
         mod = _import_agent(module_name)
