@@ -8500,6 +8500,7 @@ def admin_image_rerender():
     mode          = data.get('mode', 'new')  # 'new' or 'replace'
     surgical      = bool(data.get('surgical', False))
     crop_coords   = data.get('crop_coords') if surgical else None  # {x,y,w,h} in actual image pixels
+    ref_b64       = data.get('reference_image_b64', '').strip()   # optional style-reference image (data URL or raw b64)
     _ARCH_SUFFIX  = ' Maintain the original camera perspective and focal length. Preserve all high-frequency details on metallic hardware and cabinetry edges. Do not smooth or blur the textures of the wood grain or stone surfaces.'
     _SURGICAL_SUFFIX = ' This is a surgical edit. Focus exclusively on the selected region. Match the lighting, color, and texture of the surrounding scene. Do not alter any area outside the selection. Maintain sharp edges on hardware and treat specular highlights as light sources, not noise.'
 
@@ -8581,13 +8582,23 @@ with Image.open(src_path) as img:
     img_rgb.save(buf, 'PNG')
     img_bytes = buf.getvalue()
 
+ref_path = sys.argv[6] if len(sys.argv) > 6 else ''
+contents_parts = [types.Part(inline_data=types.Blob(mime_type='image/png', data=img_bytes))]
+if ref_path and os.path.isfile(ref_path):
+    with Image.open(ref_path) as _ref:
+        _ref_rgb = _ref.convert('RGB')
+        _ref_rgb.thumbnail((1024, 1024), Image.LANCZOS)
+        _ref_buf = io.BytesIO()
+        _ref_rgb.save(_ref_buf, 'PNG')
+        _ref_bytes = _ref_buf.getvalue()
+    contents_parts.append(types.Part(inline_data=types.Blob(mime_type='image/png', data=_ref_bytes)))
+    print(f'[AI RENDER] reference image included ({len(_ref_bytes)//1024}KB)', file=sys.stderr)
+contents_parts.append(types.Part(text=prompt))
+
 client = genai.Client(api_key=api_key)
 response = client.models.generate_content(
     model='models/gemini-3.1-flash-image-preview',
-    contents=[
-        types.Part(inline_data=types.Blob(mime_type='image/png', data=img_bytes)),
-        types.Part(text=prompt)
-    ],
+    contents=contents_parts,
     config=types.GenerateContentConfig(response_modalities=['IMAGE', 'TEXT'])
 )
 
@@ -8761,6 +8772,20 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
     _env['PYTHONPATH'] = '/home/claudeuser/.local/lib/python3.12/site-packages'
     _env['PATH'] = ':'.join(p for p in _env.get('PATH','').split(':') if 'venv' not in p)
 
+    # Decode reference image to a temp file if provided (Path A only — surgical ignores it)
+    ref_tmp_path = ''
+    if ref_b64 and not surgical:
+        try:
+            _raw_b64 = ref_b64.split(',', 1)[1] if ',' in ref_b64 else ref_b64
+            _ref_raw = _b64.b64decode(_raw_b64)
+            _ref_tmp = _tmp.NamedTemporaryFile(suffix='.img', delete=False)
+            _ref_tmp.write(_ref_raw)
+            _ref_tmp.flush()
+            _ref_tmp.close()
+            ref_tmp_path = _ref_tmp.name
+        except Exception as _e:
+            ref_tmp_path = ''  # silently skip bad reference image
+
     try:
         if surgical and crop_coords:
             # Path B — Surgical: crop patch, single-image Gemini edit, composite graft
@@ -8771,10 +8796,11 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
                 env=_env, capture_output=True, text=True, timeout=300
             )
         else:
-            # Path A — Full-scene (unchanged)
+            # Path A — Full-scene
             orig_path_arg = src_path
             result = _subp.run(
-                ['/usr/bin/python3', '-c', script, api_key, src_path, out_path, prompt + _ARCH_SUFFIX, orig_path_arg],
+                ['/usr/bin/python3', '-c', script, api_key, src_path, out_path,
+                 prompt + _ARCH_SUFFIX, orig_path_arg, ref_tmp_path],
                 env=_env, capture_output=True, text=True, timeout=300
             )
         if result.returncode != 0:
@@ -8794,6 +8820,10 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
         return jsonify({'error': 'timed out after 120s'}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    finally:
+        if ref_tmp_path and os.path.isfile(ref_tmp_path):
+            try: os.unlink(ref_tmp_path)
+            except Exception: pass
 
     # Store prompt in DB so we can display it later
     conn2 = _db_conn()

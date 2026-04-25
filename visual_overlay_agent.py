@@ -28,6 +28,8 @@ Intentionally excluded from Playwright overlay tests (no card edit overlay):
   - admin/render-review.html      standalone admin review tool — no hover/pill overlay UI
   - GET /admin/api/renders/review-queue  backend data endpoint — no interactive UI surface
   - _record_render_approval / render_approved_state  DB write helpers — backend only
+  - reference_image_b64 / ref_b64  rerender endpoint extension — admin-only file upload,
+    exercised only during manual render review sessions, not a card overlay surface
 
 Exports: run(fix=False) -> List[Dict]
 """

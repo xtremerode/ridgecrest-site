@@ -78,6 +78,20 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
 #action-status.ok{background:#052e16;color:#22c55e;border:1px solid #166534;display:inline-block}
 #action-status.err{background:#2d0707;color:#f87171;border:1px solid #7f1d1d;display:inline-block}
 
+/* Reference image row */
+#ref-row{display:flex;align-items:center;gap:10px;padding-top:4px}
+#ref-row-label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#6b8fa6;white-space:nowrap;flex-shrink:0}
+#ref-zone{flex:1;min-width:0}
+#ref-empty-label{display:flex;align-items:center;gap:6px;padding:6px 10px;border:1.5px dashed #2a4050;border-radius:7px;cursor:pointer;color:#6b8fa6;font-size:12px;transition:border-color .15s,color .15s;white-space:nowrap}
+#ref-empty-label:hover{border-color:#3b82f6;color:#60a5fa}
+#ref-empty-label.drag-over{border-color:#3b82f6;background:#091e2e;color:#60a5fa}
+#ref-empty-label span{pointer-events:none}
+#ref-loaded{display:none;align-items:center;gap:8px;padding:4px 8px;border:1px solid #2a4050;border-radius:7px;background:#091520}
+#ref-loaded img{width:48px;height:36px;object-fit:cover;border-radius:4px;flex-shrink:0}
+#ref-loaded-name{font-size:12px;color:#94a3b8;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#ref-clear-btn{background:none;border:none;color:#6b8fa6;cursor:pointer;font-size:14px;padding:2px 4px;flex-shrink:0;line-height:1}
+#ref-clear-btn:hover{color:#f87171}
+
 /* Filmstrip */
 #filmstrip{height:84px;overflow-x:auto;overflow-y:hidden;display:flex;gap:6px;padding:6px 10px;background:#061018;border-top:1px solid #1e3040;flex-shrink:0;align-items:center;min-width:0;scrollbar-width:thin;scrollbar-color:#1e3040 #061018}
 #filmstrip:empty{display:none}
@@ -146,6 +160,18 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
       <button id="btn-rerender">↺ Re-render</button>
       <a id="surgical-link" href="/view/admin/pages.html" target="_blank">Surgical Edit ↗</a>
     </div>
+    <div id="ref-row">
+      <span id="ref-row-label">Reference</span>
+      <div id="ref-zone">
+        <input type="file" id="ref-input" accept="image/*" style="display:none">
+        <label for="ref-input" id="ref-empty-label"><span>＋ Add style reference image</span></label>
+        <div id="ref-loaded">
+          <img id="ref-thumb" src="" alt="reference">
+          <span id="ref-loaded-name"></span>
+          <button id="ref-clear-btn" type="button" title="Remove reference image">✕</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -175,6 +201,7 @@ let sourceMode = 'render'; // 'base' | 'render'
 let history    = [];       // [{idx, snapshots: [{...}]}]
 let filmVersions   = []; // all _ai_N filenames on disk for current card
 let filmActiveLive = ''; // active_version from server (what's live right now)
+let refImageB64    = ''; // base64 data URL of uploaded reference image (or '')
 
 // ── Elements ─────────────────────────────────────────────────────────────────
 const loadingScreen  = document.getElementById('loading-screen');
@@ -205,6 +232,12 @@ const actionStatus   = document.getElementById('action-status');
 const doneScreen     = document.getElementById('done-screen');
 const doneSummary    = document.getElementById('done-summary');
 const filmstrip      = document.getElementById('filmstrip');
+const refInput       = document.getElementById('ref-input');
+const refEmptyLabel  = document.getElementById('ref-empty-label');
+const refLoaded      = document.getElementById('ref-loaded');
+const refThumb       = document.getElementById('ref-thumb');
+const refLoadedName  = document.getElementById('ref-loaded-name');
+const refClearBtn    = document.getElementById('ref-clear-btn');
 
 // ── Init: load queue from server ──────────────────────────────────────────────
 async function init() {
@@ -354,10 +387,12 @@ async function apiPublish(slugs) {
 }
 
 async function apiRerender(sourceFile, baseFile, prompt) {
+  const body = { filename: sourceFile, base_filename: baseFile, prompt, mode: 'new' };
+  if (refImageB64) body.reference_image_b64 = refImageB64;
   const r = await fetch('/admin/api/images/rerender', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Admin-Token': TOKEN },
-    body: JSON.stringify({ filename: sourceFile, base_filename: baseFile, prompt, mode: 'new' })
+    body: JSON.stringify(body)
   });
   if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || r.status); }
   return r.json();
@@ -513,6 +548,44 @@ async function doRerender() {
     setControlsEnabled(true);
   }
 }
+
+// ── Reference image ───────────────────────────────────────────────────────────
+function loadRefFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    refImageB64 = e.target.result; // full data URL
+    refThumb.src = refImageB64;
+    refLoadedName.textContent = file.name;
+    refEmptyLabel.style.display = 'none';
+    refLoaded.style.display = 'flex';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearRefImage() {
+  refImageB64 = '';
+  refInput.value = '';
+  refThumb.src = '';
+  refLoadedName.textContent = '';
+  refLoaded.style.display = 'none';
+  refEmptyLabel.style.display = '';
+}
+
+refInput.addEventListener('change', () => {
+  if (refInput.files[0]) loadRefFile(refInput.files[0]);
+});
+refClearBtn.addEventListener('click', clearRefImage);
+
+// Drag-and-drop onto the ref label
+refEmptyLabel.addEventListener('dragover', e => { e.preventDefault(); refEmptyLabel.classList.add('drag-over'); });
+refEmptyLabel.addEventListener('dragleave', () => refEmptyLabel.classList.remove('drag-over'));
+refEmptyLabel.addEventListener('drop', e => {
+  e.preventDefault();
+  refEmptyLabel.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) loadRefFile(file);
+});
 
 // ── Filmstrip ─────────────────────────────────────────────────────────────────
 // filmVersions: array of {filename, thumb_path, hero_path} for AI versions only
