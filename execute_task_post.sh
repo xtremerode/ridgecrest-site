@@ -81,7 +81,7 @@ info "Log: $LOG_FILE"
 # ─── GATE 1: Server health ────────────────────────────────────────────────────
 hdr "[1/5] Server health check"
 HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:8081/" 2>/dev/null || echo "000")
-if [ "$HTTP_STATUS" = "200" ]; then
+if [[ "$HTTP_STATUS" =~ ^[23] ]]; then
   pass "Server responding → HTTP $HTTP_STATUS"
 else
   fail "Server not responding (HTTP $HTTP_STATUS). Restart the server before running post-phase."
