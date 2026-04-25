@@ -67,6 +67,7 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32))
 # ── Admin auth tokens — persisted in DB so server restarts don't log users out ─
 _ADMIN_TOKENS: set = set()   # in-memory cache for speed
 _TOKENS_LOCK = threading.Lock()
+_RENDER_INDEX_LOCK = threading.Lock()  # prevents concurrent renders from claiming the same _ai_N slot
 
 # Admin password — bcrypt hash stored in ADMIN_PASSWORD_HASH env var
 _DEFAULT_PW = "Hb2425hb+"
@@ -8555,12 +8556,16 @@ def admin_image_rerender():
     base_stem = base_filename[:-5]  # strip .webp
     if mode == 'replace':
         out_filename = base_filename
+        out_path = os.path.join(opt_dir, out_filename)
     else:
-        n = 1
-        while os.path.isfile(os.path.join(opt_dir, f'{base_stem}_ai_{n}.webp')):
-            n += 1
-        out_filename = f'{base_stem}_ai_{n}.webp'
-    out_path = os.path.join(opt_dir, out_filename)
+        with _RENDER_INDEX_LOCK:
+            n = 1
+            while os.path.isfile(os.path.join(opt_dir, f'{base_stem}_ai_{n}.webp')):
+                n += 1
+            out_filename = f'{base_stem}_ai_{n}.webp'
+            out_path = os.path.join(opt_dir, out_filename)
+            # Touch to reserve slot — prevents a concurrent request from claiming the same index
+            open(out_path, 'wb').close()
 
     # Call Gemini via subprocess to avoid import conflicts in Flask process
     import subprocess as _subp, base64 as _b64, tempfile as _tmp
@@ -8922,6 +8927,12 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
                 env=_env, capture_output=True, text=True, timeout=300
             )
         if result.returncode != 0:
+            # Clean up the stub reservation file so it doesn't block future renders
+            try:
+                if os.path.exists(out_path) and os.path.getsize(out_path) == 0:
+                    os.remove(out_path)
+            except Exception:
+                pass
             raw = result.stderr.strip() or 'rerender failed'
             if 'RESOURCE_EXHAUSTED' in raw or 'quota' in raw.lower():
                 err = 'Quota exceeded — enable billing on your Google AI Studio account at aistudio.google.com'

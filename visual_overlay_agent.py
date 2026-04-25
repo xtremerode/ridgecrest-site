@@ -33,6 +33,8 @@ Intentionally excluded from Playwright overlay tests (no card edit overlay):
   - render_model / script_openai   model selector (Gemini vs gpt-image-1) — admin-only
     rerender path, no interactive card overlay UI surface; fixed to use JSON POST API
     (SDK images.edit multipart only supports dall-e-2; gpt-image-1 requires JSON body)
+  - _RENDER_INDEX_LOCK / stub reservation   threading lock around _ai_N index allocation —
+    server-side race-condition fix for concurrent auto-renders; no UI surface
 
 Exports: run(fix=False) -> List[Dict]
 """
