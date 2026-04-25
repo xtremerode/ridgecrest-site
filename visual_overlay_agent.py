@@ -363,7 +363,12 @@ def _check_card_overlay(page, card_id, slug, token):
                 checks.append(('click_cycles_image', True,
                     f'Click cycled image correctly on {card_id}'))
 
-        # ── Step 4: Restore original state ───────────────────────────────────
+        # ── Step 4: Rotate click test ─────────────────────────────────────────
+        # Verifies the full click→API→state-update flow for the rotate button.
+        # Uses route interception so no image files are modified on disk.
+        checks.extend(_check_rotate_click(page, card_id, is_gallery_item=False))
+
+        # ── Step 5: Restore original state ───────────────────────────────────
         _restore_card_state(card_id, slug, token, original_state)
 
         return checks
@@ -373,6 +378,185 @@ def _check_card_overlay(page, card_id, slug, token):
                  f'Timeout: {card_id} not scrollable/interactable (zero-size or display:none)')]
     except Exception as e:
         return [('overlay_accessible', False, f'Error checking {card_id}: {e}')]
+
+
+def _resolve_attach_el_js(card_id):
+    """Return JS snippet that resolves _attachEl for a card (mirrors setupCard logic)."""
+    return f"""(function() {{
+        var card = document.querySelector('[data-card-id="{card_id}"]');
+        if (!card) return null;
+        var attachEl = card;
+        var isGallery = card.hasAttribute('data-src');
+        if (!isGallery && card.getAttribute('role') === 'img') {{
+            var par = card.parentElement;
+            if (par && window.getComputedStyle(par).position !== 'static') attachEl = par;
+        }}
+        if (!isGallery && card.classList.contains('diff__zone')) {{
+            var dv = card.parentElement;
+            if (dv && dv.classList.contains('diff__visual') &&
+                dv.classList.contains('diff__visual--one') &&
+                window.getComputedStyle(card).display !== 'none') {{
+                attachEl = dv;
+            }}
+        }}
+        return attachEl;
+    }})()"""
+
+
+def _check_rotate_click(page, card_id, is_gallery_item):
+    """
+    Click the rotate button and verify the full flow using Playwright route interception.
+    Non-destructive — mocks the API response so no image files are modified on disk.
+
+    Verifies:
+      1. Rotate button found in pill (searched on _attachEl, not just card element)
+      2. API call fired to /admin/api/images/rotate
+      3. Filename sent is base _mv2.webp with no size suffix
+      4. Degrees = 90
+      5. Button re-enables after response (not stuck in '↻…')
+      6. Gallery items: img.src updated with ?v= cache-bust after rotation
+
+    Returns list of (check_name, ok, detail) tuples.
+    """
+    checks = []
+    rotate_requests = []
+
+    def _handle_rotate(route, request):
+        try:
+            body = request.post_data_json or {}
+        except Exception:
+            body = {}
+        rotate_requests.append(body)
+        route.fulfill(
+            status=200,
+            content_type='application/json',
+            body='{"ok": true, "filename": "mock_rotated.webp"}'
+        )
+
+    try:
+        # Set up route BEFORE hover so it's ready when the click fires the fetch
+        page.route('**/admin/api/images/rotate', _handle_rotate)
+        time.sleep(0.1)  # brief pause to ensure route is registered
+
+        # Hover on _attachEl (mirrors setupCard logic — pill is on _attachEl, not always the card)
+        page.evaluate(f"""() => {{
+            var attachEl = {_resolve_attach_el_js(card_id)};
+            if (attachEl) attachEl.dispatchEvent(
+                new MouseEvent('mouseenter', {{bubbles: false, cancelable: true}})
+            );
+        }}""")
+        time.sleep(0.4)
+
+        # Check whether card has a rotatable source.
+        # For non-gallery: require state.image to be set (background-image CSS
+        # can come from stylesheets and is not a reliable proxy for state.image).
+        # Wait up to 1s for cardMap to populate from async setupCard fetch.
+        has_source = False
+        if is_gallery_item:
+            has_source = bool(page.evaluate(f"""() => {{
+                var card = document.querySelector('[data-card-id="{card_id}"]');
+                return card ? !!card.getAttribute('data-src') : false;
+            }}"""))
+        else:
+            deadline = time.time() + 1.0
+            while time.time() < deadline:
+                src = page.evaluate(f"""() => {{
+                    var s = window.cardMap && window.cardMap['{card_id}'];
+                    return (s && s.image) ? s.image : '';
+                }}""")
+                if src:
+                    has_source = True
+                    break
+                time.sleep(0.1)
+
+        if not has_source:
+            checks.append(('rotate_click_skipped', True,
+                            f'{card_id}: no image in state.image — rotate click skipped (card may be color/gradient mode)'))
+            return checks
+
+        # Find the rotate button — search _attachEl since pill is appended there
+        found_btn = page.evaluate(f"""() => {{
+            var attachEl = {_resolve_attach_el_js(card_id)};
+            if (!attachEl) return false;
+            return Array.from(attachEl.querySelectorAll('button')).some(
+                function(b) {{ return b.textContent.trim() === '↻'; }}
+            );
+        }}""")
+
+        checks.append(('rotate_click_btn_found', found_btn,
+                        f'{card_id}: rotate button {"present" if found_btn else "MISSING"} in pill (searched _attachEl)'))
+        if not found_btn:
+            return checks
+
+        # Get an ElementHandle to the rotate button so Playwright's native .click()
+        # can be used — page.evaluate() blocks the Python thread and prevents
+        # route-interceptor callbacks from firing during the async fetch.
+        btn_handle = page.evaluate_handle(f"""() => {{
+            var attachEl = {_resolve_attach_el_js(card_id)};
+            if (!attachEl) return null;
+            return Array.from(attachEl.querySelectorAll('button')).find(
+                function(b) {{ return b.textContent.trim() === '↻'; }}
+            ) || null;
+        }}""")
+        btn_el = btn_handle.as_element()
+        if btn_el:
+            btn_el.click(timeout=3000)  # native Playwright click — Python not blocked during fetch
+
+        # Wait for API interception (up to 4s)
+        deadline = time.time() + 4.0
+        while not rotate_requests and time.time() < deadline:
+            time.sleep(0.1)
+
+        api_called = len(rotate_requests) > 0
+        checks.append(('rotate_click_api_called', api_called,
+                        f'{card_id}: rotate API {"fired" if api_called else "NOT fired — click had no effect (state.image empty or handler error)"}'))
+
+        if api_called:
+            req = rotate_requests[0]
+            fname = req.get('filename', '')
+            degrees = req.get('degrees', 0)
+            has_size_suffix = any(s in fname for s in ('_960w', '_1920w', '_480w', '_201w'))
+            is_mv2 = '_mv2.webp' in fname
+
+            checks.append(('rotate_click_filename_correct', is_mv2 and not has_size_suffix,
+                            f'{card_id}: API filename="{fname}" mv2={is_mv2} size_suffix={has_size_suffix}'))
+            checks.append(('rotate_click_degrees_correct', degrees == 90,
+                            f'{card_id}: API degrees={degrees} (expected 90)'))
+
+        # Wait for button to re-enable (JS processes mock response)
+        time.sleep(0.6)
+
+        btn_recovered = page.evaluate(f"""() => {{
+            var attachEl = {_resolve_attach_el_js(card_id)};
+            if (!attachEl) return false;
+            return Array.from(attachEl.querySelectorAll('button')).some(
+                function(b) {{ return b.textContent.trim() === '↻' && !b.disabled; }}
+            );
+        }}""")
+        checks.append(('rotate_click_btn_recovered', btn_recovered,
+                        f'{card_id}: button {"re-enabled after response" if btn_recovered else "still disabled/missing — JS error after mock response"}'))
+
+        # Gallery only: verify img.src was cache-busted
+        if is_gallery_item and api_called:
+            img_updated = page.evaluate(f"""() => {{
+                var card = document.querySelector('[data-card-id="{card_id}"]');
+                if (!card) return false;
+                var img = card.querySelector('img[data-gallery-src]') || card.querySelector('img');
+                return img ? img.src.indexOf('?v=') !== -1 : false;
+            }}""")
+            checks.append(('rotate_click_gallery_img_updated', img_updated,
+                            f'{card_id}: img.src {"cache-busted (?v= present)" if img_updated else "NOT updated — JS error in success handler"}'))
+
+    except Exception as e:
+        checks.append(('rotate_click_api_called', False,
+                        f'{card_id}: rotate click test exception: {e}'))
+    finally:
+        try:
+            page.unroute('**/admin/api/images/rotate')
+        except Exception:
+            pass
+
+    return checks
 
 
 def _check_gallery_item(page, card_id, slug, token):
@@ -468,6 +652,9 @@ def _check_gallery_item(page, card_id, slug, token):
                         f'size_suffix={render_result.get("hasSizeSuffix")} '
                         f'state_image="{render_result.get("stateImage","")}" '
                         f'state_bad={render_result.get("stateHasBadSuffix")}'))
+
+        # Rotate click test — verifies the full click→API→img-update flow
+        checks.extend(_check_rotate_click(page, card_id, is_gallery_item=True))
 
     except PlaywrightTimeoutError:
         return [('gallery_overlay_accessible', False,
