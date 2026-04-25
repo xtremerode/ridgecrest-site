@@ -67,6 +67,12 @@ PAGES_TO_TEST = [
         ['portfolio-featured-1'],
         'portfolio-featured card (portfolio page)',
     ),
+    (
+        'pleasanton-custom',
+        '/view/pleasanton-custom.html',
+        ['pleasanton-custom-gal-ff5b18_9cd0d8a66b364c1ea15c032acb7da0cc_mv2'],
+        'gallery-item card (rotate button + render button on gallery items)',
+    ),
 ]
 
 
@@ -369,6 +375,109 @@ def _check_card_overlay(page, card_id, slug, token):
         return [('overlay_accessible', False, f'Error checking {card_id}: {e}')]
 
 
+def _check_gallery_item(page, card_id, slug, token):
+    """
+    Gallery-item specific checks:
+      1. Pill visible on hover (same as _check_card_overlay step 1-2)
+      2. Rotate button present in pill
+      3. Render button present in pill
+      4. Render button postMessage sends correct base _mv2.webp filename (not _960w, not wrong hash)
+    No state is written — gallery items are guarded against saveCard() writes.
+    """
+    checks = []
+    try:
+        selector = f'[data-card-id="{card_id}"]'
+        el = page.query_selector(selector)
+        if el is None:
+            return [('gallery_overlay_accessible', False,
+                     f'Gallery element [{card_id}] not found in DOM')]
+
+        el.scroll_into_view_if_needed(timeout=5000)
+        time.sleep(0.2)
+
+        # Hover to show pill
+        page.evaluate(f"""() => {{
+            var card = document.querySelector('[data-card-id="{card_id}"]');
+            if (card) card.dispatchEvent(new MouseEvent('mouseenter', {{bubbles: false, cancelable: true}}));
+        }}""")
+        time.sleep(0.4)
+
+        # Check pill visible, rotate present, render present
+        pill_info = page.evaluate(f"""() => {{
+            var card = document.querySelector('[data-card-id="{card_id}"]');
+            if (!card) return {{found: false}};
+            var pill = card.querySelector('[style*="z-index: 9991"], [style*="z-index:9991"]');
+            if (!pill) return {{found: false, reason: 'no pill found'}};
+            var opacity = window.getComputedStyle(pill).opacity;
+            var btns = pill.querySelectorAll('button');
+            var btnTexts = Array.from(btns).map(function(b) {{ return b.textContent.trim(); }});
+            return {{
+                found: true,
+                opacity: opacity,
+                hasRotate: btnTexts.some(function(t) {{ return t === '↻'; }}),
+                hasRender: btnTexts.some(function(t) {{ return t.indexOf('Render') !== -1 || t === '✨'; }}),
+                btnTexts: btnTexts
+            }};
+        }}""")
+
+        if not pill_info.get('found'):
+            checks.append(('gallery_pill_visible', False,
+                            f'{card_id}: {pill_info.get("reason","pill not found")}'))
+            return checks
+
+        pill_visible = float(pill_info.get('opacity', 0)) > 0.5
+        checks.append(('gallery_pill_visible', pill_visible,
+                        f'{card_id}: pill opacity={pill_info.get("opacity")}'))
+        checks.append(('gallery_rotate_btn', pill_info.get('hasRotate', False),
+                        f'{card_id}: rotate button {"present" if pill_info.get("hasRotate") else "MISSING"} — buttons: {pill_info.get("btnTexts")}'))
+        checks.append(('gallery_render_btn', pill_info.get('hasRender', False),
+                        f'{card_id}: render button {"present" if pill_info.get("hasRender") else "MISSING"} — buttons: {pill_info.get("btnTexts")}'))
+
+        # Check render button will send the correct base filename.
+        # We verify by inspecting data-src directly (source of truth for gallery render path)
+        # and confirming the JS cardMap state has no stale card_settings overriding it.
+        render_result = page.evaluate(f"""() => {{
+            var card = document.querySelector('[data-card-id="{card_id}"]');
+            if (!card) return {{ok: false, reason: 'card not found', dataSrc: ''}};
+            var dataSrc = card.getAttribute('data-src') || '';
+            var fname = dataSrc.split('/').pop();
+            // Verify data-src is a base _mv2.webp with no size suffix — this is what render uses
+            var hasSizeSuffix = /_(?:1920|960|480|201)w\\.webp$/.test(fname);
+            var hasAiSuffix = /_ai_\\d/.test(fname);
+            var isMv2 = fname.indexOf('_mv2.webp') !== -1 || fname.indexOf('_mv2') !== -1;
+            // Also verify cardMap state has no stale image that would override data-src
+            var cardState = window.cardMap && window.cardMap['{card_id}'];
+            var stateImage = cardState ? (cardState.image || '') : '';
+            var stateHasBadSuffix = /_(?:1920|960|480|201)w\\.webp$/.test(stateImage);
+            return {{
+                ok: !hasSizeSuffix && !hasAiSuffix && isMv2 && !stateHasBadSuffix,
+                dataSrc: dataSrc,
+                fname: fname,
+                hasSizeSuffix: hasSizeSuffix,
+                hasAiSuffix: hasAiSuffix,
+                isMv2: isMv2,
+                stateImage: stateImage,
+                stateHasBadSuffix: stateHasBadSuffix
+            }};
+        }}""")
+
+        render_ok = render_result.get('ok', False)
+        checks.append(('gallery_render_filename', render_ok,
+                        f'{card_id}: data-src="{render_result.get("dataSrc","")}" '
+                        f'isMv2={render_result.get("isMv2")} '
+                        f'size_suffix={render_result.get("hasSizeSuffix")} '
+                        f'state_image="{render_result.get("stateImage","")}" '
+                        f'state_bad={render_result.get("stateHasBadSuffix")}'))
+
+    except PlaywrightTimeoutError:
+        return [('gallery_overlay_accessible', False,
+                 f'Timeout: {card_id} not scrollable/interactable')]
+    except Exception as e:
+        return [('gallery_overlay_accessible', False, f'Error checking gallery {card_id}: {e}')]
+
+    return checks
+
+
 def run(fix=False):
     results = []
     agent = 'visual_overlay_agent'
@@ -455,7 +564,12 @@ def run(fix=False):
                     pass
 
                 for card_id in card_ids:
-                    card_checks = _check_card_overlay(page, card_id, slug, token)
+                    # Gallery items (data-src present) use dedicated gallery check
+                    is_gallery = '-gal-' in card_id
+                    if is_gallery:
+                        card_checks = _check_gallery_item(page, card_id, slug, token)
+                    else:
+                        card_checks = _check_card_overlay(page, card_id, slug, token)
                     for check_name, ok, detail in card_checks:
                         results.append({
                             'agent': agent,

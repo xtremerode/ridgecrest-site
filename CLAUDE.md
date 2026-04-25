@@ -565,6 +565,37 @@ Standalone AI photo color grading app at `/home/claudeuser/photo_studio/` — po
 
 ---
 
+## 26. Playwright Testing Coverage — MANDATORY
+
+**Every code change must have corresponding Playwright tests for every element type touched.**
+
+### Rule
+When a guardrail execution touches a code path (e.g., a new button type, a new card behavior, a new overlay feature), `visual_overlay_agent.py` MUST include a test that exercises that specific functionality **in the same guardrail execution**. Not in the next task. Not filed as a gap. In the same post-phase run.
+
+### Coverage Requirement
+- New button added to card pill → Playwright must click that button and verify the result
+- New gallery item behavior → test must run against a gallery item card ID (not just regular cards)
+- New render/rotate/edit logic → test must verify the actual action fires correctly
+- New card type or page type → add that page and a representative card ID to `PAGES_TO_TEST`
+
+### Enforcement
+- The Playwright `after` run in `execute_task_post.sh` validates all tests pass — but only if the tests EXIST
+- "Tests pass" does NOT mean coverage is complete — it means whatever tests exist happened to pass
+- Before declaring a task done, enumerate every element type/behavior touched and verify each has a test
+- If a test is structurally difficult (e.g., involves server-side round-trip), document WHY in the test file, not just skip it
+
+### What failure looks like
+- Rotate button added to gallery items → Playwright only tests regular cards → Henry discovers rotate doesn't work → rework
+- Pre-commit gate passes (197 checks) but Playwright has no rotate test → gate passes but feature is untested
+- "All tests pass" means "existing tests pass" not "all behaviors correct"
+
+### Practical checklist before running post-phase
+1. List every function/element modified in this task
+2. For each: confirm a test exists in `visual_overlay_agent.py` that exercises it
+3. If not: add the test NOW, before running `execute_task_post.sh`
+
+---
+
 ## 25. Mandatory Execution Guardrail — REQUIRED FOR ALL CODE CHANGES
 
 **Every code change must go through the two-phase execution guardrail. No exceptions.**

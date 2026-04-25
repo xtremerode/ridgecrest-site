@@ -6153,9 +6153,9 @@ def _render_project_page(p):
     </ul>
   </nav>
 
-  <div class="project-hero" data-rd-section="project-hero">
+  <div class="project-hero" data-hero-id="{slug}-hero" data-rd-section="project-hero">
     <div class="project-hero__img" role="img" aria-label="{name} by Ridgecrest Designs, {city}, {state}" style="background-image:url('{hero_src}')"></div>
-    <div class="project-hero__overlay"></div>
+    <div class="project-hero__overlay" data-gradient-id="{slug}-hero"></div>
     <div class="project-hero__content">
       <div class="container project-hero__content-inner">
         <div class="project-hero__left">
@@ -6168,7 +6168,7 @@ def _render_project_page(p):
           </div>
         </div>
         <div class="project-hero__right">
-          <a href="{_INQUIRY_URL}" class="btn btn--primary project-hero__cta">Start a Similar Project</a>
+          <a href="start-a-project.html" class="btn btn--primary project-hero__cta" data-cta-id="primary">Start a Similar Project</a>
         </div>
       </div>
     </div>
@@ -6202,7 +6202,7 @@ def _render_project_page(p):
     <div class="container container--narrow cta__inner">
       <h2 class="cta__headline">Start your own<br><em>extraordinary project.</em></h2>
       <p class="cta__sub">We take on a limited number of projects each year. Tell us about yours.</p>
-      <a href="{_INQUIRY_URL}" class="btn btn--primary btn--lg">Submit a Project Inquiry</a>
+      <a href="start-a-project.html" class="btn btn--primary btn--lg">Submit a Project Inquiry</a>
       <p class="cta__note">Or call <a href="tel:9257842798">925-784-2798</a></p>
     </div>
   </section>
@@ -6593,7 +6593,7 @@ _BLOG_FOOTER = '''<footer class="footer">
         </div>
         <div class="footer__col">
           <p class="footer__col-head">Connect</p>
-          <a href="https://elevate-scheduling-6b2fdec8.base44.app/ProjectInquiryForm">Start a Project</a>
+          <a href="/view/start-a-project.html">Start a Project</a>
           <a href="/view/contact.html">Contact Us</a>
           <a href="https://www.instagram.com/ridgecrestdesigns" target="_blank" rel="noopener">Instagram</a>
           <a href="https://www.facebook.com/ridgecrestdesigns" target="_blank" rel="noopener">Facebook</a>
