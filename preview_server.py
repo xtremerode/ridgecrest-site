@@ -8775,11 +8775,10 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
 """
 
     script_openai = r"""
-import sys, os, base64
+import sys, os, base64, json, io
 sys.path.insert(0, '/home/claudeuser/.local/lib/python3.12/site-packages')
-from openai import OpenAI
 from PIL import Image
-import io
+import urllib.request
 
 api_key  = sys.argv[1]
 src_path = sys.argv[2]
@@ -8787,70 +8786,78 @@ out_path = sys.argv[3]
 prompt   = sys.argv[4]
 ref_path = sys.argv[5] if len(sys.argv) > 5 else ''
 
-# gpt-image-2 images.edit — convert source to PNG (WebP input not guaranteed)
+# Convert source to PNG (WebP not guaranteed as input). Cap at 2048px for cost efficiency.
 with Image.open(src_path) as img:
     img_rgb = img.convert('RGB')
-    # Downscale to max 2048px for input — keeps cost down, quality is maintained
     img_rgb.thumbnail((2048, 2048), Image.LANCZOS)
     src_buf = io.BytesIO()
     img_rgb.save(src_buf, 'PNG')
-    src_buf.seek(0)
+    src_b64 = base64.b64encode(src_buf.getvalue()).decode()
 
-# Optional reference image — also convert to PNG
-ref_buf = None
+# Build images array — gpt-image-1 JSON edit format: [{image_url: "data:..."}]
+images_arr = [{'image_url': f'data:image/png;base64,{src_b64}'}]
+
 if ref_path and os.path.isfile(ref_path):
     with Image.open(ref_path) as ref_img:
         ref_rgb = ref_img.convert('RGB')
         ref_rgb.thumbnail((1024, 1024), Image.LANCZOS)
         ref_buf = io.BytesIO()
         ref_rgb.save(ref_buf, 'PNG')
-        ref_buf.seek(0)
-    print(f'[OPENAI RENDER] reference image included', file=sys.stderr)
+        ref_b64 = base64.b64encode(ref_buf.getvalue()).decode()
+    images_arr.append({'image_url': f'data:image/png;base64,{ref_b64}'})
+    print('[OPENAI RENDER] reference image included', file=sys.stderr)
 
-# Determine best output size for this image's aspect ratio
+# Determine output size from source aspect ratio
 ar = img_rgb.width / img_rgb.height
 if ar >= 1.3:
-    out_size = '1536x1024'  # landscape
+    out_size = '1536x1024'
 elif ar <= 0.77:
-    out_size = '1024x1536'  # portrait
+    out_size = '1024x1536'
 else:
-    out_size = '1024x1024'  # square
+    out_size = '1024x1024'
 
-client = OpenAI(api_key=api_key)
-kwargs = dict(
-    model='gpt-image-2',
-    image=('source.png', src_buf, 'image/png'),
-    prompt=prompt,
-    size=out_size,
-    quality='high',
-    output_format='png',
-    n=1,
+# Raw JSON POST — gpt-image-1 requires JSON body (not multipart) for image editing
+payload = json.dumps({
+    'model':  'gpt-image-1',
+    'prompt': prompt,
+    'images': images_arr,
+    'size':   out_size,
+    'n':      1,
+}).encode()
+
+req = urllib.request.Request(
+    'https://api.openai.com/v1/images/edits',
+    data=payload,
+    headers={
+        'Authorization':  f'Bearer {api_key}',
+        'Content-Type':   'application/json',
+    },
+    method='POST',
 )
-if ref_buf:
-    # Pass reference as second image via the images list format
-    # gpt-image-2 accepts a list of images; first = source, second = reference
-    src_buf.seek(0)
-    ref_buf.seek(0)
-    kwargs['image'] = [
-        ('source.png', src_buf, 'image/png'),
-        ('reference.png', ref_buf, 'image/png'),
-    ]
-
-result = client.images.edit(**kwargs)
-if not result.data or not result.data[0].b64_json:
-    print('ERROR: no image data in response', file=sys.stderr)
+try:
+    resp = urllib.request.urlopen(req, timeout=120)
+    resp_data = json.loads(resp.read())
+except urllib.error.HTTPError as e:
+    err_body = json.loads(e.read().decode())
+    print('ERROR: ' + err_body.get('error', {}).get('message', str(e)), file=sys.stderr)
     sys.exit(1)
 
-result_bytes = base64.b64decode(result.data[0].b64_json)
+b64_result = resp_data['data'][0].get('b64_json', '')
+if not b64_result:
+    print('ERROR: no b64_json in response', file=sys.stderr)
+    sys.exit(1)
+
+result_bytes = base64.b64decode(b64_result)
 img_result = Image.open(io.BytesIO(result_bytes)).convert('RGB')
 print(f'[OPENAI RENDER] output {img_result.width}x{img_result.height} ({out_size})', file=sys.stderr)
 
 # Upscale to ~2x for consistent sizing with Gemini pipeline
 _target_w = max(img_result.width * 2, 1920)
 if img_result.width < _target_w:
-    _ratio = _target_w / img_result.width
+    _ratio    = _target_w / img_result.width
     _target_h = int(img_result.height * _ratio)
     img_result = img_result.resize((_target_w, _target_h), Image.LANCZOS)
+    print(f'[OPENAI RENDER] upscaled to {_target_w}px', file=sys.stderr)
 
 img_result.save(out_path, 'WEBP', quality=92)
 
@@ -8926,8 +8933,8 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
                 err = 'API key does not have permission — check key scopes in Google AI Studio'
             elif 'insufficient_quota' in raw or 'billing' in raw.lower():
                 err = 'OpenAI quota exceeded — check billing at platform.openai.com'
-            elif 'organization_verification' in raw or 'org_verification' in raw:
-                err = 'OpenAI org verification required for gpt-image-2 — see platform.openai.com/settings'
+            elif 'verified' in raw.lower() and 'organization' in raw.lower():
+                err = 'OpenAI org verification required — go to platform.openai.com/settings/organization/general and click Verify Organization'
             else:
                 err = raw.split('\n')[-1] or raw[:200]
             return jsonify({'error': err}), 500

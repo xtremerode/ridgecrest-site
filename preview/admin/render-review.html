@@ -170,7 +170,7 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
       <button id="btn-rerender">↺ Re-render</button>
       <div id="model-toggle">
         <button class="model-btn active" id="btn-model-gemini">Gemini</button>
-        <button class="model-btn" id="btn-model-openai">GPT Image 2</button>
+        <button class="model-btn" id="btn-model-openai">GPT Image 1</button>
       </div>
       <a id="surgical-link" href="/view/admin/pages.html" target="_blank">Surgical Edit ↗</a>
     </div>
@@ -558,7 +558,7 @@ async function doRerender() {
       });
     }
     buildFilmstrip(c);
-    const modelLabel = (result.render_model || renderModel) === 'openai' ? 'GPT Image 2' : 'Gemini';
+    const modelLabel = (result.render_model || renderModel) === 'openai' ? 'GPT Image 1' : 'Gemini';
     showActionStatus(true, `✓ New render ready (${modelLabel})`);
     setControlsEnabled(true);
   } catch(e) {
