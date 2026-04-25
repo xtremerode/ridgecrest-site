@@ -668,7 +668,7 @@ def _ensure_feature_locks_table(cur):
             ('server-webp',       'WebP Conversion',              'Server',    'development', '_to_webp() — converts uploaded images to WebP with responsive sizes'),
             ('server-db',         'Database Connection Layer',    'Server',    'development', '_db_conn(), _DB_URL, connection hygiene'),
             ('server-auth',       'Auth / Token System',          'Server',    'development', '_require_admin(), _valid_token(), admin_sessions table'),
-            ('server-rerender',   'AI Re-render (Gemini)',        'Server',    'development', '/admin/api/images/rerender — gemini-3.1-flash-image-preview'),
+            ('server-rerender',   'AI Re-render (Gemini)',        'Server',    'development', '/admin/api/images/rerender — gemini-3-pro-image-preview'),
             ('server-routes',     'Static File Routes',           'Server',    'development', '/view/<path>, /assets/, /migrate_*.bat routes'),
             # Frontend
             ('frontend-gallery',  'gallery.js',                   'Frontend',  'development', 'preview/js/gallery.js — do not modify without testing masonry'),
@@ -8611,7 +8611,7 @@ contents_parts.append(types.Part(text=prompt))
 
 client = genai.Client(api_key=api_key)
 response = client.models.generate_content(
-    model='models/gemini-3.1-flash-image-preview',
+    model='models/gemini-3-pro-image-preview',
     contents=contents_parts,
     config=types.GenerateContentConfig(response_modalities=['IMAGE', 'TEXT'])
 )
@@ -8728,7 +8728,7 @@ print(f'[SURGICAL] master={master_w}x{master_h} patch={actual_w}x{actual_h} at (
 # contain adjacent material information the model can match against.
 client = genai.Client(api_key=api_key)
 response = client.models.generate_content(
-    model='models/gemini-3.1-flash-image-preview',
+    model='models/gemini-3-pro-image-preview',
     contents=[
         types.Part(inline_data=types.Blob(mime_type='image/png', data=patch_bytes)),
         types.Part(text=prompt)
@@ -8782,10 +8782,10 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
 """
 
     script_openai = r"""
-import sys, os, base64, json, io
+import sys, os, base64, io
 sys.path.insert(0, '/home/claudeuser/.local/lib/python3.12/site-packages')
+from openai import OpenAI
 from PIL import Image
-import urllib.request
 
 api_key  = sys.argv[1]
 src_path = sys.argv[2]
@@ -8793,28 +8793,27 @@ out_path = sys.argv[3]
 prompt   = sys.argv[4]
 ref_path = sys.argv[5] if len(sys.argv) > 5 else ''
 
-# Convert source to PNG (WebP not guaranteed as input). Cap at 2048px for cost efficiency.
+# gpt-image-2 images.edit — convert source to PNG (WebP input not guaranteed)
 with Image.open(src_path) as img:
     img_rgb = img.convert('RGB')
+    # Downscale to max 2048px for input — keeps cost down, quality is maintained
     img_rgb.thumbnail((2048, 2048), Image.LANCZOS)
     src_buf = io.BytesIO()
     img_rgb.save(src_buf, 'PNG')
-    src_b64 = base64.b64encode(src_buf.getvalue()).decode()
+    src_buf.seek(0)
 
-# Build images array — gpt-image-1 JSON edit format: [{image_url: "data:..."}]
-images_arr = [{'image_url': f'data:image/png;base64,{src_b64}'}]
-
+# Optional reference image — also convert to PNG
+ref_buf = None
 if ref_path and os.path.isfile(ref_path):
     with Image.open(ref_path) as ref_img:
         ref_rgb = ref_img.convert('RGB')
         ref_rgb.thumbnail((1024, 1024), Image.LANCZOS)
         ref_buf = io.BytesIO()
         ref_rgb.save(ref_buf, 'PNG')
-        ref_b64 = base64.b64encode(ref_buf.getvalue()).decode()
-    images_arr.append({'image_url': f'data:image/png;base64,{ref_b64}'})
+        ref_buf.seek(0)
     print('[OPENAI RENDER] reference image included', file=sys.stderr)
 
-# Determine output size from source aspect ratio
+# Determine best output size for this image's aspect ratio
 ar = img_rgb.width / img_rgb.height
 if ar >= 1.3:
     out_size = '1536x1024'
@@ -8823,33 +8822,27 @@ elif ar <= 0.77:
 else:
     out_size = '1024x1024'
 
-# Raw JSON POST — gpt-image-1 requires JSON body (not multipart) for image editing
-payload = json.dumps({
-    'model':  'gpt-image-1',
-    'prompt': prompt,
-    'images': images_arr,
-    'size':   out_size,
-    'n':      1,
-}).encode()
-
-req = urllib.request.Request(
-    'https://api.openai.com/v1/images/edits',
-    data=payload,
-    headers={
-        'Authorization':  f'Bearer {api_key}',
-        'Content-Type':   'application/json',
-    },
-    method='POST',
+client = OpenAI(api_key=api_key)
+kwargs = dict(
+    model='gpt-image-2',
+    image=('source.png', src_buf, 'image/png'),
+    prompt=prompt,
+    size=out_size,
+    quality='high',
+    output_format='png',
+    n=1,
 )
-try:
-    resp = urllib.request.urlopen(req, timeout=120)
-    resp_data = json.loads(resp.read())
-except urllib.error.HTTPError as e:
-    err_body = json.loads(e.read().decode())
-    print('ERROR: ' + err_body.get('error', {}).get('message', str(e)), file=sys.stderr)
-    sys.exit(1)
+if ref_buf:
+    # gpt-image-2 accepts a list of images; first = source, second = reference
+    src_buf.seek(0)
+    ref_buf.seek(0)
+    kwargs['image'] = [
+        ('source.png', src_buf, 'image/png'),
+        ('reference.png', ref_buf, 'image/png'),
+    ]
 
-b64_result = resp_data['data'][0].get('b64_json', '')
+response = client.images.edit(**kwargs)
+b64_result = response.data[0].b64_json
 if not b64_result:
     print('ERROR: no b64_json in response', file=sys.stderr)
     sys.exit(1)
