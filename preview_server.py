@@ -1555,6 +1555,8 @@ _CARD_EDIT_OVERLAY_TPL = """\
   }}
 
   function _doSaveCard(cardId, state) {{
+    // Gallery items are owned by the gallery DB — never write card_settings for them
+    if (cardId.indexOf('-gal-') !== -1) return;
     fetch('/admin/api/cards/' + encodeURIComponent(SLUG) + '/' + encodeURIComponent(cardId), {{
       method: 'PUT',
       headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
@@ -1674,8 +1676,8 @@ _CARD_EDIT_OVERLAY_TPL = """\
     var isGalleryItem = el.hasAttribute('data-src');
     var state = JSON.parse(JSON.stringify(getState(cardId)));
 
-    // For gallery items with no saved state, initialize from the current img src
-    if (isGalleryItem && state.mode === 'color') {{
+    // Gallery items: always use data-src — never trust card_settings (Browse All corruption fix)
+    if (isGalleryItem) {{
       state.mode = 'image';
       state.image = el.getAttribute('data-src') || null;
     }}
@@ -1795,7 +1797,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
     if (!isGalleryItem) pill.appendChild(colorBtn);
     if (!isGalleryItem) pill.appendChild(imgBtn);
     pill.appendChild(browseCardBtn); // [PX] available for all including gallery
-    if (!isGalleryItem) pill.appendChild(rotateBtn);
+    pill.appendChild(rotateBtn); // rotate available for all cards including gallery items
     pill.appendChild(cardBackBtn); // [PX] available for all including gallery
     cardBackBtn.style.display = 'none'; // [PX] start hidden, show on forward cycle
     pill.appendChild(renderBtn);
@@ -2055,19 +2057,26 @@ _CARD_EDIT_OVERLAY_TPL = """\
 
     renderBtn.addEventListener('click', function(e) {{
       e.stopPropagation(); e.preventDefault();
-      var imgPath = state.image || (isGalleryItem ? el.getAttribute('data-src') : null);
+      // Gallery items: always use data-src (never stale card_settings state)
+      var imgPath = isGalleryItem ? el.getAttribute('data-src') : (state.image || null);
       if (!imgPath) return;
       var f = imgPath.split('?')[0].split('/').pop();
-      var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp');
+      // Strip AI version suffix AND size suffix to get the base _mv2.webp filename
+      var base = f.replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp')
+                  .replace(/_(?:1920|960|480|201)w\.webp$/, '.webp');
       if (!base) return;
       window.parent.postMessage({{type:'rd_open_render', cardId:cardId, filename:base}}, window.location.origin);
     }});
 
     rotateBtn.addEventListener('click', function(e) {{
       e.stopPropagation(); e.preventDefault();
-      if (!state.image) return;
-      var url = state.image.split('?')[0];
-      var fname = url.split('/').pop();
+      // Gallery items: use data-src as rotation source; normalize to base _mv2.webp
+      var rotateSource = isGalleryItem ? (el.getAttribute('data-src') || '') : (state.image || '');
+      if (!rotateSource) return;
+      var url = rotateSource.split('?')[0];
+      var fname = url.split('/').pop()
+                    .replace(/_ai_\d+(?:_\d+w)?\.webp$/, '.webp')
+                    .replace(/_(?:1920|960|480|201)w\.webp$/, '.webp');
       if (!fname) return;
       rotateBtn.textContent = '\u21bb\u2026';
       rotateBtn.disabled = true;
@@ -2078,9 +2087,15 @@ _CARD_EDIT_OVERLAY_TPL = """\
       }}).then(function(r) {{ return r.json(); }}).then(function(d) {{
         if (d.ok) {{
           var ts = '?v=' + Date.now();
-          state.image = url + ts;
-          applyStyle(el, state);
-          saveCard(cardId, state);
+          if (isGalleryItem) {{
+            // Reload gallery image in-place from data-src (cache-busted)
+            var img = el.querySelector('img[data-gallery-src]') || el.querySelector('img');
+            if (img) {{ img.src = (img.getAttribute('data-gallery-src') || img.src).split('?')[0] + ts; }}
+          }} else {{
+            state.image = url + ts;
+            applyStyle(el, state);
+            saveCard(cardId, state);
+          }}
         }}
         rotateBtn.textContent = '\u21bb';
         rotateBtn.disabled = false;

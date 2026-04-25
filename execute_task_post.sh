@@ -110,7 +110,7 @@ with open('$PLAYWRIGHT_AFTER_LOG', 'w') as f:
 # Compare before vs after — flag any new failures
 REGRESSIONS=0
 if [ -f "$PLAYWRIGHT_BEFORE" ] && [ -f "$PLAYWRIGHT_AFTER_LOG" ]; then
-  REGRESSIONS=$($PYTHON - <<'PYEOF'
+  REGRESSIONS=$($PYTHON - "$PLAYWRIGHT_BEFORE" "$PLAYWRIGHT_AFTER_LOG" 2>>"$LOG_FILE" <<'PYEOF'
 import json, sys
 before_path = sys.argv[1] if len(sys.argv) > 1 else ""
 after_path  = sys.argv[2] if len(sys.argv) > 2 else ""
@@ -130,7 +130,7 @@ if new_fails:
 else:
     print(0)
 PYEOF
-  "$PLAYWRIGHT_BEFORE" "$PLAYWRIGHT_AFTER_LOG" 2>>"$LOG_FILE")
+)
 fi
 
 if [ "$REGRESSIONS" -gt 0 ]; then
