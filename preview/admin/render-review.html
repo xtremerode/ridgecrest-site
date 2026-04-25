@@ -35,8 +35,12 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
 #viewer{flex:1;display:flex;min-height:0;display:none}
 .panel{flex:1;display:flex;flex-direction:column;min-width:0}
 #orig-panel{border-right:1px solid #1e3040}
-.panel-label{padding:6px 0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b8fa6;background:#091520;border-bottom:1px solid #1e3040;flex-shrink:0;text-align:center}
+.panel-label{padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b8fa6;background:#091520;border-bottom:1px solid #1e3040;flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:8px}
 .render-label{color:#3b82f6}
+.rotate-btns{display:flex;gap:3px;margin-left:6px}
+.rot-btn{background:#152030;color:#6b8fa6;border:1px solid #2a4050;border-radius:5px;padding:2px 7px;font-size:14px;line-height:1.4;cursor:pointer;transition:all .15s}
+.rot-btn:hover:not(:disabled){background:#243848;color:#e8eef2;border-color:#3b82f6}
+.rot-btn:disabled{opacity:.35;cursor:not-allowed}
 .panel-img-wrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#091520;position:relative}
 .panel-img-wrap img{max-width:100%;max-height:100%;object-fit:contain;transition:opacity .2s}
 #render-spinner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:40px;height:40px;border:3px solid #1e3040;border-top-color:#3b82f6;border-radius:50%;animation:spin .65s linear infinite;display:none}
@@ -145,13 +149,25 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
 
 <div id="viewer">
   <div class="panel" id="orig-panel">
-    <div class="panel-label">Original</div>
+    <div class="panel-label">
+      Original
+      <div class="rotate-btns">
+        <button class="rot-btn" id="btn-rot-orig-ccw" title="Rotate original 90&deg; CCW" disabled>↺</button>
+        <button class="rot-btn" id="btn-rot-orig-cw"  title="Rotate original 90&deg; CW"  disabled>↻</button>
+      </div>
+    </div>
     <div class="panel-img-wrap">
       <img id="orig-img" src="" alt="Original image" />
     </div>
   </div>
   <div class="panel" id="render-panel">
-    <div class="panel-label render-label">AI Render</div>
+    <div class="panel-label render-label">
+      AI Render
+      <div class="rotate-btns">
+        <button class="rot-btn" id="btn-rot-render-ccw" title="Rotate render 90&deg; CCW" disabled>↺</button>
+        <button class="rot-btn" id="btn-rot-render-cw"  title="Rotate render 90&deg; CW"  disabled>↻</button>
+      </div>
+    </div>
     <div class="panel-img-wrap">
       <img id="render-img" src="" alt="AI render" />
       <div id="render-spinner"></div>
@@ -262,6 +278,10 @@ const refLoaded      = document.getElementById('ref-loaded');
 const refThumb       = document.getElementById('ref-thumb');
 const refLoadedName  = document.getElementById('ref-loaded-name');
 const refClearBtn    = document.getElementById('ref-clear-btn');
+const btnRotOrigCCW    = document.getElementById('btn-rot-orig-ccw');
+const btnRotOrigCW     = document.getElementById('btn-rot-orig-cw');
+const btnRotRenderCCW  = document.getElementById('btn-rot-render-ccw');
+const btnRotRenderCW   = document.getElementById('btn-rot-render-cw');
 
 // ── Init: load queue from server ──────────────────────────────────────────────
 async function init() {
@@ -335,8 +355,10 @@ function renderCard(i) {
   // Prompt
   promptTA.value = c.prompt || '';
 
-  // Set It disabled if render missing
+  // Set It and render-rotate buttons disabled if render missing
   btnSet.disabled = !c.render_exists;
+  btnRotRenderCCW.disabled = !c.render_exists;
+  btnRotRenderCW.disabled  = !c.render_exists;
 
   // Surgical edit link
   surgicalLink.href = '/view/admin/pages.html';
@@ -359,14 +381,18 @@ function renderCard(i) {
 }
 
 function setControlsEnabled(on) {
-  btnSet.disabled       = !on || !CARDS[idx]?.render_exists;
-  btnSkip.disabled      = !on;
-  btnRerender.disabled  = !on;
-  btnSrcOrig.disabled   = !on;
-  btnSrcRender.disabled = !on;
+  btnSet.disabled         = !on || !CARDS[idx]?.render_exists;
+  btnSkip.disabled        = !on;
+  btnRerender.disabled    = !on;
+  btnSrcOrig.disabled     = !on;
+  btnSrcRender.disabled   = !on;
   btnModelGemini.disabled = !on;
   btnModelOpenAI.disabled = !on;
-  btnBack.disabled      = !on || history.length === 0;
+  btnBack.disabled        = !on || history.length === 0;
+  btnRotOrigCCW.disabled    = !on;
+  btnRotOrigCW.disabled     = !on;
+  btnRotRenderCCW.disabled  = !on || !CARDS[idx]?.render_exists;
+  btnRotRenderCW.disabled   = !on || !CARDS[idx]?.render_exists;
   if (on) {
     renderSpinner.style.display = 'none';
     renderImg.style.opacity = '1';
@@ -382,6 +408,61 @@ function showActionStatus(ok, msg) {
     actionStatus.style.display = 'none';
   }, 2200);
 }
+
+// ── Rotate helpers ────────────────────────────────────────────────────────────
+async function rotateImage(filename, degrees) {
+  try {
+    const r = await fetch('/admin/api/images/rotate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': TOKEN },
+      body: JSON.stringify({ filename, degrees })
+    });
+    const result = await r.json();
+    if (!result.ok) throw new Error(result.error || 'Rotate failed');
+    return true;
+  } catch(e) {
+    showActionStatus(false, '✗ ' + e.message);
+    return false;
+  }
+}
+
+function allRotBtns() { return [btnRotOrigCCW, btnRotOrigCW, btnRotRenderCCW, btnRotRenderCW]; }
+
+async function handleRotateOrig(degrees) {
+  const c = CARDS[idx];
+  if (!c) return;
+  allRotBtns().forEach(b => b.disabled = true);
+  const ok = await rotateImage(c.base_file, degrees);
+  if (ok) {
+    origImg.src = `/assets/images-opt/${c.base_file.replace('.webp', '_1920w.webp')}?t=${Date.now()}`;
+    showActionStatus(true, (degrees < 0 ? '↺' : '↻') + ' Original rotated — re-render to update AI result');
+  }
+  setControlsEnabled(true);
+}
+
+async function handleRotateRender(degrees) {
+  const c = CARDS[idx];
+  if (!c || !filmVersions.length) return;
+  const cur = filmVersions.find(v => v.filename === c.render_file) || filmVersions[filmVersions.length - 1];
+  if (!cur) return;
+  allRotBtns().forEach(b => b.disabled = true);
+  const ok = await rotateImage(cur.filename, degrees);
+  if (ok) {
+    const stem = cur.filename.replace('.webp', '');
+    const ts = Date.now();
+    renderImg.src = `/assets/images-opt/${stem}_1920w.webp?t=${ts}`;
+    // Update filmstrip thumb cache-buster for this version
+    cur.thumb_path = `/assets/images-opt/${stem}_201w.webp?t=${ts}`;
+    buildFilmstrip(c);
+    showActionStatus(true, (degrees < 0 ? '↺' : '↻') + ' Render rotated');
+  }
+  setControlsEnabled(true);
+}
+
+btnRotOrigCCW.addEventListener('click',   () => handleRotateOrig(-90));
+btnRotOrigCW.addEventListener('click',    () => handleRotateOrig(90));
+btnRotRenderCCW.addEventListener('click', () => handleRotateRender(-90));
+btnRotRenderCW.addEventListener('click',  () => handleRotateRender(90));
 
 // ── API helpers ───────────────────────────────────────────────────────────────
 async function apiPut(slug, cardId, imageFile, pos, zoom) {

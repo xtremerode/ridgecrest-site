@@ -34,6 +34,8 @@ Intentionally excluded from Playwright overlay tests (no card edit overlay):
     rerender path, no interactive card overlay UI surface; gpt-image-1 + quality='high'
     via OpenAI SDK (gpt-image-2 requires org verification, not available on this account);
     Gemini upgraded to gemini-3-pro-image-preview; no card overlay UI surface
+  - rotate buttons in render-review.html   ↺↻ CW/CCW rotate for original and render panels —
+    admin-only tool, calls existing /admin/api/images/rotate endpoint; no card overlay surface
   - _RENDER_INDEX_LOCK / stub reservation   threading lock around _ai_N index allocation —
     server-side race-condition fix for concurrent auto-renders; no UI surface
   - glob-based AI render scan in admin_image_versions + admin_image_rerender — replaces
