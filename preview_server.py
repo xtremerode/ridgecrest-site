@@ -8959,12 +8959,13 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
             cur2 = conn2.cursor()
             _ensure_render_prompts_table(cur2)
             cur2.execute("""
-                INSERT INTO image_render_prompts (filename, prompt, source_filename)
-                VALUES (%s, %s, %s)
+                INSERT INTO image_render_prompts (filename, prompt, source_filename, render_model)
+                VALUES (%s, %s, %s, %s)
                 ON CONFLICT (filename) DO UPDATE
                     SET prompt = EXCLUDED.prompt,
-                        source_filename = EXCLUDED.source_filename
-            """, (out_filename, prompt, filename))
+                        source_filename = EXCLUDED.source_filename,
+                        render_model = EXCLUDED.render_model
+            """, (out_filename, prompt, filename, render_model))
             conn2.commit()
         except Exception:
             conn2.rollback()
@@ -9139,7 +9140,7 @@ def admin_image_versions(filename):
             # Fetch prompts by exact filename — avoids LIKE wildcard issues with underscores
             if ai_fnames:
                 cur.execute("""
-                    SELECT filename, prompt, source_filename
+                    SELECT filename, prompt, source_filename, render_model
                     FROM image_render_prompts
                     WHERE filename = ANY(%s)
                 """, (ai_fnames,))
@@ -9147,6 +9148,7 @@ def admin_image_versions(filename):
                     prompts_by_file[row['filename']] = {
                         'prompt': row['prompt'],
                         'source_filename': row.get('source_filename'),
+                        'render_model': row.get('render_model'),
                     }
         except Exception:
             pass
@@ -9215,6 +9217,7 @@ def admin_image_versions(filename):
             'is_active':       active_version == ai_fname,
             'prompt':          p.get('prompt'),
             'source_filename': p.get('source_filename'),
+            'render_model':    p.get('render_model'),
             'dimensions':      _dims(ai_fname),
         })
 
@@ -10169,9 +10172,15 @@ def _ensure_render_prompts_table(cur):
             filename        TEXT PRIMARY KEY,
             prompt          TEXT NOT NULL,
             source_filename TEXT,
+            render_model    TEXT,
             created_at      TIMESTAMPTZ DEFAULT NOW()
         )
     """)
+    # Add render_model column to existing tables that predate it
+    try:
+        cur.execute("ALTER TABLE image_render_prompts ADD COLUMN IF NOT EXISTS render_model TEXT")
+    except Exception:
+        pass
 
 def _ensure_image_labels_table(cur):
     cur.execute("""

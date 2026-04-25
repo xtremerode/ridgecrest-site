@@ -110,7 +110,7 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
 #filmstrip{height:84px;overflow-x:auto;overflow-y:hidden;display:flex;gap:6px;padding:6px 10px;background:#061018;border-top:1px solid #1e3040;flex-shrink:0;align-items:center;min-width:0;scrollbar-width:thin;scrollbar-color:#1e3040 #061018}
 #filmstrip:empty{display:none}
 .fs-thumb{flex-shrink:0;width:76px;height:64px;border-radius:5px;border:2px solid #1e3040;cursor:pointer;overflow:hidden;position:relative;background:#091520;transition:border-color .15s}
-.fs-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.fs-thumb img{width:100%;height:100%;object-fit:contain;display:block;background:#091520}
 .fs-thumb.fs-selected{border-color:#3b82f6;box-shadow:0 0 0 1px #3b82f6}
 .fs-thumb:hover:not(.fs-selected){border-color:#2a4050}
 .fs-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.7);color:#94a3b8;font-size:10px;font-weight:700;text-align:center;padding:2px 0;pointer-events:none;letter-spacing:.04em}
@@ -714,7 +714,7 @@ async function loadFilmstrip(cardIdx) {
     filmActiveLive = d.active_version || '';
     filmVersions = (d.versions || [])
       .filter(v => !v.is_original)
-      .map(v => ({ filename: v.filename, thumb_path: v.thumb_path, hero_path: v.hero_path }));
+      .map(v => ({ filename: v.filename, thumb_path: v.thumb_path, hero_path: v.hero_path, render_model: v.render_model }));
 
     // Look-ahead may have pre-rendered something — update card state so panel shows it
     if (filmVersions.length > 0 && !c.render_exists && idx === cardIdx) {

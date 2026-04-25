@@ -40,6 +40,10 @@ Intentionally excluded from Playwright overlay tests (no card edit overlay):
     server-side race-condition fix for concurrent auto-renders; no UI surface
   - glob-based AI render scan in admin_image_versions + admin_image_rerender — replaces
     sequential while-loop scan; handles gaps from failed-render stub cleanup correctly
+  - render_model column in image_render_prompts + versions endpoint — DB stores model per
+    render; endpoint returns it; filmVersions JS map includes it; admin-only, no card overlay
+  - filmstrip object-fit:contain — portrait AI renders in landscape thumbnail box show full
+    image with dark bg instead of cropped center band; admin render-review.html only
 
 Exports: run(fix=False) -> List[Dict]
 """
