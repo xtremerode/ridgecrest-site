@@ -1,7 +1,0 @@
-run_id=run_20260425_155209
-timestamp=20260425_155209
-features=server-rerender
-dump_file=/home/claudeuser/agent/backups/pre_task_20260425_155209.sql
-baseline_commit=c403d0d99955e391a0b90a0e6e2cdc3987dc9900
-playwright_before=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260425_155209_playwright_before.json
-log_pre=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260425_155209_pre.log
