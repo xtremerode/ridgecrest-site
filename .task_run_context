@@ -1,7 +1,0 @@
-run_id=run_20260425_044231
-timestamp=20260425_044231
-features=qa-precommit-coverage
-dump_file=/home/claudeuser/agent/backups/pre_task_20260425_044231.sql
-baseline_commit=e5d84a180febfdbe8fd001a938359e673149f57d
-playwright_before=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260425_044231_playwright_before.json
-log_pre=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260425_044231_pre.log

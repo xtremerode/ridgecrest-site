@@ -131,7 +131,7 @@ cat /home/claudeuser/agent/ridgecrest-agency/CURRENT_STATUS.md && cat /home/clau
 
 **Pre-phase gates:** concurrent run check → feature lock check → pg_dump + binary asset backup → baseline git commit → Playwright before
 
-**Post-phase gates:** server health → Playwright after (regression diff) → git commit + 197-check QA gate → git push → audit log
+**Post-phase gates:** server health → Gate 2 infra tests (`test_infra.py`: 17 tests, fires every hook with exact Claude Code stdin JSON format) → Playwright after (regression diff) → git commit + 197-check QA gate → git push → audit log
 
 **Enforcement:** `pre` writes `.task_run_context` — `post` refuses to run without it. Features re-locked via `trap` on any exit including crash. Audit log at `ridgecrest-agency/execution_logs/`.
 
@@ -147,6 +147,8 @@ When a guardrail execution touches a code path, `visual_overlay_agent.py` MUST i
 
 **Before running post-phase:** list every element/function modified → confirm a test exists for each → add missing tests NOW.
 
+**Enforced by pre-commit hook:** `_check_playwright_coverage()` in `web_dev_orchestrator.py` is a CRITICAL gate — blocks commit if `preview_server.py`, `main.js`, `gallery.js`, or `lightbox.js` is staged without `visual_overlay_agent.py` also staged. Bypass only with `--no-verify` + commit note explaining why.
+
 ---
 
 ## Known Open Gaps
@@ -157,7 +159,7 @@ When a guardrail execution touches a code path, `visual_overlay_agent.py` MUST i
 4. **Admin panel SSL:** Accessible via IP only; no subdomain/SSL — deferred
 5. **2 Pleasanton Custom images blocked by Wix CDN:** `ff5b18_98f97a76` and `ff5b18_c5cb0ea7` — return 403. Must be recovered from Wix media library manually.
 6. **Tonya Wilson headshot** (team-member-9) — needs re-upload
-7. **All AI renders** — lost in filter-repo disaster, must be redone via ✨ Render button
+7. **AI render history** — 117 of 124 history-log renders lost in filter-repo disaster (alternates never set as active). The 3 renders actively set in `card_settings` (services hero, orinda-kitchen, pleasanton-cottage-kitchen) **survived** in `images-opt/` — no live page is broken. Future Render clicks will lose history comparison but display is fine.
 8. **services.html and team.html hero restructure** — still pending (reverted 2026-04-16)
 9. **pre-commit hook python path** — system `python3` has Playwright; venv does NOT. Fix pending in `.git/hooks/pre-commit`
 
