@@ -102,3 +102,10 @@ Must be placed **after** all text-align rules in `main.css`. See §46 in `CLAUDE
 - Files save to: `/home/claudeuser/agent/downloads/screenshot_001.jpg`, `_002.jpg`, etc.
 - Claude reads directly: `Read("/home/claudeuser/agent/downloads/screenshot_001.jpg")`
 - **When Henry says a 3-digit number (e.g. "001"):** read that file directly — do NOT fetch via URL
+
+
+---
+
+## Agent-Added Rules
+
+- Concurrent render race condition: when admin_image_rerender runs in parallel, use _RENDER_INDEX_LOCK mutex around the _ai_N index allocation and touch a stub file to reserve the slot before spawning the Gemini subprocess. On failure, clean up the stub if it is zero bytes. This prevents two concurrent render requests from claiming the same version index.
