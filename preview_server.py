@@ -9610,10 +9610,22 @@ def admin_renders_review_queue():
                 is_active = '_ai_' in active_v
                 is_approved = approval is not None
 
+                # Show the active version in the panel on load (not just the latest render)
+                if active_v:
+                    display_render = active_v
+                    active_1920 = active_v.replace('.webp', '_1920w.webp')
+                    display_render_exists = (
+                        os.path.isfile(os.path.join(opt_dir, active_1920)) or
+                        os.path.isfile(os.path.join(opt_dir, active_v))
+                    )
+                else:
+                    display_render = render_file
+                    display_render_exists = render_exists
+
                 results.append({
                     'label':         label,
                     'base_file':     base_file,
-                    'render_file':   render_file,
+                    'render_file':   display_render,
                     'prompt':        prompt,
                     'page_url':      page_url,
                     'publish':       [slug],
@@ -9621,7 +9633,7 @@ def admin_renders_review_queue():
                     'note':          None,
                     'is_approved':   is_approved,
                     'is_active':     is_active,
-                    'render_exists': render_exists,
+                    'render_exists': display_render_exists,
                     'approved_at':   approval['approved_at'].isoformat() if (approval and approval.get('approved_at')) else None,
                     'surgical_ok':   True,
                 })
@@ -9651,10 +9663,24 @@ def admin_renders_review_queue():
                 is_approved = approval is not None
                 card_label = card_id.replace('-', ' ').title()
 
+                # Show the active version in the panel on load (not just the latest render)
+                if is_active:
+                    img_base = cur_img.split('/')[-1]
+                    img_base = re.sub(r'_(201|480|960|1920)w\.webp$', '.webp', img_base)
+                    display_render = img_base
+                    active_1920 = img_base.replace('.webp', '_1920w.webp')
+                    display_render_exists = (
+                        os.path.isfile(os.path.join(opt_dir, active_1920)) or
+                        os.path.isfile(os.path.join(opt_dir, img_base))
+                    )
+                else:
+                    display_render = render_file
+                    display_render_exists = render_exists
+
                 results.append({
                     'label':         card_label,
                     'base_file':     base_file,
-                    'render_file':   render_file,
+                    'render_file':   display_render,
                     'prompt':        prompt,
                     'page_url':      page_url,
                     'publish':       [page_slug],
@@ -9663,7 +9689,7 @@ def admin_renders_review_queue():
                     'note':          None,
                     'is_approved':   is_approved,
                     'is_active':     is_active,
-                    'render_exists': render_exists,
+                    'render_exists': display_render_exists,
                     'approved_at':   approval['approved_at'].isoformat() if (approval and approval.get('approved_at')) else None,
                     'surgical_ok':   True,
                 })
