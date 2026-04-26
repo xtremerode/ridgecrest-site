@@ -620,23 +620,12 @@ async function doSet() {
   }
 }
 
-// ── Back (undo last Set) ──────────────────────────────────────────────────────
-async function doBack() {
+// ── Back (navigate to previous card — does NOT undo Set) ─────────────────────
+function doBack() {
   if (!history.length) return;
-  setControlsEnabled(false);
-  const entry = history[history.length - 1];
-  try {
-    await restoreSnapshot(entry.snaps);
-    history.pop();
-    // Revert local card state
-    const prevCard = CARDS[entry.idx];
-    if (prevCard) { prevCard.is_approved = entry.prevApproved; }
-    setCount = Math.max(0, setCount - 1);
-    renderCard(entry.idx);
-  } catch(e) {
-    showActionStatus(false, '✗ Undo failed: ' + e.message);
-    setControlsEnabled(true);
-  }
+  const entry = history.pop();
+  setCount = Math.max(0, setCount - 1);
+  renderCard(entry.idx);
 }
 
 // ── Re-render ─────────────────────────────────────────────────────────────────
