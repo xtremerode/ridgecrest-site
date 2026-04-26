@@ -179,6 +179,22 @@ Standalone AI photo color grading app at `/home/claudeuser/photo_studio/` — po
 
 ---
 
+## Research Verification Enforcement (Hooks)
+
+Analysis/diagnosis/planning responses are gated by three hooks in `.claude/settings.local.json`:
+
+1. **`UserPromptSubmit`** (`hooks/detect_analysis_request.sh`) — detects keywords ("tell me how", "why it happened", "root cause", "diagnose", etc.) and sets a timestamped `/tmp/rd_analysis_pending_<session>` flag. Clears any prior research_done marker so stale reads don't satisfy the check.
+
+2. **`PostToolUse(Read)`** (`hooks/log_file_read.sh`) — fires after every Read tool call. Writes a timestamped `/tmp/rd_research_done_<session>` marker and appends the file path to the session reads log.
+
+3. **`Stop`** (`hooks/check_research_done.sh`) — if `analysis_pending` exists and no `research_done` marker exists (or research_done predates analysis_pending), **exits 2** to block the response with: "RESEARCH REQUIRED: File reads predate this analysis question."
+
+**Why this exists**: 2026-04-26 — presented a full rotate-button diagnosis from session summary context without reading the actual source files. The summary line numbers and code snippets were from a prior Claude instance; no fresh reads were done. Three gaps were missed that only emerged when the code was actually read before the gap-check.
+
+**What this catches**: Any time an analysis/diagnosis question is asked and I attempt to respond without using the Read tool on relevant source files since the question was asked.
+
+---
+
 ## Agent-Added Rules
 
 - render_approved_state QA warning: the db_approved_state.py check in the post-phase QA gate prints 'Could not check render_approved_state: 0' — this is a WARN not a FAIL. Caused by db.get_db() context manager not being available in the standalone QA environment. Does not block commits.

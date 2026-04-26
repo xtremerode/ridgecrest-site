@@ -123,3 +123,7 @@ Must be placed **after** all text-align rules in `main.css`. See §46 in `CLAUDE
 - The screenshot paste endpoint is now native in preview_server.py (port 8081). Screenshots upload to /home/claudeuser/agent/downloads/screenshot_NNN.jpg. Files are compressed to 1920px JPEG on upload. Naming is sequential per server restart. Henry tells Claude the filename (e.g. 001) and Claude reads it directly — no root process, no crashes on large files.
 
 - The render button bug: card_settings rows that store state.image as a _960w variant path (instead of the base path) cause setupCard to skip the data-src reset and the render button opens the wrong image. Fix is to delete stale card_settings rows for gallery items (they should not have a saved state.image at all) and fix setupCard to always reset state.image from data-src for gallery items regardless of state.mode.
+
+- gallery_data.json gallery_count field must match the actual number of images for each project in the DB. Found multiple projects with stale counts after migration/audit work. gallery_count is shown on the portfolio page as the photo count badge.
+
+- When HTML project gallery files (pleasanton-custom.html, sierra-mountain-ranch.html, etc.) contain images pointing directly at Wix CDN URLs (https://static.wixstatic.com/media/...), always check if those images now exist locally at /assets/images-opt/ and update the HTML to use local paths with proper srcset. Wix CDN direct URLs in static HTML are fragile — they can return 403 from DO server IP during batch operations.

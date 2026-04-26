@@ -1,97 +1,62 @@
 # CURRENT_STATUS.md
 ## Ridgecrest Designs - Campaign Status
-### Last Updated: April 11, 2026 11:09 AM PDT
+### Last Updated: April 26, 2026
 
 ---
 
-## Google Ads - Perplexity Test One
+## Active Work: AI Render Recovery & Image Mapping
 
-- **Status**: ENABLED (Live)
-- **Campaign ID**: 23734851306
-- **Daily Budget**: $200/day
-- **Max CPC Bid**: $25 (all ad groups)
-- **Schedule**: 7 days/week with bid adjustments
-  - Fri/Sat/Sun/Mon: Full bid, +20% evening (6-10pm)
-  - Tue/Wed/Thu: -25% bid, full bid evening (6-10pm)
-- **Location Targeting**: 16 zip codes, PRESENCE only
-- **Martinez (94553)**: REMOVED April 11, 2026
+### Recovery Status (2026-04-26)
+- filter-repo disaster (2026-04-24) deleted 1,761 WebP variants from disk
+- Snapshot recovery complete: 171 base AI renders on disk (was 131, +40 recovered)
+- Temp droplet 209.38.153.220 DESTROYED — no further recovery possible from snapshot
+- 59 active versions set in DB — all files exist on disk with all variants
+- render-review.html queue: 62 cards, all "✦ Render Restored" — **Henry in progress reviewing**
 
-### Ad Groups (7) - Created April 11, 2026
-| Ad Group | Keywords | Status |
-|----------|----------|--------|
-| [PX] AG1 - Kitchen Remodeling | 27 | ENABLED |
-| [PX] AG2 - Bathroom Remodeling | 23 | ENABLED |
-| [PX] AG3 - Whole House and Home Remodel | 44 | ENABLED |
-| [PX] AG4 - Design-Build and Custom | 25 | ENABLED |
-| [PX] AG5 - Home Additions and ADU | 38 | ENABLED |
-| [PX] AG6 - Interior Design and Architecture | 42 | ENABLED |
-| [PX] AG7 - General Contractor and Neighborhood | 47 | ENABLED |
-| **TOTAL** | **246** | |
-
-### Keywords: 246 total (all broad match)
-- 88 generic/near-me keywords
-- 143 city-specific (11 patterns x 13 cities)
-- 15 neighborhood-specific (golf course/country club verified)
-- Full strategy doc: campaigns/keyword_strategy_final_2026_04_11.md
-
-### Negative Keywords: 198 (campaign-level, phrase match)
-- 10 categories covering job seekers, DIY, free/cheap/budget, education, wholesale/supplies, commercial/industrial, non-offered services, irrelevant remodeling, lead aggregators, brand safety
-- "affordable" included per Henry instruction
-
-### Cities Targeted (13):
-Walnut Creek, Danville, Pleasanton, San Ramon, Lafayette, Alamo, Moraga, Orinda, Dublin, Sunol, Blackhawk, Rossmoor, Diablo
-
-### Cities REMOVED:
-- Martinez (94553) - removed April 11, 2026, not target market
-
-### Neighborhoods Targeted (15):
-Blackhawk, Crow Canyon, Diablo, Round Hill, Ruby Hill, Castlewood, Happy Valley, Sleepy Hollow, Orinda Downs, Rossmoor, Rudgear Estates, Walnut Heights, Dougherty Valley, Gale Ranch, Canyon Lakes
-
-### Removed Campaigns:
-- Custom Home Builder | Google Search (ID: 23691180840) - removed April 11, 2026
-- Campaign #1 (Performance Max) - already removed
-- Demand Gen - 2026-03-09 - already removed
+### Render Review Tool Status
+- Back button: navigates without undoing Set ✓
+- Panel loads with active version on refresh ✓
+- Lightbox: click render to open full-screen ✓
+- Filter: "⚠ Re-render Only" button hides already-set cards ✓
 
 ---
 
-## Meta Ads
+## Open Action Items
 
-### [PX] Home Remodel - Hook 10
-- **Status**: ENABLED
-- **Campaign ID**: 6969359384893
-- **Budget**: $30/day
-- **PENDING**: Remove Martinez from targeting
+### HIGH — Requires Henry
+1. **3 missing Wix CDN images** — Wix blocks DO server IP (403), images not on server anywhere:
+   - `ff5b18_c5cb0ea7` → Pleasanton Custom photo 42 + Pleasanton Cottage Kitchen photo 4 (farmhouse sink close-up — different angle from hero)
+   - `ff5b18_98f97a76` → Pleasanton Custom photo 77 (construction section)
+   - `ff5b18_238b56fc` → Sierra Mountain Ranch photo 61 (.jpg format)
+   - **Fix**: download from Wix media library → upload via `migrate_missing_gallery_images.bat`
 
-### [PX] Custom Home Design-Build - Hook 3
-- **Status**: ENABLED
-- **Campaign ID**: 6969359386493
-- **Budget**: $30/day
-- **PENDING**: Remove Martinez from targeting
+2. **Continue render review queue** — 62 cards, tool working correctly, all showing active version on load
 
----
-
-## Pending Actions
-1. Remove Martinez from Meta Ads targeting
-2. Disable automatically created assets in Google Ads campaign settings (UI task)
-3. Link approved images to ad groups (UI task)
-4. Pull search terms report after 3-5 days of new keyword data
-5. Review ad group performance to identify which themes drive leads
-6. Build Master Playbook for Ridgecrest Marketing Agency
+### MEDIUM — DB Cleanup (no display artifact, serve-time handles it)
+- 67 `card_settings` records using `_mv2.webp` base path (should be `_960w`)
+- 139 `pages.hero_image` records using `_mv2.webp` base path (should be `_1920w`)
+- No visual regression — `_upgrade_card_images()` upgrades at serve time
 
 ---
 
-## Ridgecrest Marketing Agency (Business)
-- Business plan saved: competitors/turnkey_app_business_plan_2026_04_11.md
-- Task system initiated: TASK-001.md posted for Claude Code
-- Platform: Lovable (frontend) + DigitalOcean (backend/brain) + Supabase (auth/db)
-- Revenue model: Hybrid direct-to-user
+## Image Mapping Audit Results (2026-04-26)
+- `image_labels.active_version`: 59/59 clean — all files on disk with all size variants
+- `portfolio_projects.hero_img`: 18/18 using `_1920w` — clean
+- gallery `data-src`: 59 AI renders correctly wired, all match active_version in DB
+- QA gate updated to allow AI render base files in data-src (old rule was pre-AI-render era)
 
 ---
 
-## Rules (on server)
-- rules/AGENT_RULES.md - 10 core rules
-- rules/data_accuracy_rule.md - Rule 11
-- rules/script_delivery_rule.md - Rule 12 (scripts in chat only)
-- rules/fact_based_rule.md - Rule 13 (fact-based operations only)
-- rules/px_naming_rule.md - Rule 14 ([PX] prefix required)
-- rules/claude_code_guardrails.md - Rule 15 (safety guardrails for Claude Code)
+## Site Infrastructure
+- Server: 147.182.242.54:8081
+- Branch: ridgecrest-audit
+- Last commit: 3631a8a (2026-04-26)
+- All feature locks: locked
+- Pre-commit gate: 211 checks passing
+
+---
+
+## Agency / Campaigns
+- Google Ads: on hold pending Claude Co-Work evaluation
+- Meta Ads: status unchanged from prior sessions
+- Agency mode: check `ridgecrest-agency/agency_mode.txt`
