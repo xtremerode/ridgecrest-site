@@ -255,3 +255,10 @@ New Meta campaigns take 24–48h+ for ad review and learning phase. ACTIVE statu
 - Restrict all campaigns to the approved service areas in §12
 - All [RMA] Meta ad sets MUST use saved audience ID `6934900931693` with `advantage_audience=0`
 - Compliance agent auto-fix applies ONLY to `[RMA]` campaigns — never touch non-RMA campaigns
+
+
+---
+
+## Agent-Added Rules
+
+- NEVER run git filter-repo without first backing up all tracked image and asset files. git filter-repo rewrites git history AND simultaneously deletes those files from the working tree. To stop committing images going forward use .gitignore + git rm --cached, NOT filter-repo. Incident 2026-04-26: filter-repo deleted 1761 WebP variants and 61 original Wix source photos from disk. AI renders (not regeneratable from source) were also permanently lost.

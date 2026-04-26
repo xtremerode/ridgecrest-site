@@ -115,3 +115,11 @@ Must be placed **after** all text-align rules in `main.css`. See §46 in `CLAUDE
 - render-review.html (/view/admin/render-review.html) is the AI render re-do tool. Features: side-by-side Original+AI panel, editable prompt, filmstrip of all _ai_N versions, From-original/From-render source toggle, reference image upload, delete rejected renders, rotate buttons on both panels (CCW/CW), auto-render on arrival (Gemini+GPT), back button. 63 cards in queue. Set It = DB-only, does NOT delete source files.
 
 - Image quality degradation rule: If Gemini renders look cartoonish/non-photorealistic, check image_render_api.py for model version changes. Previously generated photorealistic renders using Gemini imagen; degraded output likely means model or prompt changed. Validate render quality matches 'real photo' standard before accepting.
+
+- When downloading Wix images via bat or ps1 script, ALWAYS include the Referer header: Referer: https://www.ridgecrestdesigns.com/ — without it, Wix CDN returns 403 Forbidden. Also check file extension: some Wix images are .png not .jpg. The working script pattern is in migrate_missing_gallery_images.ps1.
+
+- The gallery add-image upload endpoint had a bug: it returned 'already in gallery' without checking whether the actual file exists on disk, causing uploaded files to be silently dropped on retry. Fixed 2026-04-26 — server now saves the file if missing from disk even when hash is already in gallery_json.
+
+- The screenshot paste endpoint is now native in preview_server.py (port 8081). Screenshots upload to /home/claudeuser/agent/downloads/screenshot_NNN.jpg. Files are compressed to 1920px JPEG on upload. Naming is sequential per server restart. Henry tells Claude the filename (e.g. 001) and Claude reads it directly — no root process, no crashes on large files.
+
+- The render button bug: card_settings rows that store state.image as a _960w variant path (instead of the base path) cause setupCard to skip the data-src reset and the render button opens the wrong image. Fix is to delete stale card_settings rows for gallery items (they should not have a saved state.image at all) and fix setupCard to always reset state.image from data-src for gallery items regardless of state.mode.

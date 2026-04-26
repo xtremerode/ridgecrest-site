@@ -186,3 +186,7 @@ Standalone AI photo color grading app at `/home/claudeuser/photo_studio/` — po
 - Session-end protocol step: run 'python3 claude_context_agent.py --outbound "<rule>" --confirm' for any new rules, decisions, or configurations discussed this session. Show dry-run diff first; always write with --confirm. Route to correct directory CLAUDE.md — never dump everything into root CLAUDE.md.
 
 - DO snapshot recovery rule: When recovering files from a DigitalOcean snapshot, NEVER click 'Restore droplet' — that destroys ALL current data on the live droplet. Always click 'Create droplet' to spin up a temporary separate instance from the snapshot. Rsync or copy what you need, then destroy the temp droplet. Cost: ~$0.02/hr while running.
+
+- GitHub remote for the web project: git@github.com:xtremerode/ridgecrest-site.git (SSH). Deploy key: ridgecrest-do-server (ed25519, stored at /home/claudeuser/.ssh/ridgecrest_do). Git remote name: 'origin'. Both master and ridgecrest-audit branches are on GitHub. Future commits should push to origin automatically via post-phase guardrail.
+
+- The Back button in the render review tool calls restoreSnapshot() before navigating — this functions as an UNDO of the Set It action, reverting the active_version to the previous state. Henry observed this as unexpected behavior: after clicking Back, the LIVE badge disappears because the set was undone. Decision pending: remove restoreSnapshot from doBack() so Back is pure navigation (set stays live).
