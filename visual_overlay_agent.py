@@ -644,12 +644,16 @@ def _check_gallery_item(page, card_id, slug, token):
         # Check render button will send the correct base filename.
         # We verify by inspecting data-src directly (source of truth for gallery render path)
         # and confirming the JS cardMap state has no stale card_settings overriding it.
+        # Valid data-src values:
+        #   _mv2.webp          — original base (no active AI render)
+        #   _mv2_ai_N.webp     — AI render base (active version set) — CORRECT, server guards re-render source
+        # Invalid: any sized variant (_960w, _1920w, etc) in data-src
         render_result = page.evaluate(f"""() => {{
             var card = document.querySelector('[data-card-id="{card_id}"]');
             if (!card) return {{ok: false, reason: 'card not found', dataSrc: ''}};
             var dataSrc = card.getAttribute('data-src') || '';
             var fname = dataSrc.split('/').pop();
-            // Verify data-src is a base _mv2.webp with no size suffix — this is what render uses
+            // data-src must be an unsized base file — original _mv2.webp or active AI render _ai_N.webp
             var hasSizeSuffix = /_(?:1920|960|480|201)w\\.webp$/.test(fname);
             var hasAiSuffix = /_ai_\\d/.test(fname);
             var isMv2 = fname.indexOf('_mv2.webp') !== -1 || fname.indexOf('_mv2') !== -1;
@@ -658,7 +662,7 @@ def _check_gallery_item(page, card_id, slug, token):
             var stateImage = cardState ? (cardState.image || '') : '';
             var stateHasBadSuffix = /_(?:1920|960|480|201)w\\.webp$/.test(stateImage);
             return {{
-                ok: !hasSizeSuffix && !hasAiSuffix && isMv2 && !stateHasBadSuffix,
+                ok: !hasSizeSuffix && isMv2 && !stateHasBadSuffix,
                 dataSrc: dataSrc,
                 fname: fname,
                 hasSizeSuffix: hasSizeSuffix,

@@ -15,7 +15,7 @@
 | Project page hero (`project-hero__img`) | `_mv2_1920w.webp` | Hero is ~1440px wide; base file (5000-6000px) causes GPU downscale artifacts |
 | Service/blog page hero | `_mv2_1920w.webp` | Same reason |
 | Card/thumbnail backgrounds (`proj-card__img`, `portfolio-featured__img`, `portfolio-item__bg`, `portfolio-card__img`, `gallery-item__img`, `featured-home__img`) | `_mv2_960w.webp` | Cards are 350-720px; base file at 15:1 downscale causes moiré on fine patterns (wire mesh, grilles, tile) |
-| Lightbox / `data-src` / srcset full-res slot | `_mv2.webp` (base) | Full resolution needed for zoomed viewing |
+| Lightbox / `data-src` / srcset full-res slot | `_mv2.webp` (base) OR `_mv2_ai_N.webp` (active AI render) | If no active render: original base. If active render is set: AI render base shows in both thumbnail AND lightbox — same image, full res |
 | `<img srcset>` smallest slot | `_mv2_480w.webp` | Correct |
 
 ### Server-side
