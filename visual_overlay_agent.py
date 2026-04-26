@@ -97,6 +97,12 @@ PAGES_TO_TEST = [
         ['pleasanton-custom-gal-ff5b18_9cd0d8a66b364c1ea15c032acb7da0cc_mv2'],
         'gallery-item card (rotate button + render button on gallery items)',
     ),
+    (
+        'bathroom-remodels',
+        '/view/bathroom-remodels.html',
+        ['bathroom-remodels-gallery-1'],
+        'service page gallery item (rotate: CSS bg + lightbox data-src update, no saveCard)',
+    ),
 ]
 
 
@@ -331,61 +337,75 @@ def _check_card_overlay(page, card_id, slug, token):
                 f'Pill visible and correctly placed for {card_id}'))
 
         # ── Step 3: Click-to-cycle ────────────────────────────────────────────
-        # Get background-image before click
-        bg_before = page.evaluate(f"""() => {{
-            var el = document.querySelector('[data-card-id="{card_id}"]');
-            return el ? window.getComputedStyle(el).backgroundImage : null;
-        }}""")
-
-        # Click the capture overlay (ov, z-index 9990) in the correct _attachEl.
-        # Dispatch programmatically to guarantee we hit the right element regardless
-        # of pointer-events or stacking on the test viewport.
-        click_result = page.evaluate(f"""() => {{
+        # Service page gallery items (inner div inside .gallery-item[data-src]) have an
+        # empty imagePool — click-to-cycle does nothing. Skip and mark as N/A.
+        _is_service_gallery = bool(page.evaluate(f"""() => {{
             var card = document.querySelector('[data-card-id="{card_id}"]');
-            if (!card) return 'card_not_found';
-
-            var attachEl = card;
-            var isGallery = card.hasAttribute('data-src');
-            if (!isGallery && card.getAttribute('role') === 'img') {{
-                var par = card.parentElement;
-                if (par && window.getComputedStyle(par).position !== 'static') attachEl = par;
-            }}
-            if (!isGallery && card.classList.contains('diff__zone')) {{
-                var dv = card.parentElement;
-                if (dv && dv.classList.contains('diff__visual') &&
-                    dv.classList.contains('diff__visual--one') &&
-                    window.getComputedStyle(card).display !== 'none') {{
-                    attachEl = dv;
-                }}
-            }}
-
-            var ovEls = Array.from(attachEl.querySelectorAll('[data-rd-overlay="card"]'));
-            // Use direct-child constraint (same reason as pill lookup above)
-            var ov = ovEls.find(function(o) {{ return o.style.zIndex === '9990' && o.parentElement === attachEl; }});
-            if (!ov) return 'ov_not_found';
-
-            ov.click();
-            return 'clicked';
-        }}""")
-
-        if click_result != 'clicked':
-            checks.append(('click_cycles_image', False,
-                f'Could not find capture overlay (ov) to click for {card_id}: {click_result}'))
+            return !!(card && !card.hasAttribute('data-src') &&
+                      card.closest('.gallery-item[data-src]'));
+        }}"""))
+        if _is_service_gallery:
+            checks.append(('click_cycles_image', True,
+                           f'{card_id}: service gallery item — click-to-cycle skipped (imagePool empty by design)'))
         else:
-            time.sleep(0.6)  # allow saveCard debounce (1.5s) to queue + image to apply
+            pass  # fall through to normal click-to-cycle below
 
-            bg_after = page.evaluate(f"""() => {{
+        if not _is_service_gallery:
+            # Get background-image before click
+            bg_before = page.evaluate(f"""() => {{
                 var el = document.querySelector('[data-card-id="{card_id}"]');
                 return el ? window.getComputedStyle(el).backgroundImage : null;
             }}""")
 
-            if bg_before == bg_after:
+            # Click the capture overlay (ov, z-index 9990) in the correct _attachEl.
+            # Dispatch programmatically to guarantee we hit the right element regardless
+            # of pointer-events or stacking on the test viewport.
+            click_result = page.evaluate(f"""() => {{
+                var card = document.querySelector('[data-card-id="{card_id}"]');
+                if (!card) return 'card_not_found';
+
+                var attachEl = card;
+                var isGallery = card.hasAttribute('data-src');
+                if (!isGallery && card.getAttribute('role') === 'img') {{
+                    var par = card.parentElement;
+                    if (par && window.getComputedStyle(par).position !== 'static') attachEl = par;
+                }}
+                if (!isGallery && card.classList.contains('diff__zone')) {{
+                    var dv = card.parentElement;
+                    if (dv && dv.classList.contains('diff__visual') &&
+                        dv.classList.contains('diff__visual--one') &&
+                        window.getComputedStyle(card).display !== 'none') {{
+                        attachEl = dv;
+                    }}
+                }}
+
+                var ovEls = Array.from(attachEl.querySelectorAll('[data-rd-overlay="card"]'));
+                // Use direct-child constraint (same reason as pill lookup above)
+                var ov = ovEls.find(function(o) {{ return o.style.zIndex === '9990' && o.parentElement === attachEl; }});
+                if (!ov) return 'ov_not_found';
+
+                ov.click();
+                return 'clicked';
+            }}""")
+
+            if click_result != 'clicked':
                 checks.append(('click_cycles_image', False,
-                    f'Click did not change background-image on {card_id} '
-                    f'(imagePool empty, ov misplaced, or applyStyle not firing)'))
+                    f'Could not find capture overlay (ov) to click for {card_id}: {click_result}'))
             else:
-                checks.append(('click_cycles_image', True,
-                    f'Click cycled image correctly on {card_id}'))
+                time.sleep(0.6)  # allow saveCard debounce (1.5s) to queue + image to apply
+
+                bg_after = page.evaluate(f"""() => {{
+                    var el = document.querySelector('[data-card-id="{card_id}"]');
+                    return el ? window.getComputedStyle(el).backgroundImage : null;
+                }}""")
+
+                if bg_before == bg_after:
+                    checks.append(('click_cycles_image', False,
+                        f'Click did not change background-image on {card_id} '
+                        f'(imagePool empty, ov misplaced, or applyStyle not firing)'))
+                else:
+                    checks.append(('click_cycles_image', True,
+                        f'Click cycled image correctly on {card_id}'))
 
         # ── Step 4: Rotate click test ─────────────────────────────────────────
         # Verifies the full click→API→state-update flow for the rotate button.
@@ -476,6 +496,7 @@ def _check_rotate_click(page, card_id, is_gallery_item):
         # can come from stylesheets and is not a reliable proxy for state.image).
         # Wait up to 1s for cardMap to populate from async setupCard fetch.
         has_source = False
+        _is_svc_gal = False
         if is_gallery_item:
             has_source = bool(page.evaluate(f"""() => {{
                 var card = document.querySelector('[data-card-id="{card_id}"]');
@@ -492,10 +513,21 @@ def _check_rotate_click(page, card_id, is_gallery_item):
                     has_source = True
                     break
                 time.sleep(0.1)
+            # Service page gallery: inner div (no data-src) with .gallery-item[data-src] ancestor
+            if not has_source:
+                anc_src = page.evaluate(f"""() => {{
+                    var card = document.querySelector('[data-card-id="{card_id}"]');
+                    var anc = card && !card.hasAttribute('data-src') &&
+                              card.closest('.gallery-item[data-src]');
+                    return anc ? (anc.getAttribute('data-src') || '') : '';
+                }}""") or ''
+                if anc_src:
+                    has_source = True
+                    _is_svc_gal = True
 
         if not has_source:
             checks.append(('rotate_click_skipped', True,
-                            f'{card_id}: no image in state.image — rotate click skipped (card may be color/gradient mode)'))
+                            f'{card_id}: no image source found — rotate click skipped (color/gradient mode card)'))
             return checks
 
         # Find the rotate button — search _attachEl since pill is appended there
@@ -560,16 +592,39 @@ def _check_rotate_click(page, card_id, is_gallery_item):
         checks.append(('rotate_click_btn_recovered', btn_recovered,
                         f'{card_id}: button {"re-enabled after response" if btn_recovered else "still disabled/missing — JS error after mock response"}'))
 
-        # Gallery only: verify img.src was cache-busted
+        # Project gallery: verify img.src AND srcset were cache-busted
         if is_gallery_item and api_called:
-            img_updated = page.evaluate(f"""() => {{
+            img_state = page.evaluate(f"""() => {{
                 var card = document.querySelector('[data-card-id="{card_id}"]');
-                if (!card) return false;
+                if (!card) return {{srcOk: false, srcsetOk: false}};
                 var img = card.querySelector('img[data-gallery-src]') || card.querySelector('img');
-                return img ? img.src.indexOf('?v=') !== -1 : false;
+                if (!img) return {{srcOk: false, srcsetOk: false}};
+                var srcOk = img.src.indexOf('?v=') !== -1;
+                var srcsetOk = !img.srcset || img.srcset.indexOf('?v=') !== -1;
+                return {{srcOk: srcOk, srcsetOk: srcsetOk}};
             }}""")
-            checks.append(('rotate_click_gallery_img_updated', img_updated,
-                            f'{card_id}: img.src {"cache-busted (?v= present)" if img_updated else "NOT updated — JS error in success handler"}'))
+            checks.append(('rotate_click_gallery_img_updated', img_state.get('srcOk', False),
+                            f'{card_id}: img.src {"cache-busted" if img_state.get("srcOk") else "NOT updated"}'))
+            checks.append(('rotate_click_gallery_srcset_updated', img_state.get('srcsetOk', False),
+                            f'{card_id}: img.srcset {"cache-busted" if img_state.get("srcsetOk") else "NOT updated — browser may show cached pre-rotate version"}'))
+
+        # Service gallery: verify CSS background updated + ancestor data-src updated, no saveCard
+        if _is_svc_gal and api_called:
+            svc_state = page.evaluate(f"""() => {{
+                var card = document.querySelector('[data-card-id="{card_id}"]');
+                if (!card) return {{bgOk: false, ancOk: false}};
+                var bg = card.style.backgroundImage || '';
+                var anc = card.closest('.gallery-item[data-src]');
+                var ancSrc = anc ? (anc.getAttribute('data-src') || '') : '';
+                return {{
+                    bgOk: bg.indexOf('?v=') !== -1,
+                    ancOk: ancSrc.indexOf('?v=') !== -1
+                }};
+            }}""")
+            checks.append(('rotate_click_svc_bg_updated', svc_state.get('bgOk', False),
+                            f'{card_id}: CSS background-image {"cache-busted" if svc_state.get("bgOk") else "NOT updated after rotate"}'))
+            checks.append(('rotate_click_svc_datasrc_updated', svc_state.get('ancOk', False),
+                            f'{card_id}: lightbox data-src {"cache-busted" if svc_state.get("ancOk") else "NOT updated — lightbox would show stale image"}'))
 
     except Exception as e:
         checks.append(('rotate_click_api_called', False,

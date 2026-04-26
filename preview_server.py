@@ -2082,7 +2082,11 @@ _CARD_EDIT_OVERLAY_TPL = """\
 
     rotateBtn.addEventListener('click', function(e) {{
       e.stopPropagation(); e.preventDefault();
-      // Gallery items: use data-src as rotation source; normalize to base _mv2.webp
+      // Service page gallery: inner div (no data-src) inside an outer .gallery-item[data-src]
+      var _galAnc = (!isGalleryItem) ? el.closest('.gallery-item[data-src]') : null;
+      var _isServiceGallery = !!_galAnc;
+      // Source: project gallery \u2192 data-src; service gallery + regular cards \u2192 state.image
+      // (service gallery state.image is set from inline background-image by setupCard)
       var rotateSource = isGalleryItem ? (el.getAttribute('data-src') || '') : (state.image || '');
       if (!rotateSource) return;
       var url = rotateSource.split('?')[0];
@@ -2100,10 +2104,27 @@ _CARD_EDIT_OVERLAY_TPL = """\
         if (d.ok) {{
           var ts = '?v=' + Date.now();
           if (isGalleryItem) {{
-            // Reload gallery image in-place from data-src (cache-busted)
+            // Project gallery (<img> inside div): cache-bust src AND srcset
             var img = el.querySelector('img[data-gallery-src]') || el.querySelector('img');
-            if (img) {{ img.src = (img.getAttribute('data-gallery-src') || img.src).split('?')[0] + ts; }}
+            if (img) {{
+              var baseSrc = (img.getAttribute('data-gallery-src') || img.src).split('?')[0];
+              img.src = baseSrc + ts;
+              if (img.srcset) {{
+                img.srcset = img.srcset.split(',').map(function(entry) {{
+                  var parts = entry.trim().split(/\s+/);
+                  parts[0] = parts[0].split('?')[0] + ts;
+                  return parts.join(' ');
+                }}).join(', ');
+              }}
+            }}
+          }} else if (_isServiceGallery) {{
+            // Service page gallery (CSS background div): update bg + lightbox data-src
+            // No saveCard \u2014 gallery_json owns these cards, not card_settings
+            el.style.backgroundImage = "url('" + url + ts + "')";
+            var _ancSrc = _galAnc.getAttribute('data-src') || '';
+            if (_ancSrc) {{ _galAnc.setAttribute('data-src', _ancSrc.split('?')[0] + ts); }}
           }} else {{
+            // Regular card: persist image + position to DB
             state.image = url + ts;
             applyStyle(el, state);
             saveCard(cardId, state);
