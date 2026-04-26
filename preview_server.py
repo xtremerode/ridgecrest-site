@@ -1735,6 +1735,12 @@ _CARD_EDIT_OVERLAY_TPL = """\
       }}
     }}
 
+    // Fixed-position full-viewport backgrounds (e.g. .sap-bg on start-a-project):
+    // their z-index stacking context traps children below sibling overlay divs.
+    // Escape by hosting the pill on document.body; skip the capture overlay entirely.
+    var _isFixedCard = !isGalleryItem && window.getComputedStyle(el).position === 'fixed';
+    if (_isFixedCard) _attachEl = document.body;
+
     if (window.getComputedStyle(el).position === 'static') el.style.position = 'relative';
     el.style.overflow = 'hidden';
     // For gallery items (img tags), DO NOT call applyStyle on init — their src is already
@@ -1765,7 +1771,9 @@ _CARD_EDIT_OVERLAY_TPL = """\
     // Pill: [Color] [Image] toggle
     var pill = document.createElement('div');
     pill.setAttribute('data-rd-overlay','card');
-    pill.style.cssText = 'position:absolute;bottom:8px;right:8px;z-index:9991;display:flex;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 16px);border-radius:4px;overflow:hidden;opacity:0;transition:opacity .15s;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.5)';
+    pill.style.cssText = _isFixedCard
+      ? 'position:fixed;bottom:8px;right:8px;z-index:9991;display:flex;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 16px);border-radius:4px;overflow:hidden;opacity:1;transition:opacity .15s;pointer-events:auto;box-shadow:0 2px 8px rgba(0,0,0,.5)'
+      : 'position:absolute;bottom:8px;right:8px;z-index:9991;display:flex;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 16px);border-radius:4px;overflow:hidden;opacity:0;transition:opacity .15s;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.5)';
 
     var colorBtn = document.createElement('button');
     colorBtn.textContent = 'Color';
@@ -2191,14 +2199,16 @@ _CARD_EDIT_OVERLAY_TPL = """\
       saveCard(cardId, state);
     }});
 
-    // Full-card capture overlay
-    var ov = document.createElement('div');
-    ov.setAttribute('data-rd-overlay','card');
-    ov.style.cssText = 'position:absolute;inset:0;z-index:9990;cursor:pointer;user-select:none';
-    _attachEl.appendChild(ov);
-    // Track for text-mode suspend/restore
-    window.__rdCardOvs = window.__rdCardOvs || [];
-    window.__rdCardOvs.push(ov);
+    // Full-card capture overlay — skipped for fixed-position cards (pill-only interaction)
+    var ov = null;
+    if (!_isFixedCard) {{
+      ov = document.createElement('div');
+      ov.setAttribute('data-rd-overlay','card');
+      ov.style.cssText = 'position:absolute;inset:0;z-index:9990;cursor:pointer;user-select:none';
+      _attachEl.appendChild(ov);
+      window.__rdCardOvs = window.__rdCardOvs || [];
+      window.__rdCardOvs.push(ov);
+    }}
     if (!isGalleryItem) {{
       window.__rdCardPills = window.__rdCardPills || [];
       window.__rdCardPills.push(pill);
@@ -2207,25 +2217,28 @@ _CARD_EDIT_OVERLAY_TPL = """\
     var isDragging = false;
     var movedPx = 0;
 
-    _attachEl.addEventListener('mouseenter', function() {{
-      if (window.__rdTextModeActive && !isGalleryItem) {{
-        // In text mode: show pill so Done button is accessible on hover
+    if (!_isFixedCard) {{
+      _attachEl.addEventListener('mouseenter', function() {{
+        if (window.__rdTextModeActive && !isGalleryItem) {{
+          // In text mode: show pill so Done button is accessible on hover
+          pill.style.opacity = '1'; pill.style.pointerEvents = 'auto';
+          return;
+        }}
+        ov.style.boxShadow = 'inset 0 0 0 2px #3b82f6';
         pill.style.opacity = '1'; pill.style.pointerEvents = 'auto';
-        return;
-      }}
-      ov.style.boxShadow = 'inset 0 0 0 2px #3b82f6';
-      pill.style.opacity = '1'; pill.style.pointerEvents = 'auto';
-      if (state.mode === 'image') {{ ov.style.cursor = 'grab'; }}
-    }});
-    _attachEl.addEventListener('mouseleave', function() {{
-      if (window.__rdTextModeActive) return; // keep pill visible in text mode
-      if (!isDragging) {{
-        ov.style.boxShadow = '';
-        pill.style.opacity = '0'; pill.style.pointerEvents = 'none';
-        ov.style.cursor = 'pointer';
-      }}
-    }});
+        if (state.mode === 'image') {{ ov.style.cursor = 'grab'; }}
+      }});
+      _attachEl.addEventListener('mouseleave', function() {{
+        if (window.__rdTextModeActive) return; // keep pill visible in text mode
+        if (!isDragging) {{
+          ov.style.boxShadow = '';
+          pill.style.opacity = '0'; pill.style.pointerEvents = 'none';
+          ov.style.cursor = 'pointer';
+        }}
+      }});
+    }}
 
+    if (ov) {{
     ov.addEventListener('mousedown', function(e) {{
       if (e.button !== 0) return;
       if (window.__rdTextModeActive) return;
@@ -2309,6 +2322,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
         saveCard(cardId, state);
       }}
     }});
+    }} // end if (ov)
   }}
 
   // ── Gallery section "+" upload button factory ──────────────────────────────

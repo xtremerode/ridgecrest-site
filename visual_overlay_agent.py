@@ -280,6 +280,10 @@ def _check_card_overlay(page, card_id, slug, token):
                     attachEl = dv;
                 }}
             }}
+            // Fixed-position cards: pill lives on document.body
+            if (!isGallery && window.getComputedStyle(card).position === 'fixed') {{
+                attachEl = document.body;
+            }}
             attachEl.dispatchEvent(new MouseEvent('mouseenter', {{bubbles: false, cancelable: true}}));
         }}""")
         time.sleep(0.35)  # allow opacity transition (0.15s) + paint
@@ -304,6 +308,10 @@ def _check_card_overlay(page, card_id, slug, token):
                     window.getComputedStyle(card).display !== 'none') {{
                     attachEl = dv;
                 }}
+            }}
+            // Fixed-position cards: pill lives on document.body
+            if (!isGallery && window.getComputedStyle(card).position === 'fixed') {{
+                attachEl = document.body;
             }}
 
             // Find pill (z-index 9991) that is a DIRECT child of attachEl.
@@ -345,18 +353,27 @@ def _check_card_overlay(page, card_id, slug, token):
         # ── Step 3: Click-to-cycle ────────────────────────────────────────────
         # Service page gallery items (inner div inside .gallery-item[data-src]) have an
         # empty imagePool — click-to-cycle does nothing. Skip and mark as N/A.
+        # Fixed-position cards skip the capture overlay entirely — no click-to-cycle.
         _is_service_gallery = bool(page.evaluate(f"""() => {{
             var card = document.querySelector('[data-card-id="{card_id}"]');
             return !!(card && !card.hasAttribute('data-src') &&
                       card.closest('.gallery-item[data-src]'));
         }}"""))
+        _is_fixed_card = bool(page.evaluate(f"""() => {{
+            var card = document.querySelector('[data-card-id="{card_id}"]');
+            return !!(card && !card.hasAttribute('data-src') &&
+                      window.getComputedStyle(card).position === 'fixed');
+        }}"""))
         if _is_service_gallery:
             checks.append(('click_cycles_image', True,
                            f'{card_id}: service gallery item — click-to-cycle skipped (imagePool empty by design)'))
+        elif _is_fixed_card:
+            checks.append(('click_cycles_image', True,
+                           f'{card_id}: fixed-position card — capture overlay skipped, pill-only interaction'))
         else:
             pass  # fall through to normal click-to-cycle below
 
-        if not _is_service_gallery:
+        if not _is_service_gallery and not _is_fixed_card:
             # Get background-image before click
             bg_before = page.evaluate(f"""() => {{
                 var el = document.querySelector('[data-card-id="{card_id}"]');
