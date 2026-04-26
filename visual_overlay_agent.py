@@ -44,6 +44,9 @@ Intentionally excluded from Playwright overlay tests (no card edit overlay):
     render; endpoint returns it; filmVersions JS map includes it; admin-only, no card overlay
   - filmstrip object-fit:contain — portrait AI renders in landscape thumbnail box show full
     image with dark bg instead of cropped center band; admin render-review.html only
+  - set-version size-appropriate paths — card_settings/_960w, pages.hero_image/_1920w,
+    blog_posts/_960w; _migrate_ai_render_paths() startup migration fixes existing rows;
+    _upgrade_card_images() extended to catch _ai_N.webp base paths; no card overlay surface
 
 Exports: run(fix=False) -> List[Dict]
 """

@@ -1163,6 +1163,17 @@ def _upgrade_card_images(cards: list) -> list:
                     candidate_1920 = img_path.replace('_mv2.webp', '_mv2_1920w.webp')
                     abs_1920 = _os.path.join(PREVIEW_DIR, candidate_1920.lstrip('/'))
                     c['image'] = candidate_1920 if _os.path.isfile(abs_1920) else candidate_960
+            elif re.search(r'_ai_\d+\.webp$', img_path):
+                # AI render base path (no size suffix) — normalize to _960w/_1920w.
+                # set-version now writes size-suffixed paths, but this catch handles
+                # any legacy rows that slipped through before the migration ran.
+                stem_ = img_path[:-5]  # strip .webp
+                candidate_960 = f'{stem_}_960w.webp'
+                abs_960 = _os.path.join(PREVIEW_DIR, candidate_960.lstrip('/'))
+                if _os.path.isfile(abs_960):
+                    candidate_1920 = f'{stem_}_1920w.webp'
+                    abs_1920 = _os.path.join(PREVIEW_DIR, candidate_1920.lstrip('/'))
+                    c['image'] = candidate_1920 if _os.path.isfile(abs_1920) else candidate_960
         upgraded.append(c)
     return upgraded
 
@@ -9252,12 +9263,32 @@ def admin_set_version():
     else:
         version_filename = None
 
-    # Determine the canonical path that every reference should now point to
+    # Determine the canonical path for image_labels (always the bare AI render filename)
     new_active_path = (
         f'/assets/images-opt/{version_filename}' if version_filename
         else f'/assets/images-opt/{base_filename}'
     )
     base_stem = base_filename[:-5]  # strip .webp
+
+    # Compute size-appropriate storage paths per table.
+    # AI renders are generated with all 5 variants; store the right one per location:
+    #   card_settings / blog_posts → _960w  (card/thumbnail display, 350-720px slots)
+    #   pages.hero_image           → _1920w (hero display, ~1440px wide)
+    _opt_sv = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+    def _sized_path(fname, suffix):
+        if not fname:
+            return f'/assets/images-opt/{base_filename}'
+        stem_ = fname[:-5]
+        sized_ = f'{stem_}_{suffix}w.webp'
+        if os.path.isfile(os.path.join(_opt_sv, sized_)):
+            return f'/assets/images-opt/{sized_}'
+        return f'/assets/images-opt/{fname}'
+    if version_filename:
+        card_path = _sized_path(version_filename, '960')
+        hero_path = _sized_path(version_filename, '1920')
+        blog_path = _sized_path(version_filename, '960')
+    else:
+        card_path = hero_path = blog_path = f'/assets/images-opt/{base_filename}'
 
     conn = _db_conn()
     if not conn:
@@ -9289,23 +9320,23 @@ def admin_set_version():
             WHERE mode = 'image' AND (
                 image = %s OR image LIKE %s OR image LIKE %s OR image LIKE %s OR image LIKE %s
             )
-        """, (new_active_path, original_path, ai_like, ai_v_like, orig_v_like, stem_like))
+        """, (card_path, original_path, ai_like, ai_v_like, orig_v_like, stem_like))
         cards_updated = cur.rowcount
 
-        # 3. Propagate to pages hero
+        # 3. Propagate to pages hero — use _1920w variant for hero display
         cur.execute("""
             UPDATE pages SET hero_image = %s
             WHERE hero_image = %s OR hero_image LIKE %s
                OR hero_image LIKE %s OR hero_image LIKE %s OR hero_image LIKE %s
-        """, (new_active_path, original_path, ai_like, ai_v_like, orig_v_like, stem_like))
+        """, (hero_path, original_path, ai_like, ai_v_like, orig_v_like, stem_like))
         pages_updated = cur.rowcount
 
-        # 4. Propagate to blog_posts featured_image
+        # 4. Propagate to blog_posts featured_image — use _960w variant
         cur.execute("""
             UPDATE blog_posts SET featured_image = %s
             WHERE featured_image = %s OR featured_image LIKE %s
                OR featured_image LIKE %s OR featured_image LIKE %s OR featured_image LIKE %s
-        """, (new_active_path, original_path, ai_like, ai_v_like, orig_v_like, stem_like))
+        """, (blog_path, original_path, ai_like, ai_v_like, orig_v_like, stem_like))
         blog_updated = cur.rowcount
 
         # 4b. Cross-size fallback: if a _480w render was activated, also update blog posts that
@@ -9327,7 +9358,7 @@ def admin_set_version():
                        OR featured_image LIKE %s
                        OR featured_image LIKE %s
                        OR featured_image LIKE %s
-                """, (new_active_path,
+                """, (blog_path,
                       main_path,
                       f'/assets/images-opt/{main_stem}_ai_%.webp',    # _mv2_ai_N
                       f'/assets/images-opt/{main_base}?v=%',
@@ -9373,6 +9404,8 @@ def admin_set_version():
             'base_filename': base_filename,
             'active_version': version_filename,
             'new_active_path': new_active_path,
+            'card_path': card_path,
+            'hero_path': hero_path,
             'cards_updated': cards_updated,
             'pages_updated': pages_updated,
             'blog_updated': blog_updated,
@@ -12797,6 +12830,75 @@ def admin_retag_image_types():
         return jsonify({'error': str(e)}), 500
 
 
+def _migrate_ai_render_paths():
+    """One-time migration: update existing DB rows that stored bare AI render base paths
+    (e.g. _mv2_ai_1.webp, no size suffix) to size-appropriate variants:
+      card_settings / blog_posts → _960w  (card/thumbnail display slots)
+      pages.hero_image           → _1920w (hero display, ~1440px wide)
+    All size variants are guaranteed to exist (render pipeline creates all 5 before writing DB).
+    Safe to re-run: only touches rows whose path ends in _ai_N.webp with no size suffix."""
+    if not HAS_DB: return
+    conn = _db_conn()
+    if not conn: return
+    try:
+        cur = conn.cursor()
+        opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+        fixed = 0
+
+        # card_settings: _ai_N.webp → _ai_N_960w.webp
+        cur.execute("""
+            SELECT card_id, image FROM card_settings
+            WHERE mode = 'image'
+              AND image ~ '/assets/images-opt/[^/]+_ai_[0-9]+\\.webp$'
+        """)
+        for row in cur.fetchall():
+            fname = row['image'].split('/')[-1]
+            stem  = fname[:-5]
+            target = f'/assets/images-opt/{stem}_960w.webp'
+            if os.path.isfile(os.path.join(opt_dir, f'{stem}_960w.webp')):
+                cur.execute("UPDATE card_settings SET image = %s WHERE card_id = %s",
+                            (target, row['card_id']))
+                fixed += 1
+
+        # pages.hero_image: _ai_N.webp → _ai_N_1920w.webp
+        cur.execute("""
+            SELECT slug, hero_image FROM pages
+            WHERE hero_image ~ '/assets/images-opt/[^/]+_ai_[0-9]+\\.webp$'
+        """)
+        for row in cur.fetchall():
+            fname = row['hero_image'].split('/')[-1]
+            stem  = fname[:-5]
+            target = f'/assets/images-opt/{stem}_1920w.webp'
+            if os.path.isfile(os.path.join(opt_dir, f'{stem}_1920w.webp')):
+                cur.execute("UPDATE pages SET hero_image = %s WHERE slug = %s",
+                            (target, row['slug']))
+                fixed += 1
+
+        # blog_posts.featured_image: _ai_N.webp → _ai_N_960w.webp
+        cur.execute("""
+            SELECT id, featured_image FROM blog_posts
+            WHERE featured_image ~ '/assets/images-opt/[^/]+_ai_[0-9]+\\.webp$'
+        """)
+        for row in cur.fetchall():
+            fname = row['featured_image'].split('/')[-1]
+            stem  = fname[:-5]
+            target = f'/assets/images-opt/{stem}_960w.webp'
+            if os.path.isfile(os.path.join(opt_dir, f'{stem}_960w.webp')):
+                cur.execute("UPDATE blog_posts SET featured_image = %s WHERE id = %s",
+                            (target, row['id']))
+                fixed += 1
+
+        conn.commit()
+        if fixed:
+            print(f'[migrate_ai_paths] Fixed {fixed} AI render path(s) to size-appropriate variants')
+    except Exception as e:
+        conn.rollback()
+        print(f'[migrate_ai_paths] Error: {e}')
+    finally:
+        try: conn.close()
+        except: pass
+
+
 def _migrate_completed_to_project():
     """One-time migration: rename image_type='completed' → 'project' in gallery_image_types."""
     if not HAS_DB: return
@@ -12861,6 +12963,11 @@ try:
     _migrate_completed_to_project()
 except Exception as _mig2_err:
     print(f'[gallery_types] Migration failed: {_mig2_err}')
+
+try:
+    _migrate_ai_render_paths()
+except Exception as _mig3_err:
+    print(f'[migrate_ai_paths] Migration failed: {_mig3_err}')
 
 try:
     _seed_gallery_types_from_image_labels()
