@@ -29,6 +29,11 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
 .badge-active{background:#0c2b42;color:#38bdf8;border:1px solid #0e4c6e}
 .badge-approved{background:#052e16;color:#22c55e;border:1px solid #166534}
 .badge-missing{background:#2a1800;color:#f59e0b;border:1px solid #78350f}
+.badge-rerender{background:#2d0707;color:#f87171;border:1px solid #7f1d1d}
+.badge-restored{background:#0a2a1a;color:#34d399;border:1px solid #065f46}
+#btn-filter{background:#1e3040;color:#f59e0b;border:1px solid #78350f;font-size:12px;padding:7px 14px}
+#btn-filter.filter-on{background:#f59e0b;color:#1a0800;border-color:#d97706}
+#btn-filter:hover:not(:disabled){background:#2a1800;color:#fbbf24;border-color:#92400e}
 #note-text{font-size:11px;color:#d97706}
 
 /* Two-panel viewer */
@@ -215,6 +220,7 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
   <div id="footer-left">
     <button class="btn" id="btn-back" disabled>← Back</button>
     <button class="btn" id="btn-skip">Skip →</button>
+    <button class="btn" id="btn-filter">⚠ Re-render Only</button>
   </div>
   <span id="action-status"></span>
   <button class="btn" id="btn-set">✓ Set It</button>
@@ -233,6 +239,7 @@ let CARDS      = [];
 let idx        = 0;
 let setCount   = 0;
 let skipCount  = 0;
+let filterOn   = false; // true = skip cards that don't need re-render
 let sourceMode = 'render'; // 'base' | 'render'
 let history    = [];       // [{idx, snapshots: [{...}]}]
 let filmVersions   = []; // all _ai_N filenames on disk for current card
@@ -265,6 +272,7 @@ const surgicalLink   = document.getElementById('surgical-link');
 const footer         = document.getElementById('footer');
 const btnBack        = document.getElementById('btn-back');
 const btnSkip        = document.getElementById('btn-skip');
+const btnFilter      = document.getElementById('btn-filter');
 const btnSet         = document.getElementById('btn-set');
 const actionStatus   = document.getElementById('action-status');
 const doneScreen     = document.getElementById('done-screen');
@@ -300,6 +308,9 @@ async function init() {
     footer.style.display = 'flex';
     statusBar.style.display = 'flex';
     header.style.display = 'flex';
+    // Label filter button with count of cards needing re-render
+    const needCount = CARDS.filter(c => !c.render_exists).length;
+    btnFilter.textContent = `⚠ Re-render Only (${needCount})`;
     renderCard(0);
   } catch(e) {
     loadingScreen.querySelector('p').textContent = 'Error loading queue: ' + e.message;
@@ -328,11 +339,11 @@ function renderCard(i) {
     cardBadge.textContent = '◉ Currently Live';
     cardBadge.className = 'card-badge badge-active';
   } else if (!c.render_exists) {
-    cardBadge.textContent = '⚠ Render Missing';
-    cardBadge.className = 'card-badge badge-missing';
+    cardBadge.textContent = '⚠ Re-render Required';
+    cardBadge.className = 'card-badge badge-rerender';
   } else {
-    cardBadge.textContent = '';
-    cardBadge.className = 'card-badge';
+    cardBadge.textContent = '✦ Render Restored';
+    cardBadge.className = 'card-badge badge-restored';
   }
 
   // Images
@@ -966,7 +977,25 @@ function showDone() {
 btnSet.addEventListener('click', doSet);
 btnBack.addEventListener('click', doBack);
 btnRerender.addEventListener('click', doRerender);
-btnSkip.addEventListener('click', () => { skipCount++; renderCard(idx + 1); });
+btnSkip.addEventListener('click', () => {
+  skipCount++;
+  if (filterOn) {
+    const next = CARDS.findIndex((c, j) => j > idx && !c.render_exists);
+    renderCard(next >= 0 ? next : CARDS.length);
+  } else {
+    renderCard(idx + 1);
+  }
+});
+btnFilter.addEventListener('click', () => {
+  filterOn = !filterOn;
+  btnFilter.classList.toggle('filter-on', filterOn);
+  if (filterOn) {
+    const first = CARDS.findIndex(c => !c.render_exists);
+    renderCard(first >= 0 ? first : CARDS.length);
+  } else {
+    renderCard(idx);
+  }
+});
 
 btnSrcOrig.addEventListener('click', () => {
   sourceMode = 'base';
