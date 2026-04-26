@@ -131,6 +131,14 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
 #done-screen{display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:16px}
 #done-screen h2{font-size:32px;font-weight:800;color:#22c55e}
 #done-screen p{color:#6b8fa6;font-size:16px}
+
+/* Render lightbox */
+#render-lightbox{display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.92);align-items:center;justify-content:center;cursor:zoom-out}
+#render-lightbox.open{display:flex}
+#render-lightbox img{max-width:96vw;max-height:96vh;object-fit:contain;border-radius:4px;box-shadow:0 8px 48px rgba(0,0,0,.7)}
+#render-lightbox-close{position:absolute;top:16px;right:20px;font-size:28px;color:#94a3b8;cursor:pointer;line-height:1;user-select:none}
+#render-lightbox-close:hover{color:#e8eef2}
+#render-img{cursor:zoom-in}
 </style>
 </head>
 <body>
@@ -231,6 +239,11 @@ body{background:#0d1a22;color:#e8eef2;font-family:-apple-system,BlinkMacSystemFo
   <p id="done-summary"></p>
 </div>
 
+<div id="render-lightbox">
+  <span id="render-lightbox-close">✕</span>
+  <img id="render-lightbox-img" src="" alt="Full-size render" />
+</div>
+
 <script>
 const TOKEN = 'ea501a45abb967a5fde5feaa14361a230d0eed48bd76a6284d868ab7737e4365';
 
@@ -290,6 +303,8 @@ const btnRotOrigCCW    = document.getElementById('btn-rot-orig-ccw');
 const btnRotOrigCW     = document.getElementById('btn-rot-orig-cw');
 const btnRotRenderCCW  = document.getElementById('btn-rot-render-ccw');
 const btnRotRenderCW   = document.getElementById('btn-rot-render-cw');
+const renderLightbox   = document.getElementById('render-lightbox');
+const renderLightboxImg = document.getElementById('render-lightbox-img');
 
 // ── Init: load queue from server ──────────────────────────────────────────────
 async function init() {
@@ -997,6 +1012,21 @@ btnFilter.addEventListener('click', () => {
   }
 });
 
+// Render image lightbox — click to view full size
+renderImg.addEventListener('click', () => {
+  if (!CARDS[idx]?.render_exists) return;
+  const c = CARDS[idx];
+  const fullSrc = `/assets/images-opt/${c.render_file.replace('.webp', '_1920w.webp')}`;
+  renderLightboxImg.src = fullSrc;
+  renderLightboxImg.onerror = () => { renderLightboxImg.src = `/assets/images-opt/${c.render_file}`; };
+  renderLightbox.classList.add('open');
+});
+renderLightbox.addEventListener('click', () => renderLightbox.classList.remove('open'));
+document.getElementById('render-lightbox-close').addEventListener('click', e => {
+  e.stopPropagation();
+  renderLightbox.classList.remove('open');
+});
+
 btnSrcOrig.addEventListener('click', () => {
   sourceMode = 'base';
   btnSrcOrig.classList.add('active');
@@ -1020,6 +1050,7 @@ btnModelOpenAI.addEventListener('click', () => {
 });
 
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { renderLightbox.classList.remove('open'); return; }
   if (e.target === promptTA) return;
   if (e.key === 'Enter' || e.key === 'y') btnSet.click();
   if (e.key === 'ArrowRight' || e.key === 'n') btnSkip.click();
