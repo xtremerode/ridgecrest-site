@@ -1,0 +1,7 @@
+run_id=run_20260426_181840
+timestamp=20260426_181840
+features=seo-service-pages frontend-main
+dump_file=/home/claudeuser/agent/backups/pre_task_20260426_181840.sql
+baseline_commit=5dec7cd6ee33b034de2969a145e50d7661d707ad
+playwright_before=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260426_181840_playwright_before.json
+log_pre=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260426_181840_pre.log

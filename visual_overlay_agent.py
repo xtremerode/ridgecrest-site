@@ -103,6 +103,12 @@ PAGES_TO_TEST = [
         ['bathroom-remodels-gallery-1'],
         'service page gallery item (rotate: CSS bg + lightbox data-src update, no saveCard)',
     ),
+    (
+        'start-a-project',
+        '/view/start-a-project.html',
+        ['sap-bg-main'],
+        'full-viewport fixed hero background — sap-bg in _HERO_CLASSES (no _swapAll downgrade)',
+    ),
 ]
 
 

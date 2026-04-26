@@ -215,7 +215,7 @@ document.querySelectorAll('.service-card, .step, .portfolio-card, .portfolio-ite
   // The server already injects the correct URL via _apply_hero_to_html().
   var _HERO_CLASSES = [
     'page-hero--service', 'hero__bg', 'project-hero__img',
-    'blog-hero', 'post-hero'
+    'blog-hero', 'post-hero', 'sap-bg'
   ];
 
   function _swapAll() {
