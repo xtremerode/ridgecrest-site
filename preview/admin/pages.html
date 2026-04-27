@@ -3425,7 +3425,7 @@
         await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}/${encodeURIComponent(_gp.cardId)}`, {
           method: 'PUT',
           body: JSON.stringify({
-            mode: cs.mode || 'color', color: cs.color || '#1C1C1C',
+            mode: cs.mode || 'image', color: cs.color || '#1C1C1C',
             image: cs.image || null, position: cs.position || '50% 50%', zoom: cs.zoom || 1.0,
             gradient_type: g.gradient_type, gradient_tint: g.gradient_tint,
             gradient_opacity: g.gradient_opacity, gradient_direction: g.gradient_direction,
@@ -3560,7 +3560,7 @@
         await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}/${encodeURIComponent(_tp.heroId)}`, {
           method: 'PUT',
           body: JSON.stringify({
-            mode: cs.mode || 'color',
+            mode: cs.mode || 'image',
             color: cs.color || '#1C1C1C',
             image: cs.image || null,
             position: cs.position || '50% 50%',
@@ -3641,7 +3641,7 @@
         await API(`/admin/api/cards/${encodeURIComponent(currentSlug)}/${encodeURIComponent(_tp.heroId)}`, {
           method: 'PUT',
           body: JSON.stringify({
-            mode: cs.mode || 'color',
+            mode: cs.mode || 'image',
             color: cs.color || '#1C1C1C',
             image: cs.image || null,
             position: cs.position || '50% 50%',
