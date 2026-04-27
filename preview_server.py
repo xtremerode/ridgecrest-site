@@ -1079,7 +1079,9 @@ def _safe_js(value) -> str:
     Escapes </ to prevent </script> tag breakout."""
     return json.dumps(value).replace("</", r"<\/")
 
-_SECTION_HEIGHT_SKIP = {'footer', 'hero'}  # footer uses auto height — never override with px
+_SECTION_HEIGHT_SKIP = {'footer'}  # footer uses auto height — never override with px
+# 'hero' removed: home hero height is now applied from page_sections (desktop=900px, tablet=715px,
+# mobile=551px) so the live site matches the admin panel exactly on every viewport.
 
 # Classes that should never get data-rd-section injected.
 _SECTION_SKIP_FOR_ID = {'footer'}
