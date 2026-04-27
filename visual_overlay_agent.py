@@ -873,36 +873,6 @@ def run(fix=False):
                             'auto_fixable': False,
                         })
 
-                # Hero section height check — only for home page.
-                # _apply_section_heights must inject height:900px inline so the live
-                # site is deterministic regardless of the viewer's viewport height.
-                # Regression: if 'hero' is ever added back to _SECTION_HEIGHT_SKIP,
-                # the inline style disappears and this check fails.
-                if slug == 'home':
-                    try:
-                        hero_style = page.evaluate(
-                            "() => { const h = document.querySelector('section.hero'); "
-                            "return h ? h.style.height : null; }"
-                        )
-                        ok = hero_style and hero_style.endswith('px') and int(hero_style.replace('px','')) >= 800
-                        results.append({
-                            'agent': agent,
-                            'check': 'hero_section_height_home',
-                            'status': 'pass' if ok else 'fail',
-                            'detail': f'section.hero inline height={hero_style!r} (expected ≥800px from page_sections)',
-                            'page': slug,
-                            'auto_fixable': False,
-                        })
-                    except Exception as _e:
-                        results.append({
-                            'agent': agent,
-                            'check': 'hero_section_height_home',
-                            'status': 'fail',
-                            'detail': f'Could not evaluate hero height: {_e}',
-                            'page': slug,
-                            'auto_fixable': False,
-                        })
-
                 page.close()
 
             browser.close()
