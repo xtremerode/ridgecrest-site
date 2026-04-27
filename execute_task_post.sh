@@ -149,9 +149,11 @@ else
     [ "$FEAT" = "pages-card" ] && PAGES_CARD_IN_SCOPE=1
   done
 
-  DRIFT_RESULT=$(PGPASSWORD=StrongPass123! psql -h 127.0.0.1 -U agent_user -d marketing_agent -t -A -c \
-    "SELECT row_to_json(t) FROM (SELECT page_slug, card_id, mode, color, image, position, zoom FROM card_settings ORDER BY page_slug, card_id) t;" \
-    2>/dev/null | grep -v '^$' | python3 - "$CARD_SNAPSHOT_BEFORE" "$PAGES_CARD_IN_SCOPE" 2>&1 <<'PYEOF'
+  # Write Python drift script to a temp file so psql stdout can pipe to it.
+  # Using python3 - <<'PYEOF' heredoc steals stdin from the pipe (heredoc wins
+  # over pipe in bash), making current_rows always empty — always a false FAIL.
+  _DRIFT_PY="$(mktemp /tmp/rd_drift_XXXXXX.py)"
+  cat > "$_DRIFT_PY" <<'PYEOF'
 import sys, json
 
 current_rows = [json.loads(l.strip()) for l in sys.stdin if l.strip().startswith('{')]
@@ -197,7 +199,11 @@ for slug, cid in added:
 for slug, cid in removed:
     print(f"  REMOVED  {slug}/{cid}")
 PYEOF
-  )
+
+  DRIFT_RESULT=$(PGPASSWORD=StrongPass123! psql -h 127.0.0.1 -U agent_user -d marketing_agent -t -A -c \
+    "SELECT row_to_json(t) FROM (SELECT page_slug, card_id, mode, color, image, position, zoom FROM card_settings ORDER BY page_slug, card_id) t;" \
+    2>/dev/null | grep -v '^$' | python3 "$_DRIFT_PY" "$CARD_SNAPSHOT_BEFORE" "$PAGES_CARD_IN_SCOPE" 2>&1)
+  rm -f "$_DRIFT_PY"
 
   DRIFT_FIRST=$(echo "$DRIFT_RESULT" | head -1)
   DRIFT_DETAIL=$(echo "$DRIFT_RESULT" | tail -n +2)

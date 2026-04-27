@@ -2134,6 +2134,11 @@
       _applyLockUI(_pageLocks[slug] || 'development');
     }
 
+    // Reset outer scroll panel to top before loading the new page.
+    // Without this, the outer frameWrap stays at whatever Y the previous page
+    // was scrolled to, and the scroll-proxy sync sends the new iframe to that
+    // same Y before it has content — producing a fully desynced state.
+    frameWrap.scrollTop = 0;
     // Reset iframe to standard viewport height before loading the new page.
     // Without this, a tall previous page leaves the iframe element taller than
     // PREVIEW_H, so 70vh inside the new page renders larger than expected and
@@ -2864,6 +2869,19 @@
 
     // Resize iframe to actual page content (enables full-page scrolling)
     scaleFrame();
+
+    // Prevent browser scroll restoration from re-positioning the inner iframe.
+    // commit e8166d9 eliminated location.replace(), which inadvertently allowed
+    // the browser to start saving/restoring scroll positions for iframe pages.
+    // On reload, the inner window auto-restores to Y≠0 while frameWrap is at 0 —
+    // completely desyncing the outer/inner scroll relationship.
+    try {
+      if (siteFrame.contentWindow && siteFrame.contentWindow.history) {
+        siteFrame.contentWindow.history.scrollRestoration = 'manual';
+      }
+      siteFrame.contentWindow.scrollTo({top: 0, behavior: 'instant'});
+    } catch(_e) {}
+    frameWrap.scrollTop = 0;
 
     // ── Intercept in-iframe link clicks: reset height + enforce ?_stage=1 ──────
     // Two problems solved here in capture phase (fires before browser navigates):
