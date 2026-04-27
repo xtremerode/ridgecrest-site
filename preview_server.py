@@ -4661,6 +4661,32 @@ def view(filename):
             _sec_device = view_device if view_device in ("tablet", "mobile") else "desktop"
             content = _apply_section_heights(content, slug, _sec_device,
                                              preloaded_rows=_snap_sections)
+
+        # [HERO-HEIGHT] Pin hero to drag-saved height on published path only.
+        # _apply_section_heights skips 'hero' so the live site uses CSS 100vh
+        # by default — which varies by viewport and causes inconsistency across
+        # screens. On the published path _snap_sections is already in memory;
+        # inject a <style> rule (not inline) so drag handles remain unaffected.
+        # Admin preview overrides this via _updateViewportFix() which runs after
+        # page load and writes to a later stylesheet element — so admin wins.
+        if _snap_sections:
+            _hero_h = {r['device']: r['height_px']
+                       for r in _snap_sections
+                       if r.get('section_id') == 'hero' and r.get('height_px')}
+            if _hero_h.get('desktop'):
+                _dh = int(_hero_h['desktop'])
+                _th = int(_hero_h.get('tablet') or _dh)
+                _mh = int(_hero_h.get('mobile') or _th)
+                _hero_style = (
+                    f'<style id="rd-hero-height">'
+                    f'.hero{{height:{_dh}px!important;min-height:{_dh}px!important;}}'
+                    f'@media(max-width:1024px){{.hero{{height:{_th}px!important;min-height:{_th}px!important;}}}}'
+                    f'@media(max-width:768px){{.hero{{height:{_mh}px!important;min-height:{_mh}px!important;}}}}'
+                    f'</style>'
+                ).encode('utf-8')
+                if b'</head>' in content:
+                    content = content.replace(b'</head>', _hero_style + b'</head>', 1)
+
         # Inject site logo URL so main.js can prepend it to nav text
         # Prefer SVG for crisp rendering at any size; fall back to PNG
         _logo_svg  = os.path.join(PREVIEW_DIR, 'assets', 'images', 'logo.svg')

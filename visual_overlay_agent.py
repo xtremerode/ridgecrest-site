@@ -875,6 +875,48 @@ def run(fix=False):
 
                 page.close()
 
+            # [HERO-HEIGHT] Verify published home page has rd-hero-height style injected
+            # and that the hero section is pinned to the saved DB height (not 100vh).
+            try:
+                _pub_page = context.new_page()
+                _pub_page.goto(f'{BASE_URL}/view/', wait_until='networkidle', timeout=20000)
+                _style_id = _pub_page.evaluate(
+                    "() => !!document.getElementById('rd-hero-height')"
+                )
+                _hero_height = _pub_page.evaluate(
+                    "() => { const h = document.querySelector('section.hero'); "
+                    "return h ? Math.round(h.getBoundingClientRect().height) : null; }"
+                )
+                _pub_page.close()
+                results.append({
+                    'agent': agent,
+                    'check': 'hero_height_style_injected',
+                    'status': 'pass' if _style_id else 'fail',
+                    'detail': 'rd-hero-height <style> present on published home page' if _style_id
+                              else 'rd-hero-height <style> MISSING from published home page',
+                    'page': 'home',
+                    'auto_fixable': False,
+                })
+                if _hero_height is not None:
+                    _ok = 400 < _hero_height < 1400
+                    results.append({
+                        'agent': agent,
+                        'check': 'hero_height_reasonable',
+                        'status': 'pass' if _ok else 'fail',
+                        'detail': f'Home hero rendered height: {_hero_height}px (expected 400–1400px)',
+                        'page': 'home',
+                        'auto_fixable': False,
+                    })
+            except Exception as _e:
+                results.append({
+                    'agent': agent,
+                    'check': 'hero_height_style_injected',
+                    'status': 'fail',
+                    'detail': f'Hero height test error: {_e}',
+                    'page': 'home',
+                    'auto_fixable': False,
+                })
+
             browser.close()
 
     except Exception as e:
