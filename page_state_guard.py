@@ -31,7 +31,7 @@ from typing import List, Dict, Any
 #
 # Format: (slug, url_path, hero_image_pattern, description)
 EXPECTED_HEROES = [
-    ('home',              '/view/',                        'og-image',        'Homepage hero'),
+    ('home',              '/view/',                        '1777305909',      'Homepage hero'),
     ('about',             '/view/about.html',              '487bdc0f',        'About page hero'),
     ('portfolio',         '/view/portfolio.html',          '0b10882438704be9','Portfolio page hero'),
     ('process',           '/view/process.html',            'd2d0371f',        'Process page hero'),
