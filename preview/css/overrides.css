@@ -86,3 +86,28 @@
 [data-hero-cta-align="center"] .page-hero__actions { justify-content: center      !important; width: 100% !important; }
 [data-hero-cta-align="right"]  .page-hero__actions { justify-content: flex-end    !important; width: 100% !important; }
 [data-hero-cta-align="split"]  .page-hero__actions { justify-content: space-between !important; width: 100% !important; }
+
+/* ── Service area city links ─────────────────────────────────────────────────
+   locations__list items were <span> elements. Replaced with <a> links pointing
+   to each city's service hub page. These rules replicate the span appearance
+   and add a gold hover state matching the site accent colour.
+   Added: 2026-04-27
+*/
+.locations__list a {
+  font-family: var(--font-display);
+  font-size: clamp(1.1rem, 2vw, 1.5rem);
+  color: var(--charcoal);
+  padding: 0.6rem 1.5rem;
+  position: relative;
+  font-style: italic;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.locations__list a::after {
+  content: '·';
+  position: absolute;
+  right: -0.3rem;
+  color: var(--light);
+}
+.locations__list a:last-child::after { display: none; }
+.locations__list a:hover { color: var(--gold); }
