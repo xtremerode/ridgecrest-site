@@ -74,7 +74,7 @@ PAGES_TO_TEST = [
         'diff__zone in diff__visual--one (service page investment panel)',
     ),
     (
-        'index',
+        'home',
         '/view/index.html',
         ['diff-visual-top'],
         'diff__zone in diff__visual--two (home page — regression check)',

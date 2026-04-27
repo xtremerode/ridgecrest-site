@@ -101,6 +101,17 @@ while IFS= read -r f; do
 done < <(git ls-files | grep -Ei "\.(webp|jpg|jpeg|png|gif)$" 2>/dev/null || true)
 pass "Binary asset backup → $BINARY_BACKUP_DIR ($BINARY_COUNT files)"
 
+# Capture card_settings snapshot so post-phase can detect unintended DB writes
+CARD_SNAPSHOT_FILE="$REPO_DIR/backups/card_snapshot_${TIMESTAMP}.json"
+PGPASSWORD=StrongPass123! psql -h 127.0.0.1 -U agent_user -d marketing_agent -t -A -c \
+  "SELECT row_to_json(t) FROM (SELECT page_slug, card_id, mode, color, image, position, zoom FROM card_settings ORDER BY page_slug, card_id) t;" \
+  2>/dev/null | grep -v '^$' | python3 -c "
+import sys, json
+rows = [json.loads(l.strip()) for l in sys.stdin if l.strip().startswith('{')]
+json.dump(rows, open('$CARD_SNAPSHOT_FILE', 'w'), indent=2)
+print(len(rows))
+" | xargs -I{} bash -c "pass 'card_settings snapshot → $CARD_SNAPSHOT_FILE ({} rows)'" 2>/dev/null || warn "Could not capture card_settings snapshot"
+
 # ─── GATE 4: git commit current state (Rule 19) ───────────────────────────────
 hdr "[4/5] Baseline git commit (Rule 19 — save before edits)"
 cd "$REPO_DIR"
@@ -161,6 +172,7 @@ features=${FEATURES[*]}
 dump_file=${DUMP_FILE}
 baseline_commit=${BASELINE_COMMIT}
 playwright_before=${PLAYWRIGHT_BEFORE_LOG}
+card_snapshot=${CARD_SNAPSHOT_FILE}
 log_pre=${LOG_FILE}
 EOF
 
