@@ -917,6 +917,56 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # [HERO-COLOR-GUARD] Verify service hero pages are not overridden with solid color.
+            # _apply_hero_color_mode() must skip card_ids ending in -hero.
+            for _slug, _page_path in [
+                ('services/kitchen-remodel-dublin',   '/view/services/kitchen-remodel-dublin.html'),
+                ('services/kitchen-remodel-orinda',   '/view/services/kitchen-remodel-orinda.html'),
+                ('services/kitchen-remodel-san-ramon','/view/services/kitchen-remodel-san-ramon.html'),
+                ('services/kitchen-remodel-sunol',    '/view/services/kitchen-remodel-sunol.html'),
+            ]:
+                try:
+                    _svc_page = context.new_page()
+                    _svc_page.goto(f'{BASE_URL}{_page_path}', wait_until='networkidle', timeout=20000)
+                    _color_modes = _svc_page.evaluate(
+                        "() => window.__RD_HERO_COLOR_MODES || null"
+                    )
+                    _hero_bg = _svc_page.evaluate(
+                        "() => { const h = document.querySelector('[data-hero-id]'); "
+                        "return h ? getComputedStyle(h).backgroundImage : null; }"
+                    )
+                    _svc_page.close()
+                    # __RD_HERO_COLOR_MODES must not contain any -hero keys
+                    _bad_keys = [k for k in (_color_modes or {}) if k.endswith('-hero')]
+                    results.append({
+                        'agent': agent,
+                        'check': 'hero_color_guard',
+                        'status': 'fail' if _bad_keys else 'pass',
+                        'detail': (f'Hero color override injected for {_bad_keys}' if _bad_keys
+                                   else f'No color override on hero — guard active'),
+                        'page': _slug,
+                        'auto_fixable': False,
+                    })
+                    # Hero background-image must not be 'none'
+                    _bg_ok = _hero_bg and _hero_bg != 'none' and 'url(' in (_hero_bg or '')
+                    results.append({
+                        'agent': agent,
+                        'check': 'hero_image_visible',
+                        'status': 'pass' if _bg_ok else 'fail',
+                        'detail': (f'Hero background-image: {(_hero_bg or "")[:80]}'),
+                        'page': _slug,
+                        'auto_fixable': False,
+                    })
+                except Exception as _e:
+                    results.append({
+                        'agent': agent,
+                        'check': 'hero_color_guard',
+                        'status': 'fail',
+                        'detail': f'Hero color guard test error on {_slug}: {_e}',
+                        'page': _slug,
+                        'auto_fixable': False,
+                    })
+
             browser.close()
 
     except Exception as e:

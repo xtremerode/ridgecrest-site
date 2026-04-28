@@ -1025,7 +1025,8 @@ def _apply_hero_color_mode(content: bytes, cards: list) -> bytes:
     color_modes = {}
     for c in cards:
         cid = c.get('card_id', '')
-        if c.get('mode') == 'color' and c.get('color') and cid:
+        # Hero elements (-hero suffix) are owned by pages.hero_image — never override with color
+        if c.get('mode') == 'color' and c.get('color') and cid and not cid.endswith('-hero'):
             color_modes[cid] = c['color']
     if not color_modes:
         return content
