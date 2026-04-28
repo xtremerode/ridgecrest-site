@@ -21,10 +21,17 @@ Updated by both Perplexity Computer and Claude Code.
 - [x] Service card overlay was gradient → Fixed to solid 0.5/0.3
 - [x] Favicon was invisible → Rebuilt from RD monogram JPG
 
-## Deferred (Not Yet Rebuilt)
+## Resolved (April 2026 — verified 2026-04-28)
+
+- [x] Section resize drag handles — fully built: `_SECTION_RESIZE_TPL` injected via `preview_server.py`, postMessage saves heights per device
+- [x] services.html and team.html hero restructure — both pages use correct `page-hero page-hero--service` structure
+- [x] Tonya Wilson headshot (team-member-9) — photo uploaded, in DB (`team_members.photo`), file on disk at `images-opt/upload_1777247683_Tonya_Wilson...`
+- [x] AI render review queue (filter-repo recovery) — render review complete per Henry (2026-04-28); 59 active versions set in DB
+- [x] Wix CDN missing images — `ff5b18_c5cb0ea7` and `ff5b18_238b56fc` recovered to `images-opt/`; `ff5b18_98f97a76` accepted as lost and removed from gallery HTML
+
+## Deferred (Not Yet Built)
 
 - [ ] CSS staging preview system — approve/discard wrapper for CSS changes before going live
-- [ ] Section resize drag handles — server API done, frontend JS pending
 - [ ] Elevate Scheduling wrapper — page built, needs user testing on mobile
 
 ## Known Limitations

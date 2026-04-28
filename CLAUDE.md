@@ -153,15 +153,23 @@ When a guardrail execution touches a code path, `visual_overlay_agent.py` MUST i
 
 ## Known Open Gaps
 
+Each item includes a verification hint — run it before declaring the item resolved.
+
 1. **`set-version` gap:** Does NOT update static non-portfolio pages (`index.html`, `portfolio.html`, `about.html`, `contact.html`, `process.html`, `team.html`)
+   - *Verify still open:* `grep -c 'set-version' preview/index.html preview/portfolio.html` — if 0, still unimplemented
 2. **Blog index preload:** No `<link rel="preload">` when no hero is saved — dark flash on first load
+   - *Verify still open:* `grep -c 'rel="preload"' preview/blog.html` — if 0, still missing
 3. **QA blind spot:** Server-rendered CTA URLs in `preview_server.py` templates NOT caught by pre-commit gate — verify manually
-4. **Admin panel SSL:** Accessible via IP only; no subdomain/SSL — deferred
-5. **2 Pleasanton Custom images blocked by Wix CDN:** `ff5b18_98f97a76` and `ff5b18_c5cb0ea7` — return 403. Must be recovered from Wix media library manually.
-6. **Tonya Wilson headshot** (team-member-9) — needs re-upload
-7. **AI renders lost in filter-repo disaster** — 117 of 124 render files deleted from disk. Per Henry: almost every render session had one set as active, so most cards that ever had a render are now displaying the fallback base image instead of their chosen AI render. Investigation needed: determine how many card_settings were silently reset after filter-repo (server may have fallen back to base image when AI render 404'd). Must re-render per card via ✨ Render button.
-8. **services.html and team.html hero restructure** — still pending (reverted 2026-04-16)
-9. **pre-commit hook python path** — system `python3` has Playwright; venv does NOT. Fix pending in `.git/hooks/pre-commit`
+   - *Verify still open:* check `_EDIT_OVERLAY_TPL` and `_CARD_EDIT_OVERLAY_TPL` in `preview_server.py` for any hardcoded CTA URLs
+4. **Admin panel SSL:** Accessible via IP only; no subdomain/SSL — deferred by design
+   - *Verify still open:* `curl -sk https://admin.ridgecrestdesigns.com` — if fails, still IP-only
+5. **pre-commit hook python path** — system `python3` has Playwright; venv does NOT. Fix pending in `.git/hooks/pre-commit`
+   - *Verify still open:* `head -5 .git/hooks/pre-commit | grep python` — if it references the venv, still broken
+
+### Documentation Maintenance Protocol — MANDATORY
+**After every guardrail execution and at every session end:** verify each item above against current code/DB/disk state. Remove or update any item that is no longer accurate. Add new gaps as they are discovered — always include a one-line verification hint.
+
+The Stop hook (`hooks/check_doc_freshness.sh`) will remind you if guardrail runs have occurred since this file was last updated.
 
 ---
 
@@ -205,4 +213,4 @@ Analysis/diagnosis/planning responses are gated by three hooks in `.claude/setti
 
 - GitHub remote for the web project: git@github.com:xtremerode/ridgecrest-site.git (SSH). Deploy key: ridgecrest-do-server (ed25519, stored at /home/claudeuser/.ssh/ridgecrest_do). Git remote name: 'origin'. Both master and ridgecrest-audit branches are on GitHub. Future commits should push to origin automatically via post-phase guardrail.
 
-- The Back button in the render review tool calls restoreSnapshot() before navigating — this functions as an UNDO of the Set It action, reverting the active_version to the previous state. Henry observed this as unexpected behavior: after clicking Back, the LIVE badge disappears because the set was undone. Decision pending: remove restoreSnapshot from doBack() so Back is pure navigation (set stays live).
+- The Back button in the render review tool is pure navigation — it does NOT undo the Set It action. active_version stays live after clicking Back. (restoreSnapshot was removed from doBack() — 2026-04-26)
