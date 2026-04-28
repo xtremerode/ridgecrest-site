@@ -1,8 +1,0 @@
-run_id=run_20260427_200221
-timestamp=20260427_200221
-features=pages-overlay pages-hero
-dump_file=/home/claudeuser/agent/backups/pre_task_20260427_200221.sql
-baseline_commit=5f2d79547bf681818dd11c0ddca2e86ae3dc7524
-playwright_before=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260427_200221_playwright_before.json
-card_snapshot=/home/claudeuser/agent/backups/card_snapshot_20260427_200221.json
-log_pre=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260427_200221_pre.log
