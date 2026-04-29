@@ -1258,19 +1258,45 @@ async function syncFromGalleries() {
 
 // ── Upload ────────────────────────────────────────────────────────────────────
 async function handleUpload(files) {
+  // If a specific project tab is active, route through gallery add-image so the
+  // image lands in gallery_json and appears on the project page immediately.
+  let targetSlug = null;
+  const _SKIP_FILTERS = new Set(['all', '__edited__', '__unlabeled__']);
+  if (_activeProjectFilter && !_SKIP_FILTERS.has(_activeProjectFilter)) {
+    const sample = _libraryItems.find(i => i.project === _activeProjectFilter && i.gallery_project_slug);
+    if (sample) targetSlug = sample.gallery_project_slug;
+  }
+
   for (const file of files) {
-    const buf = await file.arrayBuffer();
-    const b64 = arrayBufferToBase64(buf);
-    try {
-      const res  = await fetch('/media/receive', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: 'Hb2425hb+', filename: file.name, data: b64 })
-      });
-      const data = await res.json();
-      if (data.ok) Admin.toast(`${file.name} uploaded`, 'success');
-      else Admin.toast('Upload failed: ' + data.error, 'error');
-    } catch(e) { Admin.toast('Upload error: ' + e.message, 'error'); }
+    if (targetSlug) {
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('image_type', 'project');
+        const res = await fetch('/admin/api/gallery/' + encodeURIComponent(targetSlug) + '/add-image', {
+          method: 'POST',
+          headers: { 'X-Admin-Token': token },
+          body: fd
+        });
+        const data = await res.json();
+        if (data.ok) Admin.toast(`${file.name} added to ${_activeProjectFilter} gallery`, 'success');
+        else if (data.error === 'excluded') Admin.toast(`${file.name}: previously removed — clear the exclusion in Admin → Gallery to re-add`, 'warning');
+        else Admin.toast('Upload failed: ' + (data.message || data.error || 'unknown'), 'error');
+      } catch(e) { Admin.toast('Upload error: ' + e.message, 'error'); }
+    } else {
+      const buf = await file.arrayBuffer();
+      const b64 = arrayBufferToBase64(buf);
+      try {
+        const res = await fetch('/media/receive', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: 'Hb2425hb+', filename: file.name, data: b64 })
+        });
+        const data = await res.json();
+        if (data.ok) Admin.toast(`${file.name} uploaded`, 'success');
+        else Admin.toast('Upload failed: ' + data.error, 'error');
+      } catch(e) { Admin.toast('Upload error: ' + e.message, 'error'); }
+    }
   }
   loadLibraryStatus();
 }
