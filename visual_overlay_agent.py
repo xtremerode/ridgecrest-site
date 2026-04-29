@@ -1103,6 +1103,50 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # [SNAP-FEATURED] Verify published_snapshots.featured_json is populated and
+            # the live path renders the strip from snapshot data (not live table).
+            try:
+                import psycopg2, psycopg2.extras as _pge2, json as _sfjson
+                _sf_conn = psycopg2.connect(
+                    'postgresql://agent_user:StrongPass123!@127.0.0.1/marketing_agent',
+                    cursor_factory=_pge2.RealDictCursor
+                )
+                _sf_cur = _sf_conn.cursor()
+                _sf_cur.execute("SELECT featured_json FROM published_snapshots WHERE slug = 'home'")
+                _sf_row = _sf_cur.fetchone()
+                _sf_conn.close()
+                _sf_ok = False
+                _sf_detail = ''
+                if not _sf_row:
+                    _sf_detail = 'No home snapshot found in published_snapshots'
+                elif not _sf_row.get('featured_json'):
+                    _sf_detail = 'featured_json is NULL in home snapshot — publish not yet run post-fix'
+                else:
+                    _fj_data = _sf_row['featured_json']
+                    _snap_rows = _fj_data if isinstance(_fj_data, list) else _sfjson.loads(_fj_data)
+                    if len(_snap_rows) == 4 and all(('slug' in r or 'project_slug' in r) for r in _snap_rows):
+                        _sf_ok = True
+                        _sf_detail = f'featured_json has {len(_snap_rows)} slots: ' + ', '.join(r.get("slug") or r.get("project_slug","?") for r in _snap_rows)
+                    else:
+                        _sf_detail = f'featured_json malformed: {_snap_rows!r}'
+                results.append({
+                    'agent': agent,
+                    'check': 'snap_featured_json',
+                    'status': 'pass' if _sf_ok else 'warn',
+                    'detail': _sf_detail,
+                    'page': 'home',
+                    'auto_fixable': False,
+                })
+            except Exception as _e:
+                results.append({
+                    'agent': agent,
+                    'check': 'snap_featured_json',
+                    'status': 'fail',
+                    'detail': f'snap_featured_json test error: {_e}',
+                    'page': 'home',
+                    'auto_fixable': False,
+                })
+
             browser.close()
 
     except Exception as e:

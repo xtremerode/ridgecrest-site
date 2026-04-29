@@ -359,6 +359,7 @@ def _ensure_published_snapshots_table(cur):
           sections_json     TEXT NOT NULL DEFAULT '[]',
           cards_json        TEXT NOT NULL DEFAULT '[]',
           hero_overrides_json TEXT NOT NULL DEFAULT '[]',
+          featured_json       JSONB DEFAULT NULL,
           published_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         )
     """)
@@ -435,11 +436,25 @@ def _snapshot_page(cur, slug):
         "SELECT device, hero_position, hero_zoom, hero_text_x, hero_text_y FROM page_hero_overrides WHERE slug = %s",
         (slug,))
     overrides = [dict(r) for r in cur.fetchall()]
+    # Featured project slots (home page strip, etc.) — wrapped so missing table never blocks publish
+    featured_json_val = None
+    try:
+        cur.execute(
+            "SELECT slot, project_slug, name, city, state, project_type, hero_img"
+            " FROM featured_project_slots f"
+            " JOIN portfolio_projects p ON p.slug = f.project_slug"
+            " WHERE f.page = %s ORDER BY f.slot",
+            (slug,))
+        _fp_rows = cur.fetchall()
+        if _fp_rows:
+            featured_json_val = _json.dumps([dict(r) for r in _fp_rows])
+    except Exception:
+        pass
     cur.execute("""
         INSERT INTO published_snapshots
           (slug, hero_image, hero_position, hero_zoom, hero_text_x, hero_text_y,
-           sections_json, cards_json, hero_overrides_json, published_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+           sections_json, cards_json, hero_overrides_json, featured_json, published_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
         ON CONFLICT (slug) DO UPDATE SET
           hero_image          = EXCLUDED.hero_image,
           hero_position       = EXCLUDED.hero_position,
@@ -449,10 +464,12 @@ def _snapshot_page(cur, slug):
           sections_json       = EXCLUDED.sections_json,
           cards_json          = EXCLUDED.cards_json,
           hero_overrides_json = EXCLUDED.hero_overrides_json,
+          featured_json       = EXCLUDED.featured_json,
           published_at        = NOW()
     """, (
         slug, hero_image, hero_position, hero_zoom, hero_text_x, hero_text_y,
-        _json.dumps(sections), _json.dumps(cards), _json.dumps(overrides)
+        _json.dumps(sections), _json.dumps(cards), _json.dumps(overrides),
+        featured_json_val
     ))
 
 # ── Card settings: DB-backed color/image mode per card ───────────────────────
@@ -4873,10 +4890,27 @@ def view(filename):
             if b'</head>' in content:
                 content = content.replace(b'</head>', _dm_script + b'</head>', 1)
 
-        # Dynamic portfolio strip: replace static card HTML with DB-driven featured projects
+        # Dynamic portfolio strip: replace static card HTML with DB-driven featured projects.
+        # Staging path reads from live featured_project_slots (immediate admin preview).
+        # Live path reads from published snapshot's featured_json (only goes live after Publish).
+        # NULL fallback: old snapshots pre-dating this feature fall back to live table.
         if HAS_DB and slug == 'home':
             try:
-                _featured = _get_featured_projects('home')
+                import json as _fjson
+                _featured = None
+                if _snap:
+                    _fj = _snap.get('featured_json')
+                    if _fj:
+                        _snap_rows = _fjson.loads(_fj) if isinstance(_fj, str) else _fj
+                        # Snapshot rows use 'project_slug' key; _render_featured_strip_html expects 'slug'
+                        if isinstance(_snap_rows, list):
+                            for _r in _snap_rows:
+                                if 'slug' not in _r and 'project_slug' in _r:
+                                    _r['slug'] = _r['project_slug']
+                            _featured = _snap_rows
+                if _featured is None:
+                    # Staging path, or NULL fallback for pre-fix snapshots
+                    _featured = _get_featured_projects('home')
                 if _featured:
                     _strip_html = _render_featured_strip_html(_featured)
                     content = _replace_portfolio_strip_grid(content, _strip_html)
