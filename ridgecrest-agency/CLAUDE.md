@@ -262,3 +262,5 @@ New Meta campaigns take 24–48h+ for ad review and learning phase. ACTIVE statu
 ## Agent-Added Rules
 
 - NEVER run git filter-repo without first backing up all tracked image and asset files. git filter-repo rewrites git history AND simultaneously deletes those files from the working tree. To stop committing images going forward use .gitignore + git rm --cached, NOT filter-repo. Incident 2026-04-26: filter-repo deleted 1761 WebP variants and 61 original Wix source photos from disk. AI renders (not regeneratable from source) were also permanently lost.
+
+- hero_img in portfolio_projects must be uniformly stored as _1920w (e.g. _mv2_1920w.webp, not _mv2.webp). As of 2026-04-29, three rows remain stale (pleasanton-cottage-kitchen, sierra-mountain-ranch, pleasanton-custom) — fix is Task 1 of the home-portfolio-slots guardrail run. _upgrade_card_images() compensates at serve time so the site is not broken, but normalization is required before the featured_project_slots swap endpoint goes live (so it can write card_settings directly without extra path logic).
