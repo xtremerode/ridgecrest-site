@@ -3085,8 +3085,39 @@ _CARD_EDIT_OVERLAY_TPL = """\
           body: JSON.stringify({{page: 'home', slot: slot, project_slug: proj.slug}})
         }}).then(function(r) {{ return r.json(); }}).then(function(res) {{
           if (res.ok) {{
+            // Live DOM update — no page reload, scroll position preserved
+            var cid = 'home-portfolio-' + slot;
+            var cardEl = document.querySelector('[data-card-id="' + cid + '"]');
+            if (cardEl) {{
+              // Mutate existing state object in-place so setupCard() button closures stay live
+              var s = cardMap[cid];
+              if (s) {{
+                s.mode = 'image';
+                s.image = res.image;
+                s.position = '50% 50%';
+                s.zoom = 1.0;
+              }} else {{
+                cardMap[cid] = {{ card_id: cid, mode: 'image', image: res.image, position: '50% 50%', zoom: 1.0 }};
+              }}
+              // Update image cycle index so back/forward buttons start from correct position
+              cardIndices[cid] = findPoolIndex(res.image);
+              applyStyle(cardEl, cardMap[cid]);
+              if (cardRefreshPill[cid]) cardRefreshPill[cid]();
+              // Update link, text, aria-label
+              var parentA = cardEl.closest('a');
+              if (parentA) {{
+                parentA.href = proj.slug + '.html';
+                var locEl = parentA.querySelector('.portfolio-card__loc');
+                var nameEl = parentA.querySelector('.portfolio-card__name');
+                var typeEl = parentA.querySelector('.portfolio-card__type');
+                if (locEl) locEl.textContent = (proj.city ? proj.city + ', ' : '') + (proj.state || 'CA');
+                if (nameEl) nameEl.textContent = proj.name || '';
+                if (typeEl) typeEl.textContent = proj.project_type || '';
+              }}
+              var ptype = (proj.project_type || 'project').toLowerCase();
+              cardEl.setAttribute('aria-label', (proj.name || '') + ' — ' + ptype + ' by Ridgecrest Designs');
+            }}
             overlay.remove();
-            window.location.reload();
           }} else {{
             alert('Swap failed: ' + (res.error || 'unknown error'));
             card.style.opacity = '';

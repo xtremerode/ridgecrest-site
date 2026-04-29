@@ -1067,6 +1067,42 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # [SWAP-BTN] Verify Swap button exists in admin pill for home-portfolio-1
+            try:
+                _sb_page = context.new_page()
+                _sb_page.goto(
+                    f'{BASE_URL}/view/?admin_edit=1&token={token}&_stage=1',
+                    wait_until='networkidle', timeout=20000
+                )
+                _sb_page.wait_for_timeout(600)
+                # Hover the first featured card to expose the pill
+                _sb_card = _sb_page.query_selector('[data-card-id="home-portfolio-1"]')
+                if _sb_card:
+                    _sb_card.hover()
+                    _sb_page.wait_for_timeout(300)
+                # Check Swap button rendered (rendered for all home-portfolio-N slots)
+                _swap_btn = _sb_page.query_selector('[data-rd-overlay="card"] button[title*="Swap"]')
+                _sb_ok = _swap_btn is not None
+                _sb_page.close()
+                results.append({
+                    'agent': agent,
+                    'check': 'swap_btn_home-portfolio-1',
+                    'status': 'pass' if _sb_ok else 'fail',
+                    'detail': 'Swap button found in admin pill for home-portfolio-1' if _sb_ok
+                              else 'Swap button NOT found — check _CARD_EDIT_OVERLAY_TPL',
+                    'page': 'home',
+                    'auto_fixable': False,
+                })
+            except Exception as _e:
+                results.append({
+                    'agent': agent,
+                    'check': 'swap_btn_home-portfolio-1',
+                    'status': 'fail',
+                    'detail': f'swap_btn test error: {_e}',
+                    'page': 'home',
+                    'auto_fixable': False,
+                })
+
             browser.close()
 
     except Exception as e:
