@@ -201,6 +201,20 @@ Analysis/diagnosis/planning responses are gated by three hooks in `.claude/setti
 
 **What this catches**: Any time an analysis/diagnosis question is asked and I attempt to respond without using the Read tool on relevant source files since the question was asked.
 
+## Behavioral Verification Gate — REQUIRED FOR ALL RESPONSES
+
+**Every substantive response must be backed by a tool use in the same turn.** Three hooks enforce this behaviorally (not by keyword):
+
+1. **`UserPromptSubmit`** (`hooks/mark_prompt_pending.sh`) — writes a prompt timestamp to `/tmp/rd_prompt_ts_<session>` and clears the tool-used marker so each turn starts fresh.
+
+2. **`PostToolUse(Bash|Read|Write|Edit|Grep|Glob|Agent|WebFetch|WebSearch)`** (`hooks/log_tool_used.sh`) — writes a tool timestamp to `/tmp/rd_tool_ts_<session>` on any tool use.
+
+3. **`Stop`** (`hooks/check_tool_per_response.sh`) — compares timestamps. If `tool_ts ≤ prompt_ts` (no tool used this turn) AND response length > 300 chars → **exits 2** with: "VERIFICATION GATE: Substantive response with no tool use this turn."
+
+**Why this exists**: 2026-04-29 — complements the keyword-based research gate. The research gate only fires on analysis questions; this gate fires on ALL responses. A response that comes from memory without touching any file or system gets blocked regardless of what words appear in it.
+
+**What this catches**: Any response over ~2-3 sentences generated purely from session context or memory without verifying current state via a tool.
+
 ---
 
 ## Agent-Added Rules
