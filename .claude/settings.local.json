@@ -6,6 +6,10 @@
           {
             "type": "command",
             "command": "bash /home/claudeuser/agent/hooks/detect_analysis_request.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash /home/claudeuser/agent/hooks/mark_prompt_pending.sh"
           }
         ]
       }
@@ -17,6 +21,15 @@
           {
             "type": "command",
             "command": "bash /home/claudeuser/agent/hooks/log_file_read.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Read|Write|Edit|Grep|Glob|Agent|WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /home/claudeuser/agent/hooks/log_tool_used.sh"
           }
         ]
       }
@@ -31,6 +44,10 @@
           {
             "type": "command",
             "command": "bash /home/claudeuser/agent/hooks/check_doc_freshness.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash /home/claudeuser/agent/hooks/check_tool_per_response.sh"
           }
         ]
       }

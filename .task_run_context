@@ -1,0 +1,8 @@
+run_id=run_20260429_003552
+timestamp=20260429_003552
+features=hooks-verification-gate
+dump_file=/home/claudeuser/agent/backups/pre_task_20260429_003552.sql
+baseline_commit=90cf9d81cb5ddd87e4b24199a3645bb754f25af9
+playwright_before=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260429_003552_playwright_before.json
+card_snapshot=/home/claudeuser/agent/backups/card_snapshot_20260429_003552.json
+log_pre=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260429_003552_pre.log
