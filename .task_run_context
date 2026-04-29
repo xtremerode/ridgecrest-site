@@ -1,8 +1,0 @@
-run_id=run_20260429_173239
-timestamp=20260429_173239
-features=server-webp server-routes pages-card
-dump_file=/home/claudeuser/agent/backups/pre_task_20260429_173239.sql
-baseline_commit=a85bf77deb5d8810e7460e00a79f9c5dad704b0e
-playwright_before=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260429_173239_playwright_before.json
-card_snapshot=/home/claudeuser/agent/backups/card_snapshot_20260429_173239.json
-log_pre=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260429_173239_pre.log
