@@ -214,3 +214,5 @@ Analysis/diagnosis/planning responses are gated by three hooks in `.claude/setti
 - GitHub remote for the web project: git@github.com:xtremerode/ridgecrest-site.git (SSH). Deploy key: ridgecrest-do-server (ed25519, stored at /home/claudeuser/.ssh/ridgecrest_do). Git remote name: 'origin'. Both master and ridgecrest-audit branches are on GitHub. Future commits should push to origin automatically via post-phase guardrail.
 
 - The Back button in the render review tool is pure navigation — it does NOT undo the Set It action. active_version stays live after clicking Back. (restoreSnapshot was removed from doBack() — 2026-04-26)
+
+- Henry is not a coder. When he describes a system or automated behavior, Claude must identify and fill in any architectural gaps he left out (trigger timing, verification method, failure mode) and surface them explicitly before implementing. Never assume he meant to leave gaps; assume he needs Claude to complete the design.
