@@ -4186,13 +4186,23 @@ def _to_webp(src_path: str, quality: int = 92) -> str:
     if src_path.lower().endswith('.webp'):
         return src_path
     try:
-        from PIL import Image as _PILImage
+        import io as _io_icc
+        from PIL import Image as _PILImage, ImageCms as _PILImageCms
         with _PILImage.open(src_path) as img:
             # Preserve transparency for PNG/GIF; flatten to white for JPEG-like
             if img.mode in ('RGBA', 'LA', 'P'):
                 img = img.convert('RGBA')
             else:
-                img = img.convert('RGB')
+                icc = img.info.get('icc_profile')
+                if icc:
+                    try:
+                        src_profile = _PILImageCms.ImageCmsProfile(_io_icc.BytesIO(icc))
+                        srgb_profile = _PILImageCms.createProfile('sRGB')
+                        img = _PILImageCms.profileToProfile(img, src_profile, srgb_profile, outputMode='RGB')
+                    except Exception:
+                        img = img.convert('RGB')
+                else:
+                    img = img.convert('RGB')
             webp_path = os.path.splitext(src_path)[0] + '.webp'
             img.save(webp_path, 'WEBP', quality=quality, method=4)
         os.remove(src_path)
@@ -5425,7 +5435,16 @@ def paste_upload():
     if not m:
         return jsonify({'error': 'Invalid image data'}), 400
     img_bytes = _b64.b64decode(m.group(2))
-    img = _PILImage.open(_io.BytesIO(img_bytes)).convert('RGB')
+    img = _PILImage.open(_io.BytesIO(img_bytes))
+    _icc = img.info.get('icc_profile')
+    if _icc:
+        try:
+            from PIL import ImageCms as _cms
+            img = _cms.profileToProfile(img, _cms.ImageCmsProfile(_io.BytesIO(_icc)), _cms.createProfile('sRGB'), outputMode='RGB')
+        except Exception:
+            img = img.convert('RGB')
+    else:
+        img = img.convert('RGB')
     if img.width > 1920:
         ratio = 1920 / img.width
         img = img.resize((1920, int(img.height * ratio)), _PILImage.LANCZOS)
@@ -10378,8 +10397,17 @@ create_version = {create_version}
 brightness = {brightness}/100; contrast = {contrast}/100; saturation = {saturation}/100
 color_r = {color_r}; color_g = {color_g}; color_b = {color_b}; kelvin = {kelvin}
 
+import io as _io
+from PIL import ImageCms as _cms
 with Image.open(src_path) as img:
-    img = img.convert('RGB')
+    _icc = img.info.get('icc_profile')
+    if _icc:
+        try:
+            img = _cms.profileToProfile(img, _cms.ImageCmsProfile(_io.BytesIO(_icc)), _cms.createProfile('sRGB'), outputMode='RGB')
+        except Exception:
+            img = img.convert('RGB')
+    else:
+        img = img.convert('RGB')
     if brightness != 1.0: img = ImageEnhance.Brightness(img).enhance(brightness)
     if contrast   != 1.0: img = ImageEnhance.Contrast(img).enhance(contrast)
     if saturation != 1.0: img = ImageEnhance.Color(img).enhance(saturation)
