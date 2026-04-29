@@ -192,12 +192,16 @@ document.querySelectorAll('.service-card, .step, .portfolio-card, .portfolio-ite
 
     // Strip any existing width suffix to get the base name
     var baseName = fullName.replace(/_(480|960|1920|201)w$/, '');
-    // Don't process if already has the right suffix for this size
-    var elWidth = el.offsetWidth * (window.devicePixelRatio || 1);
+    // Pick variant based on both width and height — height governs portrait containers,
+    // width governs landscape. AND logic: only step down when BOTH dims fit the variant.
+    // Thresholds 480/270 and 960/540 are worst-case 16:9 landscape at each tier.
+    var dpr = window.devicePixelRatio || 1;
+    var pixW = el.offsetWidth  * dpr;
+    var pixH = el.offsetHeight * dpr;
 
     var suffix = '_1920w'; // default
-    if (elWidth <= 500) suffix = '_480w';
-    else if (elWidth <= 1000) suffix = '_960w';
+    if      (pixW <= 480 && pixH <= 270) suffix = '_480w';
+    else if (pixW <= 960 && pixH <= 540) suffix = '_960w';
 
     var newName = baseName + suffix;
     if (newName === fullName) return; // already correct

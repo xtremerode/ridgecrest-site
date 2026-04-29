@@ -967,6 +967,47 @@ def run(fix=False):
                         'auto_fixable': False,
                     })
 
+            # [PICK-VARIANT] Verify _pickVariant() picks _960w (not _480w) for portrait
+            # strip cards (home-portfolio-2/3/4 are ~246×400 — height-constrained).
+            try:
+                _vp = context.new_page()
+                _vp.goto(f'{BASE_URL}/view/index.html', wait_until='networkidle', timeout=20000)
+                # DOMContentLoaded already fired; _swapAll() has run.
+                _variant_results = _vp.evaluate("""() => {
+                    var ids = ['home-portfolio-1','home-portfolio-2','home-portfolio-3','home-portfolio-4'];
+                    var out = {};
+                    ids.forEach(function(id) {
+                        var el = document.querySelector('[data-card-id="' + id + '"]');
+                        out[id] = el ? el.style.backgroundImage : 'NOT_FOUND';
+                    });
+                    return out;
+                }""")
+                _vp.close()
+                # Portrait cards (2,3,4) must not have _480w — height 400px > 270px threshold
+                for _cid in ['home-portfolio-2', 'home-portfolio-3', 'home-portfolio-4']:
+                    _bg = _variant_results.get(_cid, '')
+                    _has_480 = '_480w' in _bg
+                    _has_img = 'images-opt' in _bg or _bg == ''
+                    results.append({
+                        'agent': agent,
+                        'check': f'pick_variant_portrait_{_cid}',
+                        'status': 'fail' if _has_480 else 'pass',
+                        'detail': (f'REGRESSION: {_cid} using _480w on 400px-tall container: {_bg[:80]}'
+                                   if _has_480 else
+                                   f'{_cid} variant OK (no _480w): {_bg[:80]}'),
+                        'page': 'home',
+                        'auto_fixable': False,
+                    })
+            except Exception as _e:
+                results.append({
+                    'agent': agent,
+                    'check': 'pick_variant_portrait',
+                    'status': 'fail',
+                    'detail': f'pick_variant portrait test error: {_e}',
+                    'page': 'home',
+                    'auto_fixable': False,
+                })
+
             browser.close()
 
     except Exception as e:

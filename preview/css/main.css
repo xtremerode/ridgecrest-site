@@ -1817,12 +1817,10 @@ p { line-height: 1.8; }
 
 /* Portfolio card unique images 2 & 4 on homepage */
 .portfolio-card__img--2 {
-  background-image: url('/assets/images-opt/ff5b18_d7eb886d364544c1993777e2db5e8bb6_mv2_960w.webp');
   background-size: cover; background-position: center;
   background-color: #2a2520;
 }
 .portfolio-card__img--4 {
-  background-image: url('/assets/images-opt/ff5b18_39536b28ce0447b9a87797bb4c70ee51_mv2_960w.webp');
   background-size: cover; background-position: center;
   background-color: #28221c;
 }
