@@ -12703,6 +12703,13 @@ def gallery_replace_image(slug):
             new_gallery = gallery + [[final_base, 'webp']]
         cur.execute("UPDATE portfolio_projects SET gallery_json = %s WHERE slug = %s",
                     (json.dumps(new_gallery), slug))
+        # Upload is the new source of truth — clear any AI active_version for both
+        # the old hash and the new hash so the freshly uploaded file is what renders.
+        for _clear_hash in set([old_hash, final_base]):
+            _base_fname = _clear_hash + '.webp' if not _clear_hash.endswith('.webp') else _clear_hash
+            cur.execute(
+                "UPDATE image_labels SET active_version = NULL WHERE filename = %s",
+                (_base_fname,))
         conn.commit()
         conn.close()
         p['gallery'] = new_gallery

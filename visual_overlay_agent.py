@@ -98,6 +98,12 @@ PAGES_TO_TEST = [
         'gallery-item card (rotate button + render button on gallery items)',
     ),
     (
+        'danville-hilltop',
+        '/view/danville-hilltop.html',
+        ['danville-hilltop-gal-ff5b18_63757c728db94733b4f60a7102c0f722_mv2'],
+        'gallery-item card whose active_version was cleared — replace-image must reset to base file',
+    ),
+    (
         'bathroom-remodels',
         '/view/bathroom-remodels.html',
         ['bathroom-remodels-gallery-1'],
