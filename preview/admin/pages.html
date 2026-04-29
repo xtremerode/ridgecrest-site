@@ -103,7 +103,7 @@
       background: #111b27;
     }
     #siteFrame {
-      position: absolute;
+      position: sticky;
       top: 0;
       left: 0;
       /* width set by scaleFrame() — 1440px desktop, 768px iPad, 390px Phone */
@@ -4161,7 +4161,7 @@
       siteFrame.style.transformOrigin = 'top left';
       siteFrame.style.transform       = `scale(${scale})`;
       // Proxy drives scroll: visual height = iframe content height × scale
-      frameScrollProxy.style.height = Math.ceil(iframeH * scale) + 'px';
+      frameScrollProxy.style.height = Math.max(0, Math.ceil(iframeH * scale) + frameWrap.clientHeight - Math.ceil(frameWrap.clientHeight / scale)) + 'px';
       frameWrap.style.overflowY      = 'auto';
     } else {
       // Mobile/tablet: render at true device width, no scaling, centered in panel.
