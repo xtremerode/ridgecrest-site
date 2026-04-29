@@ -1274,6 +1274,64 @@ def _replace_portfolio_strip_grid(content_bytes: bytes, new_inner_html: str) -> 
     return (html[:start] + '\n' + new_inner_html + '\n' + html[end:]).encode('utf-8')
 
 
+def _render_portfolio_featured_html(projects: list) -> str:
+    """Render inner HTML for .portfolio-featured__grid from featured project rows."""
+    parts = []
+    for row in projects:
+        slot     = row['slot']
+        slug     = row.get('slug') or row.get('project_slug', '')
+        name     = row.get('name') or ''
+        city     = row.get('city') or ''
+        state    = row.get('state') or 'CA'
+        ptype    = row.get('project_type') or ''
+        year     = row.get('year')
+        loc_str  = f'{city}, {state}' if city else state
+        type_str = f'{ptype} · {year}' if year and ptype else ptype
+        aria     = f'{name} — {ptype.lower() if ptype else "project"} by Ridgecrest Designs'
+        parts.append(
+            f'<a class="portfolio-featured__card" href="{slug}.html">\n'
+            f'<div aria-label="{aria}" class="portfolio-featured__img"'
+            f' data-card-id="portfolio-featured-{slot}" role="img"></div>\n'
+            f'<div class="portfolio-featured__overlay"></div>\n'
+            f'<div class="portfolio-featured__info">\n'
+            f'<span class="portfolio-featured__loc">{loc_str}</span>\n'
+            f'<h3 class="portfolio-featured__name">{name}</h3>\n'
+            f'<span class="portfolio-featured__type">{type_str}</span>\n'
+            f'</div>\n</a>'
+        )
+    return '\n'.join(parts)
+
+
+def _replace_portfolio_featured_grid(content_bytes: bytes, new_inner_html: str) -> bytes:
+    """Replace inner content of .portfolio-featured__grid without disturbing surrounding HTML."""
+    html = content_bytes.decode('utf-8')
+    marker = '<div class="portfolio-featured__grid">'
+    idx = html.find(marker)
+    if idx < 0:
+        return content_bytes
+    start = idx + len(marker)
+    depth = 1
+    pos   = start
+    end   = -1
+    while pos < len(html) and depth > 0:
+        nd = html.find('<div', pos)
+        nc = html.find('</div>', pos)
+        if nd >= 0 and (nc < 0 or nd < nc):
+            depth += 1
+            pos = nd + 4
+        elif nc >= 0:
+            depth -= 1
+            if depth == 0:
+                end = nc
+                break
+            pos = nc + 6
+        else:
+            break
+    if end < 0:
+        return content_bytes
+    return (html[:start] + '\n' + new_inner_html + '\n' + html[end:]).encode('utf-8')
+
+
 def _inject_auto_section_ids(html: str) -> str:
     """Inject data-rd-section on <section> elements and hero <div>s that lack them.
     Algorithm mirrors the JS _seenIds counter so IDs are consistent between server
@@ -1918,16 +1976,17 @@ _CARD_EDIT_OVERLAY_TPL = """\
     cardBackBtn.style.display = 'none'; // [PX] start hidden, show on forward cycle
     pill.appendChild(renderBtn);
 
-    // [FEATURED] Swap Project button — only for home-portfolio-1..4 slots
-    if (/^home-portfolio-[1-4]$/.test(cardId)) {{
+    // [FEATURED] Swap Project button — home-portfolio-1..4 and portfolio-featured-1..4
+    if (/^home-portfolio-[1-4]$/.test(cardId) || /^portfolio-featured-[1-4]$/.test(cardId)) {{
       var swapBtn = document.createElement('button');
       swapBtn.textContent = '⇄ Swap';
       swapBtn.title = 'Swap featured project in this slot';
       swapBtn.style.cssText = 'padding:5px 11px;font-size:11px;font-weight:700;font-family:system-ui,sans-serif;border:none;cursor:pointer;line-height:1.4;white-space:nowrap;background:#0369a1;color:#fff';
       swapBtn.addEventListener('click', function(ev) {{
         ev.stopPropagation(); ev.preventDefault();
-        var slot = parseInt(cardId.replace('home-portfolio-', ''), 10);
-        _openSwapProjectModal(slot);
+        var _swapPage = /^home-portfolio-/.test(cardId) ? 'home' : 'portfolio';
+        var _swapSlot = parseInt(cardId.replace(/^home-portfolio-|^portfolio-featured-/, ''), 10);
+        _openSwapProjectModal(_swapPage, _swapSlot);
       }});
       pill.appendChild(swapBtn);
     }}
@@ -3010,25 +3069,23 @@ _CARD_EDIT_OVERLAY_TPL = """\
   }})();
 
   // ── Featured Project Picker ─────────────────────────────────────────────
-  function _openSwapProjectModal(slot) {{
-    // Fetch all published projects + current featured slot data
+  function _openSwapProjectModal(page, slot) {{
     var token = TOKEN;
     Promise.all([
       fetch('/admin/api/portfolio', {{headers: {{'X-Admin-Token': token}}}}).then(function(r) {{ return r.json(); }}),
-      fetch('/admin/api/home-featured?page=home', {{headers: {{'X-Admin-Token': token}}}}).then(function(r) {{ return r.json(); }})
+      fetch('/admin/api/home-featured?page=' + page, {{headers: {{'X-Admin-Token': token}}}}).then(function(r) {{ return r.json(); }})
     ]).then(function(results) {{
       var allProjects = (results[0] || []).filter(function(p) {{ return p.published; }});
       var featuredSlots = (results[1].slots || []);
       var currentSlug = '';
-      featuredSlots.forEach(function(s) {{ if (s.slot === slot) currentSlug = s.slug; }});
-      _renderSwapModal(slot, allProjects, currentSlug);
+      featuredSlots.forEach(function(s) {{ if (s.slot === slot) currentSlug = s.slug || s.project_slug; }});
+      _renderSwapModal(page, slot, allProjects, currentSlug);
     }}).catch(function(err) {{
       alert('Could not load projects: ' + err);
     }});
   }}
 
-  function _renderSwapModal(slot, projects, currentSlug) {{
-    // Remove any existing modal
+  function _renderSwapModal(page, slot, projects, currentSlug) {{
     var existing = document.getElementById('rd-swap-modal');
     if (existing) existing.remove();
 
@@ -3055,6 +3112,12 @@ _CARD_EDIT_OVERLAY_TPL = """\
     var grid = document.createElement('div');
     grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;';
 
+    // Selector prefixes differ between home strip and portfolio featured grid
+    var _cardIdPrefix  = page === 'home' ? 'home-portfolio-'    : 'portfolio-featured-';
+    var _locSelector   = page === 'home' ? '.portfolio-card__loc'  : '.portfolio-featured__loc';
+    var _nameSelector  = page === 'home' ? '.portfolio-card__name' : '.portfolio-featured__name';
+    var _typeSelector  = page === 'home' ? '.portfolio-card__type' : '.portfolio-featured__type';
+
     projects.forEach(function(proj) {{
       var card = document.createElement('div');
       var isCurrent = proj.slug === currentSlug;
@@ -3062,7 +3125,6 @@ _CARD_EDIT_OVERLAY_TPL = """\
       card.addEventListener('mouseenter', function() {{ if (!isCurrent) card.style.borderColor = '#555'; }});
       card.addEventListener('mouseleave', function() {{ card.style.borderColor = isCurrent ? '#3b82f6' : 'transparent'; }});
 
-      // Thumbnail — use 480w variant of hero_img
       var thumb = document.createElement('div');
       var thumbSrc = (proj.hero_img || '').replace(/_1920w\.webp$/, '_480w.webp').replace(/_mv2\.webp$/, '_mv2_480w.webp');
       thumb.style.cssText = 'width:100%;height:120px;background:#333 url("' + thumbSrc + '") center/cover no-repeat;';
@@ -3099,14 +3161,13 @@ _CARD_EDIT_OVERLAY_TPL = """\
         fetch('/admin/api/home-featured', {{
           method: 'POST',
           headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
-          body: JSON.stringify({{page: 'home', slot: slot, project_slug: proj.slug}})
+          body: JSON.stringify({{page: page, slot: slot, project_slug: proj.slug}})
         }}).then(function(r) {{ return r.json(); }}).then(function(res) {{
           if (res.ok) {{
             // Live DOM update — no page reload, scroll position preserved
-            var cid = 'home-portfolio-' + slot;
+            var cid = _cardIdPrefix + slot;
             var cardEl = document.querySelector('[data-card-id="' + cid + '"]');
             if (cardEl) {{
-              // Mutate existing state object in-place so setupCard() button closures stay live
               var s = cardMap[cid];
               if (s) {{
                 s.mode = 'image';
@@ -3116,17 +3177,15 @@ _CARD_EDIT_OVERLAY_TPL = """\
               }} else {{
                 cardMap[cid] = {{ card_id: cid, mode: 'image', image: res.image, position: '50% 50%', zoom: 1.0 }};
               }}
-              // Update image cycle index so back/forward buttons start from correct position
               cardIndices[cid] = findPoolIndex(res.image);
               applyStyle(cardEl, cardMap[cid]);
               if (cardRefreshPill[cid]) cardRefreshPill[cid]();
-              // Update link, text, aria-label
               var parentA = cardEl.closest('a');
               if (parentA) {{
                 parentA.href = proj.slug + '.html';
-                var locEl = parentA.querySelector('.portfolio-card__loc');
-                var nameEl = parentA.querySelector('.portfolio-card__name');
-                var typeEl = parentA.querySelector('.portfolio-card__type');
+                var locEl = parentA.querySelector(_locSelector);
+                var nameEl = parentA.querySelector(_nameSelector);
+                var typeEl = parentA.querySelector(_typeSelector);
                 if (locEl) locEl.textContent = (proj.city ? proj.city + ', ' : '') + (proj.state || 'CA');
                 if (nameEl) nameEl.textContent = proj.name || '';
                 if (typeEl) typeEl.textContent = proj.project_type || '';
@@ -3152,7 +3211,6 @@ _CARD_EDIT_OVERLAY_TPL = """\
 
     modal.appendChild(grid);
     overlay.appendChild(modal);
-    // Close on background click
     overlay.addEventListener('click', function(ev) {{ if (ev.target === overlay) overlay.remove(); }});
     document.body.appendChild(overlay);
   }}
@@ -4914,6 +4972,28 @@ def view(filename):
                 if _featured:
                     _strip_html = _render_featured_strip_html(_featured)
                     content = _replace_portfolio_strip_grid(content, _strip_html)
+            except Exception:
+                pass  # never break page serving
+
+        # Portfolio featured strip: same snapshot/staging pattern as home strip
+        if HAS_DB and slug == 'portfolio':
+            try:
+                import json as _pfjson
+                _pf_featured = None
+                if _snap:
+                    _pfj = _snap.get('featured_json')
+                    if _pfj:
+                        _pf_rows = _pfjson.loads(_pfj) if isinstance(_pfj, str) else _pfj
+                        if isinstance(_pf_rows, list):
+                            for _r in _pf_rows:
+                                if 'slug' not in _r and 'project_slug' in _r:
+                                    _r['slug'] = _r['project_slug']
+                            _pf_featured = _pf_rows
+                if _pf_featured is None:
+                    _pf_featured = _get_featured_projects('portfolio')
+                if _pf_featured:
+                    _pf_html = _render_portfolio_featured_html(_pf_featured)
+                    content = _replace_portfolio_featured_grid(content, _pf_html)
             except Exception:
                 pass  # never break page serving
 
@@ -8229,13 +8309,22 @@ def admin_home_featured_post():
             VALUES (%s, %s, %s, NOW())
             ON CONFLICT (page, slot) DO UPDATE SET project_slug = EXCLUDED.project_slug, updated_at = NOW()
         """, (page, slot, project_slug))
-        # Auto-fill card_settings with the project's hero image
+        # Auto-fill card_settings with the project's hero image.
+        # Home strip cards are tall (400px) — use _1920w.
+        # Portfolio featured cards are standard thumbnail size — use _960w.
         hero_img = proj['hero_img'] or ''
         if hero_img.endswith('_mv2.webp'):
-            candidate = hero_img.replace('_mv2.webp', '_mv2_1920w.webp')
+            # Normalize bare base path to sized variant
+            size_suffix = '_mv2_960w.webp' if page == 'portfolio' else '_mv2_1920w.webp'
+            candidate = hero_img.replace('_mv2.webp', size_suffix)
             if os.path.isfile(os.path.join(PREVIEW_DIR, candidate.lstrip('/'))):
                 hero_img = candidate
-        card_id = f'{page}-portfolio-{slot}'
+        elif page == 'portfolio' and hero_img.endswith('_1920w.webp'):
+            # Downsize from 1920w to 960w for portfolio card thumbnails
+            candidate = hero_img.replace('_1920w.webp', '_960w.webp')
+            if os.path.isfile(os.path.join(PREVIEW_DIR, candidate.lstrip('/'))):
+                hero_img = candidate
+        card_id = f'portfolio-featured-{slot}' if page == 'portfolio' else f'home-portfolio-{slot}'
         cur.execute("""
             INSERT INTO card_settings (page_slug, card_id, mode, image, position, zoom, updated_at)
             VALUES (%s, %s, 'image', %s, '50%% 50%%', 1.0, NOW())

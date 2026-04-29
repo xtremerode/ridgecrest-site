@@ -1147,6 +1147,96 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # [PF-STRIP] Verify portfolio featured grid renders 4 DB-driven cards
+            try:
+                import psycopg2, psycopg2.extras as _pfse
+                _pfs_conn = psycopg2.connect(
+                    'postgresql://agent_user:StrongPass123!@127.0.0.1/marketing_agent',
+                    cursor_factory=_pfse.RealDictCursor
+                )
+                _pfs_cur = _pfs_conn.cursor()
+                _pfs_cur.execute("""
+                    SELECT f.slot, p.slug FROM featured_project_slots f
+                    JOIN portfolio_projects p ON p.slug = f.project_slug
+                    WHERE f.page = 'portfolio' ORDER BY f.slot
+                """)
+                _pfs_rows = {r['slot']: r['slug'] for r in _pfs_cur.fetchall()}
+                _pfs_conn.close()
+
+                _pfs_page = browser.new_page()
+                _pfs_page.goto(f'{BASE_URL}/view/portfolio.html', wait_until='networkidle')
+                _pfs_page.wait_for_timeout(500)
+
+                _pfs_ok = True
+                _pfs_detail = []
+                for _slot in range(1, 5):
+                    _cid = f'portfolio-featured-{_slot}'
+                    _card_el = _pfs_page.query_selector(f'[data-card-id="{_cid}"]')
+                    if not _card_el:
+                        _pfs_ok = False
+                        _pfs_detail.append(f'slot {_slot}: {_cid} missing')
+                        continue
+                    _expected = _pfs_rows.get(_slot, '')
+                    _href = _pfs_page.evaluate('el => el.closest("a") ? el.closest("a").getAttribute("href") : null', _card_el)
+                    if _expected and _href and _expected not in _href:
+                        _pfs_ok = False
+                        _pfs_detail.append(f'slot {_slot}: href={_href!r} expected={_expected!r}')
+                    else:
+                        _pfs_detail.append(f'slot {_slot}: OK ({_expected})')
+                _pfs_page.close()
+
+                results.append({
+                    'agent': agent,
+                    'check': 'portfolio_featured_strip',
+                    'status': 'pass' if _pfs_ok else 'fail',
+                    'detail': '; '.join(_pfs_detail),
+                    'page': 'portfolio',
+                    'auto_fixable': False,
+                })
+            except Exception as _e:
+                results.append({
+                    'agent': agent,
+                    'check': 'portfolio_featured_strip',
+                    'status': 'fail',
+                    'detail': f'portfolio_featured_strip error: {_e}',
+                    'page': 'portfolio',
+                    'auto_fixable': False,
+                })
+
+            # [PF-SWAP-BTN] Verify Swap button appears for portfolio-featured-1 in admin edit mode
+            try:
+                _pfsb_page = context.new_page()
+                _pfsb_page.goto(
+                    f'{BASE_URL}/view/portfolio.html?admin_edit=1&token={token}&_stage=1',
+                    wait_until='networkidle', timeout=20000
+                )
+                _pfsb_page.wait_for_timeout(600)
+                _pfsb_card = _pfsb_page.query_selector('[data-card-id="portfolio-featured-1"]')
+                if _pfsb_card:
+                    _pfsb_card.hover()
+                    _pfsb_page.wait_for_timeout(300)
+                _pfsb_btn = _pfsb_page.query_selector('[data-rd-overlay="card"] button[title*="Swap"]')
+                _pfsb_ok = _pfsb_btn is not None
+                _pfsb_page.close()
+                results.append({
+                    'agent': agent,
+                    'check': 'swap_btn_portfolio-featured-1',
+                    'status': 'pass' if _pfsb_ok else 'fail',
+                    'detail': 'Swap button found for portfolio-featured-1' if _pfsb_ok
+                              else 'Swap button NOT found for portfolio-featured-1',
+                    'page': 'portfolio',
+                    'auto_fixable': False,
+                })
+            except Exception as _e:
+                results.append({
+                    'agent': agent,
+                    'check': 'swap_btn_portfolio-featured-1',
+                    'status': 'fail',
+                    'detail': f'pf_swap_btn test error: {_e}',
+                    'page': 'portfolio',
+                    'auto_fixable': False,
+                })
+
             browser.close()
 
     except Exception as e:
