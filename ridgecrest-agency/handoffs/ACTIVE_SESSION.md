@@ -1,25 +1,26 @@
-# ACTIVE SESSION — 2026-04-29 (morning, saved)
+# ACTIVE SESSION — 2026-04-29 (afternoon, complete)
 
 ## State Found
 - Branch: ridgecrest-audit
-- Last guardrail run: run_20260429_064356 (portfolio-featured + server-routes + pages-card + pages-overlay)
-- All feature locks: locked
-- No uncommitted changes
-
-## What Was Open When Session Started
-- DSC_7150.webp: on disk, no responsive variants, not in danville-hilltop gallery_json
-- Prior session diagnosis pending Henry approval to execute
+- Henry had gone to bed. Resumed with three reported issues: Danville Hilltop upload failure, color alteration on upload, identity question about "Hilltop Hideaway" project.
+- Morning session had diagnosed all four bugs in discussion mode. Henry confirmed Hilltop Hideaway = Danville Hilltop.
+- All features locked at session start.
 
 ## What This Session Did
-Discussion only — no code changes.
 
-Three issues diagnosed:
-1. DSC_7150 still unresolved (confirmed diagnosis accurate, plan ready, not yet approved)
-2. "Hilltop Hideaway" upload failure — BLOCKED: no project by that name in DB; Henry must clarify which project
-3. Color alteration on upload — ROOT CAUSE FOUND: `_to_webp()` line 4182 strips ICC profile without color space conversion; fix is a one-function change, ready to implement when approved
+Four guardrail runs, all gates passed:
 
-## Session Ended
-Henry said "save." All findings written to 2026-04-29-claude-session.md.
+1. **run_20260429_172219** — Cleared 8 gallery exclusions for danville-hilltop (DB-only)
+2. **run_20260429_173239** — Fixed ICC color profile stripping at 3 call sites in preview_server.py
+3. **run_20260429_173630** — New replace-image endpoint + JS routing for gallery card upload button
+4. **run_20260429_174237** — Media Library upload routing through gallery add-image when project tab is active
+
+All pushed to GitHub on ridgecrest-audit branch.
+
+## What Is Open
+- DSC_7150: Henry can now re-upload via gallery "+" button
+- diff__zone pill z-index bug: still unresolved
+- ridgecrest-audit branch not yet merged to master
 
 ## First Thing Next Session
-Ask Henry which project "Hilltop Hideaway" refers to — this is blocking the upload issue diagnosis.
+Nothing blocking. Can begin fresh work or test the gallery replace/upload flows.
