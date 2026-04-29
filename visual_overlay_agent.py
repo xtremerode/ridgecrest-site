@@ -702,6 +702,7 @@ def _check_gallery_item(page, card_id, slug, token):
                 opacity: opacity,
                 hasRotate: btnTexts.some(function(t) {{ return t === '↻'; }}),
                 hasRender: btnTexts.some(function(t) {{ return t.indexOf('Render') !== -1 || t === '✨'; }}),
+                hasUpload: btnTexts.some(function(t) {{ return t === '+'; }}),
                 btnTexts: btnTexts
             }};
         }}""")
@@ -718,6 +719,8 @@ def _check_gallery_item(page, card_id, slug, token):
                         f'{card_id}: rotate button {"present" if pill_info.get("hasRotate") else "MISSING"} — buttons: {pill_info.get("btnTexts")}'))
         checks.append(('gallery_render_btn', pill_info.get('hasRender', False),
                         f'{card_id}: render button {"present" if pill_info.get("hasRender") else "MISSING"} — buttons: {pill_info.get("btnTexts")}'))
+        checks.append(('gallery_upload_btn', pill_info.get('hasUpload', False),
+                        f'{card_id}: upload (+) button {"present" if pill_info.get("hasUpload") else "MISSING"} — buttons: {pill_info.get("btnTexts")}'))
 
         # Check render button will send the correct base filename.
         # We verify by inspecting data-src directly (source of truth for gallery render path)

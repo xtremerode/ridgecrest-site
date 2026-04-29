@@ -2175,18 +2175,32 @@ _CARD_EDIT_OVERLAY_TPL = """\
       uploadBtn.disabled = true;
       var fd = new FormData();
       fd.append('file', file);
-      fetch('/admin/api/images/upload', {{
+      var _curHash = el.getAttribute('data-gallery-hash') || '';
+      var _uploadUrl, _isReplace = false;
+      if (isGalleryItem && _curHash) {{
+        var _p = window.location.pathname || '';
+        var _s = _p.replace(/^.*\/view\//, '').replace(/\.html.*$/, '');
+        var _curSlug = (_s && _s !== 'index') ? _s : SLUG;
+        fd.append('old_hash', _curHash);
+        _uploadUrl = '/admin/api/gallery/' + encodeURIComponent(_curSlug) + '/replace-image';
+        _isReplace = true;
+      }} else {{
+        _uploadUrl = '/admin/api/images/upload';
+      }}
+      fetch(_uploadUrl, {{
         method: 'POST',
         headers: {{'X-Admin-Token': TOKEN}},
         body: fd
       }}).then(function(r) {{ return r.json(); }}).then(function(d) {{
         if (d.ok) {{
+          var newPath = d.path || ('/assets/images-opt/' + d.new_hash + '.webp');
           state.mode = 'image';
-          state.image = d.path;
+          state.image = newPath;
           if (isGalleryItem) {{
-            el.setAttribute('data-src', d.path);
+            el.setAttribute('data-src', newPath);
+            if (_isReplace && d.new_hash) {{ el.setAttribute('data-gallery-hash', d.new_hash); }}
             var img = el.querySelector('img');
-            if (img) img.src = d.path;
+            if (img) img.src = newPath;
             applyGalleryZoomPan(el, state);
           }} else {{
             applyStyle(el, state);
@@ -12602,6 +12616,99 @@ def gallery_add_image(slug):
         p['gallery'] = gallery
         _render_project_page(p)
         return jsonify({'ok': True, 'filename': final_base, 'gallery_count': len(gallery)})
+    except Exception as e:
+        try: conn.close()
+        except: pass
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/gallery/<slug>/replace-image', methods=['POST'])
+def gallery_replace_image(slug):
+    """Swap an existing gallery image by hash. Accepts multipart/form-data with
+    'file' (image) and 'old_hash' (the gallery entry to replace). Converts to WebP,
+    generates responsive variants (_1920w/_960w/_480w/_201w), swaps hash in gallery_json,
+    re-renders the project page."""
+    err = _require_admin()
+    if err: return err
+    if not re.match(r'^[a-z0-9-]+$', slug):
+        return jsonify({'error': 'invalid slug'}), 400
+    if 'file' not in request.files:
+        return jsonify({'error': 'file required'}), 400
+    old_hash = (request.form.get('old_hash') or '').strip()
+    if not old_hash:
+        return jsonify({'error': 'old_hash required'}), 400
+    f = request.files['file']
+    orig_name = os.path.basename(f.filename or '')
+    if not orig_name:
+        return jsonify({'error': 'invalid filename'}), 400
+    ext = os.path.splitext(orig_name)[1].lower()
+    if ext not in ('.jpg', '.jpeg', '.png', '.webp', '.gif'):
+        return jsonify({'error': 'image files only'}), 400
+    raw_bytes = f.read()
+    opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+    os.makedirs(opt_dir, exist_ok=True)
+    save_path = os.path.join(opt_dir, orig_name)
+    with open(save_path, 'wb') as _sf:
+        _sf.write(raw_bytes)
+    final_path = _to_webp(save_path)
+    final_base = os.path.splitext(os.path.basename(final_path))[0]
+    # Generate responsive variants
+    try:
+        from PIL import Image as _PILImage
+        with _PILImage.open(final_path) as _img:
+            for _suffix, _w in [('_1920w', 1920), ('_960w', 960), ('_480w', 480), ('_201w', 201)]:
+                if _img.width > _w:
+                    _r = _w / _img.width
+                    _resized = _img.resize((_w, int(_img.height * _r)), _PILImage.LANCZOS)
+                else:
+                    _resized = _img.copy()
+                _resized.save(os.path.join(opt_dir, final_base + _suffix + '.webp'), 'WEBP', quality=92)
+    except Exception as _ve:
+        print(f'[replace-image] variant generation failed: {_ve}')
+    # Register hash
+    _hr_conn = _db_conn()
+    if _hr_conn:
+        try:
+            _hrc = _hr_conn.cursor()
+            _register_file_hash(raw_bytes, final_base + '.webp', _hrc)
+            _hr_conn.commit()
+        except Exception:
+            _hr_conn.rollback()
+        finally:
+            try: _hr_conn.close()
+            except: pass
+    # Swap hash in gallery_json
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'db unavailable'}), 500
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM portfolio_projects WHERE slug = %s", (slug,))
+        row = cur.fetchone()
+        if not row:
+            conn.close()
+            return jsonify({'error': 'project not found'}), 404
+        p = _portfolio_row_to_dict(row)
+        gallery = p['gallery']
+        new_gallery = []
+        replaced = False
+        for item in gallery:
+            h = item[0] if isinstance(item, (list, tuple)) else item
+            if h == old_hash and not replaced:
+                new_gallery.append([final_base, 'webp'])
+                replaced = True
+            else:
+                new_gallery.append(item)
+        if not replaced:
+            new_gallery = gallery + [[final_base, 'webp']]
+        cur.execute("UPDATE portfolio_projects SET gallery_json = %s WHERE slug = %s",
+                    (json.dumps(new_gallery), slug))
+        conn.commit()
+        conn.close()
+        p['gallery'] = new_gallery
+        _render_project_page(p)
+        return jsonify({'ok': True, 'new_hash': final_base,
+                        'path': '/assets/images-opt/' + final_base + '.webp'})
     except Exception as e:
         try: conn.close()
         except: pass
