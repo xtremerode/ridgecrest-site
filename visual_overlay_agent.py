@@ -1008,6 +1008,65 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # [FEATURED-STRIP] Verify dynamic portfolio strip renders 4 cards from DB
+            try:
+                import psycopg2, psycopg2.extras as _pge
+                _fs_conn = psycopg2.connect(
+                    'postgresql://agent_user:StrongPass123!@127.0.0.1/marketing_agent',
+                    cursor_factory=_pge.RealDictCursor
+                )
+                _fs_cur = _fs_conn.cursor()
+                _fs_cur.execute("""
+                    SELECT f.slot, p.slug FROM featured_project_slots f
+                    JOIN portfolio_projects p ON p.slug = f.project_slug
+                    WHERE f.page = 'home' ORDER BY f.slot
+                """)
+                _fs_rows = {r['slot']: r['slug'] for r in _fs_cur.fetchall()}
+                _fs_conn.close()
+
+                _fs_page = browser.new_page()
+                _fs_page.goto(f'{BASE_URL}/view/', wait_until='networkidle')
+                _fs_page.wait_for_timeout(500)
+
+                _strip_ok = True
+                _strip_detail = []
+                for _slot in range(1, 5):
+                    # Check data-card-id element exists
+                    _cid = f'home-portfolio-{_slot}'
+                    _card_el = _fs_page.query_selector(f'[data-card-id="{_cid}"]')
+                    if not _card_el:
+                        _strip_ok = False
+                        _strip_detail.append(f'slot {_slot}: {_cid} element missing')
+                        continue
+                    # Check the parent <a> href matches the DB slug
+                    _expected_slug = _fs_rows.get(_slot, '')
+                    _parent_a = _fs_page.query_selector(f'[data-card-id="{_cid}"]')
+                    _href = _fs_page.evaluate('el => el.closest("a") ? el.closest("a").getAttribute("href") : null', _parent_a)
+                    if _expected_slug and _href and _expected_slug not in _href:
+                        _strip_ok = False
+                        _strip_detail.append(f'slot {_slot}: href={_href!r} expected slug={_expected_slug!r}')
+                    else:
+                        _strip_detail.append(f'slot {_slot}: OK ({_expected_slug})')
+                _fs_page.close()
+
+                results.append({
+                    'agent': agent,
+                    'check': 'featured_strip',
+                    'status': 'pass' if _strip_ok else 'fail',
+                    'detail': '; '.join(_strip_detail),
+                    'page': 'home',
+                    'auto_fixable': False,
+                })
+            except Exception as _e:
+                results.append({
+                    'agent': agent,
+                    'check': 'featured_strip',
+                    'status': 'fail',
+                    'detail': f'featured_strip test error: {_e}',
+                    'page': 'home',
+                    'auto_fixable': False,
+                })
+
             browser.close()
 
     except Exception as e:

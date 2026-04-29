@@ -1179,6 +1179,84 @@ def _upgrade_card_images(cards: list) -> list:
     return upgraded
 
 
+def _get_featured_projects(page: str) -> list:
+    """Return featured project rows for a page, ordered by slot."""
+    conn = _db_conn()
+    if not conn:
+        return []
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT f.slot, p.slug, p.name, p.city, p.state, p.project_type, p.hero_img
+            FROM featured_project_slots f
+            JOIN portfolio_projects p ON p.slug = f.project_slug
+            WHERE f.page = %s
+            ORDER BY f.slot
+        """, (page,))
+        return [dict(r) for r in cur.fetchall()]
+    except Exception:
+        return []
+    finally:
+        try: conn.close()
+        except: pass
+
+
+def _render_featured_strip_html(projects: list) -> str:
+    """Render inner HTML for .portfolio-strip__grid from featured project rows."""
+    parts = []
+    for row in projects:
+        slot = row['slot']
+        slug = row['slug']
+        name = row['name'] or ''
+        city = row.get('city') or ''
+        state = row.get('state') or 'CA'
+        ptype = row.get('project_type') or ''
+        card_cls = 'portfolio-card portfolio-card--large' if slot == 1 else 'portfolio-card'
+        loc_str = f'{city}, {state}' if city else state
+        aria = f'{name} — {ptype.lower() if ptype else "project"} by Ridgecrest Designs'
+        parts.append(
+            f'<a class="{card_cls}" href="{slug}.html">\n'
+            f'<div aria-label="{aria}" class="portfolio-card__img portfolio-card__img--{slot}" '
+            f'data-card-id="home-portfolio-{slot}" role="img"></div>\n'
+            f'<div class="portfolio-card__info">\n'
+            f'<span class="portfolio-card__loc">{loc_str}</span>\n'
+            f'<h3 class="portfolio-card__name">{name}</h3>\n'
+            f'<span class="portfolio-card__type">{ptype}</span>\n'
+            f'</div>\n</a>'
+        )
+    return '\n'.join(parts)
+
+
+def _replace_portfolio_strip_grid(content_bytes: bytes, new_inner_html: str) -> bytes:
+    """Replace inner content of .portfolio-strip__grid without disturbing surrounding HTML."""
+    html = content_bytes.decode('utf-8')
+    marker = '<div class="portfolio-strip__grid">'
+    idx = html.find(marker)
+    if idx < 0:
+        return content_bytes
+    start = idx + len(marker)
+    depth = 1
+    pos = start
+    end = -1
+    while pos < len(html) and depth > 0:
+        nd = html.find('<div', pos)
+        nc = html.find('</div>', pos)
+        if nd >= 0 and (nc < 0 or nd < nc):
+            depth += 1
+            pos = nd + 4
+        elif nc >= 0:
+            depth -= 1
+            if depth == 0:
+                end = nc
+                break
+            pos = nc + 6
+        else:
+            break
+    if end < 0:
+        return content_bytes
+    return (html[:start] + '\n' + new_inner_html + '\n' + html[end:]).encode('utf-8')
+
+
 def _inject_auto_section_ids(html: str) -> str:
     """Inject data-rd-section on <section> elements and hero <div>s that lack them.
     Algorithm mirrors the JS _seenIds counter so IDs are consistent between server
@@ -1822,6 +1900,20 @@ _CARD_EDIT_OVERLAY_TPL = """\
     pill.appendChild(cardBackBtn); // [PX] available for all including gallery
     cardBackBtn.style.display = 'none'; // [PX] start hidden, show on forward cycle
     pill.appendChild(renderBtn);
+
+    // [FEATURED] Swap Project button — only for home-portfolio-1..4 slots
+    if (/^home-portfolio-[1-4]$/.test(cardId)) {{
+      var swapBtn = document.createElement('button');
+      swapBtn.textContent = '⇄ Swap';
+      swapBtn.title = 'Swap featured project in this slot';
+      swapBtn.style.cssText = 'padding:5px 11px;font-size:11px;font-weight:700;font-family:system-ui,sans-serif;border:none;cursor:pointer;line-height:1.4;white-space:nowrap;background:#0369a1;color:#fff';
+      swapBtn.addEventListener('click', function(ev) {{
+        ev.stopPropagation(); ev.preventDefault();
+        var slot = parseInt(cardId.replace('home-portfolio-', ''), 10);
+        _openSwapProjectModal(slot);
+      }});
+      pill.appendChild(swapBtn);
+    }}
 
     // Gallery items: type badge (cycles Untagged → Project → Render → Before → Construction → Untagged)
     if (isGalleryItem) {{
@@ -2899,6 +2991,124 @@ _CARD_EDIT_OVERLAY_TPL = """\
       }}
     }});
   }})();
+
+  // ── Featured Project Picker ─────────────────────────────────────────────
+  function _openSwapProjectModal(slot) {{
+    // Fetch all published projects + current featured slot data
+    var token = TOKEN;
+    Promise.all([
+      fetch('/admin/api/portfolio', {{headers: {{'X-Admin-Token': token}}}}).then(function(r) {{ return r.json(); }}),
+      fetch('/admin/api/home-featured?page=home', {{headers: {{'X-Admin-Token': token}}}}).then(function(r) {{ return r.json(); }})
+    ]).then(function(results) {{
+      var allProjects = (results[0] || []).filter(function(p) {{ return p.published; }});
+      var featuredSlots = (results[1].slots || []);
+      var currentSlug = '';
+      featuredSlots.forEach(function(s) {{ if (s.slot === slot) currentSlug = s.slug; }});
+      _renderSwapModal(slot, allProjects, currentSlug);
+    }}).catch(function(err) {{
+      alert('Could not load projects: ' + err);
+    }});
+  }}
+
+  function _renderSwapModal(slot, projects, currentSlug) {{
+    // Remove any existing modal
+    var existing = document.getElementById('rd-swap-modal');
+    if (existing) existing.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'rd-swap-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.82);display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;';
+
+    var modal = document.createElement('div');
+    modal.style.cssText = 'background:#1a1a1a;border-radius:8px;padding:24px;max-width:900px;width:100%;';
+
+    var header = document.createElement('div');
+    header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;';
+    var title = document.createElement('h3');
+    title.textContent = 'Select project for Slot ' + slot;
+    title.style.cssText = 'margin:0;color:#fff;font-family:system-ui,sans-serif;font-size:16px;font-weight:700;';
+    var closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    closeBtn.style.cssText = 'background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;padding:4px 8px;';
+    closeBtn.addEventListener('click', function() {{ overlay.remove(); }});
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+    modal.appendChild(header);
+
+    var grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;';
+
+    projects.forEach(function(proj) {{
+      var card = document.createElement('div');
+      var isCurrent = proj.slug === currentSlug;
+      card.style.cssText = 'border-radius:6px;overflow:hidden;cursor:pointer;border:3px solid ' + (isCurrent ? '#3b82f6' : 'transparent') + ';transition:border-color .15s;';
+      card.addEventListener('mouseenter', function() {{ if (!isCurrent) card.style.borderColor = '#555'; }});
+      card.addEventListener('mouseleave', function() {{ card.style.borderColor = isCurrent ? '#3b82f6' : 'transparent'; }});
+
+      // Thumbnail — use 480w variant of hero_img
+      var thumb = document.createElement('div');
+      var thumbSrc = (proj.hero_img || '').replace(/_1920w\.webp$/, '_480w.webp').replace(/_mv2\.webp$/, '_mv2_480w.webp');
+      thumb.style.cssText = 'width:100%;height:120px;background:#333 url("' + thumbSrc + '") center/cover no-repeat;';
+      card.appendChild(thumb);
+
+      var info = document.createElement('div');
+      info.style.cssText = 'padding:8px 10px;background:#222;';
+      var pname = document.createElement('div');
+      pname.textContent = proj.name || proj.slug;
+      pname.style.cssText = 'color:#fff;font-family:system-ui,sans-serif;font-size:12px;font-weight:700;margin-bottom:2px;';
+      var ploc = document.createElement('div');
+      ploc.textContent = (proj.city ? proj.city + ', ' : '') + (proj.state || 'CA');
+      ploc.style.cssText = 'color:#aaa;font-family:system-ui,sans-serif;font-size:11px;';
+      var ptype = document.createElement('div');
+      ptype.textContent = proj.project_type || '';
+      ptype.style.cssText = 'color:#888;font-family:system-ui,sans-serif;font-size:10px;margin-top:2px;';
+      info.appendChild(pname);
+      info.appendChild(ploc);
+      info.appendChild(ptype);
+      card.appendChild(info);
+
+      if (isCurrent) {{
+        var badge = document.createElement('div');
+        badge.textContent = 'Current';
+        badge.style.cssText = 'position:absolute;top:6px;left:6px;background:#3b82f6;color:#fff;font-size:9px;font-weight:700;font-family:system-ui,sans-serif;padding:2px 6px;border-radius:3px;';
+        card.style.position = 'relative';
+        card.appendChild(badge);
+      }}
+
+      card.addEventListener('click', function() {{
+        if (proj.slug === currentSlug) {{ overlay.remove(); return; }}
+        card.style.opacity = '0.5';
+        card.style.pointerEvents = 'none';
+        fetch('/admin/api/home-featured', {{
+          method: 'POST',
+          headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}},
+          body: JSON.stringify({{page: 'home', slot: slot, project_slug: proj.slug}})
+        }}).then(function(r) {{ return r.json(); }}).then(function(res) {{
+          if (res.ok) {{
+            overlay.remove();
+            window.location.reload();
+          }} else {{
+            alert('Swap failed: ' + (res.error || 'unknown error'));
+            card.style.opacity = '';
+            card.style.pointerEvents = '';
+          }}
+        }}).catch(function(err) {{
+          alert('Request failed: ' + err);
+          card.style.opacity = '';
+          card.style.pointerEvents = '';
+        }});
+      }});
+
+      grid.appendChild(card);
+    }});
+
+    modal.appendChild(grid);
+    overlay.appendChild(modal);
+    // Close on background click
+    overlay.addEventListener('click', function(ev) {{ if (ev.target === overlay) overlay.remove(); }});
+    document.body.appendChild(overlay);
+  }}
+
   // ─────────────────────────────────────────────────────────────────────────
 }})();
 </script>
@@ -4631,6 +4841,16 @@ def view(filename):
             _dm_script = f'<script>window.__RD_DIFF_MODE={_safe_js(_diff_mode)};</script>'.encode('utf-8')
             if b'</head>' in content:
                 content = content.replace(b'</head>', _dm_script + b'</head>', 1)
+
+        # Dynamic portfolio strip: replace static card HTML with DB-driven featured projects
+        if HAS_DB and slug == 'home':
+            try:
+                _featured = _get_featured_projects('home')
+                if _featured:
+                    _strip_html = _render_featured_strip_html(_featured)
+                    content = _replace_portfolio_strip_grid(content, _strip_html)
+            except Exception:
+                pass  # never break page serving
 
         # Inject about-visual panel mode for about page
         if HAS_DB and slug == 'about':
@@ -7884,6 +8104,88 @@ def admin_diff_mode():
         return jsonify({'ok': True, 'mode': mode})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/api/home-featured', methods=['GET'])
+def admin_home_featured_get():
+    """Return current featured project slots for a page (default: home)."""
+    auth = _require_admin()
+    if auth: return auth
+    page = request.args.get('page', 'home')
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'no db'}), 503
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT f.slot, p.slug, p.name, p.city, p.state, p.project_type, p.hero_img
+            FROM featured_project_slots f
+            JOIN portfolio_projects p ON p.slug = f.project_slug
+            WHERE f.page = %s
+            ORDER BY f.slot
+        """, (page,))
+        rows = [dict(r) for r in cur.fetchall()]
+        return jsonify({'slots': rows})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
+
+@app.route('/admin/api/home-featured', methods=['POST'])
+def admin_home_featured_post():
+    """Swap a project into a featured slot and auto-fill card_settings with its hero image."""
+    auth = _require_admin()
+    if auth: return auth
+    data = request.get_json(force=True) or {}
+    page = data.get('page', 'home')
+    slot = data.get('slot')
+    project_slug = (data.get('project_slug') or '').strip()
+    if not isinstance(slot, int) or slot < 1 or slot > 4:
+        return jsonify({'error': 'slot must be 1-4'}), 400
+    if not project_slug:
+        return jsonify({'error': 'project_slug required'}), 400
+    conn = _db_conn()
+    if not conn:
+        return jsonify({'error': 'no db'}), 503
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT slug, name, hero_img FROM portfolio_projects WHERE slug = %s AND published = true",
+            (project_slug,)
+        )
+        proj = cur.fetchone()
+        if not proj:
+            return jsonify({'error': f'Project {project_slug!r} not found or not published'}), 404
+        # Update or insert the featured slot
+        cur.execute("""
+            INSERT INTO featured_project_slots (page, slot, project_slug, updated_at)
+            VALUES (%s, %s, %s, NOW())
+            ON CONFLICT (page, slot) DO UPDATE SET project_slug = EXCLUDED.project_slug, updated_at = NOW()
+        """, (page, slot, project_slug))
+        # Auto-fill card_settings with the project's hero image
+        hero_img = proj['hero_img'] or ''
+        if hero_img.endswith('_mv2.webp'):
+            candidate = hero_img.replace('_mv2.webp', '_mv2_1920w.webp')
+            if os.path.isfile(os.path.join(PREVIEW_DIR, candidate.lstrip('/'))):
+                hero_img = candidate
+        card_id = f'{page}-portfolio-{slot}'
+        cur.execute("""
+            INSERT INTO card_settings (page_slug, card_id, mode, image, position, zoom, updated_at)
+            VALUES (%s, %s, 'image', %s, '50%% 50%%', 1.0, NOW())
+            ON CONFLICT (page_slug, card_id) DO UPDATE SET
+                mode = 'image', image = EXCLUDED.image,
+                position = '50%% 50%%', zoom = 1.0, updated_at = NOW()
+        """, (page, card_id, hero_img))
+        conn.commit()
+        return jsonify({'ok': True, 'slot': slot, 'project_slug': project_slug,
+                        'card_id': card_id, 'image': hero_img})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
 
 
 @app.route('/admin/api/settings/nav-band', methods=['GET', 'POST'])
