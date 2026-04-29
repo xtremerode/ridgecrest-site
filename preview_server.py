@@ -2607,7 +2607,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
 
     // Inject Auto-Tag + Auto-Sort + section "+" buttons above gallery grid if gallery items exist
     var galGrid = document.querySelector('.gallery-masonry');
-    if (galGrid && galGrid.querySelector('[data-gallery-hash]')) {{
+    if (galGrid && galGrid.querySelector('[data-gallery-hash]') && !document.getElementById('rd-sort-wrap')) {{
       var sortWrap = document.createElement('div');
       sortWrap.id = 'rd-sort-wrap';
       sortWrap.style.cssText = 'display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:0 0 12px 0;';
