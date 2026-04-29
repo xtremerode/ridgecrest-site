@@ -1,13 +1,25 @@
-# Active Session — 2026-04-25 (SAVED)
+# ACTIVE SESSION — 2026-04-29 (morning, saved)
 
-Session complete. See `2026-04-25-claude-session.md` for full details.
+## State Found
+- Branch: ridgecrest-audit
+- Last guardrail run: run_20260429_064356 (portfolio-featured + server-routes + pages-card + pages-overlay)
+- All feature locks: locked
+- No uncommitted changes
 
-## Quick State Summary
+## What Was Open When Session Started
+- DSC_7150.webp: on disk, no responsive variants, not in danville-hilltop gallery_json
+- Prior session diagnosis pending Henry approval to execute
 
-**Render review tool:** `http://147.182.242.54:8081/view/admin/render-review.html`
-- 62 cards in queue; 50 have missing renders needing Re-render button
-- Filmstrip shows all `_ai_N` versions per card
-- Reference image upload now wired into Gemini calls
-- Back button works for undo
+## What This Session Did
+Discussion only — no code changes.
 
-**Next session should:** Continue the render review queue from wherever Henry left off.
+Three issues diagnosed:
+1. DSC_7150 still unresolved (confirmed diagnosis accurate, plan ready, not yet approved)
+2. "Hilltop Hideaway" upload failure — BLOCKED: no project by that name in DB; Henry must clarify which project
+3. Color alteration on upload — ROOT CAUSE FOUND: `_to_webp()` line 4182 strips ICC profile without color space conversion; fix is a one-function change, ready to implement when approved
+
+## Session Ended
+Henry said "save." All findings written to 2026-04-29-claude-session.md.
+
+## First Thing Next Session
+Ask Henry which project "Hilltop Hideaway" refers to — this is blocking the upload issue diagnosis.
