@@ -1246,6 +1246,69 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # [NAV-LINKS] Verify project pages use start-a-project.html CTA (not contact.html)
+            # and services/ SEO pages include the Services link.
+            try:
+                _nav_page = context.new_page()
+                _nav_page.goto(f'{BASE_URL}/view/danville-hilltop.html',
+                               wait_until='networkidle', timeout=20000)
+                _nav_hrefs = _nav_page.evaluate("""() => {
+                    var links = document.querySelectorAll('#navLinks a');
+                    return Array.from(links).map(function(a) { return a.getAttribute('href'); });
+                }""")
+                _nav_page.close()
+                _has_sap = any('start-a-project' in (h or '') for h in _nav_hrefs)
+                _has_contact_cta = any(h == 'contact.html' for h in _nav_hrefs)
+                results.append({
+                    'agent': agent,
+                    'check': 'nav_project_cta_href',
+                    'status': 'pass' if (_has_sap and not _has_contact_cta) else 'fail',
+                    'detail': (f'Nav CTA OK — start-a-project present, contact.html absent. hrefs={_nav_hrefs}'
+                               if (_has_sap and not _has_contact_cta) else
+                               f'REGRESSION: contact.html in nav or start-a-project missing. hrefs={_nav_hrefs}'),
+                    'page': 'danville-hilltop',
+                    'auto_fixable': False,
+                })
+            except Exception as _e:
+                results.append({
+                    'agent': agent,
+                    'check': 'nav_project_cta_href',
+                    'status': 'fail',
+                    'detail': f'nav_project_cta_href test error: {_e}',
+                    'page': 'danville-hilltop',
+                    'auto_fixable': False,
+                })
+
+            try:
+                _nav_svc_page = context.new_page()
+                _nav_svc_page.goto(f'{BASE_URL}/view/services/kitchen-remodel-danville.html',
+                                   wait_until='networkidle', timeout=20000)
+                _svc_nav_hrefs = _nav_svc_page.evaluate("""() => {
+                    var links = document.querySelectorAll('#navLinks a');
+                    return Array.from(links).map(function(a) { return a.getAttribute('href'); });
+                }""")
+                _nav_svc_page.close()
+                _has_services = any('services.html' in (h or '') for h in _svc_nav_hrefs)
+                results.append({
+                    'agent': agent,
+                    'check': 'nav_svc_page_services_link',
+                    'status': 'pass' if _has_services else 'fail',
+                    'detail': (f'Services link present in nav. hrefs={_svc_nav_hrefs}'
+                               if _has_services else
+                               f'REGRESSION: Services link missing from services/ page nav. hrefs={_svc_nav_hrefs}'),
+                    'page': 'services/kitchen-remodel-danville',
+                    'auto_fixable': False,
+                })
+            except Exception as _e:
+                results.append({
+                    'agent': agent,
+                    'check': 'nav_svc_page_services_link',
+                    'status': 'fail',
+                    'detail': f'nav_svc_page_services_link test error: {_e}',
+                    'page': 'services/kitchen-remodel-danville',
+                    'auto_fixable': False,
+                })
+
             browser.close()
 
     except Exception as e:
