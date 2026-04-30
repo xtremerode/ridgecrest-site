@@ -59,7 +59,7 @@
 - **Never hardcode `background-image`** in `main.css` for any `data-card-id` element — DB is the single source of truth
 - **`diff__zone::before`:** Never suppress with `display:none` — use `background: var(--rd-overlay, transparent) !important`
 - **Panel saves (T/G/BG):** Always fetch-merge-put — fetch current DB state, merge only UI fields, PUT — never write from stale cardState
-- **Card path normalization:** `_upgrade_card_images()` in `preview_server.py` normalizes bare `_mv2.webp` → `_960w` at serve time
+- **Card path normalization:** `_upgrade_card_images()` in `preview_server.py` normalizes bare `_mv2.webp` → `_960w` and unsized `_ai_N.webp` → `_ai_N_960w.webp` at serve time. Cards already stored with a size suffix (`_960w` or `_1920w`) are left unchanged. The former `_960w → _1920w` upgrade was **removed 2026-04-30** — it caused wire mesh / moiré on 350-720 px card slots.
 
 ---
 

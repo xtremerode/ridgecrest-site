@@ -18,7 +18,9 @@ GUARDRAIL RULE:
   If any check fails, restore from the DB or fix the code — never ship a broken state.
 """
 import sys
+import os
 import re
+import subprocess
 import urllib.request
 import urllib.error
 import argparse
@@ -161,12 +163,69 @@ def check_nav_settings(server: str) -> List[Dict]:
     return results
 
 
+
+def check_card_variants(server: str) -> List[Dict]:
+    """Verify card_settings image paths use _960w, not bare base or _1920w.
+    Portfolio cards are JS-injected at runtime, so we query the DB directly
+    rather than scraping the page HTML.
+    """
+    results = []
+    sql = (
+        "SELECT page_slug, card_id, image FROM card_settings "
+        "WHERE image IS NOT NULL "
+        "AND (image LIKE '%_mv2.webp' "
+        "OR image LIKE '%_1920w.webp' "
+        "OR image ~ '_ai_[0-9]+\\.webp$') "
+        "ORDER BY page_slug, card_id LIMIT 20;"
+    )
+    env = {**os.environ, 'PGPASSWORD': 'StrongPass123!'}
+    try:
+        proc = subprocess.run(
+            ['psql', '-h', '127.0.0.1', '-U', 'agent_user', '-d', 'marketing_agent',
+             '-t', '-A', '-F', '|', '-c', sql],
+            capture_output=True, text=True, timeout=10, env=env,
+        )
+        if proc.returncode != 0:
+            results.append(_r('card_variant_960w', 'warn',
+                f'DB query failed — skipping card variant check: {proc.stderr[:80]}'))
+            return results
+        rows = [r.strip() for r in proc.stdout.strip().split('\n') if '|' in r]
+        if rows:
+            for row in rows:
+                parts = row.split('|')
+                if len(parts) >= 3:
+                    slug, img = parts[0], parts[2]
+                    if img.endswith('_mv2.webp'):
+                        results.append(_r('card_variant_960w', 'fail',
+                            f'bare base: {img}', slug))
+                    elif '_1920w.webp' in img:
+                        results.append(_r('card_variant_960w', 'fail',
+                            f'wrong 1920w variant: {img}', slug))
+                    else:
+                        results.append(_r('card_variant_960w', 'fail',
+                            f'AI render missing size suffix: {img}', slug))
+        else:
+            count_proc = subprocess.run(
+                ['psql', '-h', '127.0.0.1', '-U', 'agent_user', '-d', 'marketing_agent',
+                 '-t', '-A', '-c',
+                 "SELECT COUNT(*) FROM card_settings WHERE image IS NOT NULL;"],
+                capture_output=True, text=True, timeout=10, env=env,
+            )
+            total = count_proc.stdout.strip()
+            results.append(_r('card_variant_960w', 'pass',
+                f'All {total} card image path(s) use correct _960w variant ✓ (DB check)', 'portfolio'))
+    except Exception as e:
+        results.append(_r('card_variant_960w', 'warn',
+            f'Could not run DB card variant check: {e}'))
+    return results
+
 def run(fix: bool = False, server: str = SERVER) -> List[Dict]:
     all_results = []
     for slug, path, pattern, desc in EXPECTED_HEROES:
         results = check_page(slug, path, pattern, desc, server)
         all_results.extend(results)
     all_results.extend(check_nav_settings(server))
+    all_results.extend(check_card_variants(server))
     return all_results
 
 

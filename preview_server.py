@@ -1130,20 +1130,15 @@ def _strip_hero_card_ids(content: bytes) -> bytes:
 
 
 def _upgrade_card_images(cards: list) -> list:
-    """Upgrade _960w → _1920w for background-image cards at serve time.
+    """Normalizes bare _mv2.webp and unsized _ai_N.webp card paths to their
+    _960w variants at serve time. Cards already stored with a size suffix
+    (_960w, _1920w) are left unchanged. Gallery items (-gal- in card_id)
+    are excluded — they use <img> srcset.
 
-    Context: the admin image picker saves _960w paths to card_settings. At
-    typical card display widths (~656 px) a 960 px source downscales only 1.46×,
-    which causes moiré on fine-detail images (wire mesh, grilles). A 1920 px
-    source downscales 2.93× and browser anti-aliasing renders cleanly.
-
-    Scope: only background-image cards (mode='image') whose image path ends in
-    _960w.webp and whose card_id does NOT contain '-gal-' (gallery items are
-    rendered as <img> tags and handled separately by the srcset pipeline).
-
-    The upgrade is conditional: if the _1920w file does not exist on disk, the
-    original _960w path is kept (safe fallback for images that were never
-    optimised to 1920 w).
+    NOTE: The former _960w → _1920w upgrade was removed 2026-04-30. Serving
+    _1920w for 350-720px card slots caused wire mesh / moiré artifacts because
+    browsers apply different anti-aliasing at 3x vs 1.5x downscale. Cards now
+    use _960w which downscales ~1.5x cleanly at typical display widths.
     """
     import os as _os
     upgraded = []
@@ -1158,40 +1153,23 @@ def _upgrade_card_images(cards: list) -> list:
             img = c['image']
             # Strip query strings for path resolution
             img_path = img.split('?')[0]
-            if img_path.endswith('_960w.webp'):
-                candidate = img_path.replace('_960w.webp', '_1920w.webp')
-                # Build absolute filesystem path for existence check
-                rel = candidate.lstrip('/')
-                # Strip leading 'assets/' prefix used in URLs
-                # Images live at PREVIEW_DIR/assets/images-opt/<name>.webp
-                abs_path = _os.path.join(PREVIEW_DIR, rel)
-                if _os.path.isfile(abs_path):
-                    c['image'] = candidate
+            if img_path.endswith('_960w.webp') or img_path.endswith('_1920w.webp'):
+                # Already has a size suffix — leave unchanged
+                pass
             elif img_path.endswith('_mv2.webp'):
-                # Base file saved by admin picker — normalize to _960w first,
-                # then the _960w → _1920w branch above will handle it on the
-                # next pass. Since we process in a single pass, promote directly
-                # to _960w here (the caller may invoke this again if needed, but
-                # in practice _960w is sufficient for card display at 350-720px).
+                # Bare base file — normalize to _960w if that variant exists
                 candidate_960 = img_path.replace('_mv2.webp', '_mv2_960w.webp')
                 abs_960 = _os.path.join(PREVIEW_DIR, candidate_960.lstrip('/'))
                 if _os.path.isfile(abs_960):
-                    # Also try to jump straight to _1920w for consistency with
-                    # cards that already stored _960w (they get upgraded above).
-                    candidate_1920 = img_path.replace('_mv2.webp', '_mv2_1920w.webp')
-                    abs_1920 = _os.path.join(PREVIEW_DIR, candidate_1920.lstrip('/'))
-                    c['image'] = candidate_1920 if _os.path.isfile(abs_1920) else candidate_960
+                    c['image'] = candidate_960
             elif re.search(r'_ai_\d+\.webp$', img_path):
-                # AI render base path (no size suffix) — normalize to _960w/_1920w.
-                # set-version now writes size-suffixed paths, but this catch handles
-                # any legacy rows that slipped through before the migration ran.
+                # AI render base path (no size suffix) — normalize to _960w if exists
                 stem_ = img_path[:-5]  # strip .webp
                 candidate_960 = f'{stem_}_960w.webp'
                 abs_960 = _os.path.join(PREVIEW_DIR, candidate_960.lstrip('/'))
                 if _os.path.isfile(abs_960):
-                    candidate_1920 = f'{stem_}_1920w.webp'
-                    abs_1920 = _os.path.join(PREVIEW_DIR, candidate_1920.lstrip('/'))
-                    c['image'] = candidate_1920 if _os.path.isfile(abs_1920) else candidate_960
+                    c['image'] = candidate_960
+            # Anything else: leave unchanged
         upgraded.append(c)
     return upgraded
 

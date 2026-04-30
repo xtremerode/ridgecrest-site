@@ -1384,6 +1384,80 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # ── card_variant_960w_playwright ──────────────────────────────
+            # Portfolio cards get background-image via JS (el.style.backgroundImage),
+            # not CSS injection, so page.content() misses them. Use evaluate() instead.
+            try:
+                _cv_page = context.new_page()
+                _cv_page.goto(
+                    f'{BASE_URL}/view/portfolio.html?_stage=1',
+                    wait_until='networkidle', timeout=20000
+                )
+                _cv_urls = _cv_page.evaluate("""
+                    () => {
+                        const cards = document.querySelectorAll('[data-card-id]');
+                        const urls = [];
+                        cards.forEach(el => {
+                            const bg = el.style.backgroundImage ||
+                                       window.getComputedStyle(el).backgroundImage;
+                            if (bg && bg.includes('_mv2')) {
+                                const m = bg.match(/url\\(["']?([^"')]+)["']?\\)/);
+                                if (m) urls.push(m[1]);
+                            }
+                        });
+                        return urls;
+                    }
+                """)
+                _cv_page.close()
+                _cv_bare    = [u for u in _cv_urls if u.endswith('_mv2.webp')]
+                _cv_1920w   = [u for u in _cv_urls if '_1920w' in u]
+                _cv_has960  = any('_960w' in u for u in _cv_urls)
+                if _cv_bare:
+                    results.append({
+                        'agent': agent,
+                        'check': 'card_variant_960w_playwright',
+                        'status': 'fail',
+                        'detail': f'Cards serving bare base file (moiré risk): {_cv_bare[:3]}',
+                        'page': 'portfolio',
+                        'auto_fixable': False,
+                    })
+                elif _cv_1920w:
+                    results.append({
+                        'agent': agent,
+                        'check': 'card_variant_960w_playwright',
+                        'status': 'fail',
+                        'detail': f'Cards serving _1920w (moiré risk): {_cv_1920w[:3]}',
+                        'page': 'portfolio',
+                        'auto_fixable': False,
+                    })
+                elif not _cv_urls:
+                    results.append({
+                        'agent': agent,
+                        'check': 'card_variant_960w_playwright',
+                        'status': 'warn',
+                        'detail': 'No mv2 card background-image URLs found via JS — cards may not have loaded',
+                        'page': 'portfolio',
+                        'auto_fixable': False,
+                    })
+                else:
+                    results.append({
+                        'agent': agent,
+                        'check': 'card_variant_960w_playwright',
+                        'status': 'pass',
+                        'detail': f'Portfolio cards use _960w variant ✓ ({len(_cv_urls)} card URL(s) checked via JS)',
+                        'page': 'portfolio',
+                        'auto_fixable': False,
+                    })
+            except Exception as _e:
+                results.append({
+                    'agent': agent,
+                    'check': 'card_variant_960w_playwright',
+                    'status': 'fail',
+                    'detail': f'card_variant_960w_playwright test error: {_e}',
+                    'page': 'portfolio',
+                    'auto_fixable': False,
+                })
+
             browser.close()
 
     except Exception as e:
