@@ -1369,7 +1369,8 @@
       // Never use the first item from the API list as default — order is non-deterministic.
       // Bug history: danville-dream.html was alphabetically first in project list → always loaded on refresh.
       // sessionStorage was previously used here but is wiped on hard refresh (Ctrl+R) — that was the root cause.
-      const _rawSavedSlug = localStorage.getItem('rd_admin_lastSlug');
+      const _hashSlug = window.location.hash ? window.location.hash.slice(1) : '';
+      const _rawSavedSlug = _hashSlug || localStorage.getItem('rd_admin_lastSlug');
       // Validate: fall back to 'home' if nothing saved or slug no longer exists in page list
       const _slugExists = _rawSavedSlug && pages.some(p => p.slug === _rawSavedSlug);
       const _savedSlug = _slugExists ? _rawSavedSlug : 'home';
@@ -2092,6 +2093,7 @@
     currentSlug = slug;
     // Persist so browser refresh restores the same page without flashing the tree
     try { localStorage.setItem('rd_admin_lastSlug', slug); } catch(e) {}
+    try { history.replaceState(null, '', '#' + slug); } catch(e) {}
     syncTreeActive(slug);
     // Clear all section height overrides — new page loads fresh from DB
     Object.keys(_sectionHeightOverrides).forEach(k => delete _sectionHeightOverrides[k]);
@@ -2963,6 +2965,8 @@
             saveNow(currentSlug);
           }
           currentSlug = newSlug;
+          try { localStorage.setItem('rd_admin_lastSlug', newSlug); } catch(e) {}
+          try { history.replaceState(null, '', '#' + newSlug); } catch(e) {}
           syncTreeActive(currentSlug);
           _heroTouched = false;
           pendingImage = null;

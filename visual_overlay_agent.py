@@ -1309,6 +1309,81 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            try:
+                # gallery_type_badge_cycle: verify the type button in the gallery card pill
+                # cycles through labels (Project/Render/Before/Construction/Untagged).
+                # Requires admin_edit=1&token= to inject the card overlay with the pill.
+                _gtb_card_id = 'danville-hilltop-gal-ff5b18_63757c728db94733b4f60a7102c0f722_mv2'
+                _gtb_url = f'{BASE_URL}/view/danville-hilltop.html?admin_edit=1&token={token}&_stage=1'
+                _gtb_page = context.new_page()
+                _gtb_page.goto(_gtb_url, wait_until='networkidle', timeout=20000)
+                _type_labels = ['Project', 'Render', 'Before', 'Construction', 'Untagged']
+                # Hover the card to show the pill
+                _gtb_page.evaluate(f"""() => {{
+                    var card = document.querySelector('[data-card-id="{_gtb_card_id}"]');
+                    if (card) card.dispatchEvent(new MouseEvent('mouseenter', {{bubbles: false, cancelable: true}}));
+                }}""")
+                time.sleep(0.4)
+                _pill_info = _gtb_page.evaluate(f"""() => {{
+                    var card = document.querySelector('[data-card-id="{_gtb_card_id}"]');
+                    if (!card) return {{found: false, reason: 'card not found'}};
+                    var pill = card.querySelector('[style*="z-index: 9991"], [style*="z-index:9991"]');
+                    if (!pill) return {{found: false, reason: 'pill not found'}};
+                    var btns = Array.from(pill.querySelectorAll('button'));
+                    var typeBtn = btns.find(function(b) {{
+                        return {str(_type_labels)}.indexOf(b.textContent.trim()) !== -1;
+                    }});
+                    return {{
+                        found: !!typeBtn,
+                        label: typeBtn ? typeBtn.textContent.trim() : null,
+                    }};
+                }}""")
+                if _pill_info.get('found'):
+                    _before_label = _pill_info['label']
+                    _gtb_page.evaluate(f"""() => {{
+                        var card = document.querySelector('[data-card-id="{_gtb_card_id}"]');
+                        var pill = card.querySelector('[style*="z-index: 9991"], [style*="z-index:9991"]');
+                        var btns = Array.from(pill.querySelectorAll('button'));
+                        var typeBtn = btns.find(function(b) {{
+                            return {str(_type_labels)}.indexOf(b.textContent.trim()) !== -1;
+                        }});
+                        if (typeBtn) typeBtn.click();
+                    }}""")
+                    time.sleep(0.3)
+                    _after_info = _gtb_page.evaluate(f"""() => {{
+                        var card = document.querySelector('[data-card-id="{_gtb_card_id}"]');
+                        var pill = card.querySelector('[style*="z-index: 9991"], [style*="z-index:9991"]');
+                        var btns = Array.from(pill.querySelectorAll('button'));
+                        var typeBtn = btns.find(function(b) {{
+                            return {str(_type_labels)}.indexOf(b.textContent.trim()) !== -1;
+                        }});
+                        return typeBtn ? typeBtn.textContent.trim() : null;
+                    }}""")
+                    _gtb_page.close()
+                    _gtb_passed = (_after_info in _type_labels and _after_info != _before_label)
+                    _gtb_detail = f'Type badge cycled: {_before_label} -> {_after_info}'
+                else:
+                    _gtb_page.close()
+                    _gtb_passed = False
+                    _gtb_detail = f'gallery_type_badge_cycle: {_pill_info.get("reason","pill/button not found")}'
+                results.append({
+                    'agent': agent,
+                    'check': 'gallery_type_badge_cycle',
+                    'status': 'pass' if _gtb_passed else 'fail',
+                    'detail': _gtb_detail,
+                    'page': 'danville-hilltop',
+                    'auto_fixable': False,
+                })
+            except Exception as _e:
+                results.append({
+                    'agent': agent,
+                    'check': 'gallery_type_badge_cycle',
+                    'status': 'fail',
+                    'detail': f'gallery_type_badge_cycle test error: {_e}',
+                    'page': 'danville-hilltop',
+                    'auto_fixable': False,
+                })
+
             browser.close()
 
     except Exception as e:

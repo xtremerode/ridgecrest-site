@@ -2031,6 +2031,14 @@ _CARD_EDIT_OVERLAY_TPL = """\
         }}).then(function() {{
           // Notify parent to refresh undo button after a tag action
           window.parent.postMessage({{type: 'rd_refresh_undo'}}, window.location.origin);
+          // Auto-sort: debounce 1s so rapid reclassification coalesces into one sort+reload
+          clearTimeout(window._rdAutoSortTimer);
+          window._rdAutoSortTimer = setTimeout(function() {{
+            fetch('/admin/api/gallery/' + encodeURIComponent(_gallerySlug()) + '/sort', {{
+              method: 'POST',
+              headers: {{'Content-Type': 'application/json', 'X-Admin-Token': TOKEN}}
+            }}).then(function() {{ location.reload(); }});
+          }}, 1000);
         }}).catch(function() {{}}).then(function() {{
           // Re-enable sort whether save succeeded or failed
           if (_sb) {{ _sb.disabled = false; _sb.style.opacity = '1'; }}
