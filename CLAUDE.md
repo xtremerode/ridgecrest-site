@@ -230,3 +230,12 @@ Analysis/diagnosis/planning responses are gated by three hooks in `.claude/setti
 - The Back button in the render review tool is pure navigation — it does NOT undo the Set It action. active_version stays live after clicking Back. (restoreSnapshot was removed from doBack() — 2026-04-26)
 
 - Henry is not a coder. When he describes a system or automated behavior, Claude must identify and fill in any architectural gaps he left out (trigger timing, verification method, failure mode) and surface them explicitly before implementing. Never assume he meant to leave gaps; assume he needs Claude to complete the design.
+
+- **Playwright test DB safety rules (2026-05-01 — portfolio-featured-1 incident):**
+  1. Tests that write to `card_settings` MUST use a safe payload: never set `image=None` (or any field to a page-breaking value) on a live displayed card. Always preserve the original image from `_read_card_state` in the PUT payload. If restore fails, the card must still be displayable.
+  2. After calling `_restore_card_state`, the test MUST read the DB and assert the restored value matches the original. Fail loudly if not — do not let corrupted state pass silently into a commit.
+  3. `_restore_card_state` never swallows exceptions — it raises on failure. Silent exception swallowing (`except Exception: pass`) is forbidden in any restore/cleanup path.
+
+- **Drift check ordering rule (2026-05-01):** The `card_settings` drift check in `execute_task_post.sh` runs as Gate 2, BEFORE Playwright (Gate 3). This ordering is mandatory. If the drift check runs after Playwright, test-induced DB mutations can be misclassified as expected agent changes. Do not swap or reorder these gates.
+
+- **Drift check image=None rule (2026-05-01):** Any `card_settings` change where `image` transitions to `None` is always a CRITICAL FAIL in the drift check, regardless of which features are in scope. A null image means a live card will show a broken/missing image on the public site.

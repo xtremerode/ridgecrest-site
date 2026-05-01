@@ -189,19 +189,20 @@ def _restore_card_state(card_id, slug, token, original_state):
     """
     Restore card to its pre-test state via the cards API.
     If the card had no row before the test, delete it.
-    This ensures no test artifact is left in card_settings.
+    RAISES RuntimeError on any failure — never swallows silently.
+    Callers must handle or propagate so that test corruption is never silent.
     """
     if original_state is None:
         # Card had no DB row before — delete whatever the test created
+        req = urllib.request.Request(
+            f'{BASE_URL}/admin/api/cards/{slug}/{card_id}',
+            method='DELETE',
+            headers={'X-Admin-Token': token}
+        )
         try:
-            req = urllib.request.Request(
-                f'{BASE_URL}/admin/api/cards/{slug}/{card_id}',
-                method='DELETE',
-                headers={'X-Admin-Token': token}
-            )
             urllib.request.urlopen(req, timeout=5)
-        except Exception:
-            pass
+        except Exception as e:
+            raise RuntimeError(f'_restore_card_state DELETE failed for {card_id}: {e}') from e
         return
 
     # Restore the exact pre-test state via PUT
@@ -224,16 +225,16 @@ def _restore_card_state(card_id, slug, token, original_state):
         'hero_cta_primary':   original_state.get('hero_cta_primary'),
         'hero_cta_secondary': original_state.get('hero_cta_secondary'),
     }).encode('utf-8')
+    req = urllib.request.Request(
+        f'{BASE_URL}/admin/api/cards/{slug}/{card_id}',
+        data=payload,
+        method='PUT',
+        headers={'X-Admin-Token': token, 'Content-Type': 'application/json'}
+    )
     try:
-        req = urllib.request.Request(
-            f'{BASE_URL}/admin/api/cards/{slug}/{card_id}',
-            data=payload,
-            method='PUT',
-            headers={'X-Admin-Token': token, 'Content-Type': 'application/json'}
-        )
         urllib.request.urlopen(req, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        raise RuntimeError(f'_restore_card_state PUT failed for {card_id}: {e}') from e
 
 
 def _check_card_overlay(page, card_id, slug, token):
@@ -1636,16 +1637,23 @@ def run(fix=False):
             # This test catches the pipeline ordering bug where _inject_gradient_id_overlays
             # ran before _replace_portfolio_featured_grid and its output was discarded.
             try:
-                import urllib.request as _ur, urllib.error as _ue, json as _tj
+                import urllib.request as _ur, urllib.error as _ue, json as _tj, re as _re
                 _test_card_id = 'portfolio-featured-1'
                 _test_slug    = 'portfolio'
                 _test_css     = 'linear-gradient(to top,rgba(0,0,0,0.72) 0%,transparent 80%)'
                 # Read current card state so we can restore after
                 _gst_orig = _read_card_state(_test_card_id)
-                # PUT a known gradient to card_settings
+                # Safety rule: NEVER set image=None on a live displayed card in a test.
+                # Keep the original image so the card is still visible even if restore fails.
+                # Only inject gradient fields — leave image/position/zoom from original state.
+                _orig_image    = (_gst_orig or {}).get('image')
+                _orig_position = (_gst_orig or {}).get('position', '50% 50%')
+                _orig_zoom     = (_gst_orig or {}).get('zoom', 1.0)
                 _put_payload = _tj.dumps({
-                    'mode': 'image', 'color': '#1C1C1C', 'image': None,
-                    'position': '50% 50%', 'zoom': 1.0,
+                    'mode': 'image', 'color': '#1C1C1C',
+                    'image': _orig_image,         # preserve original image — NEVER None
+                    'position': _orig_position,
+                    'zoom': _orig_zoom,
                     'gradient_type': 'fade', 'gradient_tint': 'dark',
                     'gradient_opacity': 72, 'gradient_direction': 'bottom',
                     'gradient_distance': 80,
@@ -1662,7 +1670,6 @@ def run(fix=False):
                 with _ur.urlopen(_pub_req, timeout=10) as _pub_resp:
                     _pub_html = _pub_resp.read().decode('utf-8', errors='replace')
                 # Check that the overlay div for slot 1 has --rd-overlay in its style
-                import re as _re
                 _gst_found = bool(_re.search(
                     r'data-gradient-id="portfolio-featured-1"[^>]*style="[^"]*--rd-overlay',
                     _pub_html
@@ -1670,8 +1677,16 @@ def run(fix=False):
                     r'style="[^"]*--rd-overlay[^"]*"[^>]*data-gradient-id="portfolio-featured-1"',
                     _pub_html
                 ))
-                # Restore original state
+                # Restore original state — _restore_card_state raises on failure (never silent)
                 _restore_card_state(_test_card_id, _test_slug, token, _gst_orig)
+                # Verify restore succeeded by reading the DB — fail loudly if not
+                _post_restore = _read_card_state(_test_card_id)
+                _restored_image = (_post_restore or {}).get('image')
+                if _restored_image != _orig_image:
+                    raise RuntimeError(
+                        f'Restore verification failed: expected image={_orig_image!r}, '
+                        f'got={_restored_image!r}. DB is corrupt — do not commit.'
+                    )
                 results.append({
                     'agent': agent,
                     'check': 'portfolio_featured_gradient_serve_time',

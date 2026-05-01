@@ -3,7 +3,7 @@
 # Usage: ./execute_task_post.sh
 # Must be run AFTER execute_task_pre.sh. Reads .task_run_context for run binding.
 #
-# Enforces: Playwright after → pre-commit gate → re-lock features → git push → audit log
+# Enforces: drift check (pre-Playwright) → Playwright after → pre-commit gate → re-lock features → git push → audit log
 # Guarantees re-lock on ANY failure path (trap-based finally).
 
 set -euo pipefail
@@ -87,59 +87,12 @@ else
   fail "Server not responding (HTTP $HTTP_STATUS). Restart the server before running post-phase."
 fi
 
-# ─── GATE 2: Playwright after ─────────────────────────────────────────────────
-hdr "[2/6] Playwright verification (after changes)"
-PLAYWRIGHT_AFTER_LOG="$LOG_DIR/${RUN_ID}_playwright_after.json"
-cd "$REPO_DIR"
-
-PLAYWRIGHT_EXIT=0
-$PYTHON visual_overlay_agent.py 2>>"$LOG_FILE" | tee -a "$LOG_FILE" | python3 -c "
-import sys, json
-data = []
-for line in sys.stdin:
-    line = line.strip()
-    if line.startswith('{') or line.startswith('['):
-        try:
-            data = json.loads(line)
-        except Exception:
-            pass
-with open('$PLAYWRIGHT_AFTER_LOG', 'w') as f:
-    json.dump(data, f, indent=2)
-" 2>/dev/null || PLAYWRIGHT_EXIT=$?
-
-# Compare before vs after — flag any new failures
-REGRESSIONS=0
-if [ -f "$PLAYWRIGHT_BEFORE" ] && [ -f "$PLAYWRIGHT_AFTER_LOG" ]; then
-  REGRESSIONS=$($PYTHON - "$PLAYWRIGHT_BEFORE" "$PLAYWRIGHT_AFTER_LOG" 2>>"$LOG_FILE" <<'PYEOF'
-import json, sys
-before_path = sys.argv[1] if len(sys.argv) > 1 else ""
-after_path  = sys.argv[2] if len(sys.argv) > 2 else ""
-try:
-    before = json.load(open(before_path)) if before_path else []
-    after  = json.load(open(after_path))  if after_path  else []
-except Exception:
-    print(0); sys.exit(0)
-
-before_fails = {r.get('card_id','') for r in before if not r.get('passed', True)}
-after_fails  = {r.get('card_id','') for r in after  if not r.get('passed', True)}
-new_fails = after_fails - before_fails
-if new_fails:
-    print(len(new_fails))
-    for f in sorted(new_fails):
-        print(f"  REGRESSION: {f}", file=sys.stderr)
-else:
-    print(0)
-PYEOF
-)
-fi
-
-if [ "$REGRESSIONS" -gt 0 ]; then
-  fail "Playwright found $REGRESSIONS NEW regression(s) introduced by this change. See $LOG_FILE for details."
-fi
-pass "Playwright after — no regressions vs baseline"
-
-# ─── GATE 3: card_settings drift check ───────────────────────────────────────
-hdr "[3/6] card_settings drift check"
+# ─── GATE 2: card_settings drift check (BEFORE Playwright) ───────────────────
+# ORDERING IS CRITICAL: drift check runs before Playwright so that test-induced
+# DB mutations (e.g. a test that PUTs to card_settings and fails to restore)
+# are NOT visible to the drift check. Playwright runs AFTER this gate.
+# Any drift seen here reflects agent code changes only, not test side effects.
+hdr "[2/6] card_settings drift check (pre-Playwright)"
 CARD_SNAPSHOT_BEFORE="$(grep 'card_snapshot' "$CONTEXT_FILE" | cut -d= -f2 || true)"
 if [ -z "$CARD_SNAPSHOT_BEFORE" ] || [ ! -f "$CARD_SNAPSHOT_BEFORE" ]; then
   warn "No card_settings snapshot from pre-phase — skipping drift check"
@@ -189,6 +142,24 @@ if total == 0:
     print("CLEAN")
     sys.exit(0)
 
+# image=None is always a critical failure regardless of scope —
+# it means a live card has lost its background image.
+has_image_nulled = any(
+    d == 'image' and cur.get('image') is None
+    for (_, _), diffs, bef, cur in changed
+    for d in diffs
+)
+if has_image_nulled:
+    print(f"FAIL:{total}")
+    for (slug, cid), diffs, bef, cur in changed:
+        for d in diffs:
+            print(f"  CRITICAL  {slug}/{cid}  {d}: {bef.get(d)!r} → {cur.get(d)!r}")
+    for slug, cid in added:
+        print(f"  ADDED    {slug}/{cid}")
+    for slug, cid in removed:
+        print(f"  REMOVED  {slug}/{cid}")
+    sys.exit(0)
+
 severity = "WARN" if in_scope else "FAIL"
 print(f"{severity}:{total}")
 for (slug, cid), diffs, bef, cur in changed:
@@ -220,11 +191,64 @@ PYEOF
   elif [[ "$DRIFT_FIRST" == FAIL:* ]]; then
     COUNT="${DRIFT_FIRST#FAIL:}"
     echo "$DRIFT_DETAIL" | while IFS= read -r line; do echo -e "  ${RED}$line${RESET}" | tee -a "$LOG_FILE"; done
-    fail "card_settings: $COUNT row(s) changed but pages-card is NOT in scope. Unexpected DB mutation detected — investigate before committing."
+    fail "card_settings: $COUNT row(s) drifted unexpectedly (image nulled or pages-card not in scope). DB mutation detected — investigate before committing."
   else
     warn "card_settings drift check returned unexpected output: $DRIFT_FIRST"
   fi
 fi
+
+# ─── GATE 3: Playwright after ─────────────────────────────────────────────────
+# Runs AFTER drift check. Any DB mutations made by tests must be cleaned up
+# by the tests themselves — _restore_card_state now raises on failure.
+hdr "[3/6] Playwright verification (after changes)"
+PLAYWRIGHT_AFTER_LOG="$LOG_DIR/${RUN_ID}_playwright_after.json"
+cd "$REPO_DIR"
+
+PLAYWRIGHT_EXIT=0
+$PYTHON visual_overlay_agent.py 2>>"$LOG_FILE" | tee -a "$LOG_FILE" | python3 -c "
+import sys, json
+data = []
+for line in sys.stdin:
+    line = line.strip()
+    if line.startswith('{') or line.startswith('['):
+        try:
+            data = json.loads(line)
+        except Exception:
+            pass
+with open('$PLAYWRIGHT_AFTER_LOG', 'w') as f:
+    json.dump(data, f, indent=2)
+" 2>/dev/null || PLAYWRIGHT_EXIT=$?
+
+# Compare before vs after — flag any new failures
+REGRESSIONS=0
+if [ -f "$PLAYWRIGHT_BEFORE" ] && [ -f "$PLAYWRIGHT_AFTER_LOG" ]; then
+  REGRESSIONS=$($PYTHON - "$PLAYWRIGHT_BEFORE" "$PLAYWRIGHT_AFTER_LOG" 2>>"$LOG_FILE" <<'PYEOF'
+import json, sys
+before_path = sys.argv[1] if len(sys.argv) > 1 else ""
+after_path  = sys.argv[2] if len(sys.argv) > 2 else ""
+try:
+    before = json.load(open(before_path)) if before_path else []
+    after  = json.load(open(after_path))  if after_path  else []
+except Exception:
+    print(0); sys.exit(0)
+
+before_fails = {r.get('card_id','') for r in before if not r.get('passed', True)}
+after_fails  = {r.get('card_id','') for r in after  if not r.get('passed', True)}
+new_fails = after_fails - before_fails
+if new_fails:
+    print(len(new_fails))
+    for f in sorted(new_fails):
+        print(f"  REGRESSION: {f}", file=sys.stderr)
+else:
+    print(0)
+PYEOF
+)
+fi
+
+if [ "$REGRESSIONS" -gt 0 ]; then
+  fail "Playwright found $REGRESSIONS NEW regression(s) introduced by this change. See $LOG_FILE for details."
+fi
+pass "Playwright after — no regressions vs baseline"
 
 # ─── GATE 4: git commit + pre-commit gate (197 checks) ────────────────────────
 hdr "[4/6] git commit + pre-commit QA gate (197 checks)"
