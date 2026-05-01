@@ -1496,6 +1496,72 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # ── portfolio_featured_gradient_btn ──────────────────────────
+            # Verify gradient (G) button appears on portfolio-featured cards
+            # after removing the cardId.indexOf('portfolio-featured-') exclusion.
+            try:
+                _pf_page = context.new_page()
+                _pf_page.goto(
+                    f'{BASE_URL}/view/portfolio.html?admin_edit=1&token={token}&_stage=1',
+                    wait_until='networkidle', timeout=20000
+                )
+                _pf_page.wait_for_timeout(800)
+                # Fire mouseenter on _attachEl (parent <a> for role="img" cards)
+                _pf_page.evaluate("""
+                    () => {
+                        var card = document.querySelector('[data-card-id="portfolio-featured-1"]');
+                        if (!card) return;
+                        var attachEl = card;
+                        if (card.getAttribute('role') === 'img') {
+                            var par = card.parentElement;
+                            if (par && window.getComputedStyle(par).position !== 'static') attachEl = par;
+                        }
+                        attachEl.dispatchEvent(new MouseEvent('mouseenter', {bubbles: false, cancelable: true}));
+                    }
+                """)
+                _pf_page.wait_for_timeout(500)
+                _pf_grad_visible = _pf_page.evaluate("""
+                    () => {
+                        var card = document.querySelector('[data-card-id="portfolio-featured-1"]');
+                        if (!card) return false;
+                        var attachEl = card;
+                        if (card.getAttribute('role') === 'img') {
+                            var par = card.parentElement;
+                            if (par && window.getComputedStyle(par).position !== 'static') attachEl = par;
+                        }
+                        var pill = Array.from(attachEl.children)
+                            .find(function(c) { return c.getAttribute('data-rd-overlay') === 'card'; });
+                        if (!pill) return false;
+                        var btns = pill.querySelectorAll('button');
+                        for (var i = 0; i < btns.length; i++) {
+                            if (btns[i].textContent.trim() === 'G') return true;
+                        }
+                        return false;
+                    }
+                """)
+                _pf_page.close()
+                results.append({
+                    'agent': agent,
+                    'check': 'portfolio_featured_gradient_btn',
+                    'status': 'pass' if _pf_grad_visible else 'fail',
+                    'detail': (
+                        'G (gradient) button present on portfolio-featured-1 card pill ✓'
+                        if _pf_grad_visible else
+                        'G button NOT found on portfolio-featured-1 — exclusion may still be in effect'
+                    ),
+                    'page': 'portfolio',
+                    'auto_fixable': False,
+                })
+            except Exception as _e:
+                results.append({
+                    'agent': agent,
+                    'check': 'portfolio_featured_gradient_btn',
+                    'status': 'fail',
+                    'detail': f'portfolio_featured_gradient_btn test error: {_e}',
+                    'page': 'portfolio',
+                    'auto_fixable': False,
+                })
+
             browser.close()
 
     except Exception as e:
