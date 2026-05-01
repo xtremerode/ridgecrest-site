@@ -1628,6 +1628,72 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # ── portfolio_featured_gradient_serve_time ────────────────────
+            # Verify gradient is baked into the served HTML at page load time
+            # (not just applied client-side). Saves a gradient to card_settings,
+            # then fetches the public page (no admin_edit) and checks the
+            # overlay div has --rd-overlay in its inline style attribute.
+            # This test catches the pipeline ordering bug where _inject_gradient_id_overlays
+            # ran before _replace_portfolio_featured_grid and its output was discarded.
+            try:
+                import urllib.request as _ur, urllib.error as _ue, json as _tj
+                _test_card_id = 'portfolio-featured-1'
+                _test_slug    = 'portfolio'
+                _test_css     = 'linear-gradient(to top,rgba(0,0,0,0.72) 0%,transparent 80%)'
+                # Read current card state so we can restore after
+                _gst_orig = _read_card_state(_test_card_id)
+                # PUT a known gradient to card_settings
+                _put_payload = _tj.dumps({
+                    'mode': 'image', 'color': '#1C1C1C', 'image': None,
+                    'position': '50% 50%', 'zoom': 1.0,
+                    'gradient_type': 'fade', 'gradient_tint': 'dark',
+                    'gradient_opacity': 72, 'gradient_direction': 'bottom',
+                    'gradient_distance': 80,
+                    'gradient_css': _test_css,
+                }).encode()
+                _put_req = _ur.Request(
+                    f'{BASE_URL}/admin/api/cards/{_test_slug}/{_test_card_id}',
+                    data=_put_payload, method='PUT',
+                    headers={'X-Admin-Token': token, 'Content-Type': 'application/json'}
+                )
+                _ur.urlopen(_put_req, timeout=8)
+                # Fetch the public (non-admin) page — no ?admin_edit, no ?_stage
+                _pub_req = _ur.Request(f'{BASE_URL}/view/portfolio.html')
+                with _ur.urlopen(_pub_req, timeout=10) as _pub_resp:
+                    _pub_html = _pub_resp.read().decode('utf-8', errors='replace')
+                # Check that the overlay div for slot 1 has --rd-overlay in its style
+                import re as _re
+                _gst_found = bool(_re.search(
+                    r'data-gradient-id="portfolio-featured-1"[^>]*style="[^"]*--rd-overlay',
+                    _pub_html
+                ) or _re.search(
+                    r'style="[^"]*--rd-overlay[^"]*"[^>]*data-gradient-id="portfolio-featured-1"',
+                    _pub_html
+                ))
+                # Restore original state
+                _restore_card_state(_test_card_id, _test_slug, token, _gst_orig)
+                results.append({
+                    'agent': agent,
+                    'check': 'portfolio_featured_gradient_serve_time',
+                    'status': 'pass' if _gst_found else 'fail',
+                    'detail': (
+                        '--rd-overlay baked into served HTML for portfolio-featured-1 ✓'
+                        if _gst_found else
+                        '--rd-overlay NOT found in served HTML — gradient injection runs before grid replacement and is discarded'
+                    ),
+                    'page': 'portfolio',
+                    'auto_fixable': False,
+                })
+            except Exception as _e:
+                results.append({
+                    'agent': agent,
+                    'check': 'portfolio_featured_gradient_serve_time',
+                    'status': 'fail',
+                    'detail': f'portfolio_featured_gradient_serve_time test error: {_e}',
+                    'page': 'portfolio',
+                    'auto_fixable': False,
+                })
+
             browser.close()
 
     except Exception as e:

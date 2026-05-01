@@ -4937,12 +4937,6 @@ def view(filename):
                 content = _inject_hero_text_controls(content, cards)
                 # Server-side apply hero color mode (overrides background image with solid color)
                 content = _apply_hero_color_mode(content, cards)
-            # Server-side inject --rd-overlay for data-gradient-id elements (heroes).
-            # Always runs even if no card_settings records exist — uses default gradient
-            # fallback so hero overlays are never missing. Must run after _apply_cards_to_html
-            # so existing style attrs from that pass are visible to the regex.
-            content = _inject_gradient_id_overlays(content, cards or [])
-
         # Inject diff panel mode for home page
         if HAS_DB and slug == 'home':
             try:
@@ -5006,6 +5000,14 @@ def view(filename):
                     content = _replace_portfolio_featured_grid(content, _pf_html)
             except Exception:
                 pass  # never break page serving
+
+        # Server-side inject --rd-overlay for data-gradient-id elements.
+        # MUST run after all grid/strip replacements (home strip, portfolio featured)
+        # because those replace entire HTML blocks and would discard any --rd-overlay
+        # style attrs injected earlier. Always runs even with no card_settings rows —
+        # default gradient fallback ensures hero overlays are never missing.
+        if HAS_DB:
+            content = _inject_gradient_id_overlays(content, cards or [])
 
         # Inject about-visual panel mode for about page
         if HAS_DB and slug == 'about':
