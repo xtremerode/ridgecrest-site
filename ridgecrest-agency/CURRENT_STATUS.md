@@ -6,27 +6,22 @@
 
 ## Recent Completions (This Session)
 
-### Start-a-project iframe scrollbar — FIXED (commit 019b7f2)
-- Removed collapse/lock mechanism entirely; pure accept-all postMessage resize
-- `loading="eager"` added to iframe
-- Playwright test added to visual_overlay_agent.py
+### Portfolio Featured Card Gradient — COMPLETE (commits 0692c7d, 19eb24e)
+All 4 cards (Sierra Mountain Ranch, Pleasanton Custom, Sunol Homestead, Danville Hilltop):
+- G button visible in card pill on hover
+- Gradient panel wired: adjusting panel updates overlay in real-time
+- Saving persists to DB; serve-time injection applies on next load
+- Root cause of "not wired" bug: `_render_portfolio_featured_html()` regenerated overlay divs without `data-gradient-id` on every request — fixed at line 1273
 
-### Service page hero settings — SET (39 pages)
+### Start-a-project iframe scrollbar — FIXED
+- Removed collapse/lock mechanism; pure accept-all postMessage resize
+
+### 39 Service Page Hero Settings — SET
 - Whole House Remodel, Custom Home Builder, Design-Build Contractor × 13 cities
-- Gradient bottom→top, black 66%, text left, CTA left — matches screenshots 022/023/024
+- Gradient bottom→top, black 66%, text left
 
 ### danville-hilltop nav CTA — PERMANENTLY FIXED
-- Template at preview_server.py line 6610 corrected; all future re-renders write `start-a-project.html`
-
----
-
-## Pending — Next Session
-
-### Portfolio Featured Card Gradient (APPROVED PENDING EXECUTION)
-Henry approved concept; execution not yet approved.
-- 4 cards: Sierra Mountain Ranch, Pleasanton Custom, Sunol Homestead, Danville Hilltop
-- 3 changes needed (see 2026-05-01 handoff for details)
-- Run guardrail on: pages-card, pages-overlay
+- Template fixed at preview_server.py line 6610
 
 ---
 
@@ -42,17 +37,16 @@ Henry approved concept; execution not yet approved.
 2. **Continue render review queue** — 62 cards, tool working
 
 ### MEDIUM — DB Cleanup (no display artifact, serve-time handles)
-- 67 `card_settings` records using `_mv2.webp` base path
-- 139 `pages.hero_image` records using `_mv2.webp` base path
+- Some `card_settings` image paths may still be base `_mv2.webp` (pre-existing, not from this session)
 
 ---
 
 ## Site Infrastructure
 - Server: 147.182.242.54:8081
 - Branch: ridgecrest-audit
-- Last commit: 019b7f2 (2026-05-01)
+- Last commit: 19eb24e (2026-05-01)
 - All feature locks: locked
-- Pre-commit gate: 197 checks passing
+- Server restart: POST /admin/api/server/restart (X-Admin-Token required; use_reloader=False)
 
 ---
 
