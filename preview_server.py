@@ -7265,6 +7265,7 @@ def blog_index():
         if _bi_cards:
             _bi_cards = _upgrade_card_images(_bi_cards)
             _bi_bytes = html.encode('utf-8')
+            _bi_bytes = _apply_cards_to_html(_bi_bytes, _bi_cards)
             _bi_bytes = _inject_hero_text_controls(_bi_bytes, _bi_cards)
             _bi_bytes = _apply_hero_color_mode(_bi_bytes, _bi_cards)
             _bi_bytes = _inject_gradient_id_overlays(_bi_bytes, _bi_cards)
@@ -7424,6 +7425,7 @@ def blog_post(slug):
         if _bp_cards:
             _bp_cards = _upgrade_card_images(_bp_cards)
             _bp_bytes = page.encode('utf-8')
+            _bp_bytes = _apply_cards_to_html(_bp_bytes, _bp_cards)
             _bp_bytes = _inject_hero_text_controls(_bp_bytes, _bp_cards)
             _bp_bytes = _apply_hero_color_mode(_bp_bytes, _bp_cards)
             _bp_bytes = _inject_gradient_id_overlays(_bp_bytes, _bp_cards)

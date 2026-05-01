@@ -1760,6 +1760,49 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # ── blog_hero_rd_cards_injected ───────────────────────────────────
+            # Verifies window.__RD_CARDS is injected on the blog index page
+            # (admin_edit=1) and contains the blog-index-hero card with
+            # hero_text_align data. Guards against _apply_cards_to_html being
+            # accidentally removed from blog_index(), which would break the
+            # edit overlay's text alignment and CTA controls silently.
+            try:
+                _brc_page = context.new_page()
+                _brc_url = f'{BASE_URL}/blog?admin_edit=1&token={token}'
+                _brc_page.goto(_brc_url, wait_until='domcontentloaded', timeout=15000)
+                _brc_cards = _brc_page.evaluate(
+                    "() => typeof window.__RD_CARDS !== 'undefined' ? window.__RD_CARDS : null"
+                )
+                _brc_page.close()
+                _brc_hero = None
+                if _brc_cards:
+                    for _c in _brc_cards:
+                        if _c.get('card_id') == 'blog-index-hero':
+                            _brc_hero = _c
+                            break
+                _brc_ok = _brc_hero is not None and 'hero_text_align' in _brc_hero
+                results.append({
+                    'agent': agent,
+                    'check': 'blog_hero_rd_cards_injected',
+                    'status': 'pass' if _brc_ok else 'fail',
+                    'detail': (
+                        'blog-index-hero present in __RD_CARDS with hero_text_align ✓'
+                        if _brc_ok else
+                        '__RD_CARDS missing or lacks blog-index-hero — edit overlay text/CTA controls broken'
+                    ),
+                    'page': 'blog',
+                    'auto_fixable': False,
+                })
+            except Exception as _brc_e:
+                results.append({
+                    'agent': agent,
+                    'check': 'blog_hero_rd_cards_injected',
+                    'status': 'fail',
+                    'detail': f'blog_hero_rd_cards_injected test error: {_brc_e}',
+                    'page': 'blog',
+                    'auto_fixable': False,
+                })
+
             # ── nav_hero_map_keys ─────────────────────────────────────────────
             # Verifies window.__RD_HERO_MAP entries for whole-house-remodels and
             # blog have real hero images (not the fallback path). Guards against
