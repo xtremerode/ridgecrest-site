@@ -6,24 +6,23 @@
 
 ## Recent Completions (This Session)
 
-### Portfolio Featured Card Gradient — COMPLETE + REGRESSION FIXED (commits 0692c7d, 19eb24e, 664b673, 3f125ca)
+### Portfolio Featured Card Gradient — FULLY COMPLETE (commits 0692c7d, 19eb24e, 664b673, 3f125ca)
 All 4 cards (Sierra Mountain Ranch, Pleasanton Custom, Sunol Homestead, Danville Hilltop):
 - G button visible in card pill on hover
-- Gradient panel wired: adjusting panel updates overlay in real-time
-- Saving persists to DB; serve-time injection applies on next load (pipeline ordering fixed)
-- Sierra Mountain Ranch image was corrupted by a Playwright test with a swapped-args bug — fully restored (commit 3f125ca)
-- Three structural guardrail gaps closed (see below)
+- Gradient panel wired and updates overlay in real-time
+- Gradient persists after publish + page reload (pipeline ordering fixed)
+- Sierra Mountain Ranch image broken by Playwright test artifact — restored
+- Three structural guardrail gaps closed (drift check ordering, image=None severity, restore verification)
 
-### Guardrail Gaps Closed (commit 3f125ca)
-1. **Drift check now runs BEFORE Playwright** — test-induced DB mutations no longer auto-pass as "expected"
-2. **`image=None` is always CRITICAL FAIL in drift check** — regardless of which features are in scope
-3. **`_restore_card_state` no longer swallows exceptions** — raises `RuntimeError` on failure so test corruption is never silent
-4. **`portfolio_featured_gradient_serve_time` test** — now preserves original image in PUT payload (safe even if restore fails), plus verifies DB state after restore
-5. **CLAUDE.md updated** with three new mandatory rules for future Claude instances
+### Sitemap Page Links — FIXED (commit 7d3bcda)
+- All 102 body links were broken (root-relative hrefs, 404 from /view/ context) since April 15
+- Fixed to relative paths — all links now navigate correctly
+- `sitemap_links_navigable` Playwright test added — enforced on every future guardrail run
 
-### Start-a-project iframe scrollbar — FIXED
-### 39 Service Page Hero Settings — SET
-### danville-hilltop nav CTA — PERMANENTLY FIXED
+### Other (prior sessions)
+- Start-a-project iframe scrollbar — FIXED
+- 39 Service Page Hero Settings — SET
+- danville-hilltop nav CTA — PERMANENTLY FIXED
 
 ---
 
@@ -38,18 +37,22 @@ All 4 cards (Sierra Mountain Ranch, Pleasanton Custom, Sunol Homestead, Danville
 
 2. **Continue render review queue** — 62 cards, tool working
 
-### MEDIUM — DB Cleanup (no display artifact, serve-time handles)
-- Some `card_settings` image paths may still be base `_mv2.webp` (pre-existing, not from this session)
+### MEDIUM — Code (small, no user impact yet)
+- **`_NAV_PREFETCH_SLUGS` bug** — `preview_server.py` line 298: `'whole-home-remodels'` should be `'whole-house-remodels'`, `'therdedit'` should be `'blog'`. Affects hero image preload on nav hover for those two pages. No visible broken links.
+- **Houzz profile link** — `https://www.houzz.com/pro/ridgecrestdesigns` — needs manual browser verification (server IP blocked by Houzz)
+
+### LOW — Known Gaps
+- `set-version` does not update static non-portfolio pages
+- pre-commit hook python path (system vs venv) — still pending
 
 ---
 
 ## Site Infrastructure
 - Server: 147.182.242.54:8081
 - Branch: ridgecrest-audit
-- Last commit: 3f125ca (2026-05-01)
+- Last commit: 7d3bcda (2026-05-01)
 - All feature locks: locked
-- Server restart: POST /admin/api/server/restart (X-Admin-Token required; use_reloader=False)
-- Portfolio page: republished after image restoration — snapshot is clean
+- Server restart: POST /admin/api/server/restart (X-Admin-Token required)
 
 ---
 

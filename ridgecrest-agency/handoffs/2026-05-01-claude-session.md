@@ -1,64 +1,46 @@
 # Session Handoff — 2026-05-01
 
 **Branch:** ridgecrest-audit
-**Last commit:** 664b673
+**Last commit:** 7d3bcda
 
 ---
 
 ## What Was Done This Session
 
-### 1. Start-a-project iframe scrollbar — FIXED (commit 019b7f2)
-- Removed collapse/lock mechanism entirely; pure accept-all postMessage resize
-- `loading="eager"` added to iframe
-- Playwright test added to visual_overlay_agent.py
+### 1. Portfolio featured card gradient — pipeline ordering fix (commit 664b673)
+- Root cause: `_inject_gradient_id_overlays` ran BEFORE `_replace_portfolio_featured_grid`, so the grid replacement discarded all injected `--rd-overlay` styles on every page load
+- Fixed by moving injection call to after all grid/strip replacements in `preview_server.py`
+- Added `portfolio_featured_gradient_serve_time` Playwright test — verifies gradient is baked into served HTML, not just applied client-side
 
-### 2. danville-hilltop nav CTA regression — PERMANENTLY FIXED
-- Template at preview_server.py line 6610 corrected; all future re-renders write `start-a-project.html`
+### 2. Sierra Mountain Ranch broken image — restored + guardrail gaps closed (commit 3f125ca)
+**Cause:** New Playwright test (`portfolio_featured_gradient_serve_time`) PUT `image: None` to a live card and failed to restore it because `_restore_card_state` was called with swapped arguments (`token` and `original_state`). The inner `except Exception: pass` swallowed the failure silently. The drift check saw the mutation but auto-passed it as "expected" because `pages-card` was in scope.
 
-### 3. 39 service page hero settings — COMPLETE
-- Whole House Remodel, Custom Home Builder, Design-Build Contractor × 13 cities
-- Gradient bottom→top, black 66%, text left, CTA left — matches screenshots 022/023/024
+**Three structural fixes:**
+1. **Drift check runs BEFORE Playwright** (Gate 2 before Gate 3) — test-induced DB mutations no longer visible to drift check
+2. **`image=None` is always CRITICAL FAIL** in drift check regardless of scope
+3. **`_restore_card_state` raises on failure** — never swallows silently. Test also verifies DB state after restore.
+4. **Test payload safety** — test now preserves original image in PUT; even if restore fails, card stays visible
+5. **CLAUDE.md** updated with three new mandatory rules
+6. **Sierra Mountain Ranch image restored** and portfolio page republished
 
-### 4. Portfolio featured card gradient feature — COMPLETE (commits 0692c7d, 19eb24e, 664b673)
+### 3. Sitemap page — all 102 body links were broken (commit 7d3bcda)
+**Cause:** `preview/sitemap.html` body used root-relative links (`/sierra-mountain-ranch.html`) written for the live domain. From `/view/sitemap.html`, browser resolves these to the server root which 404s. Had been broken since the file was first created on April 15.
 
-**Part 1 (0692c7d) — G button visible:**
-- Removed `cardId.indexOf('portfolio-featured-') !== 0` exclusion from G button condition in `preview_server.py`
-- Added `data-gradient-id="portfolio-featured-N"` to overlay divs in `portfolio.html` (static file — superseded by Part 2)
-- Updated `.portfolio-featured__overlay` CSS to `var(--rd-overlay, rgba(0,0,0,var(--card-overlay,0.5)))` in `portfolio.html`
-- Added Playwright tests: `portfolio_featured_gradient_btn` and `portfolio_featured_gradient_wired`
+**Fix:** Changed all 102 body `href="/page.html"` → `href="page.html"` (relative). `/blog` preserved as-is (dedicated server route).
 
-**Part 2 (19eb24e) — Panel wiring fixed:**
-- Root cause: `_render_portfolio_featured_html()` dynamically regenerates the card grid HTML on every request, overwriting the static `portfolio.html` overlay divs without `data-gradient-id`
-- Fixed by adding `data-gradient-id="portfolio-featured-{slot}"` to the render function at preview_server.py line 1273
-- Without this, the client-side `rd_set_gradient` listener had no `data-gradient-id` elements to attach to
-
-**Part 3 (664b673) — Gradient persists after publish/reload:**
-- Root cause: `_inject_gradient_id_overlays` ran at ~line 4944, BEFORE `_replace_portfolio_featured_grid` at ~line 5006. The grid replacement discarded all injected `--rd-overlay` styles.
-- Fixed by removing the early injection call and adding it AFTER all grid/strip replacements with a comment explaining why ordering matters
-- Added regression test `portfolio_featured_gradient_serve_time`: saves a gradient via PUT API, fetches public page, verifies `--rd-overlay` is in the served HTML — this test would have caught the original bug on first pass
-- Fixed arg-order bug in test (`token` and `original_state` were swapped in `_restore_card_state` call)
-
-**Also fixed during this session:**
-- 65 service hero `card_settings` rows were left in `mode='color'` test artifact state by previous guardrail Playwright run — reset to `mode='image'` with correct hero_image
-- 57 `card_settings` image paths normalized from bare `_mv2.webp` and `_1920w.webp` → `_960w.webp` to pass QA gate
-- Server restart protocol identified: endpoint is `/admin/api/server/restart` (POST) — server runs with `use_reloader=False`, changes to `preview_server.py` require explicit restart
-
----
-
-## How the Portfolio Gradient Feature Works (End State)
-1. Admin opens portfolio page in admin panel → `_render_portfolio_featured_html()` generates the grid with `data-gradient-id="portfolio-featured-N"` on each overlay div
-2. User hovers card → pill appears with G button (exclusion removed)
-3. User clicks G → `rd_gradient_open` postMessage → `pages.html` opens gradient panel
-4. User adjusts gradient → `rd_set_gradient` postMessage → client-side listener sets `--rd-overlay` on `[data-gradient-id="portfolio-featured-N"]` (live preview)
-5. User clicks Save → `/admin/api/cards/portfolio/portfolio-featured-N` PUT → gradient saved to `card_settings`
-6. On next page load: `_inject_gradient_id_overlays()` runs AFTER all grid replacements → reads `card_settings`, injects `--rd-overlay` as inline style on the overlay div
+**Prevention:** Added `sitemap_links_navigable` Playwright test — loads sitemap in browser, resolves every `.sm-link` via `el.href` (fully browser-resolved URL), HTTP-checks every one. Runs every guardrail post-phase. Added link verification rule to CLAUDE.md.
 
 ---
 
 ## Open Items (Carried Forward)
-- **3 missing Wix CDN images** — still need Henry to download from Wix and upload via bat script
-- **Render review queue** — 62 cards, tool working, Henry reviewing manually
-- **set-version gap** — static non-portfolio pages not updated by set-version (known gap)
+- **3 missing Wix CDN images** — need Henry to download from Wix and upload via bat script:
+  - `ff5b18_c5cb0ea7` → Pleasanton Custom photo 42 + Pleasanton Cottage Kitchen photo 4
+  - `ff5b18_98f97a76` → Pleasanton Custom photo 77
+  - `ff5b18_238b56fc` → Sierra Mountain Ranch photo 61 (.jpg)
+- **Render review queue** — 62 cards pending Henry's manual review
+- **`_NAV_PREFETCH_SLUGS` bug** — `preview_server.py` line 298 has `'whole-home-remodels'` (wrong) and `'therdedit'` (wrong); should be `'whole-house-remodels'` and `'blog'`. Affects hero preload on nav hover for those two pages. Small but real bug.
+- **Houzz external link** — `https://www.houzz.com/pro/ridgecrestdesigns` needs manual browser verification; curl times out from server
+- **set-version gap** — static non-portfolio pages not updated by set-version (known open gap)
 - **pre-commit hook python path** — system python3 vs venv still pending
 
 ---
@@ -66,5 +48,6 @@
 ## Infrastructure
 - Server: 147.182.242.54:8081
 - Branch: ridgecrest-audit
-- All features re-locked after guardrail runs
-- Server restart endpoint: POST /admin/api/server/restart (requires X-Admin-Token)
+- Last commit: 7d3bcda (2026-05-01)
+- All features re-locked
+- Server restart: POST /admin/api/server/restart (requires X-Admin-Token)
