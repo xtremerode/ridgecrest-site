@@ -1709,6 +1709,57 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # ── sitemap_links_navigable ───────────────────────────────────────
+            # Loads /view/sitemap.html and resolves every .sm-link href the way
+            # a browser would (el.href returns the fully-resolved absolute URL).
+            # Verifies every resolved URL returns HTTP 200. This catches
+            # root-relative links (/page.html) that 404 from the /view/ context
+            # even though the file exists at /view/page.html.
+            # Rule: links must work when clicked, not just when fetched by path.
+            try:
+                import urllib.request as _ur2
+                _sm_page = context.new_page()
+                _sm_page.goto(f'{BASE_URL}/view/sitemap.html', wait_until='domcontentloaded', timeout=15000)
+                # Use browser to resolve all .sm-link hrefs to absolute URLs
+                # el.href returns fully-resolved absolute URLs — the true browser destination
+                _sm_hrefs = _sm_page.evaluate(
+                    "() => Array.from(document.querySelectorAll('a.sm-link')).map(a => ({href: a.href, text: a.textContent.trim()}))"
+                )
+                _sm_page.close()
+                _sm_broken = []
+                for _item in _sm_hrefs:
+                    _url = _item['href']
+                    if not _url.startswith('http'):
+                        continue
+                    try:
+                        _req = _ur2.Request(_url)
+                        with _ur2.urlopen(_req, timeout=8) as _r:
+                            if _r.status != 200:
+                                _sm_broken.append(f"{_r.status} {_url} ({_item['text']})")
+                    except Exception as _link_e:
+                        _sm_broken.append(f"ERR {_url} ({_item['text']}): {_link_e}")
+                results.append({
+                    'agent': agent,
+                    'check': 'sitemap_links_navigable',
+                    'status': 'pass' if not _sm_broken else 'fail',
+                    'detail': (
+                        f'All {len(_sm_hrefs)} sitemap links resolve correctly ✓'
+                        if not _sm_broken else
+                        f'{len(_sm_broken)} broken link(s): ' + '; '.join(_sm_broken[:5])
+                    ),
+                    'page': 'sitemap',
+                    'auto_fixable': False,
+                })
+            except Exception as _sm_e:
+                results.append({
+                    'agent': agent,
+                    'check': 'sitemap_links_navigable',
+                    'status': 'fail',
+                    'detail': f'sitemap_links_navigable test error: {_sm_e}',
+                    'page': 'sitemap',
+                    'auto_fixable': False,
+                })
+
             browser.close()
 
     except Exception as e:

@@ -1,0 +1,8 @@
+run_id=run_20260501_054459
+timestamp=20260501_054459
+features=seo-sitemap seo-service-pages seo-project-pages
+dump_file=/home/claudeuser/agent/backups/pre_task_20260501_054459.sql
+baseline_commit=4c66ea8bc4a1dfec7eba391f48651dddbbf9b231
+playwright_before=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260501_054459_playwright_before.json
+card_snapshot=/home/claudeuser/agent/backups/card_snapshot_20260501_054459.json
+log_pre=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260501_054459_pre.log
