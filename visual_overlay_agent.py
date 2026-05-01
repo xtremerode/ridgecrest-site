@@ -1760,6 +1760,50 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # ── nav_hero_map_keys ─────────────────────────────────────────────
+            # Verifies window.__RD_HERO_MAP entries for whole-house-remodels and
+            # blog have real hero images (not the fallback path). Guards against
+            # slug typos in _NAV_PREFETCH_SLUGS that silently break nav preload.
+            # Keys in __RD_HERO_MAP are /view/<slug>.html paths, not bare slugs.
+            _HERO_FALLBACK = 'ff5b18_c520c9ca384d4c3ebe02707d0c8f45ab_mv2'
+            try:
+                _nhm_page = context.new_page()
+                _nhm_page.goto(f'{BASE_URL}/view/index.html', wait_until='domcontentloaded', timeout=15000)
+                _nhm_map = _nhm_page.evaluate(
+                    "() => typeof window.__RD_HERO_MAP === 'object' ? window.__RD_HERO_MAP : null"
+                )
+                _nhm_page.close()
+                # These two were broken by slug typos ('whole-home-remodels', 'therdedit')
+                _required_urls = ['/view/whole-house-remodels.html', '/view/blog.html']
+                _bad = []
+                if _nhm_map is None:
+                    _bad = _required_urls
+                else:
+                    for _u in _required_urls:
+                        _v = _nhm_map.get(_u, '')
+                        if not _v or _HERO_FALLBACK in _v:
+                            _bad.append(f'{_u} → fallback or missing')
+                results.append({
+                    'agent': agent,
+                    'check': 'nav_hero_map_keys',
+                    'status': 'fail' if _bad else 'pass',
+                    'detail': (
+                        f'__RD_HERO_MAP has wrong/missing heroes: {_bad}' if _bad
+                        else 'whole-house-remodels and blog have real hero images in __RD_HERO_MAP ✓'
+                    ),
+                    'page': 'home',
+                    'auto_fixable': False,
+                })
+            except Exception as _nhm_e:
+                results.append({
+                    'agent': agent,
+                    'check': 'nav_hero_map_keys',
+                    'status': 'fail',
+                    'detail': f'nav_hero_map_keys test error: {_nhm_e}',
+                    'page': 'home',
+                    'auto_fixable': False,
+                })
+
             browser.close()
 
     except Exception as e:

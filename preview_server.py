@@ -295,7 +295,7 @@ _HERO_FALLBACK_PATH = '/assets/images-opt/ff5b18_c520c9ca384d4c3ebe02707d0c8f45a
 _NAV_PREFETCH_SLUGS = [
     'home', 'about', 'process', 'portfolio', 'contact', 'team',
     'custom-homes', 'kitchen-remodels', 'bathroom-remodels',
-    'whole-home-remodels', 'therdedit',
+    'whole-house-remodels', 'blog',
 ]
 
 
