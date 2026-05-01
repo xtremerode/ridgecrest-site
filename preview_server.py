@@ -6607,7 +6607,7 @@ def _render_project_page(p):
       <li><a href="portfolio.html">Portfolio</a></li>
       <li><a href="/blog">The RD Edit</a></li>
       <li><a href="team.html">Team</a></li>
-      <li><a href="contact.html" class="nav__cta">Start a Project</a></li>
+      <li><a href="start-a-project.html" class="nav__cta">Start a Project</a></li>
     </ul>
   </nav>
 

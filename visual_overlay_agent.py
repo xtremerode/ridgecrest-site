@@ -1462,29 +1462,36 @@ def run(fix=False):
             try:
                 _sap_page = browser.new_page()
                 _sap_page.goto(f'{BASE_URL}/view/start-a-project.html', wait_until='networkidle', timeout=30000)
+                # Wait for Base44 initial resize to settle
                 _sap_page.wait_for_timeout(1500)
-                _iframe_h = _sap_page.evaluate(
+                _iframe_h_initial = _sap_page.evaluate(
+                    "() => { var f = document.querySelector('.sap-frame iframe'); return f ? f.clientHeight : 0; }"
+                )
+                # Simulate user clicking into the iframe (parent window blur).
+                # After collapse+restore cycle (500ms+600ms), height must exceed
+                # MIN_H (500). Base44 responds to collapse with its content height
+                # (~645px), so the threshold is set at 550 — well above MIN_H but
+                # below Base44's natural content height. This catches the stuck-at-500
+                # scroll bar regression without requiring the exact pre-blur height.
+                _sap_page.evaluate("() => window.dispatchEvent(new Event('blur'))")
+                _sap_page.wait_for_timeout(1300)
+                _iframe_h_after_blur = _sap_page.evaluate(
                     "() => { var f = document.querySelector('.sap-frame iframe'); return f ? f.clientHeight : 0; }"
                 )
                 _sap_page.close()
-                if _iframe_h and _iframe_h > 700:
-                    results.append({
-                        'agent': agent,
-                        'check': 'start_a_project_iframe_resize',
-                        'status': 'pass',
-                        'detail': f'iframe.clientHeight={_iframe_h} > 700 — auto-resize working',
-                        'page': 'start-a-project',
-                        'auto_fixable': False,
-                    })
-                else:
-                    results.append({
-                        'agent': agent,
-                        'check': 'start_a_project_iframe_resize',
-                        'status': 'fail',
-                        'detail': f'iframe.clientHeight={_iframe_h} — expected > 700; iframe may be stuck at default height (scroll bar regression)',
-                        'page': 'start-a-project',
-                        'auto_fixable': False,
-                    })
+                _ok = _iframe_h_initial > 700 and _iframe_h_after_blur > 550
+                results.append({
+                    'agent': agent,
+                    'check': 'start_a_project_iframe_resize',
+                    'status': 'pass' if _ok else 'fail',
+                    'detail': (
+                        f'initial={_iframe_h_initial} after_blur={_iframe_h_after_blur} — resize + restore OK'
+                        if _ok else
+                        f'initial={_iframe_h_initial} after_blur={_iframe_h_after_blur} — iframe stuck at MIN_H after blur (scroll bar regression)'
+                    ),
+                    'page': 'start-a-project',
+                    'auto_fixable': False,
+                })
             except Exception as _e:
                 results.append({
                     'agent': agent,

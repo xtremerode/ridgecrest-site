@@ -196,9 +196,11 @@
       // the body to shrink, then accept the resulting resize message.
       var collapseTimer  = null;
       var pendingCollapse = false;
+      var restoreTimer   = null;
 
       function doCollapse() {
         pendingCollapse = false;
+        var prevH = currentH;
         frame.style.transition = 'none';
         wrapper.style.transition = 'none';
         frame.style.height   = MIN_H + 'px';
@@ -210,6 +212,15 @@
             wrapper.style.transition = '';
           });
         });
+        // If Base44 sends no resize (field click — height unchanged), restore.
+        // If Base44 sends a resize (Back navigation — new smaller height), the
+        // message handler cancels this timer so the new height wins.
+        clearTimeout(restoreTimer);
+        restoreTimer = setTimeout(function() {
+          if (currentH === MIN_H && prevH > MIN_H) {
+            setSize(prevH);
+          }
+        }, 600);
       }
 
       window.addEventListener('blur', function() {
@@ -233,11 +244,12 @@
         var h = e.data.height;
         if (typeof h !== 'number' || h < 50) return;
 
-        // A natural resize arrived — cancel any pending collapse (no jump needed)
+        // A natural resize arrived — cancel pending collapse and pending restore
         if (pendingCollapse) {
           pendingCollapse = false;
           clearTimeout(collapseTimer);
         }
+        clearTimeout(restoreTimer);
 
         if (locked) return;
         accept(h);
