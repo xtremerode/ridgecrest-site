@@ -1562,6 +1562,72 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # ── portfolio_featured_gradient_wired ────────────────────────
+            # Verify that rd_set_gradient correctly applies --rd-overlay to
+            # .portfolio-featured__overlay (data-gradient-id element), NOT to
+            # .portfolio-featured__img (data-card-id). The render function must
+            # include data-gradient-id on the overlay div for this to work.
+            try:
+                _pgw_page = context.new_page()
+                _pgw_page.goto(
+                    f'{BASE_URL}/view/portfolio.html?admin_edit=1&token={token}&_stage=1',
+                    wait_until='networkidle', timeout=20000
+                )
+                _pgw_page.wait_for_timeout(800)
+                # Dispatch a synthetic rd_set_gradient message to the page
+                _pgw_page.evaluate("""
+                    () => {
+                        window.dispatchEvent(new MessageEvent('message', {
+                            data: {
+                                type: 'rd_set_gradient',
+                                cardId: 'portfolio-featured-1',
+                                gradientCss: 'linear-gradient(to top,rgba(0,0,0,0.8) 0%,transparent 80%)',
+                                gradient: {gradient_type:'fade',gradient_tint:'dark',gradient_opacity:80,gradient_direction:'bottom',gradient_distance:80}
+                            },
+                            origin: window.location.origin
+                        }));
+                    }
+                """)
+                _pgw_page.wait_for_timeout(300)
+                _pgw_result = _pgw_page.evaluate("""
+                    () => {
+                        var overlay = document.querySelector('[data-gradient-id="portfolio-featured-1"]');
+                        var imgDiv  = document.querySelector('[data-card-id="portfolio-featured-1"]');
+                        return {
+                            overlayRdOverlay: overlay ? overlay.style.getPropertyValue('--rd-overlay') : null,
+                            imgRdOverlay:     imgDiv  ? imgDiv.style.getPropertyValue('--rd-overlay')  : null,
+                            overlayFound: !!overlay
+                        };
+                    }
+                """)
+                _pgw_page.close()
+                _pgw_wired = (
+                    _pgw_result.get('overlayFound') and
+                    _pgw_result.get('overlayRdOverlay') and
+                    'gradient' in (_pgw_result.get('overlayRdOverlay') or '')
+                )
+                results.append({
+                    'agent': agent,
+                    'check': 'portfolio_featured_gradient_wired',
+                    'status': 'pass' if _pgw_wired else 'fail',
+                    'detail': (
+                        f'--rd-overlay set on overlay div ✓ ({_pgw_result.get("overlayRdOverlay","")[:40]})'
+                        if _pgw_wired else
+                        f'--rd-overlay NOT on overlay div — data-gradient-id missing from rendered HTML? overlay={_pgw_result.get("overlayRdOverlay")!r}'
+                    ),
+                    'page': 'portfolio',
+                    'auto_fixable': False,
+                })
+            except Exception as _e:
+                results.append({
+                    'agent': agent,
+                    'check': 'portfolio_featured_gradient_wired',
+                    'status': 'fail',
+                    'detail': f'portfolio_featured_gradient_wired test error: {_e}',
+                    'page': 'portfolio',
+                    'auto_fixable': False,
+                })
+
             browser.close()
 
     except Exception as e:

@@ -1270,7 +1270,7 @@ def _render_portfolio_featured_html(projects: list) -> str:
             f'<a class="portfolio-featured__card" href="{slug}.html">\n'
             f'<div aria-label="{aria}" class="portfolio-featured__img"'
             f' data-card-id="portfolio-featured-{slot}" role="img"></div>\n'
-            f'<div class="portfolio-featured__overlay"></div>\n'
+            f'<div class="portfolio-featured__overlay" data-gradient-id="portfolio-featured-{slot}"></div>\n'
             f'<div class="portfolio-featured__info">\n'
             f'<span class="portfolio-featured__loc">{loc_str}</span>\n'
             f'<h3 class="portfolio-featured__name">{name}</h3>\n'
