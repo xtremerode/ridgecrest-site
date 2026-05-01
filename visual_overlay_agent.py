@@ -1458,6 +1458,43 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # ── start_a_project_iframe_resize ─────────────────────────────
+            try:
+                _sap_page = browser.new_page()
+                _sap_page.goto(f'{BASE_URL}/view/start-a-project.html', wait_until='networkidle', timeout=30000)
+                _sap_page.wait_for_timeout(1500)
+                _iframe_h = _sap_page.evaluate(
+                    "() => { var f = document.querySelector('.sap-frame iframe'); return f ? f.clientHeight : 0; }"
+                )
+                _sap_page.close()
+                if _iframe_h and _iframe_h > 700:
+                    results.append({
+                        'agent': agent,
+                        'check': 'start_a_project_iframe_resize',
+                        'status': 'pass',
+                        'detail': f'iframe.clientHeight={_iframe_h} > 700 — auto-resize working',
+                        'page': 'start-a-project',
+                        'auto_fixable': False,
+                    })
+                else:
+                    results.append({
+                        'agent': agent,
+                        'check': 'start_a_project_iframe_resize',
+                        'status': 'fail',
+                        'detail': f'iframe.clientHeight={_iframe_h} — expected > 700; iframe may be stuck at default height (scroll bar regression)',
+                        'page': 'start-a-project',
+                        'auto_fixable': False,
+                    })
+            except Exception as _e:
+                results.append({
+                    'agent': agent,
+                    'check': 'start_a_project_iframe_resize',
+                    'status': 'fail',
+                    'detail': f'start_a_project_iframe_resize test error: {_e}',
+                    'page': 'start-a-project',
+                    'auto_fixable': False,
+                })
+
             browser.close()
 
     except Exception as e:

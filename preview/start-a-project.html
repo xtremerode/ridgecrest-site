@@ -150,7 +150,7 @@
         <iframe
           src="https://elevate-scheduling-6b2fdec8.base44.app/"
           title="Project Inquiry Form"
-          loading="lazy"
+          loading="eager"
           allow="clipboard-write"
         ></iframe>
       </div>
@@ -217,7 +217,7 @@
         clearTimeout(timer);
         clearTimeout(collapseTimer);
         pendingCollapse = true;
-        collapseTimer = setTimeout(doCollapse, 200);
+        collapseTimer = setTimeout(doCollapse, 500);
       });
 
       window.addEventListener('message', function(e) {
