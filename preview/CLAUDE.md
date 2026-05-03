@@ -97,6 +97,22 @@ Must be placed **after** all text-align rules in `main.css`. See §46 in `CLAUDE
 
 ---
 
+## Visual Truth Rule — MANDATORY
+
+**The live site at 1440px browser width is the source of truth for all spacing and layout decisions.**
+
+The admin preview panel scales the iframe by ~55% using CSS `transform: scale()`. A 96px gap on the live site looks like ~53px in the admin — nearly half the real size. Spacing that looks right in the admin can be significantly oversized on the live site.
+
+**Before declaring any CSS `padding`, `margin`, or `gap` change done:**
+1. Load the live URL (e.g. `http://147.182.242.54:8081/portfolio.html`) in a browser at 1440px viewport width
+2. Verify the spacing looks proportional relative to surrounding content
+3. The admin preview is correct for text, image, color, and overlay decisions — NOT for spacing judgments
+
+**The admin iframe is correct for:** text content, image selection, color, overlays, card settings
+**The admin iframe is misleading for:** padding, margin, gap, section height, whitespace amounts
+
+---
+
 ## Screenshot Sharing
 - Henry uploads at: `http://147.182.242.54:8081/paste` (POST multipart or raw body)
 - Files save to: `/home/claudeuser/agent/downloads/screenshot_001.jpg`, `_002.jpg`, etc.
