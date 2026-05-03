@@ -685,7 +685,7 @@ def _ensure_feature_locks_table(cur):
             ('server-webp',       'WebP Conversion',              'Server',    'development', '_to_webp() — converts uploaded images to WebP with responsive sizes'),
             ('server-db',         'Database Connection Layer',    'Server',    'development', '_db_conn(), _DB_URL, connection hygiene'),
             ('server-auth',       'Auth / Token System',          'Server',    'development', '_require_admin(), _valid_token(), admin_sessions table'),
-            ('server-rerender',   'AI Re-render (Gemini)',        'Server',    'development', '/admin/api/images/rerender — gemini-3-pro-image-preview'),
+            ('server-rerender',   'AI Re-render (Gemini)',        'Server',    'development', '/admin/api/images/rerender — gemini-3.1-flash-image-preview'),
             ('server-routes',     'Static File Routes',           'Server',    'development', '/view/<path>, /assets/, /migrate_*.bat routes'),
             # Frontend
             ('frontend-gallery',  'gallery.js',                   'Frontend',  'development', 'preview/js/gallery.js — do not modify without testing masonry'),
@@ -9163,7 +9163,7 @@ contents_parts.append(types.Part(text=prompt))
 
 client = genai.Client(api_key=api_key)
 response = client.models.generate_content(
-    model='models/gemini-3-pro-image-preview',
+    model='models/gemini-3.1-flash-image-preview',
     contents=contents_parts,
     config=types.GenerateContentConfig(response_modalities=['IMAGE', 'TEXT'])
 )
@@ -9282,7 +9282,7 @@ print(f'[SURGICAL] master={master_w}x{master_h} patch={actual_w}x{actual_h} at (
 # contain adjacent material information the model can match against.
 client = genai.Client(api_key=api_key)
 response = client.models.generate_content(
-    model='models/gemini-3-pro-image-preview',
+    model='models/gemini-3.1-flash-image-preview',
     contents=[
         types.Part(inline_data=types.Blob(mime_type='image/png', data=patch_bytes)),
         types.Part(text=prompt)

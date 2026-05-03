@@ -1855,6 +1855,8 @@ def run(fix=False):
             # Server-side: preview_server.py script_surgical and script now guard
             # against response.candidates=None and cand.content.parts=None to avoid
             # TypeError when Gemini returns MALFORMED_FUNCTION_CALL or empty content.
+            # Model updated to gemini-3.1-flash-image-preview (from gemini-3-pro-image-preview)
+            # — the pro model was returning 500 INTERNAL on real image patches.
             try:
                 _srg_page = context.new_page()
                 # Admin pages.html uses sessionStorage for auth — set token before navigating
