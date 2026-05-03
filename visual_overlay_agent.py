@@ -1881,11 +1881,13 @@ def run(fix=False):
                     var box = document.querySelector('#rerenderModal .modal-box');
                     var grid = document.getElementById('rerenderPanelGrid');
                     var btn = document.getElementById('surgicalToggleBtn');
+                    var orig = document.getElementById('rerenderOriginal');
                     return {
                         maxWidth: box ? box.style.maxWidth : null,
                         width: box ? box.style.width : null,
                         grid: grid ? grid.style.gridTemplateColumns : null,
-                        btnText: btn ? btn.textContent.trim() : null
+                        btnText: btn ? btn.textContent.trim() : null,
+                        backgroundSize: orig ? orig.style.backgroundSize : null
                     };
                 }""")
                 # Click Surgical Mode OFF
@@ -1895,11 +1897,13 @@ def run(fix=False):
                     var box = document.querySelector('#rerenderModal .modal-box');
                     var grid = document.getElementById('rerenderPanelGrid');
                     var btn = document.getElementById('surgicalToggleBtn');
+                    var orig = document.getElementById('rerenderOriginal');
                     return {
                         maxWidth: box ? box.style.maxWidth : null,
                         width: box ? box.style.width : null,
                         grid: grid ? grid.style.gridTemplateColumns : null,
-                        btnText: btn ? btn.textContent.trim() : null
+                        btnText: btn ? btn.textContent.trim() : null,
+                        backgroundSize: orig ? orig.style.backgroundSize : null
                     };
                 }""")
                 # Re-open modal while surgical is OFF to confirm size resets properly
@@ -1912,9 +1916,11 @@ def run(fix=False):
                 _srg_reopen = _srg_page.evaluate("""() => {
                     var box = document.querySelector('#rerenderModal .modal-box');
                     var grid = document.getElementById('rerenderPanelGrid');
+                    var orig = document.getElementById('rerenderOriginal');
                     return {
                         maxWidth: box ? box.style.maxWidth : null,
-                        grid: grid ? grid.style.gridTemplateColumns : null
+                        grid: grid ? grid.style.gridTemplateColumns : null,
+                        backgroundSize: orig ? orig.style.backgroundSize : null
                     };
                 }""")
                 _srg_page.close()
@@ -1930,21 +1936,27 @@ def run(fix=False):
                     _srg_errors.append(f"surgical ON: grid={_srg_on.get('grid')} expected 2fr 1fr")
                 if _srg_on.get('btnText') != '⚔ Surgical Mode ON':
                     _srg_errors.append(f"surgical ON: btn text={_srg_on.get('btnText')}")
+                if _srg_on.get('backgroundSize') != 'contain':
+                    _srg_errors.append(f"surgical ON: backgroundSize={_srg_on.get('backgroundSize')} expected contain")
                 if _srg_off.get('maxWidth') != '860px':
                     _srg_errors.append(f"surgical OFF: maxWidth={_srg_off.get('maxWidth')} expected 860px")
                 if '1fr 1fr' not in (_srg_off.get('grid') or ''):
                     _srg_errors.append(f"surgical OFF: grid={_srg_off.get('grid')} expected 1fr 1fr")
+                if _srg_off.get('backgroundSize') != 'cover':
+                    _srg_errors.append(f"surgical OFF: backgroundSize={_srg_off.get('backgroundSize')} expected cover")
                 if _srg_reopen.get('maxWidth') != '860px':
                     _srg_errors.append(f"reopen after surgical: maxWidth={_srg_reopen.get('maxWidth')} expected 860px reset")
                 if '1fr 1fr' not in (_srg_reopen.get('grid') or ''):
                     _srg_errors.append(f"reopen after surgical: grid={_srg_reopen.get('grid')} expected 1fr 1fr reset")
+                if _srg_reopen.get('backgroundSize') != 'cover':
+                    _srg_errors.append(f"reopen after surgical: backgroundSize={_srg_reopen.get('backgroundSize')} expected cover reset")
                 results.append({
                     'agent': agent,
                     'check': 'surgical_mode_expands',
                     'status': 'fail' if _srg_errors else 'pass',
                     'detail': (
                         'REGRESSION: ' + '; '.join(_srg_errors) if _srg_errors
-                        else f'Surgical mode expand/collapse verified ✓ (ON={_srg_on.get("maxWidth")}/{_srg_on.get("grid")}, OFF={_srg_off.get("maxWidth")}/{_srg_off.get("grid")}, reopen={_srg_reopen.get("maxWidth")})'
+                        else f'Surgical mode expand/collapse verified ✓ (ON={_srg_on.get("maxWidth")}/{_srg_on.get("grid")}/bg={_srg_on.get("backgroundSize")}, OFF={_srg_off.get("maxWidth")}/{_srg_off.get("grid")}/bg={_srg_off.get("backgroundSize")}, reopen={_srg_reopen.get("maxWidth")}/bg={_srg_reopen.get("backgroundSize")})'
                     ),
                     'page': 'admin/pages',
                     'auto_fixable': False,

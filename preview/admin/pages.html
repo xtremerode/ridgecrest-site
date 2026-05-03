@@ -4456,7 +4456,7 @@ function openRerender(baseFilename, label, sourceFilename) {
   if (_surgHint) _surgHint.style.display = '';
   if (_surgStatus) { _surgStatus.style.display = 'none'; _surgStatus.textContent = 'Draw a selection box on the source image to define the edit area'; }
   if (_cropCanvas) { _cropCanvas.style.display = 'none'; const _ctx = _cropCanvas.getContext('2d'); if (_ctx) _ctx.clearRect(0,0,_cropCanvas.width,_cropCanvas.height); }
-  if (_origEl) { _origEl.style.cursor = 'zoom-in'; _origEl.removeAttribute('data-lightbox-disabled'); }
+  if (_origEl) { _origEl.style.cursor = 'zoom-in'; _origEl.removeAttribute('data-lightbox-disabled'); _origEl.style.backgroundSize = 'cover'; }
   // Always reset modal to normal size on open — surgical mode may have left it expanded
   const _rrModalBox = document.querySelector('#rerenderModal .modal-box');
   const _rrPanelGrid = document.getElementById('rerenderPanelGrid');
@@ -4492,6 +4492,8 @@ function toggleSurgicalMode() {
     canvas.style.display = '';
     origEl.style.cursor = 'crosshair';
     origEl.setAttribute('data-lightbox-disabled', '1');
+    // Show full image (no clipping) so every corner is reachable for selection
+    origEl.style.backgroundSize = 'contain';
     // Expand modal so source image is large enough for precise selection
     if (modalBox) { modalBox.style.maxWidth = '1400px'; modalBox.style.width = '96vw'; }
     if (panelGrid) panelGrid.style.gridTemplateColumns = '2fr 1fr';
@@ -4508,6 +4510,7 @@ function toggleSurgicalMode() {
     canvas.style.display = 'none';
     origEl.style.cursor = 'zoom-in';
     origEl.removeAttribute('data-lightbox-disabled');
+    origEl.style.backgroundSize = 'cover';
     // Restore normal modal size
     if (modalBox) { modalBox.style.maxWidth = '860px'; modalBox.style.width = '95vw'; }
     if (panelGrid) panelGrid.style.gridTemplateColumns = '1fr 1fr';
@@ -4612,25 +4615,39 @@ function cropMouseUp(e) {
     _rerenderClearCrop();
     return;
   }
-  // Scale display coords to actual image pixels, accounting for background-size:cover offset.
-  // cover scales the image so the shorter display axis is filled, then centers and crops the
-  // longer axis. Canvas (0,0) is NOT image pixel (0,0) when aspect ratios differ.
+  // Scale display coords to actual image pixels.
+  // Surgical mode uses background-size:contain (full image visible, letterboxed).
+  // Normal mode uses background-size:cover (image cropped to fill box).
   let actualX, actualY, actualW2, actualH2;
   if (_rerenderActualDims.w > 0 && _rerenderActualDims.h > 0) {
     const imgRatio = _rerenderActualDims.w / _rerenderActualDims.h;
     const boxRatio = canvas.width / canvas.height;
     let fitScale, offX = 0, offY = 0;
-    if (imgRatio > boxRatio) {
-      // Image wider than box — height fills, width overflows and is center-cropped
-      fitScale = canvas.height / _rerenderActualDims.h;
-      offX = (_rerenderActualDims.w * fitScale - canvas.width) / 2;
+    if (_rerenderSurgical) {
+      // contain: full image fits inside box, letterboxed on the shorter axis
+      if (imgRatio > boxRatio) {
+        // Image wider → fit to width, letterbox top+bottom
+        fitScale = canvas.width / _rerenderActualDims.w;
+        offY = (canvas.height - _rerenderActualDims.h * fitScale) / 2;
+      } else {
+        // Image taller → fit to height, letterbox left+right
+        fitScale = canvas.height / _rerenderActualDims.h;
+        offX = (canvas.width - _rerenderActualDims.w * fitScale) / 2;
+      }
+      actualX = Math.round((dispX - offX) / fitScale);
+      actualY = Math.round((dispY - offY) / fitScale);
     } else {
-      // Image taller than box — width fills, height overflows and is center-cropped
-      fitScale = canvas.width / _rerenderActualDims.w;
-      offY = (_rerenderActualDims.h * fitScale - canvas.height) / 2;
+      // cover: image fills box, overflowing edges are center-cropped
+      if (imgRatio > boxRatio) {
+        fitScale = canvas.height / _rerenderActualDims.h;
+        offX = (_rerenderActualDims.w * fitScale - canvas.width) / 2;
+      } else {
+        fitScale = canvas.width / _rerenderActualDims.w;
+        offY = (_rerenderActualDims.h * fitScale - canvas.height) / 2;
+      }
+      actualX = Math.round((dispX + offX) / fitScale);
+      actualY = Math.round((dispY + offY) / fitScale);
     }
-    actualX = Math.round((dispX + offX) / fitScale);
-    actualY = Math.round((dispY + offY) / fitScale);
     actualW2 = Math.round(dispW / fitScale);
     actualH2 = Math.round(dispH / fitScale);
     // Clamp to image bounds
