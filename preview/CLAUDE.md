@@ -97,6 +97,18 @@ Must be placed **after** all text-align rules in `main.css`. See §46 in `CLAUDE
 
 ---
 
+## Section Height DB Rule — MANDATORY
+
+When clearing or updating `page_sections.height_px` in the DB, you MUST also re-publish the page immediately after:
+```
+curl -X POST http://147.182.242.54:8081/admin/api/pages/publish \
+  -H "Content-Type: application/json" -H "X-Admin-Token: <token>" \
+  -d '{"slugs":["<slug>"]}'
+```
+**Why:** The live site serves pages from `published_snapshots`, not the live `page_sections` table. Updating `page_sections` without re-publishing has no visible effect — the snapshot still contains the old height value. Verified 2026-05-03: portfolio-featured had `height_px=1165` in `page_sections` but the snapshot still injected `height:1165px` until re-publish was triggered.
+
+---
+
 ## Visual Truth Rule — MANDATORY
 
 **The live site at 1440px browser width is the source of truth for all spacing and layout decisions.**
