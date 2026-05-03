@@ -1847,6 +1847,118 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # ── surgical_mode_expands ─────────────────────────────────────────
+            # Verifies that toggling Surgical Mode ON expands the re-render modal
+            # (maxWidth 1400px, grid 2fr 1fr) and toggling OFF restores it
+            # (maxWidth 860px, grid 1fr 1fr). Also confirms openRerender() always
+            # resets to normal size regardless of prior surgical state.
+            try:
+                _srg_page = context.new_page()
+                # Admin pages.html uses sessionStorage for auth — set token before navigating
+                _srg_page.goto(f'{BASE_URL}/view/admin/index.html', wait_until='domcontentloaded', timeout=10000)
+                _srg_page.evaluate(f'() => sessionStorage.setItem("rd_admin_token", "{token}")')
+                _srg_page.goto(f'{BASE_URL}/view/admin/pages.html', wait_until='networkidle', timeout=20000)
+                # Open the rerender modal directly via JS with a dummy filename
+                _srg_page.evaluate("""() => {
+                    openRerender('ff5b18_6f6dc7ef92684e7e8af496c4f83f06be_mv2_960w.webp', 'Test');
+                }""")
+                time.sleep(0.3)
+                # Capture baseline modal width (should be 860px max-width)
+                _srg_normal = _srg_page.evaluate("""() => {
+                    var box = document.querySelector('#rerenderModal .modal-box');
+                    var grid = document.getElementById('rerenderPanelGrid');
+                    return {
+                        maxWidth: box ? box.style.maxWidth : null,
+                        width: box ? box.style.width : null,
+                        grid: grid ? grid.style.gridTemplateColumns : null,
+                        modalVisible: document.getElementById('rerenderModal').style.display !== 'none'
+                    };
+                }""")
+                # Click Surgical Mode ON
+                _srg_page.evaluate("() => { toggleSurgicalMode(); }")
+                time.sleep(0.2)
+                _srg_on = _srg_page.evaluate("""() => {
+                    var box = document.querySelector('#rerenderModal .modal-box');
+                    var grid = document.getElementById('rerenderPanelGrid');
+                    var btn = document.getElementById('surgicalToggleBtn');
+                    return {
+                        maxWidth: box ? box.style.maxWidth : null,
+                        width: box ? box.style.width : null,
+                        grid: grid ? grid.style.gridTemplateColumns : null,
+                        btnText: btn ? btn.textContent.trim() : null
+                    };
+                }""")
+                # Click Surgical Mode OFF
+                _srg_page.evaluate("() => { toggleSurgicalMode(); }")
+                time.sleep(0.2)
+                _srg_off = _srg_page.evaluate("""() => {
+                    var box = document.querySelector('#rerenderModal .modal-box');
+                    var grid = document.getElementById('rerenderPanelGrid');
+                    var btn = document.getElementById('surgicalToggleBtn');
+                    return {
+                        maxWidth: box ? box.style.maxWidth : null,
+                        width: box ? box.style.width : null,
+                        grid: grid ? grid.style.gridTemplateColumns : null,
+                        btnText: btn ? btn.textContent.trim() : null
+                    };
+                }""")
+                # Re-open modal while surgical is OFF to confirm size resets properly
+                _srg_page.evaluate("() => { toggleSurgicalMode(); }")  # turn ON again
+                time.sleep(0.1)
+                _srg_page.evaluate("""() => {
+                    openRerender('ff5b18_6f6dc7ef92684e7e8af496c4f83f06be_mv2_960w.webp', 'Test2');
+                }""")
+                time.sleep(0.2)
+                _srg_reopen = _srg_page.evaluate("""() => {
+                    var box = document.querySelector('#rerenderModal .modal-box');
+                    var grid = document.getElementById('rerenderPanelGrid');
+                    return {
+                        maxWidth: box ? box.style.maxWidth : null,
+                        grid: grid ? grid.style.gridTemplateColumns : null
+                    };
+                }""")
+                _srg_page.close()
+                # Assertions
+                _srg_errors = []
+                if not _srg_normal.get('modalVisible'):
+                    _srg_errors.append('modal did not open')
+                if _srg_on.get('maxWidth') != '1400px':
+                    _srg_errors.append(f"surgical ON: maxWidth={_srg_on.get('maxWidth')} expected 1400px")
+                if _srg_on.get('width') != '96vw':
+                    _srg_errors.append(f"surgical ON: width={_srg_on.get('width')} expected 96vw")
+                if '2fr' not in (_srg_on.get('grid') or ''):
+                    _srg_errors.append(f"surgical ON: grid={_srg_on.get('grid')} expected 2fr 1fr")
+                if _srg_on.get('btnText') != '⚔ Surgical Mode ON':
+                    _srg_errors.append(f"surgical ON: btn text={_srg_on.get('btnText')}")
+                if _srg_off.get('maxWidth') != '860px':
+                    _srg_errors.append(f"surgical OFF: maxWidth={_srg_off.get('maxWidth')} expected 860px")
+                if '1fr 1fr' not in (_srg_off.get('grid') or ''):
+                    _srg_errors.append(f"surgical OFF: grid={_srg_off.get('grid')} expected 1fr 1fr")
+                if _srg_reopen.get('maxWidth') != '860px':
+                    _srg_errors.append(f"reopen after surgical: maxWidth={_srg_reopen.get('maxWidth')} expected 860px reset")
+                if '1fr 1fr' not in (_srg_reopen.get('grid') or ''):
+                    _srg_errors.append(f"reopen after surgical: grid={_srg_reopen.get('grid')} expected 1fr 1fr reset")
+                results.append({
+                    'agent': agent,
+                    'check': 'surgical_mode_expands',
+                    'status': 'fail' if _srg_errors else 'pass',
+                    'detail': (
+                        'REGRESSION: ' + '; '.join(_srg_errors) if _srg_errors
+                        else f'Surgical mode expand/collapse verified ✓ (ON={_srg_on.get("maxWidth")}/{_srg_on.get("grid")}, OFF={_srg_off.get("maxWidth")}/{_srg_off.get("grid")}, reopen={_srg_reopen.get("maxWidth")})'
+                    ),
+                    'page': 'admin/pages',
+                    'auto_fixable': False,
+                })
+            except Exception as _srg_e:
+                results.append({
+                    'agent': agent,
+                    'check': 'surgical_mode_expands',
+                    'status': 'fail',
+                    'detail': f'surgical_mode_expands test error: {_srg_e}',
+                    'page': 'admin/pages',
+                    'auto_fixable': False,
+                })
+
             browser.close()
 
     except Exception as e:

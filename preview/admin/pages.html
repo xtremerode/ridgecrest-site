@@ -1160,7 +1160,7 @@
       <button class="btn btn-ghost btn-sm" onclick="closeRerender()" style="font-size:18px;padding:2px 8px">✕</button>
     </div>
     <!-- Image panels -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0 10px">
+    <div id="rerenderPanelGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0 10px">
       <div>
         <div id="rerenderOriginalLabel" style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Source</div>
         <div id="rerenderOriginal" style="width:100%;aspect-ratio:4/3;background:var(--surface-2);background-size:cover;background-position:center;border-radius:6px;border:1px solid var(--border);cursor:zoom-in;position:relative;overflow:hidden" onclick="if(!this.getAttribute('data-lightbox-disabled'))rerenderLightbox(0)" title="Click to enlarge">
@@ -4457,6 +4457,11 @@ function openRerender(baseFilename, label, sourceFilename) {
   if (_surgStatus) { _surgStatus.style.display = 'none'; _surgStatus.textContent = 'Draw a selection box on the source image to define the edit area'; }
   if (_cropCanvas) { _cropCanvas.style.display = 'none'; const _ctx = _cropCanvas.getContext('2d'); if (_ctx) _ctx.clearRect(0,0,_cropCanvas.width,_cropCanvas.height); }
   if (_origEl) { _origEl.style.cursor = 'zoom-in'; _origEl.removeAttribute('data-lightbox-disabled'); }
+  // Always reset modal to normal size on open — surgical mode may have left it expanded
+  const _rrModalBox = document.querySelector('#rerenderModal .modal-box');
+  const _rrPanelGrid = document.getElementById('rerenderPanelGrid');
+  if (_rrModalBox) { _rrModalBox.style.maxWidth = '860px'; _rrModalBox.style.width = '95vw'; }
+  if (_rrPanelGrid) _rrPanelGrid.style.gridTemplateColumns = '1fr 1fr';
   document.getElementById('rerenderModal').style.display = 'flex';
   _initFilmstrip();
 }
@@ -4469,12 +4474,14 @@ function closeRerender() {
 
 function toggleSurgicalMode() {
   _rerenderSurgical = !_rerenderSurgical;
-  const btn    = document.getElementById('surgicalToggleBtn');
-  const hint   = document.getElementById('surgicalHint');
-  const status = document.getElementById('surgicalCropStatus');
-  const canvas = document.getElementById('rerenderCropCanvas');
-  const origEl = document.getElementById('rerenderOriginal');
-  const runBtn = document.getElementById('rerenderRunBtn');
+  const btn      = document.getElementById('surgicalToggleBtn');
+  const hint     = document.getElementById('surgicalHint');
+  const status   = document.getElementById('surgicalCropStatus');
+  const canvas   = document.getElementById('rerenderCropCanvas');
+  const origEl   = document.getElementById('rerenderOriginal');
+  const runBtn   = document.getElementById('rerenderRunBtn');
+  const modalBox = document.querySelector('#rerenderModal .modal-box');
+  const panelGrid = document.getElementById('rerenderPanelGrid');
   if (_rerenderSurgical) {
     btn.textContent = '⚔ Surgical Mode ON';
     btn.style.background = 'rgba(139,92,246,.15)';
@@ -4485,6 +4492,9 @@ function toggleSurgicalMode() {
     canvas.style.display = '';
     origEl.style.cursor = 'crosshair';
     origEl.setAttribute('data-lightbox-disabled', '1');
+    // Expand modal so source image is large enough for precise selection
+    if (modalBox) { modalBox.style.maxWidth = '1400px'; modalBox.style.width = '96vw'; }
+    if (panelGrid) panelGrid.style.gridTemplateColumns = '2fr 1fr';
     _rerenderCropCoords = null;
     _rerenderClearCrop();
     _rerenderFetchDims(_rerenderSourceFilename || _rerenderFilename);
@@ -4498,6 +4508,9 @@ function toggleSurgicalMode() {
     canvas.style.display = 'none';
     origEl.style.cursor = 'zoom-in';
     origEl.removeAttribute('data-lightbox-disabled');
+    // Restore normal modal size
+    if (modalBox) { modalBox.style.maxWidth = '860px'; modalBox.style.width = '95vw'; }
+    if (panelGrid) panelGrid.style.gridTemplateColumns = '1fr 1fr';
     _rerenderCropCoords = null;
     _rerenderClearCrop();
     // Re-enable run button now that surgical constraint is lifted
