@@ -1,8 +1,0 @@
-run_id=run_20260503_202102
-timestamp=20260503_202102
-features=frontend-css seo-project-pages portfolio-featured
-dump_file=/home/claudeuser/agent/backups/pre_task_20260503_202102.sql
-baseline_commit=46f266babfdb40b765b333d37e649bfa7d7cc9e2
-playwright_before=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260503_202102_playwright_before.json
-card_snapshot=/home/claudeuser/agent/backups/card_snapshot_20260503_202102.json
-log_pre=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260503_202102_pre.log
