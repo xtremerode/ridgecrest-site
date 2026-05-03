@@ -9169,8 +9169,8 @@ response = client.models.generate_content(
 )
 
 result_bytes = None
-for cand in response.candidates:
-    for part in cand.content.parts:
+for cand in (response.candidates or []):
+    for part in (cand.content.parts or []):
         if hasattr(part, 'inline_data') and part.inline_data and part.inline_data.data:
             result_bytes = part.inline_data.data
             break
@@ -9178,7 +9178,9 @@ for cand in response.candidates:
         break
 
 if not result_bytes:
-    print('ERROR: no image in response', file=sys.stderr)
+    finish_reasons = [str(c.finish_reason) for c in (response.candidates or [])]
+    hint = ('FinishReason: ' + ', '.join(finish_reasons)) if finish_reasons else 'no candidates'
+    print(f'ERROR: no image in response — {hint}', file=sys.stderr)
     sys.exit(1)
 
 # Gemini returns ~1024px regardless of input size.
@@ -9289,8 +9291,8 @@ response = client.models.generate_content(
 )
 
 result_bytes = None
-for cand in response.candidates:
-    for part in cand.content.parts:
+for cand in (response.candidates or []):
+    for part in (cand.content.parts or []):
         if hasattr(part, 'inline_data') and part.inline_data and part.inline_data.data:
             result_bytes = part.inline_data.data
             break
@@ -9298,7 +9300,9 @@ for cand in response.candidates:
         break
 
 if not result_bytes:
-    print('ERROR: no image in Gemini response', file=sys.stderr)
+    finish_reasons = [str(c.finish_reason) for c in (response.candidates or [])]
+    hint = ('FinishReason: ' + ', '.join(finish_reasons)) if finish_reasons else 'no candidates'
+    print(f'ERROR: no image in surgical response — {hint}', file=sys.stderr)
     sys.exit(1)
 
 # Normalize edited patch to exact crop dimensions

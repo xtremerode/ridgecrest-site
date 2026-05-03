@@ -1852,6 +1852,9 @@ def run(fix=False):
             # (maxWidth 1400px, grid 2fr 1fr) and toggling OFF restores it
             # (maxWidth 860px, grid 1fr 1fr). Also confirms openRerender() always
             # resets to normal size regardless of prior surgical state.
+            # Server-side: preview_server.py script_surgical and script now guard
+            # against response.candidates=None and cand.content.parts=None to avoid
+            # TypeError when Gemini returns MALFORMED_FUNCTION_CALL or empty content.
             try:
                 _srg_page = context.new_page()
                 # Admin pages.html uses sessionStorage for auth — set token before navigating
