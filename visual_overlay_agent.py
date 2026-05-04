@@ -1972,6 +1972,89 @@ def run(fix=False):
                     'page': 'blog', 'auto_fixable': False,
                 })
 
+            # ── blog_post_gradient_overlay ────────────────────────────────────
+            # Verifies that .post-hero__overlay uses var(--rd-overlay) so the G
+            # panel gradient control actually changes the visual overlay on blog
+            # post hero sections. Guards against the hardcoded background regression.
+            try:
+                _bpg_page = context.new_page()
+                _bpg_page.goto(f'{BASE_URL}/blog', wait_until='domcontentloaded', timeout=15000)
+                _bpg_result = _bpg_page.evaluate('''() => {
+                    const hero = document.createElement('div');
+                    hero.className = 'post-hero post-hero--has-img';
+                    hero.style.cssText = '--rd-overlay: linear-gradient(to bottom, rgba(255,0,0,0.9) 0%, transparent 100%); position:absolute; left:-9999px;';
+                    const overlay = document.createElement('div');
+                    overlay.className = 'post-hero__overlay';
+                    hero.appendChild(overlay);
+                    document.body.appendChild(hero);
+                    const bg = window.getComputedStyle(overlay).backgroundImage;
+                    document.body.removeChild(hero);
+                    return { background: bg };
+                }''')
+                _bpg_page.close()
+                _bpg_bg = _bpg_result.get('background', '')
+                _bpg_ok = 'rgba(255, 0, 0' in _bpg_bg or 'rgb(255, 0, 0' in _bpg_bg
+                results.append({
+                    'agent': agent, 'check': 'blog_post_gradient_overlay',
+                    'status': 'pass' if _bpg_ok else 'fail',
+                    'detail': (
+                        f'.post-hero__overlay correctly reads --rd-overlay variable ✓'
+                        if _bpg_ok else
+                        f'.post-hero__overlay ignores --rd-overlay (background={_bpg_bg[:80]}) — '
+                        f'expected var(--rd-overlay) in blog.css'
+                    ),
+                    'page': 'blog', 'auto_fixable': False,
+                })
+            except Exception as _bpg_e:
+                results.append({
+                    'agent': agent, 'check': 'blog_post_gradient_overlay',
+                    'status': 'fail',
+                    'detail': f'blog_post_gradient_overlay test error: {_bpg_e}',
+                    'page': 'blog', 'auto_fixable': False,
+                })
+
+            # ── blog_post_meta_align ──────────────────────────────────────────
+            # Verifies that .post-hero__meta (flex container) gets justify-content
+            # rules when data-hero-text-align is set. Guards against the CSS fix
+            # where text-align alone doesn't center flex items in the meta row.
+            try:
+                _bpm_page = context.new_page()
+                _bpm_page.goto(f'{BASE_URL}/blog', wait_until='domcontentloaded', timeout=15000)
+                _bpm_result = _bpm_page.evaluate('''() => {
+                    const hero = document.createElement('div');
+                    hero.className = 'post-hero post-hero--has-img';
+                    hero.setAttribute('data-hero-text-align', 'center');
+                    hero.style.cssText = 'position:absolute; left:-9999px;';
+                    const meta = document.createElement('div');
+                    meta.className = 'post-hero__meta';
+                    hero.appendChild(meta);
+                    document.body.appendChild(hero);
+                    const jc = window.getComputedStyle(meta).justifyContent;
+                    document.body.removeChild(hero);
+                    return { justifyContent: jc };
+                }''')
+                _bpm_page.close()
+                _bpm_jc = _bpm_result.get('justifyContent', '')
+                _bpm_ok = _bpm_jc == 'center'
+                results.append({
+                    'agent': agent, 'check': 'blog_post_meta_align',
+                    'status': 'pass' if _bpm_ok else 'fail',
+                    'detail': (
+                        f'.post-hero__meta justify-content:center applies correctly ✓'
+                        if _bpm_ok else
+                        f'.post-hero__meta justify-content={_bpm_jc!r} (expected "center") — '
+                        f'flex meta row not centering on text alignment change'
+                    ),
+                    'page': 'blog', 'auto_fixable': False,
+                })
+            except Exception as _bpm_e:
+                results.append({
+                    'agent': agent, 'check': 'blog_post_meta_align',
+                    'status': 'fail',
+                    'detail': f'blog_post_meta_align test error: {_bpm_e}',
+                    'page': 'blog', 'auto_fixable': False,
+                })
+
             # ── nav_hero_map_keys ─────────────────────────────────────────────
             # Verifies window.__RD_HERO_MAP entries for whole-house-remodels and
             # blog have real hero images (not the fallback path). Guards against
