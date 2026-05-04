@@ -9551,6 +9551,137 @@ print('OK:' + out_path + ':dims=' + str(saved_dims.get('_1920w', (0,0))))
                     'render_model': render_model})
 
 
+# ── Crop image to a selected region ──────────────────────────────────────────
+
+@app.route('/admin/api/images/crop', methods=['POST'])
+def admin_image_crop():
+    """Crop an image to a selected region and save as a new _ai_N version."""
+    auth = _require_admin()
+    if auth: return auth
+    data = request.get_json(silent=True) or {}
+    filename      = data.get('filename', '').strip()
+    base_filename = data.get('base_filename', '').strip()
+    crop_coords   = data.get('crop_coords')  # {x, y, w, h} in actual image pixels
+
+    if not filename or not filename.endswith('.webp') or '/' in filename or '..' in filename:
+        return jsonify({'error': 'invalid filename'}), 400
+    if not base_filename:
+        base_filename = filename
+    if not base_filename.endswith('.webp') or '/' in base_filename or '..' in base_filename:
+        return jsonify({'error': 'invalid base_filename'}), 400
+    # Strip responsive-size suffixes from base_filename to get the stem for output naming
+    base_filename = re.sub(r'_(1920|960|480|201)w\.webp$', '.webp', base_filename)
+    # base_filename may be an _ai_N file (user is cropping a render) — strip that too for naming
+    # Output name is always based on the original base stem, not the ai-render stem
+    base_stem_for_naming = re.sub(r'_ai_\d+$', '', base_filename[:-5])
+
+    if not crop_coords or not isinstance(crop_coords, dict):
+        return jsonify({'error': 'crop_coords required'}), 400
+    try:
+        cx = int(crop_coords.get('x', 0))
+        cy = int(crop_coords.get('y', 0))
+        cw = int(crop_coords.get('w', 0))
+        ch = int(crop_coords.get('h', 0))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'invalid crop_coords values'}), 400
+    if cw < 4 or ch < 4:
+        return jsonify({'error': 'crop region too small (min 4px)'}), 400
+
+    opt_dir = os.path.join(PREVIEW_DIR, 'assets', 'images-opt')
+
+    # Resolve source file — strip responsive suffix to get the master
+    src_master = re.sub(r'_(1920|960|480|201)w(\.webp)$', r'\2', filename)
+    src_path = os.path.join(opt_dir, src_master)
+    if not os.path.isfile(src_path):
+        src_path = os.path.join(opt_dir, filename)
+    if not os.path.isfile(src_path):
+        return jsonify({'error': 'source file not found'}), 404
+
+    # Allocate output index using same lock as rerender to avoid collisions
+    with _RENDER_INDEX_LOCK:
+        existing = [int(re.search(r'_ai_(\d+)\.webp$', f).group(1))
+                    for f in os.listdir(opt_dir)
+                    if re.match(re.escape(base_stem_for_naming) + r'_ai_\d+\.webp$', f)]
+        n = (max(existing) + 1) if existing else 1
+        out_filename = f'{base_stem_for_naming}_ai_{n}.webp'
+        out_path = os.path.join(opt_dir, out_filename)
+        open(out_path, 'wb').close()  # stub to reserve slot
+
+    try:
+        from PIL import Image as _PIL
+        with _PIL.open(src_path) as _img:
+            master = _img.convert('RGB')
+        mw, mh = master.size
+
+        # Clamp crop to image bounds
+        x1 = max(0, min(mw - 1, cx))
+        y1 = max(0, min(mh - 1, cy))
+        x2 = max(x1 + 1, min(mw, cx + cw))
+        y2 = max(y1 + 1, min(mh, cy + ch))
+        actual_w = x2 - x1
+        actual_h = y2 - y1
+
+        if actual_w < 4 or actual_h < 4:
+            if os.path.exists(out_path) and os.path.getsize(out_path) == 0:
+                os.remove(out_path)
+            return jsonify({'error': f'crop region too small after clamping ({actual_w}x{actual_h}px)'}), 400
+
+        cropped = master.crop((x1, y1, x2, y2))
+
+        # Save the crop at its native resolution (no forced upscale — crop is intentional)
+        cropped.save(out_path, 'WEBP', quality=92)
+
+        # Generate responsive variants — downscale only, never upscale
+        sizes = [('_1920w', 1920), ('_960w', 960), ('_480w', 480), ('_201w', 201)]
+        base_out = out_path[:-5]
+        saved_dims = {}
+        for suffix, w in sizes:
+            if cropped.width > w:
+                ratio = w / cropped.width
+                h = int(cropped.height * ratio)
+                resized = cropped.resize((w, h), _PIL.LANCZOS)
+            else:
+                resized = cropped  # keep native — never upscale a crop
+            variant_path = base_out + suffix + '.webp'
+            resized.save(variant_path, 'WEBP', quality=92)
+            saved_dims[suffix] = (resized.width, resized.height)
+
+    except Exception as e:
+        if os.path.exists(out_path) and os.path.getsize(out_path) == 0:
+            try: os.remove(out_path)
+            except Exception: pass
+        return jsonify({'error': f'crop failed: {e}'}), 500
+
+    # Store a marker in image_render_prompts so filmstrip can identify this as a crop
+    conn2 = _db_conn()
+    if conn2:
+        try:
+            cur2 = conn2.cursor()
+            _ensure_render_prompts_table(cur2)
+            cur2.execute("""
+                INSERT INTO image_render_prompts (filename, prompt, source_filename, render_model)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (filename) DO UPDATE
+                    SET prompt = EXCLUDED.prompt,
+                        source_filename = EXCLUDED.source_filename,
+                        render_model = EXCLUDED.render_model
+            """, (out_filename, f'[crop {actual_w}x{actual_h}]', filename, 'crop'))
+            conn2.commit()
+        except Exception:
+            conn2.rollback()
+        finally:
+            conn2.close()
+
+    hero_path = f'/assets/images-opt/{out_filename}'
+    # display_path: use _1920w if available (crop was wide enough), else base
+    _v1920 = os.path.join(opt_dir, out_filename[:-5] + '_1920w.webp')
+    display_path = f'/assets/images-opt/{out_filename[:-5]}_1920w.webp' if os.path.isfile(_v1920) else hero_path
+    display_w, display_h = saved_dims.get('_1920w', (actual_w, actual_h)) if actual_w > 1920 else (actual_w, actual_h)
+    return jsonify({'ok': True, 'filename': out_filename, 'hero_path': hero_path,
+                    'display_path': display_path, 'width': display_w, 'height': display_h,
+                    'crop_native_w': actual_w, 'crop_native_h': actual_h})
+
+
 # ── Save render result (copy _ai_N file to final destination) ────────────────
 
 @app.route('/admin/api/images/save-result', methods=['POST'])

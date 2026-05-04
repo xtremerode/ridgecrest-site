@@ -1180,8 +1180,11 @@
     <!-- Surgical Mode toggle -->
     <div id="surgicalRow" style="display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;flex-wrap:wrap">
       <button id="surgicalToggleBtn" onclick="toggleSurgicalMode()" style="background:transparent;border:1px solid var(--border);color:var(--text-2);font-size:12px;padding:4px 12px;border-radius:5px;cursor:pointer;font-weight:600;white-space:nowrap">⚔ Surgical Mode</button>
+      <button id="cropToggleBtn" onclick="toggleCropMode()" style="background:transparent;border:1px solid var(--border);color:var(--text-2);font-size:12px;padding:4px 12px;border-radius:5px;cursor:pointer;font-weight:600;white-space:nowrap">✂ Crop Image</button>
+      <button id="cropApplyBtn" onclick="applyCrop()" style="display:none;background:#15803d;border:none;color:#fff;font-size:12px;padding:4px 14px;border-radius:5px;cursor:pointer;font-weight:600;white-space:nowrap">✂ Apply Crop</button>
       <span id="surgicalHint" style="font-size:12px;color:var(--text-muted)">Off — re-renders the full image</span>
       <span id="surgicalCropStatus" style="display:none;font-size:12px;font-weight:600;color:#a78bfa">Draw a selection box on the source image to define the edit area</span>
+      <span id="cropModeStatus" style="display:none;font-size:12px;font-weight:600;color:#4ade80">Draw a selection box on the source image to define the crop region</span>
     </div>
     <!-- Version filmstrip -->
     <div id="rerenderFilmstrip" style="display:none;margin:4px 0 14px">
@@ -4359,6 +4362,7 @@ let _rerenderPass = 0;
 let _rerenderStrip = [];
 // Surgical mode state
 let _rerenderSurgical = false;
+let _rerenderCropMode = false;    // crop mode ON/OFF (mutually exclusive with surgical)
 let _rerenderCropCoords = null;   // {x,y,w,h} scaled to actual image pixels
 let _rerenderActualDims = {w:0, h:0};
 let _cropDragging = false;
@@ -4442,8 +4446,9 @@ function openRerender(baseFilename, label, sourceFilename) {
   if (selBtn) { selBtn.textContent = 'Select'; selBtn.style.color = 'var(--text-2)'; selBtn.style.borderColor = 'var(--border)'; }
   document.getElementById('rerenderBulkDeleteBtn').style.display = 'none';
   document.getElementById('rerenderStatus').textContent = '';
-  // Reset surgical mode on every open
+  // Reset surgical and crop modes on every open
   _rerenderSurgical = false;
+  _rerenderCropMode = false;
   _rerenderCropCoords = null;
   _rerenderActualDims = {w:0, h:0};
   _cropDragging = false;
@@ -4457,7 +4462,13 @@ function openRerender(baseFilename, label, sourceFilename) {
   if (_surgStatus) { _surgStatus.style.display = 'none'; _surgStatus.textContent = 'Draw a selection box on the source image to define the edit area'; }
   if (_cropCanvas) { _cropCanvas.style.display = 'none'; const _ctx = _cropCanvas.getContext('2d'); if (_ctx) _ctx.clearRect(0,0,_cropCanvas.width,_cropCanvas.height); }
   if (_origEl) { _origEl.style.cursor = 'zoom-in'; _origEl.removeAttribute('data-lightbox-disabled'); _origEl.style.backgroundSize = 'cover'; }
-  // Always reset modal to normal size on open — surgical mode may have left it expanded
+  const _cropTogBtn = document.getElementById('cropToggleBtn');
+  const _cropApplyBtn = document.getElementById('cropApplyBtn');
+  const _cropStatus = document.getElementById('cropModeStatus');
+  if (_cropTogBtn) { _cropTogBtn.style.background=''; _cropTogBtn.style.borderColor=''; _cropTogBtn.style.color=''; }
+  if (_cropApplyBtn) _cropApplyBtn.style.display = 'none';
+  if (_cropStatus) _cropStatus.style.display = 'none';
+  // Always reset modal to normal size on open — surgical/crop mode may have left it expanded
   const _rrModalBox = document.querySelector('#rerenderModal .modal-box');
   const _rrPanelGrid = document.getElementById('rerenderPanelGrid');
   if (_rrModalBox) { _rrModalBox.style.maxWidth = '860px'; _rrModalBox.style.width = '95vw'; }
@@ -4482,6 +4493,8 @@ function toggleSurgicalMode() {
   const runBtn   = document.getElementById('rerenderRunBtn');
   const modalBox = document.querySelector('#rerenderModal .modal-box');
   const panelGrid = document.getElementById('rerenderPanelGrid');
+  // Crop mode is mutually exclusive — turn it off before toggling surgical on
+  if (_rerenderSurgical && _rerenderCropMode) _cropModeOff();
   if (_rerenderSurgical) {
     btn.textContent = '⚔ Surgical Mode ON';
     btn.style.background = 'rgba(139,92,246,.15)';
@@ -4547,12 +4560,134 @@ function _rerenderClearCrop() {
 function _rerenderUpdateRunBtn() {
   const runBtn = document.getElementById('rerenderRunBtn');
   if (!runBtn || runBtn.textContent.includes('Rendering')) return;
-  if (_rerenderSurgical && !_rerenderCropCoords) {
+  if (_rerenderCropMode) {
+    // Crop mode owns the Apply Crop button — Re-render is disabled
+    runBtn.disabled = true;
+    runBtn.title = 'Crop mode active — use Apply Crop button';
+    const applyBtn = document.getElementById('cropApplyBtn');
+    if (applyBtn) applyBtn.style.display = _rerenderCropCoords ? '' : 'none';
+  } else if (_rerenderSurgical && !_rerenderCropCoords) {
     runBtn.disabled = true;
     runBtn.title = 'Draw a selection on the source image first';
   } else {
     runBtn.disabled = false;
     runBtn.title = _rerenderSurgical ? 'Surgical edit — only the selected region will be changed' : 'New render from source image';
+  }
+}
+
+// ── Crop Mode ────────────────────────────────────────────────────────────────
+
+function _cropModeOff() {
+  _rerenderCropMode = false;
+  _rerenderCropCoords = null;
+  _cropDragging = false;
+  const btn      = document.getElementById('cropToggleBtn');
+  const applyBtn = document.getElementById('cropApplyBtn');
+  const status   = document.getElementById('cropModeStatus');
+  const canvas   = document.getElementById('rerenderCropCanvas');
+  const origEl   = document.getElementById('rerenderOriginal');
+  const modalBox = document.querySelector('#rerenderModal .modal-box');
+  const panelGrid = document.getElementById('rerenderPanelGrid');
+  if (btn)    { btn.textContent = '✂ Crop Image'; btn.style.background=''; btn.style.borderColor=''; btn.style.color=''; }
+  if (applyBtn) applyBtn.style.display = 'none';
+  if (status) status.style.display = 'none';
+  // Only collapse canvas/modal if surgical is also off
+  if (!_rerenderSurgical) {
+    if (canvas) canvas.style.display = 'none';
+    if (origEl) { origEl.style.cursor = 'zoom-in'; origEl.removeAttribute('data-lightbox-disabled'); origEl.style.backgroundSize = 'cover'; }
+    if (modalBox) { modalBox.style.maxWidth = '860px'; modalBox.style.width = '95vw'; }
+    if (panelGrid) panelGrid.style.gridTemplateColumns = '1fr 1fr'; }
+  if (canvas) { const ctx = canvas.getContext('2d'); if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height); }
+  _rerenderUpdateRunBtn();
+}
+
+function toggleCropMode() {
+  if (!_rerenderCropMode) {
+    // Mutually exclusive — turn surgical off first
+    if (_rerenderSurgical) {
+      _rerenderSurgical = false;
+      const sb = document.getElementById('surgicalToggleBtn');
+      const sh = document.getElementById('surgicalHint');
+      const ss = document.getElementById('surgicalCropStatus');
+      const mc = document.querySelector('#rerenderModal .modal-box');
+      const pg = document.getElementById('rerenderPanelGrid');
+      if (sb) { sb.textContent = '⚔ Surgical Mode'; sb.style.background=''; sb.style.borderColor=''; sb.style.color=''; }
+      if (sh) sh.style.display = '';
+      if (ss) ss.style.display = 'none';
+      if (mc) { mc.style.maxWidth = '860px'; mc.style.width = '95vw'; }
+      if (pg) pg.style.gridTemplateColumns = '1fr 1fr';
+    }
+    _rerenderCropMode = true;
+    _rerenderCropCoords = null;
+    _cropDragging = false;
+    const btn      = document.getElementById('cropToggleBtn');
+    const status   = document.getElementById('cropModeStatus');
+    const canvas   = document.getElementById('rerenderCropCanvas');
+    const origEl   = document.getElementById('rerenderOriginal');
+    const modalBox = document.querySelector('#rerenderModal .modal-box');
+    const panelGrid = document.getElementById('rerenderPanelGrid');
+    if (btn) { btn.textContent = '✂ Crop ON'; btn.style.background='rgba(22,163,74,.15)'; btn.style.borderColor='rgba(22,163,74,.5)'; btn.style.color='#4ade80'; }
+    if (status) { status.style.display = ''; status.textContent = 'Draw a selection box on the source image to define the crop region'; }
+    if (canvas) { canvas.style.display = ''; const ctx = canvas.getContext('2d'); if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height); }
+    if (origEl) { origEl.style.cursor = 'crosshair'; origEl.setAttribute('data-lightbox-disabled', '1'); origEl.style.backgroundSize = 'contain'; }
+    if (modalBox) { modalBox.style.maxWidth = '1400px'; modalBox.style.width = '96vw'; }
+    if (panelGrid) panelGrid.style.gridTemplateColumns = '2fr 1fr';
+    _rerenderFetchDims(_rerenderSourceFilename || _rerenderFilename);
+  } else {
+    _cropModeOff();
+  }
+  _rerenderUpdateRunBtn();
+}
+
+async function applyCrop() {
+  if (!_rerenderCropMode || !_rerenderCropCoords) {
+    Admin.toast('No crop selection — draw a box on the source image first', 'warn');
+    return;
+  }
+  const filename = _rerenderSourceFilename || _rerenderFilename;
+  if (!filename) { Admin.toast('No source image selected', 'warn'); return; }
+  const applyBtn  = document.getElementById('cropApplyBtn');
+  const statusEl  = document.getElementById('rerenderStatus');
+  const cropSt    = document.getElementById('cropModeStatus');
+  if (applyBtn) { applyBtn.disabled = true; applyBtn.textContent = '✂ Cropping…'; }
+  if (statusEl) statusEl.textContent = 'Applying crop…';
+  try {
+    const d = await Admin.post('/images/crop', {
+      filename,
+      base_filename: _rerenderFilename,
+      crop_coords: _rerenderCropCoords,
+    });
+    if (!d || !d.ok) throw new Error(d && d.error ? d.error : 'crop failed');
+    _rerenderResultPath = d.hero_path;
+    _rerenderPass++;
+    const resultEl  = document.getElementById('rerenderResult');
+    const cacheBust = Date.now();
+    const displayPath = d.display_path || d.hero_path;
+    resultEl.style.backgroundImage    = `url('${displayPath}?v=${cacheBust}')`;
+    resultEl.style.backgroundSize     = 'cover';
+    resultEl.style.backgroundPosition = 'center';
+    document.getElementById('rerenderPlaceholder').style.display = 'none';
+    const badge = document.getElementById('rerenderPassBadge');
+    badge.textContent = `Crop (${d.crop_native_w}×${d.crop_native_h}px)`;
+    badge.style.display = '';
+    document.getElementById('rerenderUseBtn').style.display = '';
+    document.getElementById('rerenderUseBtn').disabled = false;
+    document.getElementById('rerenderUseBtn').textContent = '✓ Use This Version';
+    document.getElementById('rerenderRestartBtn').style.display = '';
+    const runBtn = document.getElementById('rerenderRunBtn');
+    runBtn.style.display = '';
+    runBtn.disabled = false;
+    runBtn.textContent = '✦ Re-render';
+    document.getElementById('rerenderRefineBtn').style.display = 'none';
+    if (statusEl) statusEl.textContent = `✓ Crop saved (${d.crop_native_w}×${d.crop_native_h}px) — click "✓ Use This Version" to make it live`;
+    _stripAppend(d.filename, displayPath, `[crop ${d.crop_native_w}×${d.crop_native_h}]`, filename);
+    _cropModeOff();
+  } catch(e) {
+    Admin.toast('Crop failed: ' + e.message, 'error');
+    if (statusEl) statusEl.textContent = '✕ Crop failed: ' + e.message;
+    if (cropSt) cropSt.textContent = 'Crop failed — try again';
+  } finally {
+    if (applyBtn) { applyBtn.disabled = false; applyBtn.textContent = '✂ Apply Crop'; }
   }
 }
 
@@ -4565,7 +4700,7 @@ function _getCanvasCoords(canvas, e) {
 }
 
 function cropMouseDown(e) {
-  if (!_rerenderSurgical) return;
+  if (!_rerenderSurgical && !_rerenderCropMode) return;
   if (_rerenderActualDims.w === 0) {
     Admin.toast('Image dimensions still loading — wait a moment then try again', 'info');
     return;
@@ -4582,7 +4717,7 @@ function cropMouseDown(e) {
 }
 
 function cropMouseMove(e) {
-  if (!_rerenderSurgical || !_cropDragging) return;
+  if ((!_rerenderSurgical && !_rerenderCropMode) || !_cropDragging) return;
   e.preventDefault(); e.stopPropagation();
   const canvas = document.getElementById('rerenderCropCanvas');
   const ctx = canvas.getContext('2d');
@@ -4603,7 +4738,7 @@ function cropMouseMove(e) {
 }
 
 function cropMouseUp(e) {
-  if (!_rerenderSurgical || !_cropDragging) return;
+  if ((!_rerenderSurgical && !_rerenderCropMode) || !_cropDragging) return;
   e.preventDefault(); e.stopPropagation();
   _cropDragging = false;
   const canvas = document.getElementById('rerenderCropCanvas');
@@ -4623,7 +4758,7 @@ function cropMouseUp(e) {
     const imgRatio = _rerenderActualDims.w / _rerenderActualDims.h;
     const boxRatio = canvas.width / canvas.height;
     let fitScale, offX = 0, offY = 0;
-    if (_rerenderSurgical) {
+    if (_rerenderSurgical || _rerenderCropMode) {
       // contain: full image fits inside box, letterboxed on the shorter axis
       if (imgRatio > boxRatio) {
         // Image wider → fit to width, letterbox top+bottom
@@ -4666,10 +4801,21 @@ function cropMouseUp(e) {
     _rerenderClearCrop();
     return;
   }
+  // Minimum width guard \u2014 only enforced in crop mode (surgical has no minimum)
+  if (_rerenderCropMode && actualW2 < 800) {
+    Admin.toast(`Crop too narrow (${actualW2}px) \u2014 minimum 800px wide; draw a wider selection`, 'info');
+    _rerenderClearCrop();
+    return;
+  }
   _rerenderCropCoords = { x: actualX, y: actualY, w: actualW2, h: actualH2 };
-  console.log('[surgical] crop coords:', JSON.stringify(_rerenderCropCoords), 'dims:', JSON.stringify(_rerenderActualDims), 'canvas:', canvas.width + 'x' + canvas.height);
-  const st = document.getElementById('surgicalCropStatus');
-  if (st) st.textContent = `\u2713 Selection: ${_rerenderCropCoords.w}\u00d7${_rerenderCropCoords.h}px \u2014 click \u2756 Re-render to apply surgical edit`;
+  console.log('[crop/surgical] crop coords:', JSON.stringify(_rerenderCropCoords), 'dims:', JSON.stringify(_rerenderActualDims), 'canvas:', canvas.width + 'x' + canvas.height);
+  if (_rerenderSurgical) {
+    const st = document.getElementById('surgicalCropStatus');
+    if (st) st.textContent = `\u2713 Selection: ${_rerenderCropCoords.w}\u00d7${_rerenderCropCoords.h}px \u2014 click \u2756 Re-render to apply surgical edit`;
+  } else if (_rerenderCropMode) {
+    const st = document.getElementById('cropModeStatus');
+    if (st) st.textContent = `\u2713 Selection: ${_rerenderCropCoords.w}\u00d7${_rerenderCropCoords.h}px \u2014 click Apply Crop`;
+  }
   _rerenderUpdateRunBtn();
 }
 

@@ -1976,6 +1976,178 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # ── crop_mode_toggle ──────────────────────────────────────────────
+            # Verifies: crop ON expands modal (1400px/2fr 1fr/contain), crop OFF
+            # restores (860px/1fr 1fr/cover), mutual exclusion with surgical,
+            # and that applyCrop() saves a file + sets _rerenderResultPath.
+            # CLEANUP: all created _ai_N files + DB record deleted at test end.
+            _crop_created_path = None
+            try:
+                _crop_page = context.new_page()
+                _crop_page.goto(f'{BASE_URL}/view/admin/index.html', wait_until='domcontentloaded', timeout=10000)
+                _crop_page.evaluate(f'() => sessionStorage.setItem("rd_admin_token", "{token}")')
+                _crop_page.goto(f'{BASE_URL}/view/admin/pages.html', wait_until='networkidle', timeout=20000)
+                _TEST_IMG = 'ff5b18_6f6dc7ef92684e7e8af496c4f83f06be_mv2_960w.webp'
+                # Open rerender modal
+                _crop_page.evaluate(f"() => {{ openRerender('{_TEST_IMG}', 'Crop test'); }}")
+                time.sleep(0.3)
+                # ── 1: Crop mode ON ────────────────────────────────────────────
+                _crop_page.evaluate("() => { toggleCropMode(); }")
+                time.sleep(0.2)
+                _crop_on = _crop_page.evaluate("""() => {
+                    var box = document.querySelector('#rerenderModal .modal-box');
+                    var grid = document.getElementById('rerenderPanelGrid');
+                    var btn = document.getElementById('cropToggleBtn');
+                    var orig = document.getElementById('rerenderOriginal');
+                    var canvas = document.getElementById('rerenderCropCanvas');
+                    var status = document.getElementById('cropModeStatus');
+                    return {
+                        maxWidth: box ? box.style.maxWidth : null,
+                        width: box ? box.style.width : null,
+                        grid: grid ? grid.style.gridTemplateColumns : null,
+                        btnText: btn ? btn.textContent.trim() : null,
+                        backgroundSize: orig ? orig.style.backgroundSize : null,
+                        canvasVisible: canvas ? (canvas.style.display !== 'none') : false,
+                        statusVisible: status ? (status.style.display !== 'none') : false,
+                        cropModeActive: (typeof _rerenderCropMode !== 'undefined') ? _rerenderCropMode : null,
+                    };
+                }""")
+                # ── 2: Crop mode OFF ───────────────────────────────────────────
+                _crop_page.evaluate("() => { toggleCropMode(); }")
+                time.sleep(0.2)
+                _crop_off = _crop_page.evaluate("""() => {
+                    var box = document.querySelector('#rerenderModal .modal-box');
+                    var grid = document.getElementById('rerenderPanelGrid');
+                    var orig = document.getElementById('rerenderOriginal');
+                    var canvas = document.getElementById('rerenderCropCanvas');
+                    return {
+                        maxWidth: box ? box.style.maxWidth : null,
+                        grid: grid ? grid.style.gridTemplateColumns : null,
+                        backgroundSize: orig ? orig.style.backgroundSize : null,
+                        canvasVisible: canvas ? (canvas.style.display !== 'none') : false,
+                        cropModeActive: (typeof _rerenderCropMode !== 'undefined') ? _rerenderCropMode : null,
+                    };
+                }""")
+                # ── 3: Mutual exclusion — surgical ON → crop ON kills surgical ─
+                _crop_page.evaluate("() => { toggleSurgicalMode(); }")
+                time.sleep(0.1)
+                _crop_page.evaluate("() => { toggleCropMode(); }")
+                time.sleep(0.2)
+                _crop_mutex = _crop_page.evaluate("""() => {
+                    return {
+                        surgicalOff: !_rerenderSurgical,
+                        cropOn: _rerenderCropMode,
+                        surgBtnText: (document.getElementById('surgicalToggleBtn') || {}).textContent || '',
+                    };
+                }""")
+                # ── 4: Apply Crop (inject coords, call applyCrop) ─────────────
+                # Image is 9499x6333 — inject realistic dims and a wide crop (>800px).
+                # We inject _rerenderCropCoords directly (simulates user drawing a box)
+                # and call applyCrop() which posts to /admin/api/images/crop.
+                _crop_page.evaluate("""() => {
+                    _rerenderActualDims = {w: 9499, h: 6333};
+                    _rerenderCropCoords = {x: 500, y: 500, w: 5000, h: 3000};
+                    _rerenderFilename = 'ff5b18_6f6dc7ef92684e7e8af496c4f83f06be_mv2_960w.webp';
+                }""")
+                _crop_page.evaluate("() => { applyCrop(); }")
+                # Wait up to 15s for status to reflect completion or failure
+                _crop_page.wait_for_function(
+                    "() => { var s = document.getElementById('rerenderStatus'); return s && (s.textContent.includes('Crop saved') || s.textContent.includes('failed')); }",
+                    timeout=15000
+                )
+                _crop_result = _crop_page.evaluate("""() => {
+                    var st = document.getElementById('rerenderStatus');
+                    var ph = document.getElementById('rerenderPlaceholder');
+                    var ub = document.getElementById('rerenderUseBtn');
+                    return {
+                        status: st ? st.textContent : '',
+                        placeholderHidden: ph ? (ph.style.display === 'none') : false,
+                        useBtnVisible: ub ? (ub.style.display !== 'none') : false,
+                        resultPath: (typeof _rerenderResultPath !== 'undefined') ? _rerenderResultPath : null,
+                        cropModeOff: (typeof _rerenderCropMode !== 'undefined') ? !_rerenderCropMode : null,
+                    };
+                }""")
+                _crop_created_path = _crop_result.get('resultPath')  # e.g. /assets/images-opt/...webp
+                _crop_page.close()
+
+                # ── Assertions ─────────────────────────────────────────────────
+                _crop_errors = []
+                if not _crop_on.get('cropModeActive'):
+                    _crop_errors.append('crop ON: _rerenderCropMode not true')
+                if _crop_on.get('maxWidth') != '1400px':
+                    _crop_errors.append(f"crop ON: maxWidth={_crop_on.get('maxWidth')} expected 1400px")
+                if '2fr' not in (_crop_on.get('grid') or ''):
+                    _crop_errors.append(f"crop ON: grid={_crop_on.get('grid')} expected 2fr 1fr")
+                if _crop_on.get('backgroundSize') != 'contain':
+                    _crop_errors.append(f"crop ON: backgroundSize={_crop_on.get('backgroundSize')} expected contain")
+                if not _crop_on.get('canvasVisible'):
+                    _crop_errors.append('crop ON: rerenderCropCanvas not visible')
+                if not _crop_on.get('statusVisible'):
+                    _crop_errors.append('crop ON: cropModeStatus not visible')
+                if _crop_off.get('cropModeActive'):
+                    _crop_errors.append('crop OFF: _rerenderCropMode still true')
+                if _crop_off.get('maxWidth') != '860px':
+                    _crop_errors.append(f"crop OFF: maxWidth={_crop_off.get('maxWidth')} expected 860px")
+                if _crop_off.get('canvasVisible'):
+                    _crop_errors.append('crop OFF: canvas still visible')
+                if not _crop_mutex.get('surgicalOff'):
+                    _crop_errors.append('mutual exclusion: _rerenderSurgical still ON after crop toggle')
+                if not _crop_mutex.get('cropOn'):
+                    _crop_errors.append('mutual exclusion: crop not ON after toggle over surgical')
+                if 'Crop saved' not in (_crop_result.get('status') or ''):
+                    _crop_errors.append(f"apply crop: status={_crop_result.get('status')!r}")
+                if not _crop_result.get('placeholderHidden'):
+                    _crop_errors.append('apply crop: result placeholder still visible')
+                if not _crop_result.get('useBtnVisible'):
+                    _crop_errors.append('apply crop: Use This Version button not shown')
+                if not _crop_result.get('resultPath'):
+                    _crop_errors.append('apply crop: _rerenderResultPath not set')
+                if not _crop_result.get('cropModeOff'):
+                    _crop_errors.append('apply crop: crop mode not auto-off after apply')
+
+                results.append({
+                    'agent': agent,
+                    'check': 'crop_mode_toggle',
+                    'status': 'fail' if _crop_errors else 'pass',
+                    'detail': (
+                        'REGRESSION: ' + '; '.join(_crop_errors) if _crop_errors
+                        else (f'Crop mode toggle/exclusion/apply verified ✓ '
+                              f'(ON={_crop_on.get("maxWidth")}/{_crop_on.get("grid")}'
+                              f'/bg={_crop_on.get("backgroundSize")}, '
+                              f'OFF={_crop_off.get("maxWidth")}, '
+                              f'apply={_crop_result.get("status")!r})')
+                    ),
+                    'page': 'admin/pages',
+                    'auto_fixable': False,
+                })
+            except Exception as _crop_e:
+                results.append({
+                    'agent': agent,
+                    'check': 'crop_mode_toggle',
+                    'status': 'fail',
+                    'detail': f'crop_mode_toggle test error: {_crop_e}',
+                    'page': 'admin/pages',
+                    'auto_fixable': False,
+                })
+            finally:
+                # MANDATORY CLEANUP — delete any _ai_N files and DB record created by this test
+                import glob as _glob
+                import subprocess as _sp
+                if _crop_created_path:
+                    _stem = '/home/claudeuser/agent/preview' + _crop_created_path.replace('.webp', '')
+                    for _f in _glob.glob(_stem + '*.webp'):
+                        try: os.remove(_f)
+                        except Exception: pass
+                    _fname = os.path.basename(_crop_created_path)
+                    try:
+                        _sp.run(
+                            ['psql', '-h', '127.0.0.1', '-U', 'agent_user', '-d', 'marketing_agent',
+                             '-c', f"DELETE FROM image_render_prompts WHERE filename='{_fname}' AND render_model='crop';"],
+                            env={**os.environ, 'PGPASSWORD': 'StrongPass123!'},
+                            capture_output=True, timeout=10
+                        )
+                    except Exception: pass
+
             browser.close()
 
     except Exception as e:
