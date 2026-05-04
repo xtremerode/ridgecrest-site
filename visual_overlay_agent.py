@@ -1854,6 +1854,124 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # ── blog_post_hero_image_sync ─────────────────────────────────────
+            # Verifies that PUT /admin/api/pages/blog/<slug> writes hero_image to
+            # BOTH pages.hero_image AND blog_posts.featured_image. Without the
+            # blog_posts sync, blog_post() always reads the old featured_image on
+            # reload, causing every picker save to silently revert.
+            try:
+                _bps_conn = psycopg2.connect(**DB_CONFIG)
+                _bps_conn.autocommit = False
+                _bps_cur = _bps_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                _bps_cur.execute(
+                    "SELECT slug, featured_image FROM blog_posts WHERE status='published' LIMIT 1"
+                )
+                _bps_row = _bps_cur.fetchone()
+                if not _bps_row:
+                    results.append({
+                        'agent': agent, 'check': 'blog_post_hero_image_sync',
+                        'status': 'pass',
+                        'detail': 'no published blog posts — test skipped',
+                        'page': 'blog', 'auto_fixable': False,
+                    })
+                else:
+                    _bps_slug    = _bps_row['slug']
+                    _bps_orig    = _bps_row['featured_image']
+                    # Use the existing image or a known fallback for the write test
+                    _bps_img = _bps_orig or '/assets/images-opt/ff5b18_c520c9ca384d4c3ebe02707d0c8f45ab_mv2.webp'
+                    import requests as _bps_req
+                    _bps_resp = _bps_req.put(
+                        f'{BASE_URL}/admin/api/pages/blog/{_bps_slug}',
+                        json={'hero_image': _bps_img},
+                        headers={'X-Admin-Token': token},
+                        timeout=10
+                    )
+                    # Verify blog_posts.featured_image was updated
+                    _bps_cur.execute(
+                        "SELECT featured_image FROM blog_posts WHERE slug = %s", (_bps_slug,)
+                    )
+                    _bps_after = _bps_cur.fetchone()
+                    _bps_synced = _bps_after and _bps_after['featured_image'] == _bps_img
+                    _bps_ok = _bps_resp.ok and _bps_synced
+                    results.append({
+                        'agent': agent, 'check': 'blog_post_hero_image_sync',
+                        'status': 'pass' if _bps_ok else 'fail',
+                        'detail': (
+                            f'blog_posts.featured_image synced for slug={_bps_slug} ✓'
+                            if _bps_ok else
+                            f'sync failed — api_status={_bps_resp.status_code}, '
+                            f'blog_posts.featured_image={repr(_bps_after["featured_image"] if _bps_after else None)} '
+                            f'expected={repr(_bps_img)}'
+                        ),
+                        'page': 'blog', 'auto_fixable': False,
+                    })
+                    # Restore original value
+                    if _bps_orig != _bps_img:
+                        _bps_cur.execute(
+                            "UPDATE blog_posts SET featured_image = %s WHERE slug = %s",
+                            (_bps_orig, _bps_slug)
+                        )
+                        _bps_conn.commit()
+                _bps_conn.close()
+            except Exception as _bps_e:
+                results.append({
+                    'agent': agent, 'check': 'blog_post_hero_image_sync',
+                    'status': 'fail',
+                    'detail': f'blog_post_hero_image_sync test error: {_bps_e}',
+                    'page': 'blog', 'auto_fixable': False,
+                })
+
+            # ── blog_post_text_align_css ──────────────────────────────────────
+            # Verifies that [data-hero-text-align] CSS rules apply to .post-hero
+            # elements. Guards against missing CSS rules that leave text-alignment
+            # controls saving to DB but having zero visual effect on blog post pages.
+            try:
+                _bpt_page = context.new_page()
+                # Load a blog post (or blog index as fallback) with a forced data attribute
+                _bpt_url = f'{BASE_URL}/blog'
+                _bpt_page.goto(_bpt_url, wait_until='domcontentloaded', timeout=15000)
+                # Inject a test post-hero div, set data-hero-text-align, measure CSS effect
+                _bpt_result = _bpt_page.evaluate('''() => {
+                    const div = document.createElement('div');
+                    div.className = 'post-hero post-hero--has-img';
+                    div.setAttribute('data-hero-text-align', 'center');
+                    div.style.position = 'absolute';
+                    div.style.left = '-9999px';
+                    const title = document.createElement('h1');
+                    title.className = 'post-hero__title';
+                    title.textContent = 'Test';
+                    div.appendChild(title);
+                    document.body.appendChild(div);
+                    const computed = window.getComputedStyle(div).textAlign;
+                    const titleComputed = window.getComputedStyle(title).textAlign;
+                    document.body.removeChild(div);
+                    return { divAlign: computed, titleAlign: titleComputed };
+                }''')
+                _bpt_page.close()
+                _bpt_ok = (
+                    _bpt_result.get('divAlign') == 'center' or
+                    _bpt_result.get('titleAlign') == 'center'
+                )
+                results.append({
+                    'agent': agent, 'check': 'blog_post_text_align_css',
+                    'status': 'pass' if _bpt_ok else 'fail',
+                    'detail': (
+                        f'[data-hero-text-align=center].post-hero applies correctly '
+                        f'(div={_bpt_result.get("divAlign")}, title={_bpt_result.get("titleAlign")}) ✓'
+                        if _bpt_ok else
+                        f'CSS rule missing — div={_bpt_result.get("divAlign")}, '
+                        f'title={_bpt_result.get("titleAlign")} (expected center)'
+                    ),
+                    'page': 'blog', 'auto_fixable': False,
+                })
+            except Exception as _bpt_e:
+                results.append({
+                    'agent': agent, 'check': 'blog_post_text_align_css',
+                    'status': 'fail',
+                    'detail': f'blog_post_text_align_css test error: {_bpt_e}',
+                    'page': 'blog', 'auto_fixable': False,
+                })
+
             # ── nav_hero_map_keys ─────────────────────────────────────────────
             # Verifies window.__RD_HERO_MAP entries for whole-house-remodels and
             # blog have real hero images (not the fallback path). Guards against

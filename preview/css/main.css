@@ -1971,6 +1971,21 @@ p { line-height: 1.8; }
 [data-hero-text-align="right"].page-hero--service  .blog-hero__title,
 [data-hero-text-align="right"].page-hero--service  .blog-hero__sub  { text-align: right  !important; width: 100%; margin-left: auto !important; margin-right: 0 !important; }
 
+/* Text alignment — blog post heroes (.post-hero)
+   post-hero is a flex column container — align-items controls horizontal alignment. */
+[data-hero-text-align="left"].post-hero   { text-align: left   !important; align-items: flex-start !important; }
+[data-hero-text-align="center"].post-hero { text-align: center !important; align-items: center      !important; }
+[data-hero-text-align="right"].post-hero  { text-align: right  !important; align-items: flex-end   !important; }
+[data-hero-text-align="left"].post-hero   .post-hero__title,
+[data-hero-text-align="left"].post-hero   .post-hero__meta,
+[data-hero-text-align="left"].post-hero   .post-hero__author { text-align: left   !important; margin-left: 0    !important; margin-right: auto !important; }
+[data-hero-text-align="center"].post-hero .post-hero__title,
+[data-hero-text-align="center"].post-hero .post-hero__meta,
+[data-hero-text-align="center"].post-hero .post-hero__author { text-align: center !important; margin-left: auto !important; margin-right: auto !important; }
+[data-hero-text-align="right"].post-hero  .post-hero__title,
+[data-hero-text-align="right"].post-hero  .post-hero__meta,
+[data-hero-text-align="right"].post-hero  .post-hero__author { text-align: right  !important; margin-left: auto !important; margin-right: 0    !important; }
+
 /* Text alignment — project heroes */
 [data-hero-text-align="left"]   .project-hero__content-inner { justify-content: flex-start !important; }
 [data-hero-text-align="left"]   .project-hero__left          { text-align: left !important; }

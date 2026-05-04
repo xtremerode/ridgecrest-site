@@ -7977,6 +7977,19 @@ def admin_page_update(slug):
         """, [slug, hero_image, hero_position or '50% 50%', float(hero_zoom) if hero_zoom else 1.0,
               slug, slug + '.html'] + params)
         conn.commit()
+        # Sync hero_image to blog_posts.featured_image for blog/<slug> paths.
+        # blog_post() reads from blog_posts.featured_image, not pages.hero_image, so
+        # a write to pages alone would silently revert on every page reload.
+        if slug.startswith('blog/') and hero_image is not None:
+            _bpost_slug = slug[5:]  # 'blog/color-trend-deep-red' → 'color-trend-deep-red'
+            try:
+                cur.execute(
+                    "UPDATE blog_posts SET featured_image = %s WHERE slug = %s",
+                    (hero_image, _bpost_slug)
+                )
+                conn.commit()
+            except Exception:
+                pass  # slug doesn't exist in blog_posts — ignore silently
         # Bidirectional sync: if this slug is a portfolio project, keep portfolio_projects in sync.
         # hero_image is always a local /assets/images-opt/{hash}.webp path here.
         if hero_image:
