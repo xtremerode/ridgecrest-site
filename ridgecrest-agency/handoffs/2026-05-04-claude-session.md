@@ -1,54 +1,76 @@
-# Session Handoff — May 4, 2026
+# Session Handoff — May 4, 2026 (Evening Session)
 
-## What Was Found at Session Start
-- Branch: `ridgecrest-audit`, all features locked
-- Session picked up mid-execution from a previous context — proxy fix for start-a-project iframe had been attempted but the guardrail was halted at Gate 4 (pre-commit QA), and start-a-project.html had been accidentally reverted by a failed `git stash pop`
+## Session Focus
+Blog post hero edit pill — gradient overlay, text alignment, and text block positioning (References 10025–10030).
 
-## What Was Done This Session
+---
 
-### Start-a-Project Iframe — Investigated, Proxy Attempted, Reverted to Pre-Session State
+## What Was Completed This Session
 
-**Root cause confirmed (Playwright CDP diagnostics):**
-Base44's `ResizeObserver` observes `#root > firstElementChild` which is a NEW DOM node per wizard step. By Step 2, the observer is orphaned — it watches a detached node and sends ZERO postMessages. Step 2 content is ~1029px but Base44 never reports it.
+### Reference 10027 — Blog Post Hero Gradient Overlay + Meta Row Alignment (commit `9be52eb`)
+**Gradient fix (blog.css):**
+- `.post-hero__overlay` previously had a hardcoded `background: linear-gradient(...)` — the G panel's `--rd-overlay` CSS variable was being set on `.post-hero` but never read by the overlay child
+- Fix: changed to `background: var(--rd-overlay, <fallback>)` — CSS custom property inherits, overlay now respects gradient picker
 
-**Proxy fix attempted:** Served Base44 through `/booking-proxy` in `preview_server.py` — rewrites asset URLs same-origin, injects a 300ms polling height script. Passed all guardrail gates BUT Base44's React Router saw `/booking-proxy` as its URL path and showed a 404 "page not found" inside the iframe.
+**Meta row alignment fix (main.css):**
+- `.post-hero__meta` is `display:flex` — `text-align` alone has no effect on flex items
+- Added `justify-content: flex-start/center/flex-end` rules for left/center/right alignment
 
-**Final state — reverted to pre-session `019b7f2` state:**
-- `start-a-project.html`: `src="https://elevate-scheduling-6b2fdec8.base44.app/"`, CSS `height: 600px`, `MIN_H=500`, no MAX_H
-- Steps 1 and 2 resize naturally (no extra whitespace)
-- Step 3 (Your Details) will show a scrollbar — Base44 sends no resize message for it
-- Henry accepted this tradeoff: "I would rather have the two smaller frames with the scroll bar on the third"
-- Proxy routes remain in `preview_server.py` as dead code (harmless)
+**Playwright tests added:** `blog_post_gradient_overlay`, `blog_post_meta_align`
+All 6 guardrail gates passed.
 
-**Guardrail improvements made this session (committed, permanent):**
-1. `CLAUDE.md` — "Measure Before Fix — MANDATORY" rule added
-2. `hooks/detect_analysis_request.sh` — bug-report keywords added ("not working", "broken", "scroll bar", "you didn't fix", etc.)
-3. `.claude/settings.local.json` — `log_file_read.sh` now also fires on Bash tool (so running a diagnostic satisfies the research gate)
+### Reference 10029 — Blog Post Hero Text Block Physically Shifts Left/Right (commit `9fc196d`)
+**Root cause:** `.container.container--narrow` has `margin: 0 auto` which overrides `align-items` on the flex parent (`.post-hero`). Auto margins eat all free space on both sides — no alignment change had any effect on block position.
 
-## Open Items Carrying Forward
+**Fix (main.css):** Three rules override the container margins per alignment:
+```css
+[data-hero-text-align="left"].post-hero   .container { margin-left: 0    !important; margin-right: auto !important; }
+[data-hero-text-align="center"].post-hero .container { margin-left: auto !important; margin-right: auto !important; }
+[data-hero-text-align="right"].post-hero  .container { margin-left: auto !important; margin-right: 0    !important; }
+```
+Left pins the 860px block to the left edge; right pins it to the right edge (~210px travel room).
 
-### START-A-PROJECT IFRAME (DEFERRED — Henry acknowledged)
-- Step 3 "Your Details" has a scrollbar because Base44 sends no resize message for that step
-- Root cause: Base44 ResizeObserver orphaned on Step2 (new DOM node per step)
-- Proxy approach failed: React Router 404s on non-root paths
-- Possible future fix: configure Base44 app to use hash routing, OR contact Base44 support, OR iframe height override for Step 3 specifically
-- **Do not attempt again without a new plan** — three failed attempts this session
+**Playwright test added:** `blog_post_container_shift`
+All 6 guardrail gates passed.
 
-### All other open items from prior session unchanged:
-- 3 missing Wix CDN images (Henry must download + upload via bat script)
-- Continue render review queue (62 cards)
-- `_NAV_PREFETCH_SLUGS` bug in `preview_server.py` line 298
-- `set-version` doesn't update static pages
-- pre-commit hook python path (system vs venv)
+### Pre-Commit Cleanup (between guardrail runs)
+- `blog/consult-builder-before-buying-land` had a Playwright test artifact in `card_settings` (mode='color', image=NULL). Fixed with UPDATE to image mode + correct `_960w` path.
+- `danville-hilltop.html` had staged gallery photo renumbering from a prior audit publish — committed as baseline cleanup.
+
+---
+
+## Open / Pending
+
+### Reference 10030 — Portfolio Section Background Color — PLAN APPROVED, NOT YET EXECUTED
+
+**Problem:** `<section class="section section--dark" style="padding:0" data-rd-section="portfolio-featured">` in `portfolio.html` — the dark gray (`#1C1C1C`) behind the four project cards is hardcoded via `.section--dark { background: var(--charcoal); }` in main.css. No DB hook.
+
+**Agreed plan:**
+- Add `data-card-id="portfolio-section-bg"` to that `<section>` element in `portfolio.html`
+- Zero new infrastructure — existing BG panel + `card_settings` pipeline handles save/load
+- `.section--dark` CSS class stays as default fallback; inline `background-color` from card apply script overrides when a color is saved in DB
+- Live preview works via existing `rd_set_hero_bg` postMessage
+
+**Optional (Henry hasn't decided yet):** Add color-only restriction in the BG panel to prevent image mode being accidentally applied to the full-width section.
+
+**Feature key needed:** `seo-service-pages`
+
+---
 
 ## Commit Trail This Session
-- `669738d` WIP baseline (proxy attempt start)
-- `125124660` Proxy fix — passed guardrail but Base44 404d at runtime
-- `cf932d7` Reverted to MIN_H=1080 (no whitespace issue but Step 2 oversized)
-- `fb8fe06` **FINAL** — Reverted to pre-session 019b7f2 state (600px, MIN_H=500, direct Base44 URL)
+- `9be52eb` — Task complete: 10027 blog gradient + meta alignment
+- `9fc196d` — Task complete: 10029 blog text block position shift
+- `ea36168` — Cleanup: test artifacts + danville renumber
 
 ## Branch / Infrastructure
 - Branch: `ridgecrest-audit`
-- Last commit: `fb8fe06`
+- Last commit: `9fc196d` (pushed to GitHub)
 - All features: locked
-- Server: 147.182.242.54:8081
+- Server: 147.182.242.54:8081 — running normally
+
+---
+
+## Next Session Priorities
+1. Execute Reference 10030 (portfolio section background color — plan already approved)
+2. Continue render review queue — 62 cards remaining at `/view/admin/render-review.html`
+3. 3 missing Wix CDN images (Henry must download + upload via bat script — DO server IP blocked by Wix CDN)
