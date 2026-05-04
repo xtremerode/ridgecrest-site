@@ -1,27 +1,29 @@
 # CURRENT_STATUS.md
 ## Ridgecrest Designs - Campaign Status
-### Last Updated: May 1, 2026
+### Last Updated: May 4, 2026
 
 ---
 
 ## Recent Completions (This Session)
 
-### Portfolio Featured Card Gradient — FULLY COMPLETE (commits 0692c7d, 19eb24e, 664b673, 3f125ca)
-All 4 cards (Sierra Mountain Ranch, Pleasanton Custom, Sunol Homestead, Danville Hilltop):
-- G button visible in card pill on hover
-- Gradient panel wired and updates overlay in real-time
-- Gradient persists after publish + page reload (pipeline ordering fixed)
-- Sierra Mountain Ranch image broken by Playwright test artifact — restored
-- Three structural guardrail gaps closed (drift check ordering, image=None severity, restore verification)
+### Guardrail / Hook Improvements — COMPLETE
+Three permanent guardrail improvements shipped this session:
+1. `CLAUDE.md` — "Measure Before Fix — MANDATORY" rule: diagnostic → root cause → fix (no more theorizing)
+2. `hooks/detect_analysis_request.sh` — extended to catch bug-report language ("not working", "broken", "scroll bar", "you didn't fix", etc.)
+3. `.claude/settings.local.json` — research gate now also satisfied by Bash tool use (not just Read)
 
-### Sitemap Page Links — FIXED (commit 7d3bcda)
-- All 102 body links were broken (root-relative hrefs, 404 from /view/ context) since April 15
-- Fixed to relative paths — all links now navigate correctly
-- `sitemap_links_navigable` Playwright test added — enforced on every future guardrail run
+### Start-a-Project Iframe Investigation — CLOSED (deferred)
+- Root cause confirmed: Base44 ResizeObserver orphaned on wizard step transitions (new DOM node per step, no resize message for Step 3)
+- Proxy approach failed: Base44 React Router 404s when path ≠ "/"
+- **Final state:** reverted to pre-session state — 600px frame, MIN_H=500, direct Base44 URL
+- Step 3 has a scrollbar; Henry accepted this tradeoff — will revisit later
+- Do NOT retry without a new plan
 
-### Other (prior sessions)
-- Start-a-project iframe scrollbar — FIXED
+### Prior Session Completions (still current)
+- Portfolio Featured Card Gradient — FULLY COMPLETE
+- Sitemap Page Links — FIXED (all 102 links, Playwright test added)
 - 39 Service Page Hero Settings — SET
+- Crop mode in rerender modal — COMPLETE
 - danville-hilltop nav CTA — PERMANENTLY FIXED
 
 ---
@@ -35,22 +37,23 @@ All 4 cards (Sierra Mountain Ranch, Pleasanton Custom, Sunol Homestead, Danville
    - `ff5b18_238b56fc` → Sierra Mountain Ranch photo 61 (.jpg)
    - **Fix:** download from Wix media library → upload via `migrate_missing_gallery_images.bat`
 
-2. **Continue render review queue** — 62 cards, tool working
+2. **Continue render review queue** — 62 cards remaining, tool working
 
 ### MEDIUM — Code (small, no user impact yet)
-- **`_NAV_PREFETCH_SLUGS` bug** — `preview_server.py` line 298: `'whole-home-remodels'` should be `'whole-house-remodels'`, `'therdedit'` should be `'blog'`. Affects hero image preload on nav hover for those two pages. No visible broken links.
-- **Houzz profile link** — `https://www.houzz.com/pro/ridgecrestdesigns` — needs manual browser verification (server IP blocked by Houzz)
+- **`_NAV_PREFETCH_SLUGS` bug** — `preview_server.py` line 298: `'whole-home-remodels'` should be `'whole-house-remodels'`, `'therdedit'` should be `'blog'`. Affects hero image preload on nav hover for those two pages.
+- **Houzz profile link** — needs manual browser verification (server IP blocked)
 
 ### LOW — Known Gaps
 - `set-version` does not update static non-portfolio pages
 - pre-commit hook python path (system vs venv) — still pending
+- Start-a-project Step 3 scrollbar — deferred by Henry
 
 ---
 
 ## Site Infrastructure
 - Server: 147.182.242.54:8081
 - Branch: ridgecrest-audit
-- Last commit: 7d3bcda (2026-05-01)
+- Last commit: `fb8fe06` (2026-05-04)
 - All feature locks: locked
 - Server restart: POST /admin/api/server/restart (X-Admin-Token required)
 
