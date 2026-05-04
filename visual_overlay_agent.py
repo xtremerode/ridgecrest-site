@@ -1803,6 +1803,57 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # ── blog_hero_inline_style ────────────────────────────────────────
+            # When a hero image is saved for the blog page in the DB, the
+            # .blog-hero div must carry an inline style="background-image:url(...)"
+            # so the edit overlay's init() can discover the current image.
+            # Without it, picking a new image reverts on reload because the
+            # overlay calls buildOverlay(el, null) — url=null — and save writes null.
+            try:
+                _bhi_page = context.new_page()
+                _bhi_page.goto(f'{BASE_URL}/blog?admin_edit=1&token={token}',
+                               wait_until='domcontentloaded', timeout=15000)
+                _bhi_data = _bhi_page.evaluate('''() => {
+                    const hero = document.querySelector('.blog-hero');
+                    if (!hero) return {found: false};
+                    const rdHero = typeof window.__RD_HERO !== 'undefined' ? window.__RD_HERO : null;
+                    const inlineStyle = hero.style.backgroundImage || '';
+                    return {found: true, rdHero, inlineStyle};
+                }''')
+                _bhi_page.close()
+                # If __RD_HERO is set (hero image saved in DB), inline style must be present.
+                # If __RD_HERO is not set, inline style is correctly absent.
+                if not _bhi_data.get('found'):
+                    _bhi_ok = False
+                    _bhi_detail = '.blog-hero element not found on blog page'
+                elif _bhi_data.get('rdHero'):
+                    _bhi_ok = bool(_bhi_data.get('inlineStyle'))
+                    _bhi_detail = (
+                        f"inline style present ✓ ({_bhi_data['inlineStyle'][:60]})"
+                        if _bhi_ok else
+                        '__RD_HERO set but .blog-hero has no inline background-image — edit overlay will revert image on save'
+                    )
+                else:
+                    _bhi_ok = True
+                    _bhi_detail = 'no hero image set in DB — inline style correctly absent'
+                results.append({
+                    'agent': agent,
+                    'check': 'blog_hero_inline_style',
+                    'status': 'pass' if _bhi_ok else 'fail',
+                    'detail': _bhi_detail,
+                    'page': 'blog',
+                    'auto_fixable': False,
+                })
+            except Exception as _bhi_e:
+                results.append({
+                    'agent': agent,
+                    'check': 'blog_hero_inline_style',
+                    'status': 'fail',
+                    'detail': f'blog_hero_inline_style test error: {_bhi_e}',
+                    'page': 'blog',
+                    'auto_fixable': False,
+                })
+
             # ── nav_hero_map_keys ─────────────────────────────────────────────
             # Verifies window.__RD_HERO_MAP entries for whole-house-remodels and
             # blog have real hero images (not the fallback path). Guards against

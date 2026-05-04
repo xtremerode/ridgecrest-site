@@ -7254,10 +7254,14 @@ def blog_index():
 
     # Inject DB hero image (if set) so the blog hero background-image loads
     # before JS runs, matching the flash-fix pattern used on all other pages.
+    _bh = None
     if HAS_DB:
         _bh, _bh_pos, _bh_zoom, _, _ = _get_page_data('blog')
         if _bh:
             head = _apply_hero_to_html(head.encode('utf-8'), _bh, _bh_pos, _bh_zoom).decode('utf-8')
+    # Inline style on the hero div lets init() discover the current image without
+    # needing postMessages — same pattern as all other page heroes.
+    _bh_style_attr = f' style="background-image:url(\'{_hero_display_path(_bh)}\')"' if _bh else ''
 
     cat_links = '<a href="/blog" class="blog-cat-pill{}"  >All</a>'.format(
         ' blog-cat-pill--active' if not request.args.get('cat') else ''
@@ -7301,7 +7305,7 @@ def blog_index():
     body = f'''
   {_BLOG_NAV}
 
-  <div class="blog-hero page-hero--service" data-hero-id="blog-index-hero" data-gradient-id="blog-index-hero">
+  <div class="blog-hero page-hero--service" data-hero-id="blog-index-hero" data-gradient-id="blog-index-hero"{_bh_style_attr}>
     <div class="container">
       <p class="blog-hero__eyebrow">The RD Edit</p>
       <h1 class="blog-hero__title">Design Ideas, Project Stories &amp; Expert Advice</h1>
