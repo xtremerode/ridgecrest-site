@@ -2426,14 +2426,20 @@ _CARD_EDIT_OVERLAY_TPL = """\
       }});
       // Color swatch strip — appears as a second row in the pill when color mode is active.
       // The pill uses flex-wrap:wrap so width:100% forces it below the mode buttons.
+      // #FAFAF8 is the --white design token (service page locations bg) added at the end;
+      // kept separate from COLORS so regular card cycling stays dark-only.
+      var _sbgColors = COLORS.concat(['#FAFAF8']);
       swatchRow = document.createElement('div');
       swatchRow.setAttribute('data-rd-overlay', 'card');
       swatchRow.style.cssText = 'display:none;width:100%;padding:3px 6px 4px;gap:6px;justify-content:center;align-items:center;flex-wrap:wrap;';
-      COLORS.forEach(function(c) {{
+      _sbgColors.forEach(function(c) {{
         var sw = document.createElement('button');
         sw.setAttribute('data-swatch', c);
         sw.title = c;
-        sw.style.cssText = 'width:20px;height:20px;border-radius:50%;border:none;cursor:pointer;outline:2px solid transparent;outline-offset:2px;flex-shrink:0;';
+        // Light swatches get a subtle inset ring so they're visible on the dark pill
+        var _isLight = (parseInt(c.slice(1,3),16)||0)+(parseInt(c.slice(3,5),16)||0)+(parseInt(c.slice(5,7),16)||0) > 400;
+        sw.style.cssText = 'width:20px;height:20px;border-radius:50%;cursor:pointer;outline:2px solid transparent;outline-offset:2px;flex-shrink:0;' +
+          (_isLight ? 'border:1px solid rgba(255,255,255,0.5);' : 'border:none;');
         sw.style.background = c;
         sw.addEventListener('click', function(e) {{
           e.stopPropagation(); e.preventDefault();

@@ -1652,25 +1652,28 @@ def run(fix=False):
                         var visible = Array.from(swatches).some(function(sw) {
                             return window.getComputedStyle(sw.parentElement).display !== 'none';
                         });
-                        // Click the second swatch (#1a2a35) to verify it changes the background
-                        var second = swatches[1];
-                        if (second) second.click();
+                        // Click the white swatch (#FAFAF8 — last swatch) to verify it applies
+                        var whiteSw = Array.from(swatches).find(function(sw) {
+                            return sw.getAttribute('data-swatch') === '#FAFAF8';
+                        });
+                        if (whiteSw) whiteSw.click();
                         return {found: true, swatchCount: swatches.length, visible: visible,
-                                clickedColor: second ? second.getAttribute('data-swatch') : null};
+                                hasWhite: !!whiteSw};
                     }''')
                     _psbs_page.wait_for_timeout(500)
                     if _psbs_swatch_result.get('found'):
-                        _expected_color = _psbs_swatch_result.get('clickedColor', '#1a2a35')
                         _psbs_bg = _psbs_page.evaluate(
                             "() => window.getComputedStyle(document.querySelector('[data-card-id=\"portfolio-section-bg\"]')).backgroundColor"
                         )
-                        # Convert #1a2a35 → rgb(26, 42, 53) for comparison
-                        _psbs_ok = 'rgb(26, 42, 53)' in _psbs_bg or '26, 42, 53' in _psbs_bg
+                        # #FAFAF8 = rgb(250, 250, 248)
+                        _white_ok = 'rgb(250, 250, 248)' in _psbs_bg or '250, 250, 248' in _psbs_bg
+                        _count_ok = _psbs_swatch_result.get('swatchCount', 0) == 6
+                        _psbs_ok = _white_ok and _count_ok and _psbs_swatch_result.get('hasWhite')
                         _psbs_detail = (
-                            f'color swatches visible ({_psbs_swatch_result.get("swatchCount")} swatches), '
-                            f'swatch click applied {_expected_color} → bg={_psbs_bg} ✓'
+                            f'6 swatches (5 dark + white #FAFAF8), white swatch applied → bg={_psbs_bg} ✓'
                             if _psbs_ok else
-                            f'swatch click did not change background — bg={_psbs_bg}, expected rgb(26,42,53)'
+                            f'swatch issue — count={_psbs_swatch_result.get("swatchCount")}, '
+                            f'hasWhite={_psbs_swatch_result.get("hasWhite")}, bg={_psbs_bg}'
                         )
                     else:
                         _psbs_detail = f'swatch strip not visible after Color click: {_psbs_swatch_result.get("reason","")}'
