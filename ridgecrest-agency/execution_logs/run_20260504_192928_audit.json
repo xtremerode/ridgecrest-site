@@ -1,0 +1,13 @@
+{
+  "run_id": "run_20260504_192928",
+  "completed_at": "2026-05-04T19:33:32Z",
+  "features": ["server-routes", "frontend-css"],
+  "baseline_commit": "85d8bc630b3803654918d3434627779b32972ad8",
+  "final_commit": "1560ca3e5e3120f708342535910d51a6a36d2494",
+  "dump_file": "/home/claudeuser/agent/backups/pre_task_20260504_192928.sql",
+  "playwright_before": "/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260504_192928_playwright_before.json",
+  "playwright_after": "/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260504_192928_playwright_after.json",
+  "log_pre": "/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260504_192928_pre.log",
+  "log_post": "/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260504_192928_post.log",
+  "result": "PASS"
+}
