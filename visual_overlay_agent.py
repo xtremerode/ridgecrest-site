@@ -2055,6 +2055,51 @@ def run(fix=False):
                     'page': 'blog', 'auto_fixable': False,
                 })
 
+            # ── blog_post_container_shift ─────────────────────────────────────
+            # Verifies that [data-hero-text-align="right"].post-hero .container
+            # has margin-right:0 (not auto) so the text block physically shifts to
+            # the right side of the screen. Guards against the margin:auto override
+            # that keeps .container centered even when align-items:flex-end is set.
+            try:
+                _bpc_page = context.new_page()
+                _bpc_page.goto(f'{BASE_URL}/blog', wait_until='domcontentloaded', timeout=15000)
+                _bpc_result = _bpc_page.evaluate('''() => {
+                    const hero = document.createElement('div');
+                    hero.className = 'post-hero post-hero--has-img';
+                    hero.setAttribute('data-hero-text-align', 'right');
+                    hero.style.cssText = 'position:absolute; left:-9999px; width:1200px; display:flex; flex-direction:column;';
+                    const container = document.createElement('div');
+                    container.className = 'container container--narrow';
+                    hero.appendChild(container);
+                    document.body.appendChild(hero);
+                    const ml = window.getComputedStyle(container).marginLeft;
+                    const mr = window.getComputedStyle(container).marginRight;
+                    document.body.removeChild(hero);
+                    return { marginLeft: ml, marginRight: mr };
+                }''')
+                _bpc_page.close()
+                _bpc_mr = _bpc_result.get('marginRight', '')
+                _bpc_ok = _bpc_mr == '0px'
+                results.append({
+                    'agent': agent, 'check': 'blog_post_container_shift',
+                    'status': 'pass' if _bpc_ok else 'fail',
+                    'detail': (
+                        f'.post-hero .container margin-right:0 on right-align — '
+                        f'text block physically shifts right ✓'
+                        if _bpc_ok else
+                        f'.post-hero .container margin-right={_bpc_mr!r} on right-align '
+                        f'(expected "0px") — container still auto-centered'
+                    ),
+                    'page': 'blog', 'auto_fixable': False,
+                })
+            except Exception as _bpc_e:
+                results.append({
+                    'agent': agent, 'check': 'blog_post_container_shift',
+                    'status': 'fail',
+                    'detail': f'blog_post_container_shift test error: {_bpc_e}',
+                    'page': 'blog', 'auto_fixable': False,
+                })
+
             # ── nav_hero_map_keys ─────────────────────────────────────────────
             # Verifies window.__RD_HERO_MAP entries for whole-house-remodels and
             # blog have real hero images (not the fallback path). Guards against
