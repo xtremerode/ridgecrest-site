@@ -91,7 +91,7 @@
     }
     .sap-frame iframe {
       width: 100%;
-      height: 1080px;
+      height: 600px;
       border: none;
       display: block;
       transition: height 0.3s ease;
@@ -113,7 +113,7 @@
         flex: none;
       }
       .sap-frame iframe {
-        height: 1080px;
+        height: 600px;
       }
     }
   </style>
@@ -161,35 +161,25 @@
 <script src="js/nav-transition.js" defer></script>
   <script>
     // Auto-resize iframe via postMessage from Elevate Scheduling.
-    // MIN_H=1080 is required because Base44's ResizeObserver gets orphaned
-    // between wizard steps — they observe #root > firstElementChild which is a
-    // new DOM node per step. Step 2 content is ~1029px but Base44 sends NO
-    // resize message for it. MIN_H=1080 ensures Step 2 fits without a message.
-    // Trade-off: Steps 0/1 have extra whitespace below shorter content. A scrollbar
-    // that hides form fields is worse UX than whitespace.
+    // Accept every resize unconditionally — no collapse, no lock.
     (function() {
-      var frame   = document.querySelector('.sap-frame iframe');
+      var frame = document.querySelector('.sap-frame iframe');
       var wrapper = document.querySelector('.sap-frame');
       if (!frame || !wrapper) return;
 
-      var PADDING  = 40;
-      var MIN_H    = 1080;
-      var MAX_H    = 2400;
+      var PADDING = 40;
+      var MIN_H   = 500;
       var currentH = 0;
-
-      function applyHeight(target) {
-        target = Math.min(Math.max(target, MIN_H), MAX_H);
-        if (target === currentH) return;
-        currentH = target;
-        frame.style.height   = target + 'px';
-        wrapper.style.height = target + 'px';
-      }
 
       window.addEventListener('message', function(e) {
         if (!e.data || e.data.type !== 'elevate-resize') return;
         var h = e.data.height;
         if (typeof h !== 'number' || h < 50) return;
-        applyHeight(h + PADDING);
+        var target = Math.max(h + PADDING, MIN_H);
+        if (target === currentH) return;
+        currentH = target;
+        frame.style.height   = target + 'px';
+        wrapper.style.height = target + 'px';
       });
     })();
   </script>
