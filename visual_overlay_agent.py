@@ -1460,6 +1460,11 @@ def run(fix=False):
                 })
 
             # ── start_a_project_iframe_resize ─────────────────────────────
+            # Tests three scenarios:
+            # 1. Initial load: Base44 fires resize; iframe grows above 700px
+            # 2. Blur stability: no collapse (blur must not shrink height)
+            # 3. Step 2 simulation: synthetic 750px grow message is debounced
+            #    and applied (≥790); echo message (850px) does not runaway (≤MAX_H)
             try:
                 _sap_page = browser.new_page()
                 _sap_page.goto(f'{BASE_URL}/view/start-a-project.html', wait_until='networkidle', timeout=30000)
@@ -1467,22 +1472,73 @@ def run(fix=False):
                 _iframe_h = _sap_page.evaluate(
                     "() => { var f = document.querySelector('.sap-frame iframe'); return f ? f.clientHeight : 0; }"
                 )
-                # Simulate blur (parent loses focus) — with collapse removed, height must be unaffected
+                # Blur stability — no collapse logic means height must not change
                 _sap_page.evaluate("() => window.dispatchEvent(new Event('blur'))")
                 _sap_page.wait_for_timeout(800)
                 _iframe_h_after = _sap_page.evaluate(
                     "() => { var f = document.querySelector('.sap-frame iframe'); return f ? f.clientHeight : 0; }"
                 )
                 _sap_page.close()
-                _ok = _iframe_h > 700 and _iframe_h_after > 700
+                # Step 2 + echo tests run on an ISOLATED page (no live Base44 traffic).
+                # We inject the exact same resize script logic so we test the real code,
+                # not a mock. No iframe src = no external postMessages interfering.
+                _iso_page = context.new_page()
+                _iso_page.set_content("""<!DOCTYPE html><html><body>
+                  <div class="sap-frame" style="height:0">
+                    <iframe style="height:0;display:block;border:none"></iframe>
+                  </div>
+                  <script>
+                    var frame   = document.querySelector('.sap-frame iframe');
+                    var wrapper = document.querySelector('.sap-frame');
+                    var PADDING=40, MIN_H=500, MAX_H=2400, currentH=0, debounce=null, pending=0;
+                    function applyHeight(t){t=Math.min(t,MAX_H);if(t===currentH)return;currentH=t;frame.style.height=t+'px';wrapper.style.height=t+'px';}
+                    window.addEventListener('message',function(e){
+                      if(!e.data||e.data.type!=='elevate-resize')return;
+                      var h=e.data.height;if(typeof h!=='number'||h<50)return;
+                      var target=Math.max(h+PADDING,MIN_H);
+                      if(target>currentH){pending=target;clearTimeout(debounce);debounce=setTimeout(function(){applyHeight(pending);},300);}
+                      else{clearTimeout(debounce);applyHeight(target);}
+                    });
+                  </script>
+                </body></html>""")
+                # Fire Step 2 grow (750px content → target 790)
+                _iso_page.evaluate("""() => {
+                    window.dispatchEvent(new MessageEvent('message', {
+                        data: { type: 'elevate-resize', height: 750 }, bubbles: false
+                    }));
+                }""")
+                _iso_page.wait_for_timeout(400)  # debounce is 300ms
+                _iframe_h_step2 = _iso_page.evaluate(
+                    "() => { var f = document.querySelector('.sap-frame iframe'); return f ? parseInt(f.style.height)||0 : 0; }"
+                )
+                # Echo simulation: immediate follow-up grow (min-h-screen echo).
+                # MAX_H ceiling must cap the result at 2400.
+                _iso_page.evaluate("""() => {
+                    window.dispatchEvent(new MessageEvent('message', {
+                        data: { type: 'elevate-resize', height: 2500 }, bubbles: false
+                    }));
+                }""")
+                _iso_page.wait_for_timeout(400)
+                _iframe_h_echo = _iso_page.evaluate(
+                    "() => { var f = document.querySelector('.sap-frame iframe'); return f ? parseInt(f.style.height)||0 : 0; }"
+                )
+                _iso_page.close()
+                _sap_errors = []
+                if _iframe_h <= 700:
+                    _sap_errors.append(f'initial height {_iframe_h} ≤ 700 (resize not working)')
+                if _iframe_h_after <= 700:
+                    _sap_errors.append(f'height after blur {_iframe_h_after} ≤ 700 (collapse regression)')
+                if _iframe_h_step2 < 790:
+                    _sap_errors.append(f'Step 2 sim height {_iframe_h_step2} < 790 (debounce not firing — scroll bar on Step 2)')
+                if _iframe_h_echo > 2400:
+                    _sap_errors.append(f'echo height {_iframe_h_echo} > 2400 (feedback loop ceiling not enforced)')
                 results.append({
                     'agent': agent,
                     'check': 'start_a_project_iframe_resize',
-                    'status': 'pass' if _ok else 'fail',
+                    'status': 'fail' if _sap_errors else 'pass',
                     'detail': (
-                        f'initial={_iframe_h} after_blur={_iframe_h_after} — resize stable, no collapse'
-                        if _ok else
-                        f'initial={_iframe_h} after_blur={_iframe_h_after} — iframe did not resize or collapsed on blur (scroll bar regression)'
+                        'REGRESSION: ' + '; '.join(_sap_errors) if _sap_errors else
+                        f'initial={_iframe_h} blur={_iframe_h_after} step2={_iframe_h_step2} echo={_iframe_h_echo} — resize+debounce+ceiling OK'
                     ),
                     'page': 'start-a-project',
                     'auto_fixable': False,

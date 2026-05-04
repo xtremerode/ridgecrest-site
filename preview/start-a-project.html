@@ -161,25 +161,45 @@
 <script src="js/nav-transition.js" defer></script>
   <script>
     // Auto-resize iframe via postMessage from Elevate Scheduling.
-    // Accept every resize unconditionally — no collapse, no lock.
+    // Debounce + ceiling: breaks the min-h-screen feedback loop without
+    // collapse-on-blur (which caused the stuck-at-MIN_H regression).
+    // Grows are debounced 300ms so echoes from min-h-screen are absorbed.
+    // Shrinks are applied immediately (genuine step-back content change).
     (function() {
-      var frame = document.querySelector('.sap-frame iframe');
+      var frame   = document.querySelector('.sap-frame iframe');
       var wrapper = document.querySelector('.sap-frame');
       if (!frame || !wrapper) return;
 
-      var PADDING = 40;
-      var MIN_H   = 500;
+      var PADDING  = 40;
+      var MIN_H    = 500;
+      var MAX_H    = 2400;
       var currentH = 0;
+      var debounce = null;
+      var pending  = 0;
+
+      function applyHeight(target) {
+        target = Math.min(target, MAX_H);
+        if (target === currentH) return;
+        currentH = target;
+        frame.style.height   = target + 'px';
+        wrapper.style.height = target + 'px';
+      }
 
       window.addEventListener('message', function(e) {
         if (!e.data || e.data.type !== 'elevate-resize') return;
         var h = e.data.height;
         if (typeof h !== 'number' || h < 50) return;
         var target = Math.max(h + PADDING, MIN_H);
-        if (target === currentH) return;
-        currentH = target;
-        frame.style.height   = target + 'px';
-        wrapper.style.height = target + 'px';
+        if (target > currentH) {
+          // Grow: debounce so min-h-screen echoes are absorbed before applying
+          pending = target;
+          clearTimeout(debounce);
+          debounce = setTimeout(function() { applyHeight(pending); }, 300);
+        } else {
+          // Shrink: apply immediately — no echo for shrinks
+          clearTimeout(debounce);
+          applyHeight(target);
+        }
       });
     })();
   </script>
