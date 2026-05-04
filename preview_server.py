@@ -1938,6 +1938,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
     renderBtn.title = 'Open render editor for this image';
     renderBtn.style.cssText = 'padding:5px 11px;font-size:11px;font-weight:700;font-family:system-ui,sans-serif;border:none;cursor:pointer;line-height:1.4;white-space:nowrap;background:rgba(90,50,180,.8);color:#fff';
 
+    var swatchRow = null; // populated for _isSectionBg after pill append
     function refreshPill() {{
       if (state.mode === 'color') {{
         colorBtn.style.background = '#3b82f6'; colorBtn.style.color = '#fff';
@@ -1945,6 +1946,13 @@ _CARD_EDIT_OVERLAY_TPL = """\
       }} else {{
         imgBtn.style.background = '#3b82f6'; imgBtn.style.color = '#fff';
         colorBtn.style.background = 'rgba(0,0,0,.65)'; colorBtn.style.color = 'rgba(255,255,255,.6)';
+      }}
+      if (_isSectionBg && swatchRow) {{
+        swatchRow.style.display = state.mode === 'color' ? 'flex' : 'none';
+        Array.prototype.forEach.call(swatchRow.querySelectorAll('[data-swatch]'), function(sw) {{
+          sw.style.outline = sw.getAttribute('data-swatch') === (state.color || '#1C1C1C')
+            ? '2px solid #fff' : '2px solid transparent';
+        }});
       }}
     }}
     refreshPill();
@@ -2416,6 +2424,27 @@ _CARD_EDIT_OVERLAY_TPL = """\
       el.addEventListener('mouseleave', function() {{
         pill.style.opacity = '0'; pill.style.pointerEvents = 'none';
       }});
+      // Color swatch strip — appears as a second row in the pill when color mode is active.
+      // The pill uses flex-wrap:wrap so width:100% forces it below the mode buttons.
+      swatchRow = document.createElement('div');
+      swatchRow.setAttribute('data-rd-overlay', 'card');
+      swatchRow.style.cssText = 'display:none;width:100%;padding:3px 6px 4px;gap:6px;justify-content:center;align-items:center;flex-wrap:wrap;';
+      COLORS.forEach(function(c) {{
+        var sw = document.createElement('button');
+        sw.setAttribute('data-swatch', c);
+        sw.title = c;
+        sw.style.cssText = 'width:20px;height:20px;border-radius:50%;border:none;cursor:pointer;outline:2px solid transparent;outline-offset:2px;flex-shrink:0;';
+        sw.style.background = c;
+        sw.addEventListener('click', function(e) {{
+          e.stopPropagation(); e.preventDefault();
+          state.color = c;
+          applyStyle(el, state); refreshPill();
+          saveCard(cardId, state);
+        }});
+        swatchRow.appendChild(sw);
+      }});
+      pill.appendChild(swatchRow);
+      refreshPill(); // re-run to initialize swatch display state
     }}
 
     if (ov) {{

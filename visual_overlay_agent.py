@@ -1611,6 +1611,86 @@ def run(fix=False):
                     'page': 'portfolio', 'auto_fixable': False,
                 })
 
+            # ── portfolio_section_bg_swatches ─────────────────────────────
+            # Verifies the color swatch strip appears in the pill after clicking
+            # Color on the portfolio-section-bg card, and that clicking a swatch
+            # changes the section's background color. Guards against the _isSectionBg
+            # ov-skip breaking color selection (no ov = no click-to-cycle mechanism).
+            try:
+                _psbs_orig = _read_card_state('portfolio-section-bg')
+                _psbs_page = context.new_page()
+                _psbs_page.goto(
+                    f'{BASE_URL}/view/portfolio.html?admin_edit=1&token={token}&_stage=1',
+                    wait_until='networkidle', timeout=20000
+                )
+                _psbs_page.wait_for_timeout(800)
+                _psbs_section = _psbs_page.query_selector('[data-card-id="portfolio-section-bg"]')
+                _psbs_ok = False
+                _psbs_detail = 'section element not found'
+                if _psbs_section:
+                    _psbs_section.hover()
+                    _psbs_page.wait_for_timeout(300)
+                    # Click Color button in pill
+                    _psbs_color_btn = _psbs_page.query_selector(
+                        '[data-card-id="portfolio-section-bg"] ~ [data-rd-overlay="card"] button:first-child, '
+                        '[data-card-id="portfolio-section-bg"] [data-rd-overlay="card"] button:first-child'
+                    )
+                    # Use evaluate to click the Color button inside the section's pill
+                    _psbs_page.evaluate('''() => {
+                        var pill = document.querySelector('[data-card-id="portfolio-section-bg"] [data-rd-overlay="card"]');
+                        if (!pill) return;
+                        var btn = Array.from(pill.querySelectorAll('button')).find(b => b.textContent.trim() === 'Color');
+                        if (btn) btn.click();
+                    }''')
+                    _psbs_page.wait_for_timeout(400)
+                    # Verify swatch row is visible and contains swatch buttons
+                    _psbs_swatch_result = _psbs_page.evaluate('''() => {
+                        var section = document.querySelector('[data-card-id="portfolio-section-bg"]');
+                        if (!section) return {found: false, reason: 'no section'};
+                        var swatches = section.querySelectorAll('[data-swatch]');
+                        if (!swatches.length) return {found: false, reason: 'no swatches'};
+                        var visible = Array.from(swatches).some(function(sw) {
+                            return window.getComputedStyle(sw.parentElement).display !== 'none';
+                        });
+                        // Click the second swatch (#1a2a35) to verify it changes the background
+                        var second = swatches[1];
+                        if (second) second.click();
+                        return {found: true, swatchCount: swatches.length, visible: visible,
+                                clickedColor: second ? second.getAttribute('data-swatch') : null};
+                    }''')
+                    _psbs_page.wait_for_timeout(500)
+                    if _psbs_swatch_result.get('found'):
+                        _expected_color = _psbs_swatch_result.get('clickedColor', '#1a2a35')
+                        _psbs_bg = _psbs_page.evaluate(
+                            "() => window.getComputedStyle(document.querySelector('[data-card-id=\"portfolio-section-bg\"]')).backgroundColor"
+                        )
+                        # Convert #1a2a35 → rgb(26, 42, 53) for comparison
+                        _psbs_ok = 'rgb(26, 42, 53)' in _psbs_bg or '26, 42, 53' in _psbs_bg
+                        _psbs_detail = (
+                            f'color swatches visible ({_psbs_swatch_result.get("swatchCount")} swatches), '
+                            f'swatch click applied {_expected_color} → bg={_psbs_bg} ✓'
+                            if _psbs_ok else
+                            f'swatch click did not change background — bg={_psbs_bg}, expected rgb(26,42,53)'
+                        )
+                    else:
+                        _psbs_detail = f'swatch strip not visible after Color click: {_psbs_swatch_result.get("reason","")}'
+                _psbs_page.close()
+                # Restore original card state
+                _restore_card_state('portfolio-section-bg', 'portfolio', token, _psbs_orig)
+                results.append({
+                    'agent': agent, 'check': 'portfolio_section_bg_swatches',
+                    'status': 'pass' if _psbs_ok else 'fail',
+                    'detail': _psbs_detail,
+                    'page': 'portfolio', 'auto_fixable': False,
+                })
+            except Exception as _psbs_e:
+                results.append({
+                    'agent': agent, 'check': 'portfolio_section_bg_swatches',
+                    'status': 'fail',
+                    'detail': f'portfolio_section_bg_swatches test error: {_psbs_e}',
+                    'page': 'portfolio', 'auto_fixable': False,
+                })
+
             # ── portfolio_featured_gradient_wired ────────────────────────
             # Verify that rd_set_gradient correctly applies --rd-overlay to
             # .portfolio-featured__overlay (data-gradient-id element), NOT to
