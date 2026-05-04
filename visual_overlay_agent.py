@@ -1461,10 +1461,12 @@ def run(fix=False):
 
             # ── start_a_project_iframe_resize ─────────────────────────────
             # Tests three scenarios:
-            # 1. Initial load: CSS floor is 800px; iframe is ≥800 on load
+            # 1. Initial load: CSS floor is 1080px; iframe is ≥1080 on load
             # 2. Blur stability: no collapse (blur must not shrink height)
-            # 3. Step 2 simulation: synthetic 750px message → MIN_H floor clamps to 800;
-            #    echo message (2500px) is capped at MAX_H=2400
+            # 3. Step 2 simulation: synthetic 750px message → MIN_H=1080 clamps it;
+            #    echo message (2500px) is capped at MAX_H=2400.
+            # Note: Base44 sends NO resize message for Step 2 (ResizeObserver orphaned
+            # between wizard steps). MIN_H=1080 is required to cover Step 2 (~1029px).
             try:
                 _sap_page = browser.new_page()
                 _sap_page.goto(f'{BASE_URL}/view/start-a-project.html', wait_until='networkidle', timeout=30000)
@@ -1490,7 +1492,7 @@ def run(fix=False):
                   <script>
                     var frame   = document.querySelector('.sap-frame iframe');
                     var wrapper = document.querySelector('.sap-frame');
-                    var PADDING=40, MIN_H=800, MAX_H=2400, currentH=0;
+                    var PADDING=40, MIN_H=1080, MAX_H=2400, currentH=0;
                     function applyHeight(t){t=Math.min(Math.max(t,MIN_H),MAX_H);if(t===currentH)return;currentH=t;frame.style.height=t+'px';wrapper.style.height=t+'px';}
                     window.addEventListener('message',function(e){
                       if(!e.data||e.data.type!=='elevate-resize')return;
@@ -1521,12 +1523,12 @@ def run(fix=False):
                 )
                 _iso_page.close()
                 _sap_errors = []
-                if _iframe_h < 800:
-                    _sap_errors.append(f'initial height {_iframe_h} < 800 (CSS floor not applied)')
-                if _iframe_h_after < 800:
-                    _sap_errors.append(f'height after blur {_iframe_h_after} < 800 (collapse regression)')
-                if _iframe_h_step2 < 800:
-                    _sap_errors.append(f'Step 2 sim height {_iframe_h_step2} < 800 (MIN_H floor not clamping — scroll bar on Step 2)')
+                if _iframe_h < 1080:
+                    _sap_errors.append(f'initial height {_iframe_h} < 1080 (CSS floor not applied)')
+                if _iframe_h_after < 1080:
+                    _sap_errors.append(f'height after blur {_iframe_h_after} < 1080 (collapse regression)')
+                if _iframe_h_step2 < 1080:
+                    _sap_errors.append(f'Step 2 sim height {_iframe_h_step2} < 1080 (MIN_H floor not clamping — scroll bar on Step 2)')
                 if _iframe_h_echo > 2400:
                     _sap_errors.append(f'echo height {_iframe_h_echo} > 2400 (MAX_H ceiling not enforced)')
                 results.append({
@@ -1535,7 +1537,7 @@ def run(fix=False):
                     'status': 'fail' if _sap_errors else 'pass',
                     'detail': (
                         'REGRESSION: ' + '; '.join(_sap_errors) if _sap_errors else
-                        f'initial={_iframe_h} blur={_iframe_h_after} step2={_iframe_h_step2} echo={_iframe_h_echo} — resize+MIN_H_floor+MAX_H_ceiling OK'
+                        f'initial={_iframe_h} blur={_iframe_h_after} step2={_iframe_h_step2} echo={_iframe_h_echo} — MIN_H=1080 floor covers Step2(~1029px)+MAX_H ceiling OK'
                     ),
                     'page': 'start-a-project',
                     'auto_fixable': False,
