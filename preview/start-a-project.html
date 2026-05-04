@@ -91,7 +91,7 @@
     }
     .sap-frame iframe {
       width: 100%;
-      height: 760px;
+      height: 1080px;
       border: none;
       display: block;
       transition: height 0.3s ease;
@@ -113,7 +113,7 @@
         flex: none;
       }
       .sap-frame iframe {
-        height: 760px;
+        height: 1080px;
       }
     }
   </style>
@@ -148,7 +148,7 @@
       </div>
       <div class="sap-frame">
         <iframe
-          src="/booking-proxy"
+          src="https://elevate-scheduling-6b2fdec8.base44.app/"
           title="Project Inquiry Form"
           loading="eager"
           allow="clipboard-write"
@@ -161,17 +161,19 @@
 <script src="js/nav-transition.js" defer></script>
   <script>
     // Auto-resize iframe via postMessage from Elevate Scheduling.
-    // Auto-resize from postMessage. The iframe now loads through /booking-proxy,
-    // which injects a 300ms polling script using Base44's own _D() measurement.
-    // That script correctly reports height for ALL steps including Step 2 (~1029px)
-    // which Base44's native ResizeObserver misses (orphaned DOM node per step).
+    // MIN_H=1080 is required because Base44's ResizeObserver gets orphaned
+    // between wizard steps — they observe #root > firstElementChild which is a
+    // new DOM node per step. Step 2 content is ~1029px but Base44 sends NO
+    // resize message for it. MIN_H=1080 ensures Step 2 fits without a message.
+    // Trade-off: Steps 0/1 have extra whitespace below shorter content. A scrollbar
+    // that hides form fields is worse UX than whitespace.
     (function() {
       var frame   = document.querySelector('.sap-frame iframe');
       var wrapper = document.querySelector('.sap-frame');
       if (!frame || !wrapper) return;
 
       var PADDING  = 40;
-      var MIN_H    = 500;
+      var MIN_H    = 1080;
       var MAX_H    = 2400;
       var currentH = 0;
 
@@ -186,7 +188,7 @@
       window.addEventListener('message', function(e) {
         if (!e.data || e.data.type !== 'elevate-resize') return;
         var h = e.data.height;
-        if (typeof h !== 'number' || h < 300) return;
+        if (typeof h !== 'number' || h < 50) return;
         applyHeight(h + PADDING);
       });
     })();
