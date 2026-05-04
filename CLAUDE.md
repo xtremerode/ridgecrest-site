@@ -151,6 +151,20 @@ When a guardrail execution touches a code path, `visual_overlay_agent.py` MUST i
 
 ---
 
+## Measure Before Fix — MANDATORY
+
+When a user reports unexpected behavior — scroll bars, wrong sizes, missing content, broken functionality, visual regressions, values that are incorrect — the sequence is:
+
+1. **FIRST: diagnostic** — Write and run code that captures what the actual system is doing. Log the real data: intercept postMessages, curl the endpoint, query the DB, measure the DOM, read the actual response. No assumptions.
+2. **SECOND: root cause** — State the confirmed root cause from the data. "It's probably X" is not a root cause.
+3. **THIRD: fix** — Propose and implement only after steps 1 and 2 are complete.
+
+**Never write fix code before step 1 is complete.** This applies regardless of technology — API responses, browser events, third-party services, postMessages, CSS rendering, DB queries, server routes, anything.
+
+**The hook enforces tool use before responding, but not which tool.** Satisfying the gate by reading the wrong file is a violation of this rule in spirit. The diagnostic must produce real data about the symptom — not just verify that our code looks correct.
+
+---
+
 ## Known Open Gaps
 
 Each item includes a verification hint — run it before declaring the item resolved.

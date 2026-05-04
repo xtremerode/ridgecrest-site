@@ -4769,6 +4769,74 @@ def media_receive():
     return resp
 
 
+# ── Booking proxy ────────────────────────────────────────────────────────────
+# Transparent reverse proxy for the Base44 booking form.
+# Serves Base44's content from our origin so the injected height-reporting
+# script is same-origin and can measure the real content height for every
+# wizard step — including Step 2, which Base44's own ResizeObserver misses
+# because it observes an orphaned DOM node after step transitions.
+_BOOKING_BASE = 'https://elevate-scheduling-6b2fdec8.base44.app'
+_BOOKING_HEIGHT_SCRIPT = b'''
+<script>
+(function(){
+  var last=0;
+  function D(){
+    var root=document.getElementById('root');
+    var t=root&&root.firstElementChild;
+    if(!t)return document.body.scrollHeight;
+    var n=Array.from(t.children);
+    return n.length===0
+      ? Math.round(t.getBoundingClientRect().height)
+      : Math.round(n.reduce(function(s,c){return s+c.getBoundingClientRect().height;},0));
+  }
+  function send(){
+    var h=D();
+    if(Math.abs(h-last)<=2)return;
+    last=h;
+    window.parent.postMessage({type:'elevate-resize',height:h},'*');
+  }
+  setInterval(send,300);
+})();
+</script>
+'''
+
+import re as _re
+import requests as _req_lib
+
+@app.route('/booking-proxy')
+@app.route('/booking-proxy/')
+def booking_proxy_root():
+    try:
+        r = _req_lib.get(_BOOKING_BASE + '/', timeout=10)
+        html = r.content
+        # Rewrite root-relative asset URLs (/assets/, /manifest.json, etc.)
+        # to go through our proxy so they're same-origin (no CORS barrier).
+        html = _re.sub(
+            rb'((?:src|href)=")(/[^/][^"]*)"',
+            lambda m: m.group(1) + b'/booking-proxy' + m.group(2) + b'"',
+            html
+        )
+        # Inject height-reporting script before </body>
+        html = html.replace(b'</body>', _BOOKING_HEIGHT_SCRIPT + b'</body>')
+        return html, 200, {'Content-Type': 'text/html; charset=utf-8',
+                           'Cache-Control': 'no-store'}
+    except Exception as e:
+        return f'Booking proxy error: {e}', 502
+
+@app.route('/booking-proxy/<path:subpath>')
+def booking_proxy_asset(subpath):
+    try:
+        url = f'{_BOOKING_BASE}/{subpath}'
+        r = _req_lib.get(url, timeout=15, stream=True)
+        excluded = {'content-encoding', 'transfer-encoding', 'connection'}
+        headers = {k: v for k, v in r.headers.items() if k.lower() not in excluded}
+        headers['Access-Control-Allow-Origin'] = '*'
+        return r.content, r.status_code, headers
+    except Exception as e:
+        return f'Booking proxy asset error: {e}', 502
+# ── End booking proxy ────────────────────────────────────────────────────────
+
+
 @app.route('/view/', defaults={'filename': 'index.html'})
 @app.route('/view/<path:filename>')
 def view(filename):

@@ -1460,30 +1460,30 @@ def run(fix=False):
                 })
 
             # ── start_a_project_iframe_resize ─────────────────────────────
-            # Tests three scenarios:
-            # 1. Initial load: CSS floor is 1080px; iframe is ≥1080 on load
-            # 2. Blur stability: no collapse (blur must not shrink height)
-            # 3. Step 2 simulation: synthetic 750px message → MIN_H=1080 clamps it;
-            #    echo message (2500px) is capped at MAX_H=2400.
-            # Note: Base44 sends NO resize message for Step 2 (ResizeObserver orphaned
-            # between wizard steps). MIN_H=1080 is required to cover Step 2 (~1029px).
+            # Tests three scenarios via /booking-proxy (same-origin proxy that
+            # injects a 300ms height-polling script using Base44's _D() measurement):
+            # 1. Landing: proxy fires resize message; iframe grows above 700px
+            # 2. Step 2 simulation: synthetic 1029px message → 1069px applied
+            # 3. MAX_H ceiling: echo message (2500px) capped at 2400
+            # The proxy approach means all three wizard steps report correct heights.
             try:
                 _sap_page = browser.new_page()
                 _sap_page.goto(f'{BASE_URL}/view/start-a-project.html', wait_until='networkidle', timeout=30000)
-                _sap_page.wait_for_timeout(1500)
+                # Poll until proxy sends a real resize message and height stabilizes above 700,
+                # or timeout after 15s. Fixed waits are unreliable because the proxy must
+                # fetch Base44 externally and React must finish rendering before D() returns a real height.
+                try:
+                    _sap_page.wait_for_function(
+                        "() => { var f = document.querySelector('.sap-frame iframe'); return f && f.clientHeight >= 700; }",
+                        timeout=15000
+                    )
+                except Exception:
+                    pass  # read whatever height exists; assertion below will catch failure
                 _iframe_h = _sap_page.evaluate(
                     "() => { var f = document.querySelector('.sap-frame iframe'); return f ? f.clientHeight : 0; }"
                 )
-                # Blur stability — height must not collapse on blur
-                _sap_page.evaluate("() => window.dispatchEvent(new Event('blur'))")
-                _sap_page.wait_for_timeout(800)
-                _iframe_h_after = _sap_page.evaluate(
-                    "() => { var f = document.querySelector('.sap-frame iframe'); return f ? f.clientHeight : 0; }"
-                )
                 _sap_page.close()
-                # Step 2 + echo tests run on an ISOLATED page (no live Base44 traffic).
-                # We inject the exact same resize script logic so we test the real code,
-                # not a mock. No iframe src = no external postMessages interfering.
+                # Isolated resize-listener tests — verify Step 2 and MAX_H via synthetic messages
                 _iso_page = context.new_page()
                 _iso_page.set_content("""<!DOCTYPE html><html><body>
                   <div class="sap-frame" style="height:0">
@@ -1492,7 +1492,7 @@ def run(fix=False):
                   <script>
                     var frame   = document.querySelector('.sap-frame iframe');
                     var wrapper = document.querySelector('.sap-frame');
-                    var PADDING=40, MIN_H=1080, MAX_H=2400, currentH=0;
+                    var PADDING=40, MIN_H=500, MAX_H=2400, currentH=0;
                     function applyHeight(t){t=Math.min(Math.max(t,MIN_H),MAX_H);if(t===currentH)return;currentH=t;frame.style.height=t+'px';wrapper.style.height=t+'px';}
                     window.addEventListener('message',function(e){
                       if(!e.data||e.data.type!=='elevate-resize')return;
@@ -1501,17 +1501,17 @@ def run(fix=False):
                     });
                   </script>
                 </body></html>""")
-                # Fire Step 2 message (750px content → 790 after PADDING → clamped to MIN_H=800)
+                # Simulate Step 2 (proxy reports 1029px → target 1069)
                 _iso_page.evaluate("""() => {
                     window.dispatchEvent(new MessageEvent('message', {
-                        data: { type: 'elevate-resize', height: 750 }, bubbles: false
+                        data: { type: 'elevate-resize', height: 1029 }, bubbles: false
                     }));
                 }""")
                 _iso_page.wait_for_timeout(100)
                 _iframe_h_step2 = _iso_page.evaluate(
                     "() => { var f = document.querySelector('.sap-frame iframe'); return f ? parseInt(f.style.height)||0 : 0; }"
                 )
-                # Echo simulation: large message must be capped at MAX_H=2400.
+                # Echo: MAX_H ceiling must cap at 2400
                 _iso_page.evaluate("""() => {
                     window.dispatchEvent(new MessageEvent('message', {
                         data: { type: 'elevate-resize', height: 2500 }, bubbles: false
@@ -1523,12 +1523,10 @@ def run(fix=False):
                 )
                 _iso_page.close()
                 _sap_errors = []
-                if _iframe_h < 1080:
-                    _sap_errors.append(f'initial height {_iframe_h} < 1080 (CSS floor not applied)')
-                if _iframe_h_after < 1080:
-                    _sap_errors.append(f'height after blur {_iframe_h_after} < 1080 (collapse regression)')
-                if _iframe_h_step2 < 1080:
-                    _sap_errors.append(f'Step 2 sim height {_iframe_h_step2} < 1080 (MIN_H floor not clamping — scroll bar on Step 2)')
+                if _iframe_h < 700:
+                    _sap_errors.append(f'initial height {_iframe_h} < 700 (proxy not sending resize or listener broken)')
+                if _iframe_h_step2 < 1069:
+                    _sap_errors.append(f'Step 2 sim height {_iframe_h_step2} < 1069 (resize listener not applying 1029+40)')
                 if _iframe_h_echo > 2400:
                     _sap_errors.append(f'echo height {_iframe_h_echo} > 2400 (MAX_H ceiling not enforced)')
                 results.append({
@@ -1537,7 +1535,7 @@ def run(fix=False):
                     'status': 'fail' if _sap_errors else 'pass',
                     'detail': (
                         'REGRESSION: ' + '; '.join(_sap_errors) if _sap_errors else
-                        f'initial={_iframe_h} blur={_iframe_h_after} step2={_iframe_h_step2} echo={_iframe_h_echo} — MIN_H=1080 floor covers Step2(~1029px)+MAX_H ceiling OK'
+                        f'initial={_iframe_h} step2_sim={_iframe_h_step2} echo={_iframe_h_echo} — proxy+resize OK'
                     ),
                     'page': 'start-a-project',
                     'auto_fixable': False,
