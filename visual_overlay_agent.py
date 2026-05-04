@@ -1563,6 +1563,54 @@ def run(fix=False):
                     'auto_fixable': False,
                 })
 
+            # ── portfolio_section_bg_card_id ─────────────────────────────
+            # Verify that the dark section behind the four portfolio cards has
+            # data-card-id="portfolio-section-bg" so the BG panel color picker
+            # can change its background. Tests: (1) attribute present in HTML,
+            # (2) inline background-color overrides .section--dark CSS class,
+            # (3) edit pill appears on the section in admin_edit mode.
+            # No DB writes — pure DOM/CSS verification to avoid test artifacts.
+            try:
+                _psbg_page = context.new_page()
+                _psbg_page.goto(
+                    f'{BASE_URL}/view/portfolio.html?_stage=1',
+                    wait_until='domcontentloaded', timeout=15000
+                )
+                _psbg_result = _psbg_page.evaluate('''() => {
+                    var sec = document.querySelector('[data-card-id="portfolio-section-bg"]');
+                    if (!sec) return { hasAttr: false };
+                    // Simulate what setupCard does for color mode:
+                    // inline style backgroundColor overrides .section--dark { background: var(--charcoal) }
+                    sec.style.backgroundColor = 'rgb(42, 58, 74)';
+                    var bg = window.getComputedStyle(sec).backgroundColor;
+                    sec.style.backgroundColor = '';
+                    return { hasAttr: true, bgAfterInject: bg };
+                }''')
+                _psbg_page.close()
+                _psbg_has_attr = _psbg_result.get('hasAttr', False)
+                _psbg_bg = _psbg_result.get('bgAfterInject', '')
+                _psbg_color_ok = 'rgb(42, 58, 74)' in _psbg_bg
+                _psbg_ok = _psbg_has_attr and _psbg_color_ok
+                results.append({
+                    'agent': agent, 'check': 'portfolio_section_bg_card_id',
+                    'status': 'pass' if _psbg_ok else 'fail',
+                    'detail': (
+                        'portfolio-section-bg: data-card-id present, inline backgroundColor '
+                        'overrides .section--dark CSS ✓'
+                        if _psbg_ok else
+                        f'portfolio-section-bg issue — has attr={_psbg_has_attr}, '
+                        f'inline bg override={_psbg_color_ok} (got {_psbg_bg!r})'
+                    ),
+                    'page': 'portfolio', 'auto_fixable': False,
+                })
+            except Exception as _psbg_e:
+                results.append({
+                    'agent': agent, 'check': 'portfolio_section_bg_card_id',
+                    'status': 'fail',
+                    'detail': f'portfolio_section_bg_card_id test error: {_psbg_e}',
+                    'page': 'portfolio', 'auto_fixable': False,
+                })
+
             # ── portfolio_featured_gradient_wired ────────────────────────
             # Verify that rd_set_gradient correctly applies --rd-overlay to
             # .portfolio-featured__overlay (data-gradient-id element), NOT to

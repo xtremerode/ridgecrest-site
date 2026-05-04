@@ -1872,9 +1872,12 @@ _CARD_EDIT_OVERLAY_TPL = """\
     // Escape by hosting the pill on document.body; skip the capture overlay entirely.
     var _isFixedCard = !isGalleryItem && window.getComputedStyle(el).position === 'fixed';
     if (_isFixedCard) _attachEl = document.body;
+    // Section-level background cards (e.g. portfolio-section-bg): skip ov/textBlock wrapping
+    // so the inner card grid remains hoverable and interactable.
+    var _isSectionBg = !isGalleryItem && el.tagName === 'SECTION';
 
     if (window.getComputedStyle(el).position === 'static') el.style.position = 'relative';
-    el.style.overflow = 'hidden';
+    if (!_isSectionBg) el.style.overflow = 'hidden';
     // For gallery items (img tags), DO NOT call applyStyle on init — their src is already
     // correct from the HTML / _CARD_APPLY_SCRIPT. Calling applyStyle here would override
     // loading="lazy" on all off-screen images, triggering a flood of simultaneous requests.
@@ -1886,7 +1889,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
     // Wrap card's own text children in a draggable block (non-gallery only).
     // pill/ov are not yet appended, so only the original HTML children get wrapped.
     var textBlock = null;
-    if (!isGalleryItem) {{
+    if (!isGalleryItem && !_isSectionBg) {{
       textBlock = el.querySelector('[data-rd-textblock]');
       if (!textBlock) {{
         textBlock = document.createElement('div');
@@ -2368,9 +2371,9 @@ _CARD_EDIT_OVERLAY_TPL = """\
       saveCard(cardId, state);
     }});
 
-    // Full-card capture overlay — skipped for fixed-position cards (pill-only interaction)
+    // Full-card capture overlay — skipped for fixed-position cards and section backgrounds
     var ov = null;
-    if (!_isFixedCard) {{
+    if (!_isFixedCard && !_isSectionBg) {{
       ov = document.createElement('div');
       ov.setAttribute('data-rd-overlay','card');
       ov.style.cssText = 'position:absolute;inset:0;z-index:9990;cursor:pointer;user-select:none';
@@ -2386,7 +2389,7 @@ _CARD_EDIT_OVERLAY_TPL = """\
     var isDragging = false;
     var movedPx = 0;
 
-    if (!_isFixedCard) {{
+    if (!_isFixedCard && !_isSectionBg) {{
       _attachEl.addEventListener('mouseenter', function() {{
         if (window.__rdTextModeActive && !isGalleryItem) {{
           // In text mode: show pill so Done button is accessible on hover
@@ -2404,6 +2407,14 @@ _CARD_EDIT_OVERLAY_TPL = """\
           pill.style.opacity = '0'; pill.style.pointerEvents = 'none';
           ov.style.cursor = 'pointer';
         }}
+      }});
+    }}
+    if (_isSectionBg) {{
+      el.addEventListener('mouseenter', function() {{
+        pill.style.opacity = '1'; pill.style.pointerEvents = 'auto';
+      }});
+      el.addEventListener('mouseleave', function() {{
+        pill.style.opacity = '0'; pill.style.pointerEvents = 'none';
       }});
     }}
 
