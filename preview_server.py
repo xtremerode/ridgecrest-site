@@ -1908,7 +1908,9 @@ _CARD_EDIT_OVERLAY_TPL = """\
     pill.setAttribute('data-rd-overlay','card');
     pill.style.cssText = _isFixedCard
       ? 'position:fixed;bottom:8px;right:8px;z-index:9991;display:flex;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 16px);border-radius:4px;overflow:hidden;opacity:1;transition:opacity .15s;pointer-events:auto;box-shadow:0 2px 8px rgba(0,0,0,.5)'
-      : 'position:absolute;bottom:8px;right:8px;z-index:9991;display:flex;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 16px);border-radius:4px;overflow:hidden;opacity:0;transition:opacity .15s;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.5)';
+      : _isSectionBg
+        ? 'position:absolute;top:50%;right:8px;transform:translateY(-50%);z-index:9991;display:flex;flex-direction:column;align-items:stretch;border-radius:4px;overflow:hidden;opacity:0;transition:opacity .15s;pointer-events:none;box-shadow:-2px 0 8px rgba(0,0,0,.5)'
+        : 'position:absolute;bottom:8px;right:8px;z-index:9991;display:flex;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 16px);border-radius:4px;overflow:hidden;opacity:0;transition:opacity .15s;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.5)';
 
     var colorBtn = document.createElement('button');
     colorBtn.textContent = 'Color';

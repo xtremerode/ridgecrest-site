@@ -1630,53 +1630,71 @@ def run(fix=False):
                 if _psbs_section:
                     _psbs_section.hover()
                     _psbs_page.wait_for_timeout(300)
-                    # Click Color button in pill
-                    _psbs_color_btn = _psbs_page.query_selector(
-                        '[data-card-id="portfolio-section-bg"] ~ [data-rd-overlay="card"] button:first-child, '
-                        '[data-card-id="portfolio-section-bg"] [data-rd-overlay="card"] button:first-child'
-                    )
-                    # Use evaluate to click the Color button inside the section's pill
-                    _psbs_page.evaluate('''() => {
-                        var pill = document.querySelector('[data-card-id="portfolio-section-bg"] [data-rd-overlay="card"]');
-                        if (!pill) return;
-                        var btn = Array.from(pill.querySelectorAll('button')).find(b => b.textContent.trim() === 'Color');
-                        if (btn) btn.click();
-                    }''')
-                    _psbs_page.wait_for_timeout(400)
-                    # Verify swatch row is visible and contains swatch buttons
-                    _psbs_swatch_result = _psbs_page.evaluate('''() => {
+                    # Verify vertical pill orientation (Reference 10034)
+                    # The section's own pill is a direct child of the section element;
+                    # child card pills are nested deeper — use :scope > to avoid those.
+                    _psbs_pill_css = _psbs_page.evaluate('''() => {
                         var section = document.querySelector('[data-card-id="portfolio-section-bg"]');
-                        if (!section) return {found: false, reason: 'no section'};
-                        var swatches = section.querySelectorAll('[data-swatch]');
-                        if (!swatches.length) return {found: false, reason: 'no swatches'};
-                        var visible = Array.from(swatches).some(function(sw) {
-                            return window.getComputedStyle(sw.parentElement).display !== 'none';
-                        });
-                        // Click the white swatch (#FAFAF8 — last swatch) to verify it applies
-                        var whiteSw = Array.from(swatches).find(function(sw) {
-                            return sw.getAttribute('data-swatch') === '#FAFAF8';
-                        });
-                        if (whiteSw) whiteSw.click();
-                        return {found: true, swatchCount: swatches.length, visible: visible,
-                                hasWhite: !!whiteSw};
+                        if (!section) return null;
+                        var pill = Array.from(section.children).find(function(c) { return c.dataset.rdOverlay === 'card'; });
+                        if (!pill) return null;
+                        var cs = window.getComputedStyle(pill);
+                        return {flexDirection: cs.flexDirection, right: cs.right, position: cs.position};
                     }''')
-                    _psbs_page.wait_for_timeout(500)
-                    if _psbs_swatch_result.get('found'):
-                        _psbs_bg = _psbs_page.evaluate(
-                            "() => window.getComputedStyle(document.querySelector('[data-card-id=\"portfolio-section-bg\"]')).backgroundColor"
-                        )
-                        # #FAFAF8 = rgb(250, 250, 248)
-                        _white_ok = 'rgb(250, 250, 248)' in _psbs_bg or '250, 250, 248' in _psbs_bg
-                        _count_ok = _psbs_swatch_result.get('swatchCount', 0) == 6
-                        _psbs_ok = _white_ok and _count_ok and _psbs_swatch_result.get('hasWhite')
+                    _psbs_pill_ok = _psbs_pill_css and _psbs_pill_css.get('flexDirection') == 'column'
+                    if not _psbs_pill_ok:
+                        _psbs_ok = False
                         _psbs_detail = (
-                            f'6 swatches (5 dark + white #FAFAF8), white swatch applied → bg={_psbs_bg} ✓'
-                            if _psbs_ok else
-                            f'swatch issue — count={_psbs_swatch_result.get("swatchCount")}, '
-                            f'hasWhite={_psbs_swatch_result.get("hasWhite")}, bg={_psbs_bg}'
+                            f'pill not vertical: flexDirection={_psbs_pill_css.get("flexDirection") if _psbs_pill_css else "null"} (expected column)'
                         )
                     else:
-                        _psbs_detail = f'swatch strip not visible after Color click: {_psbs_swatch_result.get("reason","")}'
+                        # Use evaluate to click the Color button inside the section's direct-child pill
+                        _psbs_page.evaluate('''() => {
+                            var section = document.querySelector('[data-card-id="portfolio-section-bg"]');
+                            if (!section) return;
+                            var pill = Array.from(section.children).find(function(c) { return c.dataset.rdOverlay === 'card'; });
+                            if (!pill) return;
+                            var btn = Array.from(pill.querySelectorAll('button')).find(b => b.textContent.trim() === 'Color');
+                            if (btn) btn.click();
+                        }''')
+                        _psbs_page.wait_for_timeout(400)
+                        # Verify swatch row is visible and contains swatch buttons
+                        # Search only the section's direct-child pill to avoid child card swatches
+                        _psbs_swatch_result = _psbs_page.evaluate('''() => {
+                            var section = document.querySelector('[data-card-id="portfolio-section-bg"]');
+                            if (!section) return {found: false, reason: 'no section'};
+                            var pill = Array.from(section.children).find(function(c) { return c.dataset.rdOverlay === 'card'; });
+                            if (!pill) return {found: false, reason: 'no direct-child pill'};
+                            var swatches = pill.querySelectorAll('[data-swatch]');
+                            if (!swatches.length) return {found: false, reason: 'no swatches in pill'};
+                            var visible = Array.from(swatches).some(function(sw) {
+                                return window.getComputedStyle(sw.parentElement).display !== 'none';
+                            });
+                            // Click the white swatch (#FAFAF8 — last swatch) to verify it applies
+                            var whiteSw = Array.from(swatches).find(function(sw) {
+                                return sw.getAttribute('data-swatch') === '#FAFAF8';
+                            });
+                            if (whiteSw) whiteSw.click();
+                            return {found: true, swatchCount: swatches.length, visible: visible,
+                                    hasWhite: !!whiteSw};
+                        }''')
+                        _psbs_page.wait_for_timeout(500)
+                        if _psbs_swatch_result.get('found'):
+                            _psbs_bg = _psbs_page.evaluate(
+                                "() => window.getComputedStyle(document.querySelector('[data-card-id=\"portfolio-section-bg\"]')).backgroundColor"
+                            )
+                            # #FAFAF8 = rgb(250, 250, 248)
+                            _white_ok = 'rgb(250, 250, 248)' in _psbs_bg or '250, 250, 248' in _psbs_bg
+                            _count_ok = _psbs_swatch_result.get('swatchCount', 0) == 6
+                            _psbs_ok = _white_ok and _count_ok and _psbs_swatch_result.get('hasWhite')
+                            _psbs_detail = (
+                                f'vertical pill ✓, 6 swatches (5 dark + white #FAFAF8), white swatch applied → bg={_psbs_bg} ✓'
+                                if _psbs_ok else
+                                f'vertical pill ✓ but swatch issue — count={_psbs_swatch_result.get("swatchCount")}, '
+                                f'hasWhite={_psbs_swatch_result.get("hasWhite")}, bg={_psbs_bg}'
+                            )
+                        else:
+                            _psbs_detail = f'swatch strip not visible after Color click: {_psbs_swatch_result.get("reason","")}'
                 _psbs_page.close()
                 # Restore original card state
                 _restore_card_state('portfolio-section-bg', 'portfolio', token, _psbs_orig)

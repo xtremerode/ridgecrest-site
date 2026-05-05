@@ -1,0 +1,8 @@
+run_id=run_20260505_003958
+timestamp=20260505_003958
+features=server-routes pages-card
+dump_file=/home/claudeuser/agent/backups/pre_task_20260505_003958.sql
+baseline_commit=5824bc85419861cb9ec86c7c7ca8b6beff16b654
+playwright_before=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260505_003958_playwright_before.json
+card_snapshot=/home/claudeuser/agent/backups/card_snapshot_20260505_003958.json
+log_pre=/home/claudeuser/agent/ridgecrest-agency/execution_logs/run_20260505_003958_pre.log
